@@ -5,6 +5,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Send, Loader2, Bot, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { ChatHistoryResponse, ChatMessageResponse } from '../../types'
 
 interface Message {
   id: string
@@ -20,7 +21,7 @@ export const ChatInterface: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
 
-  const { data: chatHistory } = useChatHistory(50)
+  const { data: chatHistory } = useChatHistory(50) as { data: ChatHistoryResponse | undefined }
   const sendMessageMutation = useSendMessage()
 
   useEffect(() => {
@@ -58,7 +59,7 @@ export const ChatInterface: React.FC = () => {
           userId: user?.uid,
           recentMessages: messages.slice(-5)
         }
-      })
+      }) as ChatMessageResponse
 
       const aiMessage: Message = {
         id: response.response.id,

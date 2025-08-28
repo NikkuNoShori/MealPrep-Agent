@@ -2,8 +2,9 @@ import React, { useState } from 'react'
 import { useRecipes } from '@/services/api'
 import { RecipeCard } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
+import { RecipesResponse } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Plus, Grid, List } from 'lucide-react'
 
 interface RecipeListProps {
@@ -26,7 +27,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 
   const { data: recipes, isLoading, error } = useRecipes({ limit: 50 })
 
-  const filteredRecipes = recipes?.recipes?.filter((recipe: any) => {
+  const filteredRecipes = (recipes?.data as RecipesResponse)?.recipes?.filter((recipe: any) => {
     // Search filter
     if (searchQuery && !recipe.title.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false

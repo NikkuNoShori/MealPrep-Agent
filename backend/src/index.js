@@ -21,7 +21,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 // Import services
 import { initializeFirebase } from './services/firebase.js';
-import { initializeVertexAI } from './services/vertexAI.js';
+import { initializeDatabase } from './services/database.js';
 
 dotenv.config();
 
@@ -112,8 +112,8 @@ app.use('*', (req, res) => {
 // Initialize services
 const initializeServices = async () => {
   try {
+    await initializeDatabase();
     await initializeFirebase();
-    await initializeVertexAI();
     console.log('✅ Services initialized successfully');
   } catch (error) {
     console.error('❌ Failed to initialize services:', error);

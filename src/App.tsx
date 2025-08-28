@@ -1,9 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/common/Layout'
 import LandingPage from './pages/LandingPage'
-import AuthPage from './pages/AuthPage'
+import { AuthPage } from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import Chat from './pages/Chat'
 import Recipes from './pages/Recipes'
@@ -32,52 +32,50 @@ function AppRoutes() {
   const { user } = useAuth()
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/chat"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Chat />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/recipes"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Recipes />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/meal-planner"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <MealPlanner />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/chat"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Chat />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recipes"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Recipes />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/meal-planner"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <MealPlanner />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   )
 }
 

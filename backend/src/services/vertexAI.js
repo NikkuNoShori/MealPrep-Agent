@@ -1,15 +1,9 @@
-import { VertexAI } from '@google-cloud/vertex-ai';
-
+// Mock VertexAI service for now
 let vertexAI;
 
 export const initializeVertexAI = async () => {
   try {
-    vertexAI = new VertexAI({
-      project: process.env.GOOGLE_CLOUD_PROJECT_ID,
-      location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'
-    });
-
-    console.log('✅ Vertex AI initialized');
+    console.log('✅ Vertex AI initialized (mock)');
     return vertexAI;
   } catch (error) {
     console.error('❌ Vertex AI initialization failed:', error);
@@ -17,48 +11,29 @@ export const initializeVertexAI = async () => {
   }
 };
 
-// Recipe parsing with LLM
+// Recipe parsing with LLM (mock)
 export const parseRecipeFromText = async (text) => {
   try {
-    const model = vertexAI.preview.getGenerativeModel({
-      model: 'gemini-pro',
-      generation_config: {
-        max_output_tokens: 2048,
-        temperature: 0.1,
-        top_p: 0.8,
-        top_k: 40
-      }
-    });
-
-    const prompt = `
-      Parse the following recipe text and extract structured data. Return a JSON object with the following structure:
-      {
-        "title": "Recipe title",
-        "ingredients": [
-          {
-            "name": "ingredient name",
-            "amount": number,
-            "unit": "unit of measurement",
-            "category": "dairy|meat|produce|pantry|spices|beverages|frozen|other"
-          }
-        ],
-        "instructions": ["step 1", "step 2", ...],
-        "servings": number,
-        "prepTime": number (in minutes),
-        "cookTime": number (in minutes),
-        "difficulty": "easy|medium|hard",
-        "tags": ["tag1", "tag2", ...]
-      }
-
-      Recipe text:
-      ${text}
-    `;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const parsedRecipe = JSON.parse(response.text());
-
-    return parsedRecipe;
+    console.log('Mock: Parsing recipe from text:', text.substring(0, 100) + '...');
+    
+    // Return a mock parsed recipe
+    return {
+      title: "Mock Recipe",
+      ingredients: [
+        {
+          name: "ingredient",
+          amount: 1,
+          unit: "cup",
+          category: "pantry"
+        }
+      ],
+      instructions: ["Step 1", "Step 2"],
+      servings: 4,
+      prepTime: 15,
+      cookTime: 30,
+      difficulty: "easy",
+      tags: ["mock", "recipe"]
+    };
   } catch (error) {
     console.error('Error parsing recipe:', error);
     throw new Error('Failed to parse recipe');

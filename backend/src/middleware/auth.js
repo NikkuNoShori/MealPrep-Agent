@@ -1,5 +1,4 @@
-import jwt from 'jsonwebtoken';
-import { admin } from '../services/firebase.js';
+import { AuthService } from '../services/authService.js';
 
 export const authenticateToken = async (req, res, next) => {
   try {
@@ -11,19 +10,18 @@ export const authenticateToken = async (req, res, next) => {
     }
 
     // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = AuthService.verifyToken(token);
     
-    // Verify user exists in Firebase
-    const userRecord = await admin.auth().getUser(decoded.uid);
+    // Get user from database
+    const user = await AuthService.getUserById(decoded.userId);
     
-    if (!userRecord) {
-      return res.status(401).json({ error: 'Invalid user' });
-    }
-
     req.user = {
-      uid: userRecord.uid,
-      email: userRecord.email,
-      displayName: userRecord.displayName
+      id: user.id,
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      familyId: user.familyId,
+      householdSize: user.householdSize
     };
 
     next();
@@ -43,5 +41,5 @@ export const authenticateToken = async (req, res, next) => {
 };
 
 export const generateToken = (uid) => {
-  return jwt.sign({ uid }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return AuthService.generateToken(uid);
 };

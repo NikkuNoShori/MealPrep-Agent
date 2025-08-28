@@ -55,10 +55,10 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
   if (viewMode === 'list') {
     return (
-      <Card 
-        className="cursor-pointer hover:shadow-md transition-shadow"
-        onClick={onClick}
-      >
+      <div onClick={onClick}>
+        <Card 
+          className="cursor-pointer hover:shadow-md transition-shadow"
+        >
         <CardContent className="p-4">
           <div className="flex items-center gap-4">
             {/* Recipe Image */}
@@ -148,16 +148,17 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             </div>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     )
   }
 
   // Grid view
   return (
-    <Card 
-      className="cursor-pointer hover:shadow-md transition-shadow h-full"
-      onClick={onClick}
-    >
+    <div onClick={onClick}>
+      <Card 
+        className="cursor-pointer hover:shadow-md transition-shadow h-full"
+      >
       <CardHeader className="p-4 pb-2">
         {/* Recipe Image */}
         <div className="aspect-video rounded-lg bg-muted overflow-hidden mb-3">
@@ -246,6 +247,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         </div>
       </CardContent>
     </Card>
+    </div>
   )
 }
 

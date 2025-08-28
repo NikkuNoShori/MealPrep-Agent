@@ -151,3 +151,38 @@ export interface UserCorrection {
   correctedCategory: IngredientCategory
   timestamp: Date
 }
+
+// API Response types
+export interface ApiResponse<T> {
+  success: boolean
+  data: T
+  message?: string
+}
+
+export interface AuthResponse {
+  token: string
+  user: {
+    id: string
+    email: string
+    displayName: string
+    uid: string
+  }
+}
+
+export interface ChatHistoryResponse {
+  messages: ChatMessage[]
+  total: number
+}
+
+export interface ChatMessageResponse {
+  response: {
+    id: string
+    content: string
+    timestamp: string
+  }
+}
+
+export interface RecipesResponse {
+  recipes: Recipe[]
+  total: number
+}
