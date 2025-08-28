@@ -1,0 +1,3 @@
+- Do not run npm run dev.
+- Always check the existing codebase before creating new files and features. 
+- Do not replace any UI elements unless asked. No unauthorized UI changes should be made. 
