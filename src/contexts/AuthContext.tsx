@@ -55,48 +55,56 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const fetchCurrentUser = async () => {
     try {
-      const response = await apiClient.getCurrentUser()
-      setUser(response.user)
+      const response = (await apiClient.getCurrentUser()) as any;
+      setUser(response.user);
     } catch (error) {
-      console.error('Failed to fetch current user:', error)
+      console.error("Failed to fetch current user:", error);
       // Clear invalid token
-      localStorage.removeItem('authToken')
-      setToken(null)
-      apiClient.clearToken()
+      localStorage.removeItem("authToken");
+      setToken(null);
+      apiClient.clearToken();
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await apiClient.login({ email, password })
-      const { token: newToken, user: userData } = response
-      
-      setToken(newToken)
-      setUser(userData)
-      localStorage.setItem('authToken', newToken)
-      apiClient.setToken(newToken)
-    } catch (error) {
-      console.error('Login failed:', error)
-      throw error
-    }
-  }
+      const response = (await apiClient.login({ email, password })) as any;
+      const { token: newToken, user: userData } = response;
 
-  const register = async (email: string, password: string, displayName: string) => {
-    try {
-      const response = await apiClient.register({ email, password, displayName })
-      const { token: newToken, user: userData } = response
-      
-      setToken(newToken)
-      setUser(userData)
-      localStorage.setItem('authToken', newToken)
-      apiClient.setToken(newToken)
+      setToken(newToken);
+      setUser(userData);
+      localStorage.setItem("authToken", newToken);
+      apiClient.setToken(newToken);
     } catch (error) {
-      console.error('Registration failed:', error)
-      throw error
+      console.error("Login failed:", error);
+      throw error;
     }
-  }
+  };
+
+  const register = async (
+    email: string,
+    password: string,
+    displayName: string
+  ) => {
+    try {
+      const response = (await apiClient.register({
+        email,
+        password,
+        displayName,
+      })) as any;
+      const { token: newToken, user: userData } = response;
+
+      setToken(newToken);
+      setUser(userData);
+      localStorage.setItem("authToken", newToken);
+      apiClient.setToken(newToken);
+    } catch (error) {
+      console.error("Registration failed:", error);
+      throw error;
+    }
+  };
 
   const logout = () => {
     setUser(null)

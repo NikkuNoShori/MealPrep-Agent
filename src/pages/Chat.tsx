@@ -1,5 +1,4 @@
-import React from 'react'
-import { ChatInterface } from '../components/chat/ChatInterface'
+import { ChatInterface } from "../components/chat/ChatInterface";
 
 const Chat = () => {
   return (
@@ -9,13 +8,13 @@ const Chat = () => {
         <p className="text-muted-foreground mb-8">
           Get help with meal planning, recipe suggestions, and cooking tips.
         </p>
-        
+
         <div className="h-full">
           <ChatInterface />
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Chat
+export default Chat;

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useRecipes } from '@/services/api'
 import { RecipeCard } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
-import { RecipesResponse } from '@/types'
+
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Plus, Grid, List } from 'lucide-react'
@@ -27,37 +27,43 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 
   const { data: recipes, isLoading, error } = useRecipes({ limit: 50 })
 
-  const filteredRecipes = (recipes?.data as RecipesResponse)?.recipes?.filter((recipe: any) => {
-    // Search filter
-    if (searchQuery && !recipe.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false
-    }
-
-    // Dietary restrictions filter
-    if (filters.dietaryRestrictions.length > 0) {
-      const recipeTags = recipe.tags || []
-      if (!filters.dietaryRestrictions.some(restriction => 
-        recipeTags.includes(restriction)
-      )) {
-        return false
+  const filteredRecipes =
+    (recipes as any)?.recipes?.filter((recipe: any) => {
+      // Search filter
+      if (
+        searchQuery &&
+        !recipe.title.toLowerCase().includes(searchQuery.toLowerCase())
+      ) {
+        return false;
       }
-    }
 
-    // Prep time filter
-    if (filters.prepTime) {
-      const [min, max] = filters.prepTime.split('-').map(Number)
-      if (recipe.prepTime < min || recipe.prepTime > max) {
-        return false
+      // Dietary restrictions filter
+      if (filters.dietaryRestrictions.length > 0) {
+        const recipeTags = recipe.tags || [];
+        if (
+          !filters.dietaryRestrictions.some((restriction) =>
+            recipeTags.includes(restriction)
+          )
+        ) {
+          return false;
+        }
       }
-    }
 
-    // Difficulty filter
-    if (filters.difficulty && recipe.difficulty !== filters.difficulty) {
-      return false
-    }
+      // Prep time filter
+      if (filters.prepTime) {
+        const [min, max] = filters.prepTime.split("-").map(Number);
+        if (recipe.prepTime < min || recipe.prepTime > max) {
+          return false;
+        }
+      }
 
-    return true
-  }) || []
+      // Difficulty filter
+      if (filters.difficulty && recipe.difficulty !== filters.difficulty) {
+        return false;
+      }
+
+      return true;
+    }) || [];
 
   if (isLoading) {
     return (

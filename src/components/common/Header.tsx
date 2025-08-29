@@ -4,7 +4,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { useAuth } from "../../contexts/AuthContext";
 import { Button } from "../ui/button";
 import { ThemeToggle } from "../ui/ThemeToggle";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
 const Header = () => {
   const { theme, setTheme, isDark } = useTheme();
@@ -14,7 +14,7 @@ const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard" },

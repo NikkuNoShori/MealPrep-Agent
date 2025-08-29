@@ -1,31 +1,27 @@
 import React from 'react'
 import { Button } from './button'
-import { Sun, Moon, Monitor } from 'lucide-react'
-import { useTheme } from '../../providers/ThemeProvider'
-import type { Theme } from '../../stores/themeStore'
+import { Sun, Moon } from "lucide-react";
+import { useTheme } from "../../providers/ThemeProvider";
 
 interface ThemeToggleProps {
-  variant?: 'button' | 'select'
-  className?: string
+  variant?: "button" | "select";
+  className?: string;
 }
 
-export const ThemeToggle: React.FC<ThemeToggleProps> = ({ 
-  variant = 'button', 
-  className 
-}) => {
-  const { theme, setTheme, isDark } = useTheme()
+export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className }) => {
+  const { setTheme, isDark } = useTheme();
 
   const toggleTheme = () => {
-    setTheme(isDark ? 'light' : 'dark')
-  }
+    setTheme(isDark ? "light" : "dark");
+  };
 
   const getThemeIcon = () => {
-    return isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />
-  }
+    return isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />;
+  };
 
   const getThemeLabel = () => {
-    return isDark ? 'Light' : 'Dark'
-  }
+    return isDark ? "Light" : "Dark";
+  };
 
   return (
     <Button
@@ -37,8 +33,8 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
     >
       {getThemeIcon()}
     </Button>
-  )
-}
+  );
+};
 
 // Color scheme selector component
 export const ColorSchemeSelector: React.FC<{ className?: string }> = ({ className }) => {

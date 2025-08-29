@@ -1,0 +1,19 @@
+{
+  "functions": {
+    "src/edge-functions/chat.js": {
+      "runtime": "edge"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/chat/(.*)",
+      "dest": "/src/edge-functions/chat.js"
+    }
+  ],
+  "env": {
+    "DATABASE_URL": "@neon-database-url",
+    "FRONTEND_URL": "@frontend-url",
+    "VERTEX_AI_PROJECT_ID": "@vertex-ai-project-id",
+    "VERTEX_AI_LOCATION": "@vertex-ai-location"
+  }
+}
