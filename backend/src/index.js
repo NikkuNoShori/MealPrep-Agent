@@ -20,7 +20,6 @@ import { authenticateToken } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 // Import services
-import { initializeFirebase } from './services/firebase.js';
 import { initializeDatabase } from './services/database.js';
 
 dotenv.config();
@@ -113,7 +112,6 @@ app.use('*', (req, res) => {
 const initializeServices = async () => {
   try {
     await initializeDatabase();
-    await initializeFirebase();
     console.log('✅ Services initialized successfully');
   } catch (error) {
     console.error('❌ Failed to initialize services:', error);

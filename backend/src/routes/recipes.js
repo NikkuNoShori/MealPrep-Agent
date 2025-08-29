@@ -1,5 +1,5 @@
 import express from 'express';
-import { db } from '../services/firebase.js';
+import sql from '../services/database.js';
 import { parseRecipeFromText, generateEmbedding } from '../services/vertexAI.js';
 
 const router = express.Router();
@@ -10,23 +10,24 @@ router.get('/', async (req, res) => {
     const { uid } = req.user;
     const { limit = 20, offset = 0 } = req.query;
 
-    const recipesRef = db.collection('recipes')
-      .where('userId', '==', uid)
-      .orderBy('createdAt', 'desc')
-      .limit(parseInt(limit))
-      .offset(parseInt(offset));
+    // Get user ID from uid
+    const user = await sql`
+      SELECT id FROM users WHERE uid = ${uid}
+    `;
 
-    const snapshot = await recipesRef.get();
-    const recipes = [];
+    if (!user || user.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-    snapshot.forEach(doc => {
-      recipes.push({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate()
-      });
-    });
+    const userId = user[0].id;
+
+    const recipes = await sql`
+      SELECT * FROM recipes 
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC
+      LIMIT ${parseInt(limit)}
+      OFFSET ${parseInt(offset)}
+    `;
 
     res.json({ recipes });
   } catch (error) {

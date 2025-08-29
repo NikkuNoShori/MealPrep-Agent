@@ -1,6 +1,6 @@
 import express from 'express';
 import { generateChatResponse, parseRecipeFromText } from '../services/vertexAI.js';
-import { db } from '../services/firebase.js';
+import sql from '../services/database.js';
 import { io } from '../index.js';
 
 const router = express.Router();

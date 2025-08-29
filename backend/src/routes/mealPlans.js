@@ -1,5 +1,5 @@
 import express from 'express';
-import { db } from '../services/firebase.js';
+import sql from '../services/database.js';
 import { generateRecipeSuggestions } from '../services/vertexAI.js';
 
 const router = express.Router();
