@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, User, ChevronDown, Sun, Moon } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
-import { Button } from "../ui/button";
 import { ThemeToggle } from "../ui/ThemeToggle";
 import { useState, useRef } from "react";
 

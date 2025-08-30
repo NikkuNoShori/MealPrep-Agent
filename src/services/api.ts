@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_URL || "http://localhost:3001/api";
+  (import.meta as any).env?.VITE_API_URL ||
+  "https://meal-prep-agent-hooio7jxi-nickneal1717s-projects.vercel.app";
 
 // API client
 class ApiClient {

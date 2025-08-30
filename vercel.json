@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend/edge-functions/chat-api.js"
+    }
+  ]
+}

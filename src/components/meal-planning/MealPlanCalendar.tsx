@@ -30,8 +30,6 @@ interface PlannedMeal {
 
 interface MealPlanCalendarProps {
   mealPlans: MealPlan[];
-  onAddMeal: (date: string, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snacks', meal: Omit<PlannedMeal, 'id'>) => void;
-  onUpdateMeal: (date: string, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snacks', mealId: string, updates: Partial<PlannedMeal>) => void;
   onRemoveMeal: (date: string, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snacks', mealId: string) => void;
   onGenerateMealPlan: (startDate: string, endDate: string) => void;
 }
@@ -41,10 +39,8 @@ const MEAL_TYPES = ['breakfast', 'lunch', 'dinner'] as const;
 
 export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
   mealPlans,
-  onAddMeal,
-  onUpdateMeal,
   onRemoveMeal,
-  onGenerateMealPlan
+  onGenerateMealPlan,
 }) => {
   const [currentWeek, setCurrentWeek] = useState(() => {
     const now = new Date();
@@ -54,62 +50,64 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
   });
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedMealType, setSelectedMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snacks' | null>(null);
+  const [selectedMealType, setSelectedMealType] = useState<
+    "breakfast" | "lunch" | "dinner" | "snacks" | null
+  >(null);
 
   const getWeekDates = () => {
     const dates = [];
     const startDate = new Date(currentWeek);
-    
+
     for (let i = 0; i < 7; i++) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + i);
       dates.push(date);
     }
-    
+
     return dates;
   };
 
   const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   };
 
   const getMealPlanForDate = (date: string) => {
-    return mealPlans.find(plan => plan.date === date);
+    return mealPlans.find((plan) => plan.date === date);
   };
 
   const getMealCount = (date: string) => {
     const plan = getMealPlanForDate(date);
     if (!plan) return 0;
-    
+
     let count = 0;
     if (plan.meals.breakfast) count++;
     if (plan.meals.lunch) count++;
     if (plan.meals.dinner) count++;
     if (plan.meals.snacks) count += plan.meals.snacks.length;
-    
+
     return count;
   };
 
   const getTotalPrepTime = (date: string) => {
     const plan = getMealPlanForDate(date);
     if (!plan) return 0;
-    
+
     let totalTime = 0;
-    Object.values(plan.meals).forEach(meal => {
-      if (meal && 'prepTime' in meal && meal.prepTime) {
+    Object.values(plan.meals).forEach((meal) => {
+      if (meal && "prepTime" in meal && meal.prepTime) {
         totalTime += meal.prepTime;
       }
-      if (meal && 'cookTime' in meal && meal.cookTime) {
+      if (meal && "cookTime" in meal && meal.cookTime) {
         totalTime += meal.cookTime;
       }
     });
-    
+
     return totalTime;
   };
 
-  const navigateWeek = (direction: 'prev' | 'next') => {
+  const navigateWeek = (direction: "prev" | "next") => {
     const newWeek = new Date(currentWeek);
-    if (direction === 'prev') {
+    if (direction === "prev") {
       newWeek.setDate(newWeek.getDate() - 7);
     } else {
       newWeek.setDate(newWeek.getDate() + 7);
@@ -117,7 +115,10 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
     setCurrentWeek(newWeek);
   };
 
-  const handleAddMeal = (date: string, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snacks') => {
+  const handleAddMeal = (
+    date: string,
+    mealType: "breakfast" | "lunch" | "dinner" | "snacks"
+  ) => {
     setSelectedDate(date);
     setSelectedMealType(mealType);
     // TODO: Open meal selection modal
@@ -125,7 +126,9 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
 
   const generateWeekPlan = () => {
     const startDate = formatDate(currentWeek);
-    const endDate = formatDate(new Date(currentWeek.getTime() + 6 * 24 * 60 * 60 * 1000));
+    const endDate = formatDate(
+      new Date(currentWeek.getTime() + 6 * 24 * 60 * 60 * 1000)
+    );
     onGenerateMealPlan(startDate, endDate);
   };
 
@@ -136,14 +139,14 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
           Meal Planning Calendar
         </h2>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigateWeek('prev')}>
+          <Button variant="outline" onClick={() => navigateWeek("prev")}>
             Previous Week
           </Button>
           <Button onClick={generateWeekPlan}>
             <ChefHat className="h-4 w-4 mr-2" />
             Generate Meal Plan
           </Button>
-          <Button variant="outline" onClick={() => navigateWeek('next')}>
+          <Button variant="outline" onClick={() => navigateWeek("next")}>
             Next Week
           </Button>
         </div>
@@ -151,14 +154,29 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
 
       {/* Week Navigation */}
       <div className="flex justify-center items-center gap-4">
-        <Button variant="outline" size="sm" onClick={() => navigateWeek('prev')}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigateWeek("prev")}
+        >
           ←
         </Button>
         <div className="text-lg font-semibold">
-          {currentWeek.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} - Week of{' '}
-          {currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          {currentWeek.toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          })}{" "}
+          - Week of{" "}
+          {currentWeek.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })}
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigateWeek('next')}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigateWeek("next")}
+        >
           →
         </Button>
       </div>
@@ -166,14 +184,17 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
       {/* Weekly Calendar */}
       <div className="grid grid-cols-7 gap-4">
         {/* Day Headers */}
-        {DAYS_OF_WEEK.map(day => (
-          <div key={day} className="text-center font-semibold text-gray-700 dark:text-gray-300 py-2">
+        {DAYS_OF_WEEK.map((day) => (
+          <div
+            key={day}
+            className="text-center font-semibold text-gray-700 dark:text-gray-300 py-2"
+          >
             {day}
           </div>
         ))}
 
         {/* Day Cards */}
-        {getWeekDates().map((date, index) => {
+        {getWeekDates().map((date) => {
           const dateString = formatDate(date);
           const mealPlan = getMealPlanForDate(dateString);
           const mealCount = getMealCount(dateString);
@@ -181,11 +202,20 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
           const isToday = formatDate(new Date()) === dateString;
 
           return (
-            <Card key={dateString} className={`min-h-[200px] ${isToday ? 'ring-2 ring-primary' : ''}`}>
+            <Card
+              key={dateString}
+              className={`min-h-[200px] ${
+                isToday ? "ring-2 ring-primary" : ""
+              }`}
+            >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex justify-between items-center">
                   <span>{date.getDate()}</span>
-                  {isToday && <Badge variant="default" className="text-xs">Today</Badge>}
+                  {isToday && (
+                    <Badge variant="default" className="text-xs">
+                      Today
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -205,11 +235,16 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
 
                 {/* Meal Types */}
                 <div className="space-y-1">
-                  {MEAL_TYPES.map(mealType => {
+                  {MEAL_TYPES.map((mealType) => {
                     const meal = mealPlan?.meals[mealType];
                     return (
-                      <div key={mealType} className="flex items-center justify-between">
-                        <span className="text-xs font-medium capitalize">{mealType}</span>
+                      <div
+                        key={mealType}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="text-xs font-medium capitalize">
+                          {mealType}
+                        </span>
                         {meal ? (
                           <div className="flex items-center gap-1">
                             <Badge variant="outline" className="text-xs">
@@ -219,7 +254,9 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                               variant="ghost"
                               size="sm"
                               className="h-4 w-4 p-0"
-                              onClick={() => onRemoveMeal(dateString, mealType, meal.id)}
+                              onClick={() =>
+                                onRemoveMeal(dateString, mealType, meal.id)
+                              }
                             >
                               ×
                             </Button>
@@ -247,12 +284,12 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                       variant="ghost"
                       size="sm"
                       className="h-4 w-4 p-0 text-gray-400 hover:text-gray-600"
-                      onClick={() => handleAddMeal(dateString, 'snacks')}
+                      onClick={() => handleAddMeal(dateString, "snacks")}
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
-                  {mealPlan?.meals.snacks?.map((snack, index) => (
+                  {mealPlan?.meals.snacks?.map((snack) => (
                     <div key={snack.id} className="flex items-center gap-1">
                       <Badge variant="outline" className="text-xs">
                         {snack.recipeName}
@@ -261,7 +298,9 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                         variant="ghost"
                         size="sm"
                         className="h-4 w-4 p-0"
-                        onClick={() => onRemoveMeal(dateString, 'snacks', snack.id)}
+                        onClick={() =>
+                          onRemoveMeal(dateString, "snacks", snack.id)
+                        }
                       >
                         ×
                       </Button>
@@ -290,33 +329,53 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-primary">
-                {getWeekDates().reduce((total, date) => total + getMealCount(formatDate(date)), 0)}
+                {getWeekDates().reduce(
+                  (total, date) => total + getMealCount(formatDate(date)),
+                  0
+                )}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Total Meals</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Total Meals
+              </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {getWeekDates().reduce((total, date) => total + getTotalPrepTime(formatDate(date)), 0)}
+                {getWeekDates().reduce(
+                  (total, date) => total + getTotalPrepTime(formatDate(date)),
+                  0
+                )}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Total Prep Time (min)</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Total Prep Time (min)
+              </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {getWeekDates().filter(date => getMealCount(formatDate(date)) > 0).length}
+                {
+                  getWeekDates().filter(
+                    (date) => getMealCount(formatDate(date)) > 0
+                  ).length
+                }
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Days Planned</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Days Planned
+              </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
-                {mealPlans.filter(plan => {
-                  const planDate = new Date(plan.date);
-                  const weekStart = new Date(currentWeek);
-                  const weekEnd = new Date(currentWeek);
-                  weekEnd.setDate(weekEnd.getDate() + 6);
-                  return planDate >= weekStart && planDate <= weekEnd;
-                }).length}
+                {
+                  mealPlans.filter((plan) => {
+                    const planDate = new Date(plan.date);
+                    const weekStart = new Date(currentWeek);
+                    const weekEnd = new Date(currentWeek);
+                    weekEnd.setDate(weekEnd.getDate() + 6);
+                    return planDate >= weekStart && planDate <= weekEnd;
+                  }).length
+                }
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Meal Plans</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Meal Plans
+              </div>
             </div>
           </div>
         </CardContent>
@@ -334,17 +393,22 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                 Select a recipe for {selectedMealType} on {selectedDate}
               </p>
               <div className="flex gap-2">
-                <Button onClick={() => {
-                  setSelectedDate(null);
-                  setSelectedMealType(null);
-                }}>
+                <Button
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setSelectedMealType(null);
+                  }}
+                >
                   Cancel
                 </Button>
-                <Button variant="outline" onClick={() => {
-                  // TODO: Open recipe selection
-                  setSelectedDate(null);
-                  setSelectedMealType(null);
-                }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // TODO: Open recipe selection
+                    setSelectedDate(null);
+                    setSelectedMealType(null);
+                  }}
+                >
                   Select Recipe
                 </Button>
               </div>
