@@ -3,12 +3,10 @@
 ## 🎯 Core Features (PRD Requirements)
 
 ### Authentication & User Management
-- [x] User registration with email/password
-- [x] User login with email/password
-- [x] JWT token management and persistence
-- [x] Protected routes with automatic redirects
-- [x] User logout functionality
-- [x] User profile display in header
+- [x] NeonDB authentication integration
+- [x] User profile management
+- [x] User preferences and settings
+- [x] Family member management
 - [x] Loading states during authentication
 
 ### Conversational AI Interface
@@ -78,7 +76,6 @@
 - [x] Dark mode support
 
 ### Component Architecture
-- [x] Authentication components (Login/Register forms)
 - [x] Layout components (Header, Layout wrapper)
 - [x] UI components (Button, Input, Card, Alert)
 - [x] Chat interface components
@@ -88,7 +85,6 @@
 - [ ] Dashboard components
 
 ### State Management
-- [x] Authentication context with JWT
 - [x] Theme context for dark/light mode
 - [ ] Recipe store (Zustand)
 - [ ] Meal plan store (Zustand)
@@ -96,10 +92,9 @@
 - [ ] User preferences store (Zustand)
 
 ### API Integration
-- [x] API client with authentication headers
+- [x] API client with NeonDB authentication
 - [x] React Query hooks for data fetching
 - [x] Error handling and loading states
-- [x] Automatic token refresh
 - [ ] WebSocket integration for real-time chat
 - [ ] File upload handling
 - [ ] Offline support
@@ -114,7 +109,6 @@
 - [ ] Animations and transitions
 
 ### Form Handling
-- [x] Login/Register forms with validation
 - [ ] Recipe creation/editing forms
 - [ ] Meal planning forms
 - [ ] Grocery list forms
@@ -122,15 +116,13 @@
 - [ ] File upload forms
 
 ### Navigation & Routing
-- [x] Protected route implementation
-- [x] Navigation header with user status
+- [x] Navigation header
 - [x] Mobile-responsive navigation
 - [x] Breadcrumb navigation
 - [ ] Deep linking support
 - [ ] Route-based code splitting
 
 ### Error Handling
-- [x] Authentication error handling
 - [x] API error handling
 - [x] Form validation errors
 - [x] Network error handling
@@ -153,8 +145,7 @@
 - [ ] Performance testing
 
 ### Security
-- [x] JWT token storage in localStorage
-- [x] Protected route guards
+- [x] NeonDB authentication
 - [x] Input sanitization
 - [ ] XSS protection
 - [ ] CSRF protection
@@ -164,9 +155,8 @@
 
 ### Public Pages
 - [x] Landing page with marketing content
-- [x] Authentication page (login/register)
 
-### Protected Pages
+### App Pages
 - [x] Dashboard overview page
 - [x] Chat interface page
 - [ ] Recipe management page

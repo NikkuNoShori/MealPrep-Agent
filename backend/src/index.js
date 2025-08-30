@@ -8,7 +8,6 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 
 // Import routes
-import authRoutes from './routes/auth.js';
 import recipeRoutes from './routes/recipes.js';
 import chatRoutes from './routes/chat.js';
 import mealPlanRoutes from './routes/mealPlans.js';
@@ -16,7 +15,7 @@ import receiptRoutes from './routes/receipts.js';
 import preferenceRoutes from './routes/preferences.js';
 
 // Import middleware
-import { authenticateToken } from './middleware/auth.js';
+import { authenticateNeonUser } from './middleware/neonAuth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 // Import services
@@ -61,12 +60,11 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/recipes', authenticateToken, recipeRoutes);
-app.use('/api/chat', authenticateToken, chatRoutes);
-app.use('/api/meal-plans', authenticateToken, mealPlanRoutes);
-app.use('/api/receipts', authenticateToken, receiptRoutes);
-app.use('/api/preferences', authenticateToken, preferenceRoutes);
+app.use('/api/recipes', authenticateNeonUser, recipeRoutes);
+app.use('/api/chat', authenticateNeonUser, chatRoutes);
+app.use('/api/meal-plans', authenticateNeonUser, mealPlanRoutes);
+app.use('/api/receipts', authenticateNeonUser, receiptRoutes);
+app.use('/api/preferences', authenticateNeonUser, preferenceRoutes);
 
 // WebSocket connection for chat
 io.on('connection', (socket) => {

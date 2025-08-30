@@ -3,21 +3,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 const API_BASE_URL =
   (import.meta as any).env?.VITE_API_URL || "http://localhost:3001/api";
 
-// API client with authentication
+// API client
 class ApiClient {
   private baseURL: string;
-  private token: string | null = null;
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
-  }
-
-  setToken(token: string) {
-    this.token = token;
-  }
-
-  clearToken() {
-    this.token = null;
   }
 
   private async request<T>(
@@ -30,10 +21,6 @@ class ApiClient {
       "Content-Type": "application/json",
       ...(options.headers as Record<string, string>),
     };
-
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
-    }
 
     const response = await fetch(url, {
       ...options,
@@ -48,29 +35,6 @@ class ApiClient {
     }
 
     return response.json();
-  }
-
-  // Auth endpoints
-  async register(data: {
-    email: string;
-    password: string;
-    displayName: string;
-  }) {
-    return this.request("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async login(data: { email: string; password: string }) {
-    return this.request("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async getCurrentUser() {
-    return this.request("/auth/me");
   }
 
   // Recipe endpoints

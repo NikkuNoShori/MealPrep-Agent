@@ -7,19 +7,8 @@ const router = express.Router();
 // Get all recipes for user
 router.get('/', async (req, res) => {
   try {
-    const { uid } = req.user;
+    const { id: userId } = req.user;
     const { limit = 20, offset = 0 } = req.query;
-
-    // Get user ID from uid
-    const user = await sql`
-      SELECT id FROM users WHERE uid = ${uid}
-    `;
-
-    if (!user || user.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userId = user[0].id;
 
     const recipes = await sql`
       SELECT * FROM recipes 

@@ -1,81 +1,46 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from "./providers/ThemeProvider";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Layout from "./components/common/Layout";
 import LandingPage from "./pages/LandingPage";
-import { AuthPage } from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import Recipes from "./pages/Recipes";
 import MealPlanner from "./pages/MealPlanner";
 
-// Protected Route Component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <>{children}</>;
-};
-
 function AppRoutes() {
-  const { user } = useAuth();
-
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route
-        path="/auth"
-        element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />}
-      />
-      <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
-            <Layout>
-              <Dashboard />
-            </Layout>
-          </ProtectedRoute>
+          <Layout>
+            <Dashboard />
+          </Layout>
         }
       />
       <Route
         path="/chat"
         element={
-          <ProtectedRoute>
-            <Layout>
-              <Chat />
-            </Layout>
-          </ProtectedRoute>
+          <Layout>
+            <Chat />
+          </Layout>
         }
       />
       <Route
         path="/recipes"
         element={
-          <ProtectedRoute>
-            <Layout>
-              <Recipes />
-            </Layout>
-          </ProtectedRoute>
+          <Layout>
+            <Recipes />
+          </Layout>
         }
       />
       <Route
         path="/meal-planner"
         element={
-          <ProtectedRoute>
-            <Layout>
-              <MealPlanner />
-            </Layout>
-          </ProtectedRoute>
+          <Layout>
+            <MealPlanner />
+          </Layout>
         }
       />
     </Routes>
@@ -85,9 +50,7 @@ function AppRoutes() {
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <AppRoutes />
     </ThemeProvider>
   )
 }

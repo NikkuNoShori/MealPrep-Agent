@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Send, Loader2, Bot, User } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
 import { ChatHistoryResponse, ChatMessageResponse } from '../../types'
 
 interface Message {
@@ -19,7 +18,6 @@ export const ChatInterface: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { user } = useAuth()
 
   const { data: chatHistory } = useChatHistory(50) as { data: ChatHistoryResponse | undefined }
   const sendMessageMutation = useSendMessage()
@@ -56,7 +54,6 @@ export const ChatInterface: React.FC = () => {
       const response = await sendMessageMutation.mutateAsync({
         message: inputMessage,
         context: {
-          userId: user?.uid,
           recentMessages: messages.slice(-5)
         }
       }) as ChatMessageResponse
