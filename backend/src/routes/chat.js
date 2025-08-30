@@ -2,6 +2,7 @@ import express from 'express';
 import { generateChatResponse, parseRecipeFromText } from '../services/vertexAI.js';
 import sql from '../services/database.js';
 import { io } from '../index.js';
+import webhookService from '../services/webhookService.js';
 
 const router = express.Router();
 
@@ -9,35 +10,37 @@ const router = express.Router();
 router.post('/message', async (req, res) => {
   try {
     const { message, context } = req.body;
-    const { uid } = req.user;
+    const { id: userId } = req.user;
 
     // Generate AI response
     const aiResponse = await generateChatResponse(message, context);
 
-    // Save message to Firestore
-    const messageData = {
-      userId: uid,
+    // Save user message
+    const userMessageResult = await sql`
+      INSERT INTO chat_messages (user_id, content, sender, type, timestamp)
+      VALUES (${userId}, ${message}, 'user', 'text', NOW())
+      RETURNING id
+    `;
+
+    // Save AI response
+    const aiMessageResult = await sql`
+      INSERT INTO chat_messages (user_id, content, sender, type, timestamp)
+      VALUES (${userId}, ${aiResponse}, 'ai', 'text', NOW())
+      RETURNING id
+    `;
+
+    const aiMessageId = aiMessageResult[0].id;
+
+    // Send webhook event for chat message
+    await webhookService.chatMessageSent({
+      id: aiMessageId,
       content: message,
-      sender: 'user',
-      timestamp: new Date(),
       type: 'text'
-    };
-
-    const aiMessageData = {
-      userId: uid,
-      content: aiResponse,
-      sender: 'ai',
-      timestamp: new Date(),
-      type: 'text'
-    };
-
-    // Save both messages
-    await db.collection('chat_messages').add(messageData);
-    const aiMessageRef = await db.collection('chat_messages').add(aiMessageData);
+    }, req.user);
 
     // Emit to WebSocket if user is connected
-    io.to(`user-${uid}`).emit('message-received', {
-      id: aiMessageRef.id,
+    io.to(`user-${userId}`).emit('message-received', {
+      id: aiMessageId,
       content: aiResponse,
       sender: 'ai',
       timestamp: new Date()
@@ -46,7 +49,7 @@ router.post('/message', async (req, res) => {
     res.json({
       message: 'Message processed successfully',
       response: {
-        id: aiMessageRef.id,
+        id: aiMessageId,
         content: aiResponse,
         sender: 'ai',
         timestamp: new Date()
@@ -62,22 +65,39 @@ router.post('/message', async (req, res) => {
 router.post('/add-recipe', async (req, res) => {
   try {
     const { recipeText } = req.body;
-    const { uid } = req.user;
+    const { id: userId } = req.user;
 
     // Parse recipe using AI
     const parsedRecipe = await parseRecipeFromText(recipeText);
 
-    // Add user-specific data
-    const recipeData = {
-      ...parsedRecipe,
-      userId: uid,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      preferences: {}
-    };
+    // Save to database
+    const result = await sql`
+      INSERT INTO recipes (
+        user_id, title, description, ingredients, instructions, 
+        prep_time, cook_time, total_time, servings, difficulty, 
+        tags, image_url, rating, nutrition_info, source_url, 
+        is_public
+      )
+      VALUES (
+        ${userId}, ${parsedRecipe.title}, ${parsedRecipe.description || null}, 
+        ${JSON.stringify(parsedRecipe.ingredients)}, ${JSON.stringify(parsedRecipe.instructions)},
+        ${parsedRecipe.prepTime || null}, ${parsedRecipe.cookTime || null}, 
+        ${parsedRecipe.totalTime || null}, ${parsedRecipe.servings || 4}, 
+        ${parsedRecipe.difficulty || 'medium'}, ${JSON.stringify(parsedRecipe.tags || [])},
+        ${parsedRecipe.imageUrl || null}, ${parsedRecipe.rating || null}, 
+        ${JSON.stringify(parsedRecipe.nutritionInfo || null)}, ${parsedRecipe.sourceUrl || null},
+        ${false}
+      )
+      RETURNING id
+    `;
 
-    // Save to Firestore
-    const recipeRef = await db.collection('recipes').add(recipeData);
+    const recipeId = result[0].id;
+
+    // Send webhook event for recipe added via chat
+    await webhookService.recipeAddedViaChat({
+      id: recipeId,
+      title: parsedRecipe.title
+    }, req.user);
 
     // Generate confirmation message
     const confirmationMessage = `I've added "${parsedRecipe.title}" to your recipe collection! You can find it in your recipes section.`;
@@ -85,8 +105,8 @@ router.post('/add-recipe', async (req, res) => {
     res.json({
       message: 'Recipe added successfully',
       recipe: {
-        id: recipeRef.id,
-        ...recipeData
+        id: recipeId,
+        ...parsedRecipe
       },
       confirmation: confirmationMessage
     });
@@ -99,29 +119,26 @@ router.post('/add-recipe', async (req, res) => {
 // Get chat history
 router.get('/history', async (req, res) => {
   try {
-    const { uid } = req.user;
+    const { id: userId } = req.user;
     const { limit = 50 } = req.query;
 
-    const messagesRef = db.collection('chat_messages')
-      .where('userId', '==', uid)
-      .orderBy('timestamp', 'desc')
-      .limit(parseInt(limit));
-
-    const snapshot = await messagesRef.get();
-    const messages = [];
-
-    snapshot.forEach(doc => {
-      messages.push({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp.toDate()
-      });
-    });
+    const messages = await sql`
+      SELECT * FROM chat_messages 
+      WHERE user_id = ${userId}
+      ORDER BY timestamp DESC
+      LIMIT ${parseInt(limit)}
+    `;
 
     // Reverse to get chronological order
-    messages.reverse();
+    const reversedMessages = messages.reverse().map(msg => ({
+      id: msg.id,
+      content: msg.content,
+      sender: msg.sender,
+      type: msg.type,
+      timestamp: msg.timestamp
+    }));
 
-    res.json({ messages });
+    res.json({ messages: reversedMessages });
   } catch (error) {
     console.error('Get chat history error:', error);
     res.status(500).json({ error: 'Failed to get chat history' });
@@ -131,19 +148,12 @@ router.get('/history', async (req, res) => {
 // Clear chat history
 router.delete('/history', async (req, res) => {
   try {
-    const { uid } = req.user;
+    const { id: userId } = req.user;
 
-    const messagesRef = db.collection('chat_messages')
-      .where('userId', '==', uid);
-
-    const snapshot = await messagesRef.get();
-    
-    const batch = db.batch();
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    await batch.commit();
+    await sql`
+      DELETE FROM chat_messages 
+      WHERE user_id = ${userId}
+    `;
 
     res.json({ message: 'Chat history cleared successfully' });
   } catch (error) {

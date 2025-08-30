@@ -4,7 +4,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Database connection using Neon serverless driver
-const sql = neon(process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_iugwGTjkF52J@ep-misty-snow-afo8dxhj-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require');
+const sql = neon(process.env.DATABASE_URL);
+
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL environment variable is required');
+  process.exit(1);
+}
 
 console.log('✅ Connected to Neon PostgreSQL database');
 

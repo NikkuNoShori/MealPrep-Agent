@@ -13,6 +13,7 @@ import chatRoutes from './routes/chat.js';
 import mealPlanRoutes from './routes/mealPlans.js';
 import receiptRoutes from './routes/receipts.js';
 import preferenceRoutes from './routes/preferences.js';
+import webhookRoutes from './routes/webhooks.js';
 
 // Import middleware
 import { authenticateNeonUser } from './middleware/neonAuth.js';
@@ -65,6 +66,7 @@ app.use('/api/chat', authenticateNeonUser, chatRoutes);
 app.use('/api/meal-plans', authenticateNeonUser, mealPlanRoutes);
 app.use('/api/receipts', authenticateNeonUser, receiptRoutes);
 app.use('/api/preferences', authenticateNeonUser, preferenceRoutes);
+app.use('/api/webhooks', authenticateNeonUser, webhookRoutes);
 
 // WebSocket connection for chat
 io.on('connection', (socket) => {
