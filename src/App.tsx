@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import Recipes from "./pages/Recipes";
 import MealPlanner from "./pages/MealPlanner";
+import Settings from "./pages/Settings";
 
 function AppRoutes() {
   return (
@@ -40,6 +41,14 @@ function AppRoutes() {
         element={
           <Layout>
             <MealPlanner />
+          </Layout>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <Layout>
+            <Settings />
           </Layout>
         }
       />

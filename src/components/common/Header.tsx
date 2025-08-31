@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
-import { ThemeToggle } from "../ui/ThemeToggle";
 import { useState, useRef } from "react";
 
 const Header = () => {
@@ -17,6 +16,7 @@ const Header = () => {
     { name: "Chat", href: "/chat" },
     { name: "Recipes", href: "/recipes" },
     { name: "Meal Planner", href: "/meal-planner" },
+    { name: "Settings", href: "/settings" },
   ];
 
   // Get first name from display name
@@ -70,14 +70,8 @@ const Header = () => {
             ))}
           </nav>
 
-          {/* Theme Toggle & Mobile Menu */}
+          {/* Mobile Menu Button */}
           <div className="flex items-center space-x-4">
-            {/* Desktop Theme Toggle */}
-            <div className="hidden md:block">
-              <ThemeToggle />
-            </div>
-
-            {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="md:hidden p-2 rounded-lg bg-stone-100 dark:bg-gray-700 hover:bg-stone-200 dark:hover:bg-gray-600 transition-colors"
@@ -110,10 +104,6 @@ const Header = () => {
                   {item.name}
                 </Link>
               ))}
-              {/* Mobile Theme Toggle */}
-              <div className="pt-2 border-t border-stone-200 dark:border-gray-700">
-                <ThemeToggle />
-              </div>
             </nav>
           </div>
         )}

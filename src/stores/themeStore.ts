@@ -252,18 +252,18 @@ export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
       // Initial state
-      theme: 'light',
-      systemTheme: 'light',
+      theme: "system",
+      systemTheme: "light",
       colorScheme: defaultColorScheme,
       availableColorSchemes: {
-        'Ocean': defaultColorScheme,
+        Ocean: defaultColorScheme,
         ...alternativeSchemes,
       },
 
       // Actions
       setTheme: (theme: Theme) => {
-        set({ theme })
-        
+        set({ theme });
+
         // Apply theme to document
         const root = document.documentElement;
 
@@ -278,27 +278,27 @@ export const useThemeStore = create<ThemeState>()(
         }
       },
 
-      setSystemTheme: (systemTheme: 'light' | 'dark') => {
-        set({ systemTheme })
-        
+      setSystemTheme: (systemTheme: "light" | "dark") => {
+        set({ systemTheme });
+
         // Re-apply theme if using system theme
-        const { theme } = get()
-        if (theme === 'system') {
-          const root = document.documentElement
-          root.classList.remove('light', 'dark')
-          root.classList.add(systemTheme)
+        const { theme } = get();
+        if (theme === "system") {
+          const root = document.documentElement;
+          root.classList.remove("light", "dark");
+          root.classList.add(systemTheme);
         }
       },
 
       setColorScheme: (schemeName: string) => {
-        const { availableColorSchemes } = get()
-        const scheme = availableColorSchemes[schemeName]
-        
+        const { availableColorSchemes } = get();
+        const scheme = availableColorSchemes[schemeName];
+
         if (scheme) {
-          set({ colorScheme: scheme })
-          
+          set({ colorScheme: scheme });
+
           // Apply CSS custom properties
-          applyColorSchemeToCSS(scheme)
+          applyColorSchemeToCSS(scheme);
         }
       },
 
@@ -308,37 +308,40 @@ export const useThemeStore = create<ThemeState>()(
             ...state.availableColorSchemes,
             [name]: { ...scheme, name },
           },
-        }))
+        }));
       },
 
       removeColorScheme: (name: string) => {
         set((state) => {
-          const { [name]: removed, ...remaining } = state.availableColorSchemes
+          const { [name]: removed, ...remaining } = state.availableColorSchemes;
           return {
             availableColorSchemes: remaining,
             // Reset to default if current scheme is removed
-            colorScheme: state.colorScheme.name === name ? defaultColorScheme : state.colorScheme,
-          }
-        })
+            colorScheme:
+              state.colorScheme.name === name
+                ? defaultColorScheme
+                : state.colorScheme,
+          };
+        });
       },
 
       // Computed values
       get currentTheme() {
-        const { theme, systemTheme } = get()
-        if (theme === 'system') return systemTheme
-        return theme
+        const { theme, systemTheme } = get();
+        if (theme === "system") return systemTheme;
+        return theme;
       },
 
       get isDark() {
-        return get().currentTheme === 'dark'
+        return get().currentTheme === "dark";
       },
 
       get isLight() {
-        return get().currentTheme === 'light'
+        return get().currentTheme === "light";
       },
     }),
     {
-      name: 'theme-store',
+      name: "theme-store",
       partialize: (state) => ({
         theme: state.theme,
         colorScheme: state.colorScheme,
@@ -346,7 +349,7 @@ export const useThemeStore = create<ThemeState>()(
       }),
     }
   )
-)
+);
 
 // Helper function to apply color scheme to CSS custom properties
 function applyColorSchemeToCSS(scheme: ColorScheme) {

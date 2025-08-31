@@ -11,7 +11,7 @@ app.use(express.json());
 
 // Environment variables (set these for local development)
 const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED || 'true';
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://agents.eaglesightlabs.com/webhook/cc0fb704-932c-467c-96a8-87c75f962c35';
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://agents.eaglesightlabs.com/webhook/e7acd79d-bd3d-4e8b-851c-6e93f06ccfa1';
 
 // Webhook service
 const webhookService = {
@@ -28,20 +28,20 @@ const webhookService = {
     }
 
     try {
-      const payload = {
-        content: data.content,
-        user: user?.displayName || 'User',
-        timestamp: new Date().toISOString()
-      };
+      console.log('🌐 Attempting to reach webhook at:', N8N_WEBHOOK_URL);
 
-      console.log('Sending webhook payload:', JSON.stringify(payload, null, 2));
+      console.log('Sending webhook payload:', data.content);
 
       const response = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          content: data.content,
+          sessionId: user.id || 'default-session',
+          userId: user.id
+        }),
         signal: AbortSignal.timeout(30000)
       });
 
@@ -54,19 +54,35 @@ const webhookService = {
       } else {
         const responseText = await response.text();
         console.log(`Webhook sent successfully: ${eventType}`);
+        console.log('📥 Response from n8n:', responseText);
+        console.log('📥 Response length:', responseText.length);
+        
+        if (!responseText || responseText.trim() === '') {
+          console.log('❌ Empty response from n8n');
+          return null;
+        }
         
         try {
           const responseData = JSON.parse(responseText);
+          console.log('✅ Parsed JSON response:', responseData);
           return responseData;
         } catch (parseError) {
+          console.log('⚠️ Response is not JSON, treating as text:', responseText);
           return { content: responseText };
         }
       }
-      } catch (error) {
-    console.error('Webhook error:', error.message);
-    // Don't throw the error, return null instead to handle gracefully
-    return null;
-  }
+             } catch (error) {
+     console.error('❌ Webhook error:', error.message);
+     console.error('🔍 Error details:', {
+       code: error.code,
+       errno: error.errno,
+       syscall: error.syscall,
+       hostname: error.hostname,
+       port: error.port
+     });
+     // Don't throw the error, return null instead to handle gracefully
+     return null;
+   }
   },
 
   async chatMessageSent(message, user) {
@@ -98,24 +114,36 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/test-webhook', async (req, res) => {
   try {
-    console.log('Testing webhook connectivity...');
+    console.log('🧪 Testing webhook connectivity...');
+    console.log('🎯 Target URL:', N8N_WEBHOOK_URL);
+    
     const response = await fetch(N8N_WEBHOOK_URL, {
       method: 'GET',
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(10000)
     });
+    
+    console.log('✅ Webhook test response:', response.status, response.statusText);
     
     res.json({
       status: response.status,
       ok: response.ok,
       webhookUrl: N8N_WEBHOOK_URL,
-      message: response.ok ? 'Webhook is reachable' : 'Webhook returned error status'
+      message: response.ok ? '✅ Webhook is reachable' : '❌ Webhook returned error status',
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
+    console.error('❌ Webhook test failed:', error.message);
     res.json({
       status: 'error',
       webhookUrl: N8N_WEBHOOK_URL,
       message: error.message,
-      error: 'Webhook is not reachable'
+      error: '❌ Webhook is not reachable',
+      details: {
+        code: error.code,
+        errno: error.errno,
+        syscall: error.syscall
+      },
+      timestamp: new Date().toISOString()
     });
   }
 });
@@ -141,7 +169,9 @@ app.post('/api/chat/message', async (req, res) => {
       id: Date.now().toString(),
       content: message,
       type: 'text',
-      context
+      context,
+      userId: user.id,
+      sessionId: context?.sessionId || 'default-session' // Use sessionId from context
     }, user);
 
     // Determine the AI response based on webhook response
@@ -176,6 +206,64 @@ app.post('/api/chat/message', async (req, res) => {
 
   } catch (error) {
     console.error('Chat message error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// Recipe storage endpoint
+app.post('/api/recipes', async (req, res) => {
+  try {
+    const { recipe } = req.body;
+    const user = getTestUser();
+
+    console.log('Received recipe for storage:', recipe.title);
+
+    // TODO: Add database connection and recipe storage logic
+    // For now, just log the recipe data
+    console.log('Recipe data:', JSON.stringify(recipe, null, 2));
+
+    // Simulate successful storage
+    const storedRecipe = {
+      id: Date.now(),
+      ...recipe,
+      user_id: user.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    res.json({
+      message: 'Recipe stored successfully',
+      recipe: storedRecipe
+    });
+
+  } catch (error) {
+    console.error('Recipe storage error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// Get user's recipes
+app.get('/api/recipes', async (req, res) => {
+  try {
+    const user = getTestUser();
+
+    // TODO: Add database connection and recipe retrieval logic
+    // For now, return empty array
+    const recipes = [];
+
+    res.json({
+      recipes,
+      total: recipes.length
+    });
+
+  } catch (error) {
+    console.error('Recipe retrieval error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
       message: error.message 
