@@ -11,7 +11,7 @@ app.use(express.json());
 
 // Environment variables (set these for local development)
 const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED || 'true';
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/cc0fb704-932c-467c-96a8-87c75f962c35';
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://agents.eaglesightlabs.com/webhook/cc0fb704-932c-467c-96a8-87c75f962c35';
 
 // Webhook service
 const webhookService = {
