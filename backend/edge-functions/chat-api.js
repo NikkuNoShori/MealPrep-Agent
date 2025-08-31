@@ -1,15 +1,26 @@
 import { neon } from '@neondatabase/serverless';
 import fetch from 'node-fetch';
 
-// Database connection
-const sql = neon(process.env.DATABASE_URL);
+// Vercel Edge Runtime configuration
+export const runtime = 'edge';
 
-// Webhook service
+// Database connection
+const sql = neon(process.env.DATABASE_URL || 'postgresql://dummy:dummy@localhost/dummy');
+
+// Enhanced webhook service with response handling
 const webhookService = {
   async sendEvent(eventType, data, user = null, metadata = {}) {
+    console.log('Webhook service called with:', {
+      eventType,
+      webhookEnabled: process.env.WEBHOOK_ENABLED,
+      webhookUrl: process.env.N8N_WEBHOOK_URL ? 'configured' : 'not configured'
+    });
+
     if (process.env.WEBHOOK_ENABLED !== 'true' || !process.env.N8N_WEBHOOK_URL) {
-      console.log('Webhook disabled or URL not configured');
-      return;
+      console.error('Webhook not properly configured');
+      console.error('WEBHOOK_ENABLED:', process.env.WEBHOOK_ENABLED);
+      console.error('N8N_WEBHOOK_URL:', process.env.N8N_WEBHOOK_URL ? 'set' : 'not set');
+      throw new Error('Webhook not configured');
     }
 
     try {
@@ -21,51 +32,72 @@ const webhookService = {
         metadata
       };
 
+      console.log('Sending webhook payload:', JSON.stringify(payload, null, 2));
+      console.log('Webhook URL:', process.env.N8N_WEBHOOK_URL);
+
       const response = await fetch(process.env.N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        signal: AbortSignal.timeout(30000) // 30 second timeout for AI processing
       });
 
+      console.log('Webhook response status:', response.status);
+      console.log('Webhook response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
+        const errorText = await response.text();
         console.error(`Webhook failed: ${response.status} ${response.statusText}`);
+        console.error('Webhook error response:', errorText);
+        return null;
       } else {
+        const responseText = await response.text();
         console.log(`Webhook sent successfully: ${eventType}`);
+        console.log('Webhook response body:', responseText);
+        
+        // Try to parse the response as JSON
+        try {
+          const responseData = JSON.parse(responseText);
+          return responseData;
+        } catch (parseError) {
+          console.log('Webhook response is not JSON, treating as text');
+          return { content: responseText };
+        }
       }
-    } catch (error) {
-      console.error('Webhook error:', error.message);
-    }
+          } catch (error) {
+        console.error('Webhook error:', error.message);
+        console.error('Webhook error stack:', error.stack);
+        throw error;
+      }
   },
 
   async chatMessageSent(message, user) {
+    console.log('chatMessageSent called with:', { message, user });
     return this.sendEvent('chat.message.sent', message, user);
   },
 
   async recipeCreated(recipe, user) {
+    console.log('recipeCreated called with:', { recipe, user });
     return this.sendEvent('recipe.created', recipe, user);
   }
 };
 
 // CORS headers
 const corsHeaders = {
-  'Access-Control-Allow-Origin': process.env.FRONTEND_URL || 'http://localhost:5173',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Credentials': 'true',
 };
 
-// Mock user for development
-const getMockUser = () => ({
-  id: '11111111-1111-1111-1111-111111111111',
-  neonUserId: 'test-user-123',
-  email: 'test@example.com',
-  displayName: 'Test User',
-  familyId: '11111111-1111-1111-1111-111111111111',
-  householdSize: 4
-});
+// User authentication - replace with your actual auth logic
+const getAuthenticatedUser = async (request) => {
+  // TODO: Implement proper authentication
+  // For now, return null to force webhook-only operation
+  return null;
+};
 
 export default async function handler(request) {
   try {
@@ -73,16 +105,27 @@ export default async function handler(request) {
     const urlObj = new URL(url);
     const path = urlObj.pathname;
 
+    console.log('Edge function called:', { method, path, url: urlObj.href });
+
     // Handle preflight requests
     if (method === 'OPTIONS') {
+      console.log('Handling OPTIONS request');
       return new Response(null, {
         status: 200,
         headers: corsHeaders,
       });
     }
 
-    // Mock authentication for development
-    const user = getMockUser();
+    // Get authenticated user
+    const user = await getAuthenticatedUser(request);
+    
+    // Require authentication for all operations
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Route handling
     if (method === 'POST' && path === '/api/chat/message') {
@@ -96,11 +139,14 @@ export default async function handler(request) {
       return await handleCreateRecipe(body, user);
     } else if (method === 'GET' && path === '/api/recipes') {
       return await handleGetRecipes(user);
-    } else if (method === 'GET' && path === '/health') {
-      return new Response(JSON.stringify({ 
-        status: 'OK', 
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
+    } else if (method === 'POST' && path === '/api/webhook/n8n-response') {
+      return await handleN8nResponse(body);
+    } else if (method === 'GET' && path === '/api/debug/env') {
+      // Temporary debug endpoint - remove in production
+      return new Response(JSON.stringify({
+        webhookEnabled: process.env.WEBHOOK_ENABLED,
+        webhookUrlConfigured: !!process.env.N8N_WEBHOOK_URL,
+        databaseUrlConfigured: !!process.env.DATABASE_URL
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -126,17 +172,52 @@ async function handleSendMessage(body, user) {
   try {
     const { message, context } = JSON.parse(body);
 
-    // Generate simple response (AI handled by n8n webhook)
-    const aiResponse = `I received your message: "${message}". This will be processed by my n8n workflow.`;
-
-    // Save user message
+    // Save user message first
     const userMessageResult = await sql`
       INSERT INTO chat_messages (user_id, content, sender, message_type, metadata, created_at)
       VALUES (${user.id}, ${message}, 'user', 'text', '{}', NOW())
       RETURNING id
     `;
 
-    // Save AI response
+    const userMessageId = userMessageResult[0].id;
+
+    // Send webhook event for chat message and wait for n8n response
+    console.log('Sending message to n8n webhook and waiting for response...');
+    const webhookResponse = await webhookService.chatMessageSent({
+      id: userMessageId,
+      content: message,
+      type: 'text',
+      context
+    }, user);
+
+    // Determine the AI response based on webhook response
+    let aiResponse;
+
+    if (webhookResponse && webhookResponse.content) {
+      // Use the response from n8n
+      aiResponse = webhookResponse.content;
+      console.log('Using n8n AI response:', aiResponse);
+    } else if (webhookResponse && webhookResponse.message) {
+      // Alternative response format
+      aiResponse = webhookResponse.message;
+      console.log('Using n8n AI response (message field):', aiResponse);
+    } else if (webhookResponse && typeof webhookResponse === 'string') {
+      // Direct string response
+      aiResponse = webhookResponse;
+      console.log('Using n8n AI response (string):', aiResponse);
+    } else {
+      // No webhook response - return error
+      console.log('No response from n8n webhook');
+      return new Response(JSON.stringify({ 
+        error: 'AI service unavailable',
+        message: 'The AI service is currently unavailable. Please try again later.'
+      }), {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Save AI response to database
     const aiMessageResult = await sql`
       INSERT INTO chat_messages (user_id, content, sender, message_type, metadata, created_at)
       VALUES (${user.id}, ${aiResponse}, 'ai', 'text', '{}', NOW())
@@ -144,13 +225,6 @@ async function handleSendMessage(body, user) {
     `;
 
     const aiMessageId = aiMessageResult[0].id;
-
-    // Send webhook event for chat message
-    await webhookService.chatMessageSent({
-      id: aiMessageId,
-      content: message,
-      type: 'text'
-    }, user);
 
     return new Response(JSON.stringify({
       message: 'Message processed successfully',
@@ -313,6 +387,81 @@ async function handleGetRecipes(user) {
   } catch (error) {
     console.error('Get recipes error:', error);
     return new Response(JSON.stringify({ error: 'Failed to get recipes' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+// Handle n8n webhook responses (for Option 2 implementation)
+async function handleN8nResponse(body) {
+  try {
+    const responseData = await body.json();
+    console.log('Received n8n response webhook:', JSON.stringify(responseData, null, 2));
+
+    // Extract the AI response from n8n
+    let aiResponse = null;
+    let messageId = null;
+    let userId = null;
+
+    // Try different response formats
+    if (responseData.content) {
+      aiResponse = responseData.content;
+    } else if (responseData.message) {
+      aiResponse = responseData.message;
+    } else if (responseData.response) {
+      aiResponse = responseData.response;
+    } else if (typeof responseData === 'string') {
+      aiResponse = responseData;
+    }
+
+    // Extract message ID and user ID if provided
+    if (responseData.messageId) {
+      messageId = responseData.messageId;
+    }
+    if (responseData.userId) {
+      userId = responseData.userId;
+    }
+
+    if (!aiResponse) {
+      console.error('No AI response found in n8n webhook data');
+      return new Response(JSON.stringify({ error: 'No AI response provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // If we have a message ID, update the existing message
+    if (messageId) {
+      await sql`
+        UPDATE chat_messages 
+        SET content = ${aiResponse}, updated_at = NOW()
+        WHERE id = ${messageId}
+      `;
+      console.log('Updated existing message with AI response');
+    } else {
+      // No message ID provided - return error
+      console.error('No message ID provided in n8n response');
+      return new Response(JSON.stringify({ 
+        error: 'Invalid response format',
+        message: 'The AI response is missing required information.'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: 'AI response processed successfully' 
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Handle n8n response error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to process n8n response' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

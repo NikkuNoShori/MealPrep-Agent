@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const API_BASE_URL =
   (import.meta as any).env?.VITE_API_URL ||
-  "https://meal-prep-agent-hooio7jxi-nickneal1717s-projects.vercel.app";
+  "https://meal-prep-agent-pyfznejz1-nickneal1717s-projects.vercel.app";
 
 // API client
 class ApiClient {
@@ -44,29 +44,29 @@ class ApiClient {
     if (params?.limit) searchParams.append("limit", params.limit.toString());
     if (params?.offset) searchParams.append("offset", params.offset.toString());
 
-    return this.request(`/recipes?${searchParams.toString()}`);
+    return this.request(`/api/recipes?${searchParams.toString()}`);
   }
 
   async getRecipe(id: string) {
-    return this.request(`/recipes/${id}`);
+    return this.request(`/api/recipes/${id}`);
   }
 
   async createRecipe(data: any) {
-    return this.request("/recipes", {
+    return this.request("/api/recipes", {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   async updateRecipe(id: string, data: any) {
-    return this.request(`/recipes/${id}`, {
+    return this.request(`/api/recipes/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
   }
 
   async deleteRecipe(id: string) {
-    return this.request(`/recipes/${id}`, {
+    return this.request(`/api/recipes/${id}`, {
       method: "DELETE",
     });
   }
@@ -75,19 +75,21 @@ class ApiClient {
     const searchParams = new URLSearchParams({ query });
     if (limit) searchParams.append("limit", limit.toString());
 
-    return this.request(`/recipes/search/${query}?${searchParams.toString()}`);
+    return this.request(
+      `/api/recipes/search/${query}?${searchParams.toString()}`
+    );
   }
 
   // Chat endpoints
   async sendMessage(data: { message: string; context?: any }) {
-    return this.request("/chat/message", {
+    return this.request("/api/chat/message", {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   async addRecipeViaChat(data: { recipeText: string }) {
-    return this.request("/chat/add-recipe", {
+    return this.request("/api/chat/add-recipe", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -97,11 +99,11 @@ class ApiClient {
     const searchParams = new URLSearchParams();
     if (limit) searchParams.append("limit", limit.toString());
 
-    return this.request(`/chat/history?${searchParams.toString()}`);
+    return this.request(`/api/chat/history?${searchParams.toString()}`);
   }
 
   async clearChatHistory() {
-    return this.request("/chat/history", {
+    return this.request("/api/chat/history", {
       method: "DELETE",
     });
   }
@@ -111,7 +113,7 @@ class ApiClient {
     const searchParams = new URLSearchParams();
     if (limit) searchParams.append("limit", limit.toString());
 
-    return this.request(`/meal-plans?${searchParams.toString()}`);
+    return this.request(`/api/meal-plans?${searchParams.toString()}`);
   }
 
   async createMealPlan(data: {
@@ -119,7 +121,7 @@ class ApiClient {
     endDate: string;
     preferences: any;
   }) {
-    return this.request("/meal-plans", {
+    return this.request("/api/meal-plans", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -130,11 +132,11 @@ class ApiClient {
     const searchParams = new URLSearchParams();
     if (limit) searchParams.append("limit", limit.toString());
 
-    return this.request(`/receipts?${searchParams.toString()}`);
+    return this.request(`/api/receipts?${searchParams.toString()}`);
   }
 
   async uploadReceipt(data: { imageUrl: string; storeInfo: any }) {
-    return this.request("/receipts/upload", {
+    return this.request("/api/receipts/upload", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -142,11 +144,11 @@ class ApiClient {
 
   // Preferences endpoints
   async getPreferences() {
-    return this.request("/preferences");
+    return this.request("/api/preferences");
   }
 
   async updatePreferences(data: any) {
-    return this.request("/preferences", {
+    return this.request("/api/preferences", {
       method: "PUT",
       body: JSON.stringify(data),
     });
