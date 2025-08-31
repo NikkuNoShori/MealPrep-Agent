@@ -130,9 +130,12 @@ export default async function handler(req, res) {
       // Determine the AI response based on webhook response
       let aiResponse;
 
-      if (webhookResponse && webhookResponse.content) {
+      if (webhookResponse && webhookResponse.output) {
+        aiResponse = webhookResponse.output;
+        console.log('Using n8n AI response (output field):', aiResponse);
+      } else if (webhookResponse && webhookResponse.content) {
         aiResponse = webhookResponse.content;
-        console.log('Using n8n AI response:', aiResponse);
+        console.log('Using n8n AI response (content field):', aiResponse);
       } else if (webhookResponse && webhookResponse.message) {
         aiResponse = webhookResponse.message;
         console.log('Using n8n AI response (message field):', aiResponse);
@@ -140,10 +143,10 @@ export default async function handler(req, res) {
         aiResponse = webhookResponse;
         console.log('Using n8n AI response (string):', aiResponse);
       } else {
-        console.log('No response from n8n webhook');
+        console.log('No response from n8n webhook - n8n may not be running or returned empty response');
         return res.status(503).json({ 
           error: 'AI service unavailable',
-          message: 'The AI service is currently unavailable. Please try again later.'
+          message: 'The AI service (n8n) is currently unavailable. Please make sure n8n is running on http://localhost:5678 and the workflow is active.'
         });
       }
 

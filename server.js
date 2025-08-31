@@ -30,18 +30,20 @@ const webhookService = {
     try {
       console.log('🌐 Attempting to reach webhook at:', N8N_WEBHOOK_URL);
 
-      console.log('Sending webhook payload:', data.content);
+      const webhookPayload = {
+        content: data.content,
+        sessionId: user.id || 'default-session',
+        userId: user.id
+      };
+      
+      console.log('Sending webhook payload:', JSON.stringify(webhookPayload, null, 2));
 
       const response = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          content: data.content,
-          sessionId: user.id || 'default-session',
-          userId: user.id
-        }),
+        body: JSON.stringify(webhookPayload),
         signal: AbortSignal.timeout(30000)
       });
 
@@ -165,21 +167,23 @@ app.post('/api/chat/message', async (req, res) => {
 
     // Send webhook event for chat message and wait for n8n response
     console.log('Sending message to n8n webhook and waiting for response...');
-    const webhookResponse = await webhookService.chatMessageSent({
-      id: Date.now().toString(),
-      content: message,
-      type: 'text',
-      context,
-      userId: user.id,
-      sessionId: context?.sessionId || 'default-session' // Use sessionId from context
-    }, user);
-
-    // Determine the AI response based on webhook response
+          const webhookResponse = await webhookService.chatMessageSent({
+        id: Date.now().toString(),
+        content: message,
+        type: 'text',
+        context,
+        userId: user.id,
+        sessionId: context?.sessionId || 'default-session' // Use sessionId from context
+      }, user);
+    
     let aiResponse;
 
-    if (webhookResponse && webhookResponse.content) {
+    if (webhookResponse && webhookResponse.output) {
+      aiResponse = webhookResponse.output;
+      console.log('Using n8n AI response (output field):', aiResponse);
+    } else if (webhookResponse && webhookResponse.content) {
       aiResponse = webhookResponse.content;
-      console.log('Using n8n AI response:', aiResponse);
+      console.log('Using n8n AI response (content field):', aiResponse);
     } else if (webhookResponse && webhookResponse.message) {
       aiResponse = webhookResponse.message;
       console.log('Using n8n AI response (message field):', aiResponse);
@@ -187,11 +191,11 @@ app.post('/api/chat/message', async (req, res) => {
       aiResponse = webhookResponse;
       console.log('Using n8n AI response (string):', aiResponse);
     } else {
-      console.log('No response from n8n webhook - n8n may not be running');
-      return res.status(503).json({ 
-        error: 'AI service unavailable',
-        message: 'The AI service (n8n) is currently unavailable. Please make sure n8n is running on http://localhost:5678 and the workflow is active.'
-      });
+      console.log('No response from n8n webhook - n8n may not be running or returned empty response');
+      
+      // Provide a fallback response instead of failing completely
+      aiResponse = "I'm sorry, but I'm having trouble connecting to my AI service right now. Please try again in a moment, or check if the n8n workflow is properly configured and running.";
+      console.log('Using fallback response:', aiResponse);
     }
 
     res.json({
@@ -200,7 +204,7 @@ app.post('/api/chat/message', async (req, res) => {
         id: Date.now().toString(),
         content: aiResponse,
         sender: 'ai',
-        timestamp: new Date()
+        timestamp: new Date().toISOString()
       }
     });
 

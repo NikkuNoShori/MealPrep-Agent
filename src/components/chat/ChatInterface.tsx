@@ -303,9 +303,9 @@ export const ChatInterface: React.FC = () => {
   const currentConversation = getCurrentConversation();
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full overflow-hidden">
       {/* Sidebar - Conversation History */}
-      <div className="w-80 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+      <div className="w-80 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col min-h-0">
         {/* New Chat Button */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <Button
@@ -365,9 +365,9 @@ export const ChatInterface: React.FC = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        <Card className="flex-1 flex flex-col">
-          <CardContent className="flex-1 flex flex-col p-0">
+      <div className="flex-1 flex flex-col min-h-0">
+        <Card className="flex-1 flex flex-col min-h-0">
+          <CardContent className="flex-1 flex flex-col p-0 min-h-0">
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
               {!currentConversation ||
