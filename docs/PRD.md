@@ -114,18 +114,18 @@ Create an intuitive, AI-powered kitchen companion that transforms how families d
 - **API Layer**: React Query for server state management
 
 ### Backend Requirements
-- **Cloud Platform**: Google Cloud Platform
-- **AI/ML**: Vertex AI for LLM and embedding models
-- **Database**: Firestore for recipe storage, Vector Search for RAG
-- **API**: Cloud Functions for serverless endpoints
-- **Processing**: Cloud Run for agent services
-- **Storage**: Cloud Storage for images and files
+- **Cloud Platform**: Vercel (production) + Local Express (development)
+- **AI/ML**: OpenRouter integration via n8n workflows ✅
+- **Database**: NeonDB (PostgreSQL) for recipe storage ✅
+- **API**: Express.js server (local) + Vercel Edge Functions (production) ✅
+- **Processing**: n8n workflows for AI agent services ✅
+- **Storage**: Local file system (future: Vercel storage for images)
 
 ### Integration Requirements
-- **Automation**: N8N for workflow orchestration
-- **Real-time**: WebSocket support for chat interface
-- **External APIs**: OCR services, nutrition APIs, grocery store APIs
-- **Authentication**: Firebase Auth with family account support
+- **Automation**: N8N for workflow orchestration ✅
+- **Real-time**: HTTP polling for chat interface (WebSocket future enhancement)
+- **External APIs**: OpenRouter for AI ✅, future OCR services, nutrition APIs
+- **Authentication**: JWT-based authentication with family account support ✅
 
 ## Success Metrics
 

@@ -8,22 +8,23 @@ The Recipe Intelligence Platform is a microservices-based application that combi
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   API Gateway   │    │   AI Agents     │
-│   (Vite/React)  │◄──►│  (Cloud Run)    │◄──►│  (Cloud Run)    │
+│   Frontend      │    │   API Layer     │    │   N8N Workflows │
+│   (Vite/React)  │◄──►│  (Express/Edge) │◄──►│   (AI Agents)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                 │                       │
                                 ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   N8N Workflows │    │   Firestore     │    │   Vertex AI     │
-│   (Automation)  │    │   (Database)    │    │   (ML Models)   │
+│   NeonDB        │    │   OpenRouter    │    │   Vector Search │
+│   (PostgreSQL)  │    │   (AI Models)   │    │   (Future RAG)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                    ┌─────────────────┐
-                    │  Vector Search  │
-                    │     (RAG)       │
-                    └─────────────────┘
 ```
+
+### Current Implementation
+- **Frontend**: Vite + React + TypeScript
+- **API Layer**: Express.js (local) + Vercel Edge Functions (production)
+- **Database**: NeonDB (PostgreSQL)
+- **AI**: OpenRouter via n8n workflows
+- **Deployment**: Vercel for production, local development
 
 ## Frontend Architecture (Vite + React)
 
