@@ -66,11 +66,11 @@ const webhookService = {
           return { content: responseText };
         }
       }
-          } catch (error) {
-        console.error('Webhook error:', error.message);
-        console.error('Webhook error stack:', error.stack);
-        throw error;
-      }
+    } catch (error) {
+      console.error('Webhook error:', error.message);
+      console.error('Webhook error stack:', error.stack);
+      throw error;
+    }
   },
 
   async chatMessageSent(message, user) {
@@ -95,8 +95,15 @@ const corsHeaders = {
 // User authentication - replace with your actual auth logic
 const getAuthenticatedUser = async (request) => {
   // TODO: Implement proper authentication
-  // For now, return null to force webhook-only operation
-  return null;
+  // For now, return a test user to allow webhook testing
+  return {
+    id: '11111111-1111-1111-1111-111111111111',
+    neonUserId: 'test-user-123',
+    email: 'test@example.com',
+    displayName: 'Test User',
+    familyId: '11111111-1111-1111-1111-111111111111',
+    householdSize: 4
+  };
 };
 
 export default async function handler(request) {
@@ -141,6 +148,17 @@ export default async function handler(request) {
       return await handleGetRecipes(user);
     } else if (method === 'POST' && path === '/api/webhook/n8n-response') {
       return await handleN8nResponse(body);
+    } else if (method === 'GET' && path === '/api/health') {
+      return new Response(JSON.stringify({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        webhookEnabled: process.env.WEBHOOK_ENABLED,
+        webhookUrlConfigured: !!process.env.N8N_WEBHOOK_URL,
+        databaseUrlConfigured: !!process.env.DATABASE_URL
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     } else if (method === 'GET' && path === '/api/debug/env') {
       // Temporary debug endpoint - remove in production
       return new Response(JSON.stringify({
@@ -153,14 +171,20 @@ export default async function handler(request) {
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Route not found' }), {
+    return new Response(JSON.stringify({ 
+      error: 'Route not found',
+      message: `No handler found for ${method} ${path}`
+    }), {
       status: 404,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Edge function error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      message: error.message 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
