@@ -84,7 +84,13 @@ class ApiClient {
   }
 
   // Chat endpoints
-  async sendMessage(data: { message: string; context?: any }) {
+  async sendMessage(data: {
+    message: string;
+    context?: any;
+    sessionId?: string;
+    clearMemory?: boolean;
+    intent?: string;
+  }) {
     return this.request("/api/chat/message", {
       method: "POST",
       body: JSON.stringify(data),
@@ -231,8 +237,13 @@ export const useSendMessage = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { message: string; context?: any }) =>
-      apiClient.sendMessage(data),
+    mutationFn: (data: {
+      message: string;
+      context?: any;
+      sessionId?: string;
+      clearMemory?: boolean;
+      intent?: string;
+    }) => apiClient.sendMessage(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chat", "history"] });
     },

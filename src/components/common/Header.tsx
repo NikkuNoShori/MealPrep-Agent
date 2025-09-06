@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useState, useRef } from "react";
@@ -6,6 +6,7 @@ import { useState, useRef } from "react";
 const Header = () => {
   const { theme, setTheme, isDark } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -39,6 +40,15 @@ const Header = () => {
     }, 150);
   };
 
+  const handleChatClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // Clear any existing chat state to ensure a fresh session
+    localStorage.removeItem("chat-current-conversation-id");
+    // Set a flag to indicate we want a fresh temporary session
+    localStorage.setItem("chat-create-temporary-session", "true");
+    navigate("/chat");
+  };
+
   return (
     <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-stone-200 dark:border-gray-700">
       <div className="container mx-auto px-4">
@@ -55,19 +65,33 @@ const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === item.href
-                    ? "text-primary-600 dark:text-primary-400"
-                    : "text-stone-600 hover:text-stone-900 dark:text-gray-300 dark:hover:text-white"
-                }`}
-              >
-                {item.name}
-              </Link>
-            ))}
+            {navigation.map((item) =>
+              item.name === "Chat" ? (
+                <button
+                  key={item.name}
+                  onClick={handleChatClick}
+                  className={`text-sm font-medium transition-colors ${
+                    location.pathname === item.href
+                      ? "text-primary-600 dark:text-primary-400"
+                      : "text-stone-600 hover:text-stone-900 dark:text-gray-300 dark:hover:text-white"
+                  }`}
+                >
+                  {item.name}
+                </button>
+              ) : (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`text-sm font-medium transition-colors ${
+                    location.pathname === item.href
+                      ? "text-primary-600 dark:text-primary-400"
+                      : "text-stone-600 hover:text-stone-900 dark:text-gray-300 dark:hover:text-white"
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              )
+            )}
           </nav>
 
           {/* Mobile Menu Button */}
@@ -90,20 +114,37 @@ const Header = () => {
         {isMobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-stone-200 dark:border-gray-700">
             <nav className="flex flex-col space-y-4">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`text-sm font-medium transition-colors ${
-                    location.pathname === item.href
-                      ? "text-primary-600 dark:text-primary-400"
-                      : "text-stone-600 hover:text-stone-900 dark:text-gray-300 dark:hover:text-white"
-                  }`}
-                >
-                  {item.name}
-                </Link>
-              ))}
+              {navigation.map((item) =>
+                item.name === "Chat" ? (
+                  <button
+                    key={item.name}
+                    onClick={(e) => {
+                      handleChatClick(e);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`text-sm font-medium transition-colors text-left ${
+                      location.pathname === item.href
+                        ? "text-primary-600 dark:text-primary-400"
+                        : "text-stone-600 hover:text-stone-900 dark:text-gray-300 dark:hover:text-white"
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                ) : (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`text-sm font-medium transition-colors ${
+                      location.pathname === item.href
+                        ? "text-primary-600 dark:text-primary-400"
+                        : "text-stone-600 hover:text-stone-900 dark:text-gray-300 dark:hover:text-white"
+                    }`}
+                  >
+                    {item.name}
+                  </Link>
+                )
+              )}
             </nav>
           </div>
         )}
@@ -112,4 +153,4 @@ const Header = () => {
   );
 };
 
-export default Header
+export default Header;
