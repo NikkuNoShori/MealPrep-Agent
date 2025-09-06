@@ -46,39 +46,27 @@ export interface RecipeEmbeddingResponse {
 export const ragService = {
   // Search recipes using semantic similarity
   async searchRecipes(request: RAGSearchRequest): Promise<RAGSearchResponse> {
-    return apiClient.request('/api/rag/search', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    }) as Promise<RAGSearchResponse>;
+    return apiClient.ragSearch(request) as Promise<RAGSearchResponse>;
   },
 
   // Generate embeddings for a recipe
   async generateEmbedding(request: RecipeEmbeddingRequest): Promise<RecipeEmbeddingResponse> {
-    return apiClient.request('/api/rag/embedding', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    }) as Promise<RecipeEmbeddingResponse>;
+    return apiClient.ragEmbedding(request) as Promise<RecipeEmbeddingResponse>;
   },
 
   // Get similar recipes based on a recipe ID
   async getSimilarRecipes(recipeId: string, userId: string, limit: number = 5): Promise<RecipeSearchResult[]> {
-    return apiClient.request(`/api/rag/similar/${recipeId}?userId=${userId}&limit=${limit}`) as Promise<RecipeSearchResult[]>;
+    return apiClient.ragSimilar(recipeId, userId, limit) as Promise<RecipeSearchResult[]>;
   },
 
   // Search by ingredients
   async searchByIngredients(ingredients: string[], userId: string, limit: number = 10): Promise<RecipeSearchResult[]> {
-    return apiClient.request('/api/rag/ingredients', {
-      method: 'POST',
-      body: JSON.stringify({ ingredients, userId, limit }),
-    }) as Promise<RecipeSearchResult[]>;
+    return apiClient.ragIngredients(ingredients, userId, limit) as Promise<RecipeSearchResult[]>;
   },
 
   // Get recipe recommendations based on user preferences
   async getRecommendations(userId: string, preferences?: any, limit: number = 10): Promise<RecipeSearchResult[]> {
-    return apiClient.request('/api/rag/recommendations', {
-      method: 'POST',
-      body: JSON.stringify({ userId, preferences, limit }),
-    }) as Promise<RecipeSearchResult[]>;
+    return apiClient.ragRecommendations(userId, preferences, limit) as Promise<RecipeSearchResult[]>;
   }
 };
 

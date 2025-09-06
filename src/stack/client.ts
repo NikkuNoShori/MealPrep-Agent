@@ -1,7 +1,7 @@
 import { StackClientApp } from "@stackframe/js";
 
-const projectId = import.meta.env.VITE_STACK_PROJECT_ID || process.env.STACK_PROJECT_ID;
-const publishableClientKey = import.meta.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY || process.env.STACK_PUBLISHABLE_CLIENT_KEY;
+const projectId = (import.meta as any).env?.VITE_STACK_PROJECT_ID || process.env.STACK_PROJECT_ID;
+const publishableClientKey = (import.meta as any).env?.VITE_STACK_PUBLISHABLE_CLIENT_KEY || process.env.STACK_PUBLISHABLE_CLIENT_KEY;
 
 console.log('🟢 StackClient: Initializing with config:', {
   projectId,

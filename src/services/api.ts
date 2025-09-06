@@ -151,6 +151,39 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  // RAG endpoints
+  async ragSearch(request: any) {
+    return this.request('/api/rag/search', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async ragEmbedding(request: any) {
+    return this.request('/api/rag/embedding', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async ragSimilar(recipeId: string, userId: string, limit: number = 5) {
+    return this.request(`/api/rag/similar/${recipeId}?userId=${userId}&limit=${limit}`);
+  }
+
+  async ragIngredients(ingredients: string[], userId: string, limit: number = 10) {
+    return this.request('/api/rag/ingredients', {
+      method: 'POST',
+      body: JSON.stringify({ ingredients, userId, limit }),
+    });
+  }
+
+  async ragRecommendations(userId: string, preferences?: any, limit: number = 10) {
+    return this.request('/api/rag/recommendations', {
+      method: 'POST',
+      body: JSON.stringify({ userId, preferences, limit }),
+    });
+  }
 }
 
 // Create singleton instance
