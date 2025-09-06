@@ -110,6 +110,9 @@ const getTestUser = () => ({
   householdSize: 4
 });
 
+// Note: Recipe storage moved to direct Neon database access
+// This server now only handles chat functionality
+
 // Routes
 app.get('/api/health', (req, res) => {
   res.json({
@@ -225,63 +228,8 @@ app.post('/api/chat/message', async (req, res) => {
   }
 });
 
-// Recipe storage endpoint
-app.post('/api/recipes', async (req, res) => {
-  try {
-    const { recipe } = req.body;
-    const user = getTestUser();
-
-    console.log('Received recipe for storage:', recipe.title);
-
-    // TODO: Add database connection and recipe storage logic
-    // For now, just log the recipe data
-    console.log('Recipe data:', JSON.stringify(recipe, null, 2));
-
-    // Simulate successful storage
-    const storedRecipe = {
-      id: Date.now(),
-      ...recipe,
-      user_id: user.id,
-      created_at: new Date(),
-      updated_at: new Date()
-    };
-
-    res.json({
-      message: 'Recipe stored successfully',
-      recipe: storedRecipe
-    });
-
-  } catch (error) {
-    console.error('Recipe storage error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
-  }
-});
-
-// Get user's recipes
-app.get('/api/recipes', async (req, res) => {
-  try {
-    const user = getTestUser();
-
-    // TODO: Add database connection and recipe retrieval logic
-    // For now, return empty array
-    const recipes = [];
-
-    res.json({
-      recipes,
-      total: recipes.length
-    });
-
-  } catch (error) {
-    console.error('Recipe retrieval error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
-  }
-});
+// Recipe endpoints removed - now using direct Neon database access
+// See src/services/neon.ts for recipe operations
 
 // Test endpoint
 app.get('/api/rag/test', (req, res) => {

@@ -457,7 +457,7 @@ export const ChatInterface: React.FC = () => {
   const currentConversation = getCurrentConversation();
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full min-h-0">
       {/* Sidebar - Conversation History */}
       <div className="w-80 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col min-h-0">
         {/* Header with New Chat and Multi-select */}

@@ -62,7 +62,7 @@ const LandingPage = () => {
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
         <div className="relative container mx-auto px-4 text-center">
           <div className="max-w-4xl mx-auto">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-sm font-medium mb-6">
+            <div className="inline-flex items-center px-4 py-2 text-white/90 text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4 mr-2" />
               AI-Powered Meal Planning
             </div>
@@ -81,14 +81,20 @@ const LandingPage = () => {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
-                to="/dashboard"
+                to="/signup"
                 className="btn-primary text-lg px-8 py-4 flex items-center group"
               >
                 Get Started Free
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               
-              <button className="btn-secondary text-lg px-8 py-4 flex items-center">
+              <button 
+                className="btn-secondary text-lg px-8 py-4 flex items-center"
+                onClick={() => {
+                  // Scroll to features section for demo
+                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+                }}
+              >
                 <Play className="mr-2 w-5 h-5" />
                 Watch Demo
               </button>
@@ -98,7 +104,7 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white dark:bg-gray-800">
+      <section id="features" className="py-20 bg-white dark:bg-gray-800">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
@@ -229,18 +235,21 @@ const LandingPage = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/auth"
+              to="/signup"
               className="inline-flex items-center bg-white text-primary-600 font-semibold px-8 py-4 rounded-lg hover:bg-gray-50 transition-colors text-lg"
             >
               Start Your Free Trial
               <ArrowRight className="ml-2 w-5 h-5" />
             </Link>
-            <Link
-              to="/dashboard"
+            <button 
               className="inline-flex items-center border-2 border-white text-white font-semibold px-8 py-4 rounded-lg hover:bg-white hover:text-primary-600 transition-colors text-lg"
+              onClick={() => {
+                // Scroll to features section for demo
+                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+              }}
             >
               View Demo
-            </Link>
+            </button>
           </div>
         </div>
       </section>

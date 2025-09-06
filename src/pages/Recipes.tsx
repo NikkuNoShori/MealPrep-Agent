@@ -36,41 +36,42 @@ const Recipes = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Recipes
-        </h1>
-        <p className="text-gray-600 dark:text-gray-300">
-          Manage your recipe collection
-        </p>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {showAddForm && (
+          <div className="animate-fade-in">
+            <RecipeForm
+              recipe={editingRecipe}
+              onSave={() => {
+                handleCloseForm();
+                // Refresh recipe list
+              }}
+              onCancel={handleCloseForm}
+            />
+          </div>
+        )}
+
+        {selectedRecipe && (
+          <div className="animate-fade-in">
+            <RecipeDetail
+              recipe={selectedRecipe}
+              onEdit={() => handleEditRecipe(selectedRecipe)}
+              onClose={handleCloseDetail}
+            />
+          </div>
+        )}
+
+        {!showAddForm && !selectedRecipe && (
+          <div className="animate-fade-in">
+            <RecipeList
+              onRecipeSelect={handleRecipeSelect}
+              onAddRecipe={handleAddRecipe}
+              onEditRecipe={handleEditRecipe}
+            />
+          </div>
+        )}
       </div>
-
-      {showAddForm && (
-        <RecipeForm
-          recipe={editingRecipe}
-          onSave={() => {
-            handleCloseForm();
-            // Refresh recipe list
-          }}
-          onCancel={handleCloseForm}
-        />
-      )}
-
-      {selectedRecipe && (
-        <RecipeDetail
-          recipe={selectedRecipe}
-          onEdit={() => handleEditRecipe(selectedRecipe)}
-          onClose={handleCloseDetail}
-        />
-      )}
-
-      {!showAddForm && !selectedRecipe && (
-        <RecipeList
-          onRecipeSelect={handleRecipeSelect}
-          onAddRecipe={handleAddRecipe}
-        />
-      )}
     </div>
   );
 };

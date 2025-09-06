@@ -1,10 +1,13 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Menu, X, LogOut, User } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useState, useRef } from "react";
+import { useAuthStore } from "@/stores/authStore";
+import { Button } from "../ui/button";
 
 const Header = () => {
   const { theme, setTheme, isDark } = useTheme();
+  const { user, signOut } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -94,8 +97,38 @@ const Header = () => {
             )}
           </nav>
 
-          {/* Mobile Menu Button */}
+          {/* User Menu & Mobile Menu Button */}
           <div className="flex items-center space-x-4">
+            {/* User Menu */}
+            {user && (
+              <div 
+                className="relative"
+                ref={userMenuRef}
+                onMouseEnter={handleUserMenuMouseEnter}
+                onMouseLeave={handleUserMenuMouseLeave}
+              >
+                <button className="flex items-center space-x-2 p-2 rounded-lg bg-stone-100 dark:bg-gray-700 hover:bg-stone-200 dark:hover:bg-gray-600 transition-colors">
+                  <User className="w-4 h-4 text-stone-600 dark:text-gray-300" />
+                  <span className="text-sm font-medium text-stone-700 dark:text-gray-300">
+                    {user.email}
+                  </span>
+                </button>
+                
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-stone-200 dark:border-gray-700 py-1 z-50">
+                    <button
+                      onClick={signOut}
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-stone-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="md:hidden p-2 rounded-lg bg-stone-100 dark:bg-gray-700 hover:bg-stone-200 dark:hover:bg-gray-600 transition-colors"

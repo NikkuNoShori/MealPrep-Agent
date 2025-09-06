@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { recipeService } from "./neon";
 
 // Use local development API for localhost, production API for deployed app
 const API_BASE_URL =
@@ -41,37 +42,25 @@ class ApiClient {
     return response.json();
   }
 
-  // Recipe endpoints
+  // Recipe endpoints - now using direct Neon database access
   async getRecipes(params?: { limit?: number; offset?: number }) {
-    const searchParams = new URLSearchParams();
-    if (params?.limit) searchParams.append("limit", params.limit.toString());
-    if (params?.offset) searchParams.append("offset", params.offset.toString());
-
-    return this.request(`/api/recipes?${searchParams.toString()}`);
+    return await recipeService.getRecipes();
   }
 
   async getRecipe(id: string) {
-    return this.request(`/api/recipes/${id}`);
+    return await recipeService.getRecipe(id);
   }
 
   async createRecipe(data: any) {
-    return this.request("/api/recipes", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+    return await recipeService.createRecipe(data);
   }
 
   async updateRecipe(id: string, data: any) {
-    return this.request(`/api/recipes/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
+    return await recipeService.updateRecipe(id, data);
   }
 
   async deleteRecipe(id: string) {
-    return this.request(`/api/recipes/${id}`, {
-      method: "DELETE",
-    });
+    return await recipeService.deleteRecipe(id);
   }
 
   async searchRecipes(query: string, limit?: number) {
@@ -174,6 +163,9 @@ export const useRecipes = (params?: { limit?: number; offset?: number }) => {
     queryFn: () => apiClient.getRecipes(params),
   });
 };
+
+// Auth hooks
+// Auth is now managed by Zustand store in src/stores/authStore
 
 export const useRecipe = (id: string) => {
   return useQuery({
