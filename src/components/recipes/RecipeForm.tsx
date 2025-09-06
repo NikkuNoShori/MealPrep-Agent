@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, X, Save, ArrowLeft } from 'lucide-react'
+import { Plus, X, Save, ArrowLeft, TestTube } from 'lucide-react'
 
 interface RecipeFormProps {
   recipe?: any
@@ -143,6 +143,37 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     }))
   }
 
+  const populateTestData = () => {
+    setFormData({
+      title: 'Classic Spaghetti Carbonara',
+      description: 'A traditional Italian pasta dish with eggs, cheese, pancetta, and black pepper. Rich, creamy, and absolutely delicious!',
+      prepTime: '15',
+      cookTime: '20',
+      servings: '4',
+      difficulty: 'medium',
+      tags: ['Italian', 'Pasta', 'Quick', 'Comfort Food', 'Dinner'],
+      ingredients: [
+        { name: 'Spaghetti', amount: 400, unit: 'g' },
+        { name: 'Pancetta', amount: 150, unit: 'g' },
+        { name: 'Large eggs', amount: 4, unit: 'pieces' },
+        { name: 'Parmesan cheese', amount: 100, unit: 'g' },
+        { name: 'Black pepper', amount: 1, unit: 'tsp' },
+        { name: 'Salt', amount: 1, unit: 'tsp' },
+        { name: 'Olive oil', amount: 2, unit: 'tbsp' }
+      ],
+      instructions: [
+        'Bring a large pot of salted water to boil and cook spaghetti according to package directions.',
+        'While pasta cooks, cut pancetta into small cubes and cook in a large skillet over medium heat until crispy.',
+        'In a bowl, whisk together eggs, grated Parmesan, and black pepper.',
+        'Drain pasta, reserving 1 cup of pasta water.',
+        'Add hot pasta to the skillet with pancetta and toss to combine.',
+        'Remove from heat and quickly stir in egg mixture, adding pasta water as needed to create a creamy sauce.',
+        'Serve immediately with extra Parmesan and black pepper.'
+      ],
+      imageUrl: 'https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=800&h=600&fit=crop'
+    })
+  }
+
   const isLoading = createRecipeMutation.isPending || updateRecipeMutation.isPending
 
   return (
@@ -162,14 +193,26 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
             </p>
           </div>
         </div>
-        <Button 
-          onClick={handleSubmit} 
-          disabled={isLoading}
-          className="gap-2"
-        >
-          <Save className="h-4 w-4" />
-          {isLoading ? 'Saving...' : 'Save Recipe'}
-        </Button>
+        <div className="flex items-center gap-3">
+          {!isEditing && (
+            <Button 
+              variant="outline" 
+              onClick={populateTestData}
+              className="gap-2 bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700 hover:text-orange-800 dark:bg-orange-900/20 dark:hover:bg-orange-900/30 dark:border-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
+            >
+              <TestTube className="h-4 w-4" />
+              Add Test Recipe
+            </Button>
+          )}
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <Save className="h-4 w-4" />
+            {isLoading ? 'Saving...' : 'Save Recipe'}
+          </Button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

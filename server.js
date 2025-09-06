@@ -1,6 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import { 
+  searchRecipes, 
+  generateRecipeEmbedding, 
+  getSimilarRecipes, 
+  searchByIngredients, 
+  getRecommendations,
+  batchGenerateEmbeddings 
+} from './backend/rag-api-simple.js';
 
 const app = express();
 const PORT = 3000;
@@ -101,6 +109,9 @@ const getTestUser = () => ({
   familyId: '11111111-1111-1111-1111-111111111111',
   householdSize: 4
 });
+
+// Note: Recipe storage moved to direct Neon database access
+// This server now only handles chat functionality
 
 // Routes
 app.get('/api/health', (req, res) => {
@@ -217,68 +228,105 @@ app.post('/api/chat/message', async (req, res) => {
   }
 });
 
-// Recipe storage endpoint
-app.post('/api/recipes', async (req, res) => {
+// Recipe endpoints removed - now using direct Neon database access
+// See src/services/neon.ts for recipe operations
+
+// Test endpoint
+app.get('/api/rag/test', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'RAG API is working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// RAG API endpoints
+// Search recipes using RAG
+app.post('/api/rag/search', async (req, res) => {
   try {
-    const { recipe } = req.body;
-    const user = getTestUser();
-
-    console.log('Received recipe for storage:', recipe.title);
-
-    // TODO: Add database connection and recipe storage logic
-    // For now, just log the recipe data
-    console.log('Recipe data:', JSON.stringify(recipe, null, 2));
-
-    // Simulate successful storage
-    const storedRecipe = {
-      id: Date.now(),
-      ...recipe,
-      user_id: user.id,
-      created_at: new Date(),
-      updated_at: new Date()
-    };
-
-    res.json({
-      message: 'Recipe stored successfully',
-      recipe: storedRecipe
-    });
-
+    console.log('🔍 RAG Search Request received:');
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+    console.log('Content-Type:', req.get('Content-Type'));
+    
+    const { query, userId, limit } = req.body;
+    console.log('Extracted params:', { query, userId, limit });
+    
+    const result = await searchRecipes({ query, userId, limit });
+    console.log('RAG Search result:', result);
+    res.json(result);
   } catch (error) {
-    console.error('Recipe storage error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
+    console.error('RAG search error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Get user's recipes
-app.get('/api/recipes', async (req, res) => {
+// Generate embedding for a recipe
+app.post('/api/rag/embedding', async (req, res) => {
   try {
-    const user = getTestUser();
-
-    // TODO: Add database connection and recipe retrieval logic
-    // For now, return empty array
-    const recipes = [];
-
-    res.json({
-      recipes,
-      total: recipes.length
-    });
-
+    const { recipeId } = req.body;
+    const result = await generateRecipeEmbedding(recipeId);
+    res.json(result);
   } catch (error) {
-    console.error('Recipe retrieval error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
+    console.error('Generate embedding error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get similar recipes
+app.get('/api/rag/similar/:recipeId', async (req, res) => {
+  try {
+    const { recipeId } = req.params;
+    const { userId, limit } = req.query;
+    const result = await getSimilarRecipes(recipeId, userId, limit);
+    res.json(result);
+  } catch (error) {
+    console.error('Get similar recipes error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Search by ingredients
+app.post('/api/rag/ingredients', async (req, res) => {
+  try {
+    const { ingredients, userId, limit } = req.body;
+    const result = await searchByIngredients(ingredients, userId, limit);
+    res.json(result);
+  } catch (error) {
+    console.error('Search by ingredients error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get recommendations
+app.get('/api/rag/recommendations', async (req, res) => {
+  try {
+    const { userId, ...preferences } = req.query;
+    const result = await getRecommendations(userId, preferences);
+    res.json(result);
+  } catch (error) {
+    console.error('Get recommendations error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Batch generate embeddings
+app.post('/api/rag/batch-embeddings', async (req, res) => {
+  try {
+    const { recipeIds } = req.body;
+    const result = await batchGenerateEmbeddings(recipeIds);
+    res.json(result);
+  } catch (error) {
+    console.error('Batch generate embeddings error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Local development server running on http://localhost:${PORT}`);
   console.log(`📡 n8n webhook URL: ${N8N_WEBHOOK_URL}`);
   console.log(`🔧 Webhook enabled: ${WEBHOOK_ENABLED}`);
   console.log(`🌐 CORS enabled for localhost:5173`);
+  console.log(`🔗 Server listening on all interfaces (0.0.0.0:${PORT})`);
 });

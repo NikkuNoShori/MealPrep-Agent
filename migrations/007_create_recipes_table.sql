@@ -19,14 +19,11 @@ CREATE TABLE IF NOT EXISTS recipes (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes(user_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_title ON recipes(title);
 CREATE INDEX IF NOT EXISTS idx_recipes_cuisine ON recipes(cuisine);
 CREATE INDEX IF NOT EXISTS idx_recipes_difficulty ON recipes(difficulty);
 CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes(created_at);
-
--- Trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_recipes_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
