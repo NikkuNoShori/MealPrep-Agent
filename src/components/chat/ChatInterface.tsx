@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useChatHistory, useSendMessage } from '../../services/api'
+import {
+  ragService,
+  detectIntent,
+  formatRecipeContext,
+} from "../../services/ragService";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -11,6 +16,11 @@ import {
   Plus,
   MessageSquare,
   Trash2,
+  CheckSquare,
+  Square,
+  X,
+  Search,
+  BookOpen,
 } from "lucide-react";
 import { ChatHistoryResponse, ChatMessageResponse } from "../../types";
 
@@ -28,6 +38,7 @@ interface Conversation {
   lastMessage: string;
   timestamp: Date;
   sessionId: string; // Add sessionId for n8n context
+  isTemporary: boolean; // Track if session is temporary (not yet persisted)
 }
 
 export const ChatInterface: React.FC = () => {
@@ -40,6 +51,10 @@ export const ChatInterface: React.FC = () => {
   const [messageHistory, setMessageHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [tempInput, setTempInput] = useState("");
+  const [selectedConversations, setSelectedConversations] = useState<
+    Set<string>
+  >(new Set());
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: chatHistory } = useChatHistory(50) as {
@@ -51,18 +66,27 @@ export const ChatInterface: React.FC = () => {
   useEffect(() => {
     const savedConversations = localStorage.getItem("chat-conversations");
     const savedCurrentId = localStorage.getItem("chat-current-conversation-id");
+    const shouldCreateTemporary = localStorage.getItem(
+      "chat-create-temporary-session"
+    );
 
     console.log("Loading conversations from localStorage:", {
       savedConversations,
       savedCurrentId,
+      shouldCreateTemporary,
     });
+
+    // Clear the temporary session flag
+    if (shouldCreateTemporary) {
+      localStorage.removeItem("chat-create-temporary-session");
+    }
 
     if (savedConversations) {
       try {
         const parsedConversations = JSON.parse(savedConversations);
         console.log("Parsed conversations:", parsedConversations);
 
-        // Convert timestamp strings back to Date objects
+        // Convert timestamp strings back to Date objects and ensure isTemporary is set
         const conversationsWithDates = parsedConversations.map((conv: any) => ({
           ...conv,
           timestamp: new Date(conv.timestamp),
@@ -70,10 +94,14 @@ export const ChatInterface: React.FC = () => {
             ...msg,
             timestamp: new Date(msg.timestamp),
           })),
+          isTemporary: conv.isTemporary || false, // Ensure isTemporary is set
         }));
         setConversations(conversationsWithDates);
 
-        if (
+        if (shouldCreateTemporary) {
+          // Create a new temporary session when requested from navbar
+          createNewConversation();
+        } else if (
           savedCurrentId &&
           conversationsWithDates.find(
             (c: Conversation) => c.id === savedCurrentId
@@ -82,6 +110,8 @@ export const ChatInterface: React.FC = () => {
           setCurrentConversationId(savedCurrentId);
         } else if (conversationsWithDates.length > 0) {
           setCurrentConversationId(conversationsWithDates[0].id);
+        } else {
+          createDefaultConversation();
         }
       } catch (error) {
         console.error("Error loading conversations from localStorage:", error);
@@ -95,25 +125,45 @@ export const ChatInterface: React.FC = () => {
   }, []);
 
   const createDefaultConversation = () => {
+    const newSessionId = `session-${Date.now()}`;
     const defaultConversation: Conversation = {
-      id: "default",
+      id: Date.now().toString(),
       title: "New Chat",
       messages: [],
       lastMessage: "",
       timestamp: new Date(),
-      sessionId: "default-session",
+      sessionId: newSessionId,
+      isTemporary: true, // Mark as temporary until first message
     };
     setConversations([defaultConversation]);
-    setCurrentConversationId("default");
+    setCurrentConversationId(defaultConversation.id);
   };
 
-  // Save conversations to localStorage whenever they change
+  // Save conversations to localStorage whenever they change (excluding temporary ones)
   useEffect(() => {
     if (conversations.length > 0) {
-      console.log("Saving conversations to localStorage:", conversations);
-      localStorage.setItem("chat-conversations", JSON.stringify(conversations));
+      // Only save non-temporary conversations to localStorage
+      const persistentConversations = conversations.filter(
+        (conv) => !conv.isTemporary
+      );
+      console.log(
+        "Saving persistent conversations to localStorage:",
+        persistentConversations
+      );
+      localStorage.setItem(
+        "chat-conversations",
+        JSON.stringify(persistentConversations)
+      );
     }
   }, [conversations]);
+
+  // Clean up temporary sessions on component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up any temporary sessions when component unmounts
+      setConversations((prev) => prev.filter((conv) => !conv.isTemporary));
+    };
+  }, []);
 
   // Save current conversation ID to localStorage
   useEffect(() => {
@@ -146,6 +196,7 @@ export const ChatInterface: React.FC = () => {
       lastMessage: "",
       timestamp: new Date(),
       sessionId: newSessionId,
+      isTemporary: true, // Mark as temporary until first message
     };
     setConversations((prev) => [newConversation, ...prev]);
     setCurrentConversationId(newConversation.id);
@@ -168,6 +219,64 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  const deleteSelectedConversations = () => {
+    const conversationsToDelete = Array.from(selectedConversations);
+    setConversations((prev) =>
+      prev.filter((conv) => !selectedConversations.has(conv.id))
+    );
+
+    // If current conversation is being deleted, switch to another one
+    if (
+      currentConversationId &&
+      selectedConversations.has(currentConversationId)
+    ) {
+      const remainingConversations = conversations.filter(
+        (conv) => !selectedConversations.has(conv.id)
+      );
+      if (remainingConversations.length > 0) {
+        setCurrentConversationId(remainingConversations[0].id);
+      } else {
+        createNewConversation();
+      }
+    }
+
+    // Clear selection and exit multi-select mode
+    setSelectedConversations(new Set());
+    setIsMultiSelectMode(false);
+  };
+
+  const toggleConversationSelection = (conversationId: string) => {
+    setSelectedConversations((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(conversationId)) {
+        newSet.delete(conversationId);
+      } else {
+        newSet.add(conversationId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllConversations = () => {
+    setSelectedConversations(new Set(conversations.map((conv) => conv.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedConversations(new Set());
+    setIsMultiSelectMode(false);
+  };
+
+  // Clean up temporary sessions that haven't been used
+  const cleanupTemporarySessions = () => {
+    setConversations((prev) => prev.filter((conv) => !conv.isTemporary));
+  };
+
+  // Check if current conversation is temporary and unused
+  const isCurrentConversationTemporary = () => {
+    const current = getCurrentConversation();
+    return current?.isTemporary && current.messages.length === 0;
+  };
+
   const updateConversationTitle = (conversationId: string, title: string) => {
     setConversations((prev) =>
       prev.map((conv) =>
@@ -184,6 +293,10 @@ export const ChatInterface: React.FC = () => {
     const currentConversation = getCurrentConversation();
     if (!currentConversation) return;
 
+    // Detect intent
+    const intent = detectIntent(inputMessage);
+    console.log("Detected intent:", intent);
+
     // Add message to history
     setMessageHistory((prev) => [
       inputMessage,
@@ -199,7 +312,7 @@ export const ChatInterface: React.FC = () => {
       timestamp: new Date(),
     };
 
-    // Update conversation with user message
+    // Update conversation with user message and persist if temporary
     setConversations((prev) =>
       prev.map((conv) =>
         conv.id === currentConversationId
@@ -212,6 +325,7 @@ export const ChatInterface: React.FC = () => {
                 conv.messages.length === 0
                   ? inputMessage.slice(0, 30) + "..."
                   : conv.title,
+              isTemporary: false, // Persist the session when first message is sent
             }
           : conv
       )
@@ -221,13 +335,53 @@ export const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = (await sendMessageMutation.mutateAsync({
-        message: inputMessage,
-        context: {
-          recentMessages: currentConversation.messages.slice(-5),
-          sessionId: currentConversation.sessionId, // Pass sessionId for n8n context
-        },
-      })) as ChatMessageResponse;
+      let response: ChatMessageResponse;
+
+      if (intent === "recipe_extraction") {
+        // Handle recipe extraction
+        response = (await sendMessageMutation.mutateAsync({
+          message: inputMessage,
+          sessionId: currentConversation.sessionId,
+          intent: "recipe_extraction",
+          context: {
+            recentMessages: currentConversation.messages.slice(-5),
+          },
+        })) as ChatMessageResponse;
+      } else {
+        // Handle RAG-based queries
+        let recipeContext = "";
+
+        if (
+          intent === "recipe_search" ||
+          intent === "ingredient_search" ||
+          intent === "cooking_advice"
+        ) {
+          try {
+            const ragResults = await ragService.searchRecipes({
+              query: inputMessage,
+              userId: "test-user", // TODO: Get actual user ID
+              limit: 5,
+              searchType: "hybrid",
+            });
+            recipeContext = formatRecipeContext(ragResults.results);
+          } catch (ragError) {
+            console.warn(
+              "RAG search failed, proceeding without context:",
+              ragError
+            );
+          }
+        }
+
+        response = (await sendMessageMutation.mutateAsync({
+          message: inputMessage,
+          sessionId: currentConversation.sessionId,
+          intent: intent,
+          context: {
+            recentMessages: currentConversation.messages.slice(-5),
+            recipeContext: recipeContext,
+          },
+        })) as ChatMessageResponse;
+      }
 
       const aiMessage: Message = {
         id: response.response.id,
@@ -303,11 +457,11 @@ export const ChatInterface: React.FC = () => {
   const currentConversation = getCurrentConversation();
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full min-h-0">
       {/* Sidebar - Conversation History */}
       <div className="w-80 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col min-h-0">
-        {/* New Chat Button */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        {/* Header with New Chat and Multi-select */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-2">
           <Button
             onClick={createNewConversation}
             className="w-full justify-start"
@@ -316,6 +470,66 @@ export const ChatInterface: React.FC = () => {
             <Plus className="h-4 w-4 mr-2" />
             New Chat
           </Button>
+
+          {conversations.length > 0 && (
+            <div className="flex gap-2">
+              {!isMultiSelectMode ? (
+                <Button
+                  onClick={() => setIsMultiSelectMode(true)}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                >
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  Select
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    onClick={selectAllConversations}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    onClick={clearSelection}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
+          {isMultiSelectMode && selectedConversations.size > 0 && (
+            <Button
+              onClick={deleteSelectedConversations}
+              variant="destructive"
+              size="sm"
+              className="w-full"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected ({selectedConversations.size})
+            </Button>
+          )}
+
+          {conversations.some((conv) => conv.isTemporary) && (
+            <Button
+              onClick={cleanupTemporarySessions}
+              variant="outline"
+              size="sm"
+              className="w-full"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Clean Up Unused Chats
+            </Button>
+          )}
         </div>
 
         {/* Conversation List */}
@@ -327,37 +541,74 @@ export const ChatInterface: React.FC = () => {
                 currentConversationId === conversation.id
                   ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700"
                   : ""
+              } ${
+                selectedConversations.has(conversation.id)
+                  ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700"
+                  : ""
               }`}
-              onClick={() => setCurrentConversationId(conversation.id)}
+              onClick={() => {
+                if (isMultiSelectMode) {
+                  toggleConversationSelection(conversation.id);
+                } else {
+                  setCurrentConversationId(conversation.id);
+                }
+              }}
             >
               <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-gray-500" />
-                    <span className="font-medium text-sm truncate">
-                      {conversation.title}
-                    </span>
-                  </div>
-                  {conversation.lastMessage && (
-                    <p className="text-xs text-gray-500 truncate mt-1">
-                      {conversation.lastMessage}
-                    </p>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {isMultiSelectMode ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleConversationSelection(conversation.id);
+                      }}
+                      className="flex-shrink-0"
+                    >
+                      {selectedConversations.has(conversation.id) ? (
+                        <CheckSquare className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Square className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  ) : (
+                    <MessageSquare className="h-4 w-4 text-gray-500 flex-shrink-0" />
                   )}
-                  <p className="text-xs text-gray-400 mt-1">
-                    {conversation.timestamp.toLocaleDateString()}
-                  </p>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate block">
+                        {conversation.title}
+                      </span>
+                      {conversation.isTemporary && (
+                        <span className="text-xs bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded">
+                          Temporary
+                        </span>
+                      )}
+                    </div>
+                    {conversation.lastMessage && (
+                      <p className="text-xs text-gray-500 truncate mt-1">
+                        {conversation.lastMessage}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      {conversation.timestamp.toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteConversation(conversation.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+
+                {!isMultiSelectMode && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteConversation(conversation.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           ))}
@@ -377,10 +628,24 @@ export const ChatInterface: React.FC = () => {
                   <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
                     Welcome to MealPrep Assistant!
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                     Ask me anything about recipes, meal planning, or cooking
                     tips.
                   </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-md mx-auto">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <BookOpen className="h-5 w-5 mx-auto mb-2 text-blue-600" />
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        "Add this recipe to my collection"
+                      </p>
+                    </div>
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <Search className="h-5 w-5 mx-auto mb-2 text-green-600" />
+                      <p className="text-xs text-green-700 dark:text-green-300">
+                        "Find recipes with chicken"
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 currentConversation.messages.map((message) => (

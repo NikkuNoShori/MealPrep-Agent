@@ -108,6 +108,9 @@ const getTestUser = () => ({
   householdSize: 4
 });
 
+// Note: Recipe storage moved to direct Neon database access
+// This server now only handles chat functionality
+
 // Routes
 app.get('/api/health', (req, res) => {
   res.json({
@@ -271,16 +274,13 @@ app.post('/api/recipes', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Recipe storage error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
+    console.error('Generate embedding error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Get user's recipes
-app.get('/api/recipes', async (req, res) => {
+// Get similar recipes
+app.get('/api/rag/similar/:recipeId', async (req, res) => {
   try {
     const user = getTestUser();
     const limit = parseInt(req.query.limit) || 50;
@@ -497,9 +497,11 @@ app.post('/api/rag/embedding', async (req, res) => {
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Local development server running on http://localhost:${PORT}`);
   console.log(`🌐 Server accessible on all network interfaces (including 192.168.1.143:${PORT})`);
   console.log(`📡 n8n webhook URL: ${N8N_WEBHOOK_URL}`);
   console.log(`🔧 Webhook enabled: ${WEBHOOK_ENABLED}`);
   console.log(`🌐 CORS enabled for localhost:5173`);
+  console.log(`🔗 Server listening on all interfaces (0.0.0.0:${PORT})`);
 });
