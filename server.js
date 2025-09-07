@@ -1,6 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import { config } from 'dotenv';
+import { db } from './src/services/database.js';
+import { embeddingService } from './src/services/embeddingService.js';
+
+// Load environment variables
+config();
 
 const app = express();
 const PORT = 3000;
@@ -225,18 +231,39 @@ app.post('/api/recipes', async (req, res) => {
 
     console.log('Received recipe for storage:', recipe.title);
 
-    // TODO: Add database connection and recipe storage logic
-    // For now, just log the recipe data
-    console.log('Recipe data:', JSON.stringify(recipe, null, 2));
-
-    // Simulate successful storage
-    const storedRecipe = {
-      id: Date.now(),
-      ...recipe,
+    // Create the recipe in the database
+    const storedRecipe = await db.createRecipe({
       user_id: user.id,
-      created_at: new Date(),
-      updated_at: new Date()
-    };
+      title: recipe.title,
+      description: recipe.description,
+      ingredients: recipe.ingredients || [],
+      instructions: recipe.instructions || [],
+      prep_time: recipe.prep_time,
+      cook_time: recipe.cook_time,
+      servings: recipe.servings,
+      difficulty: recipe.difficulty,
+      cuisine: recipe.cuisine,
+      dietary_tags: recipe.dietary_tags,
+      source_url: recipe.source_url,
+      source_name: recipe.source_name,
+      rating: recipe.rating,
+      is_favorite: recipe.is_favorite || false
+    });
+
+    // Generate and store embedding for the recipe
+    try {
+      const { embedding, textContent } = await embeddingService.generateRecipeEmbedding(storedRecipe);
+      await db.createEmbedding({
+        recipe_id: storedRecipe.id,
+        embedding: embedding,
+        text_content: textContent,
+        embedding_type: 'recipe_content'
+      });
+      console.log('✅ Generated embedding for recipe:', storedRecipe.id);
+    } catch (embeddingError) {
+      console.error('⚠️ Failed to generate embedding for recipe:', embeddingError);
+      // Don't fail the recipe creation if embedding generation fails
+    }
 
     res.json({
       message: 'Recipe stored successfully',
@@ -256,10 +283,11 @@ app.post('/api/recipes', async (req, res) => {
 app.get('/api/recipes', async (req, res) => {
   try {
     const user = getTestUser();
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
 
-    // TODO: Add database connection and recipe retrieval logic
-    // For now, return empty array
-    const recipes = [];
+    // Get recipes from database
+    const recipes = await db.getRecipes(user.id, limit, offset);
 
     res.json({
       recipes,
@@ -275,9 +303,202 @@ app.get('/api/recipes', async (req, res) => {
   }
 });
 
+// RAG Search endpoint
+app.post('/api/rag/search', async (req, res) => {
+  try {
+    const { query, userId, limit = 10, searchType = 'semantic' } = req.body;
+    
+    console.log('RAG Search request:', { query, userId, limit, searchType });
+    
+    let results = [];
+    
+    if (searchType === 'semantic' || searchType === 'hybrid') {
+      // Generate embedding for the query
+      const queryEmbedding = await embeddingService.generateEmbedding(query);
+      
+      if (searchType === 'semantic') {
+        // Pure vector search
+        results = await db.searchSimilarRecipes(queryEmbedding, userId, 0.5, limit);
+      } else {
+        // Hybrid search (vector + text)
+        results = await db.hybridSearch(queryEmbedding, query, userId, limit);
+      }
+    } else if (searchType === 'text') {
+      // Pure text search
+      results = await db.searchRecipesText(query, userId, limit);
+    } else {
+      throw new Error(`Invalid search type: ${searchType}`);
+    }
+    
+    console.log(`Found ${results.length} results for query: "${query}"`);
+    
+    res.json({
+      results: results.map(result => ({
+        id: result.recipe_id,
+        title: result.title,
+        description: result.description,
+        ingredients: result.ingredients,
+        instructions: result.instructions,
+        similarity_score: result.similarity_score,
+        rank_score: result.rank_score,
+        searchable_text: result.searchable_text
+      })),
+      total: results.length,
+      searchType,
+      query
+    });
+    
+  } catch (error) {
+    console.error('RAG Search error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// RAG Similar recipes endpoint
+app.get('/api/rag/similar/:recipeId', async (req, res) => {
+  try {
+    const { recipeId } = req.params;
+    const { userId, limit = 5 } = req.query;
+    
+    console.log('RAG Similar request:', { recipeId, userId, limit });
+    
+    // Get the recipe to find similar ones
+    const recipe = await db.getRecipe(recipeId, userId);
+    if (!recipe) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    
+    // Generate embedding for the recipe
+    const { embedding } = await embeddingService.generateRecipeEmbedding(recipe);
+    
+    // Find similar recipes
+    const results = await db.searchSimilarRecipes(embedding, userId, 0.6, parseInt(limit));
+    
+    // Filter out the original recipe
+    const similarResults = results.filter(result => result.recipe_id !== recipeId);
+    
+    res.json(similarResults.map(result => ({
+      id: result.recipe_id,
+      title: result.title,
+      description: result.description,
+      ingredients: result.ingredients,
+      instructions: result.instructions,
+      similarity_score: result.similarity_score
+    })));
+    
+  } catch (error) {
+    console.error('RAG Similar error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// RAG Ingredients search endpoint
+app.post('/api/rag/ingredients', async (req, res) => {
+  try {
+    const { ingredients, userId, limit = 10 } = req.body;
+    
+    console.log('RAG Ingredients request:', { ingredients, userId, limit });
+    
+    if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
+      return res.status(400).json({ error: 'Ingredients array is required' });
+    }
+    
+    // Search for recipes containing these ingredients
+    const results = await db.searchByIngredients(ingredients, userId, parseInt(limit));
+    
+    res.json(results.map(result => ({
+      id: result.recipe_id,
+      title: result.title,
+      description: result.description,
+      ingredients: result.ingredients,
+      instructions: result.instructions,
+      rank_score: result.rank_score
+    })));
+    
+  } catch (error) {
+    console.error('RAG Ingredients error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// RAG Recommendations endpoint
+app.post('/api/rag/recommendations', async (req, res) => {
+  try {
+    const { userId, preferences, limit = 10 } = req.body;
+    
+    console.log('RAG Recommendations request:', { userId, preferences, limit });
+    
+    // Get recipe recommendations based on user preferences
+    const results = await db.getRecommendations(userId, preferences, parseInt(limit));
+    
+    res.json(results.map(result => ({
+      id: result.recipe_id,
+      title: result.title,
+      description: result.description,
+      ingredients: result.ingredients,
+      instructions: result.instructions
+    })));
+    
+  } catch (error) {
+    console.error('RAG Recommendations error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// RAG Embedding endpoint
+app.post('/api/rag/embedding', async (req, res) => {
+  try {
+    const { recipeId, text } = req.body;
+    
+    console.log('RAG Embedding request:', { recipeId, text });
+    
+    if (!text) {
+      return res.status(400).json({ error: 'Text is required for embedding generation' });
+    }
+    
+    // Generate embedding for the provided text
+    const embedding = await embeddingService.generateEmbedding(text);
+    
+    // If recipeId is provided, store the embedding in the database
+    if (recipeId) {
+      await db.createEmbedding({
+        recipe_id: recipeId,
+        embedding: embedding,
+        text_content: text,
+        embedding_type: 'manual'
+      });
+    }
+    
+    res.json({
+      success: true,
+      embedding: embedding
+    });
+    
+  } catch (error) {
+    console.error('RAG Embedding error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Local development server running on http://localhost:${PORT}`);
+  console.log(`🌐 Server accessible on all network interfaces (including 192.168.1.143:${PORT})`);
   console.log(`📡 n8n webhook URL: ${N8N_WEBHOOK_URL}`);
   console.log(`🔧 Webhook enabled: ${WEBHOOK_ENABLED}`);
   console.log(`🌐 CORS enabled for localhost:5173`);

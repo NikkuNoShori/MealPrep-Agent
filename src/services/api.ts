@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Use local development API for localhost, production API for deployed app
 const API_BASE_URL =
-  window.location.hostname === "localhost"
+  window.location.hostname === "localhost" || window.location.hostname === "app.localhost"
     ? "http://localhost:3000" // Local development API
     : (import.meta as any).env?.VITE_API_URL ||
       "https://meal-prep-agent-405dzxcab-nickneal1717s-projects.vercel.app";
