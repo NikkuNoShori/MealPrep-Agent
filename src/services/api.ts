@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { recipeService } from "./neon";
+import { recipeService } from "./recipeService";
 
 // Use local development API for localhost, production API for deployed app
 const API_BASE_URL =

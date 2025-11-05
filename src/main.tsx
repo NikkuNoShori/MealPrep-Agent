@@ -28,6 +28,20 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               background: '#363636',
               color: '#fff',
             },
+            success: {
+              duration: 4000,
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              duration: 5000,
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
           }}
         />
       </BrowserRouter>

@@ -7,7 +7,8 @@ import { BackButton } from '@/components/common/BackButton'
 import { useAuthStore } from '@/stores/authStore'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import { ToastService } from '@/services/toast'
+import { Logger } from '@/services/logger'
 import { Loader2, UserPlus } from 'lucide-react'
 
 interface SignupFormProps {
@@ -23,19 +24,46 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
   const { signUp } = useAuthStore()
   
   const signupMutation = useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => signUp(email, password),
-    onSuccess: () => {
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      Logger.info('🔵 SignupForm: Calling signUp...')
+      
+      // signUp now returns the user directly with retry logic built-in
+      const user = await signUp(email, password)
+      
+      if (!user || !user.id) {
+        throw new Error('Sign up successful but user not found. Please try signing in.')
+      }
+      
+      Logger.info('🔵 SignupForm: SignUp successful', { userId: user.id })
+      return user
+    },
+    onSuccess: (user) => {
+      Logger.info('🔵 SignupForm: onSuccess called with user', { userId: user.id })
+      ToastService.success('Account created successfully!')
+      
+      // Navigate immediately - user is confirmed
       onSuccess?.()
-      navigate('/dashboard')
-      toast.success('Account created')
+      navigate('/dashboard', { replace: true })
     },
     onError: (error: any) => {
       const raw = error?.message || ''
-      const friendly = /exists|taken|already/i.test(raw)
-        ? 'An account already exists with this email.'
-        : (raw || 'Signup failed')
+      Logger.error('🔴 SignupForm: SignUp error', error)
+      
+      // Handle different error types
+      let friendly = raw || 'Sign up failed'
+      
+      if (/exists|taken|already/i.test(raw)) {
+        friendly = 'An account already exists with this email. Please sign in instead.'
+      } else if (/not\s*found|user/i.test(raw)) {
+        friendly = 'User not found after sign up. Please try signing in.'
+      } else if (/password/i.test(raw)) {
+        friendly = 'Password requirements not met. Please check your password.'
+      } else if (/email/i.test(raw) && /invalid/i.test(raw)) {
+        friendly = 'Invalid email address. Please check your email.'
+      }
+      
       setError(friendly)
-      toast.error(friendly)
+      ToastService.error(friendly)
     }
   })
 
@@ -77,6 +105,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
+              autoComplete="username"
               required
             />
           </div>
@@ -89,6 +118,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Create a password"
+              autoComplete="new-password"
               required
             />
           </div>
@@ -101,6 +131,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm your password"
+              autoComplete="new-password"
               required
             />
           </div>

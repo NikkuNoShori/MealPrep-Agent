@@ -5,9 +5,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BackButton } from '@/components/common/BackButton'
 import { useAuthStore } from '@/stores/authStore'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import { ToastService } from '@/services/toast'
+import { Logger } from '@/services/logger'
 import { Loader2, LogIn } from 'lucide-react'
 
 interface LoginFormProps {
@@ -22,19 +23,39 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const { signIn } = useAuthStore()
   
   const loginMutation = useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => signIn(email, password),
-    onSuccess: () => {
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      Logger.info('🔵 LoginForm: Calling signIn...')
+      
+      // signIn now returns the user directly with retry logic built-in
+      const user = await signIn(email, password)
+      
+      if (!user || !user.id) {
+        throw new Error('Sign in successful but user not found. Please try again.')
+      }
+      
+      Logger.info('🔵 LoginForm: SignIn successful', { userId: user.id })
+      return user
+    },
+    onSuccess: (user) => {
+      Logger.info('🔵 LoginForm: onSuccess called with user', { userId: user.id })
+      ToastService.success('Signed in successfully')
+      
+      // Navigate immediately - user is confirmed
       onSuccess?.()
-      navigate('/dashboard')
-      toast.success('Signed in successfully')
+      navigate('/dashboard', { replace: true })
     },
     onError: (error: any) => {
       const raw = error?.message || ''
+      Logger.error('🔴 LoginForm: SignIn error', error)
+      
       const friendly = /not\s*found|no\s*user|invalid/i.test(raw)
         ? 'No account found for this email. Please sign up first.'
-        : (raw || 'Login failed')
+        : /password/i.test(raw)
+        ? 'Incorrect password. Please try again.'
+        : (raw || 'Sign in failed')
+      
       setError(friendly)
-      toast.error(friendly)
+      ToastService.error(friendly)
     }
   })
 
@@ -66,18 +87,28 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
+              autoComplete="username"
               required
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                to="/forgot-password"
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
+              autoComplete="current-password"
               required
             />
           </div>

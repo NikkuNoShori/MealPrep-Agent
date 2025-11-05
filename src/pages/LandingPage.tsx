@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
 import { 
   MessageSquare, 
   ChefHat, 
@@ -9,8 +10,18 @@ import {
   Play,
   Star
 } from 'lucide-react'
+import { useAuthStore } from '@/stores/authStore'
+import { Logger } from '@/services/logger'
 
 const LandingPage = () => {
+  // Refresh auth state when landing page loads to check for existing session
+  const { refreshUser } = useAuthStore()
+  
+  useEffect(() => {
+    Logger.info('🔵 LandingPage: Refreshing auth state on mount')
+    refreshUser()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const features = [
     {
       icon: MessageSquare,

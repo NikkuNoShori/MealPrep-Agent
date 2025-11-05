@@ -123,6 +123,45 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Database connection test endpoint
+app.get('/api/test-db', async (req, res) => {
+  try {
+    console.log('🔵 Testing database connection...');
+    const result = await db.query('SELECT NOW() as current_time, version() as pg_version');
+    const connectionInfo = await db.query(`
+      SELECT 
+        current_database() as database_name,
+        current_user as user_name,
+        inet_server_addr() as server_address,
+        inet_server_port() as server_port
+    `);
+    
+    res.json({
+      status: 'success',
+      message: 'Database connection successful',
+      timestamp: new Date().toISOString(),
+      database: {
+        time: result.rows[0]?.current_time,
+        version: result.rows[0]?.pg_version?.split(' ')[0] + ' ' + result.rows[0]?.pg_version?.split(' ')[1],
+        name: connectionInfo.rows[0]?.database_name,
+        user: connectionInfo.rows[0]?.user_name,
+        server: connectionInfo.rows[0]?.server_address || 'cloud',
+        port: connectionInfo.rows[0]?.server_port || 'default'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Database connection test failed:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Database connection failed',
+      error: error.message
+    });
+  }
+});
+
+// Password reset is now handled client-side by Supabase Auth
+// No backend proxy needed
+
 app.get('/api/test-webhook', async (req, res) => {
   try {
     console.log('🧪 Testing webhook connectivity...');
@@ -496,7 +535,6 @@ app.post('/api/rag/embedding', async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Local development server running on http://localhost:${PORT}`);
   console.log(`🌐 Server accessible on all network interfaces (including 192.168.1.143:${PORT})`);

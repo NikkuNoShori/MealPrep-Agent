@@ -1,13 +1,26 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-});
-
 export class EmbeddingService {
   constructor() {
-    this.openai = openai;
+    this._openai = null;
+  }
+
+  get openai() {
+    if (!this._openai) {
+      const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          'OpenAI API key not configured. Please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file.'
+        );
+      }
+      this._openai = new OpenAI({
+        apiKey: apiKey,
+        baseURL: process.env.OPENROUTER_API_KEY 
+          ? 'https://openrouter.ai/api/v1'
+          : undefined, // Use default OpenAI endpoint if using OPENAI_API_KEY
+      });
+    }
+    return this._openai;
   }
 
   async generateEmbedding(text) {

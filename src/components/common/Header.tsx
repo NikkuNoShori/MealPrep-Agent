@@ -3,6 +3,8 @@ import { Menu, X, LogOut, User } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useState, useRef } from "react";
 import { useAuthStore } from "@/stores/authStore";
+import { ToastService } from "@/services/toast";
+import { Logger } from "@/services/logger";
 import { Button } from "../ui/button";
 
 const Header = () => {
@@ -117,7 +119,17 @@ const Header = () => {
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-stone-200 dark:border-gray-700 py-1 z-50">
                     <button
-                      onClick={signOut}
+                      onClick={async () => {
+                        try {
+                          Logger.info('🔵 Header: Sign out requested');
+                          await signOut();
+                          ToastService.success('Signed out successfully');
+                          navigate('/signin');
+                        } catch (error: any) {
+                          Logger.error('🔴 Header: Sign out error', error);
+                          ToastService.error('Failed to sign out. Please try again.');
+                        }
+                      }}
                       className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-stone-100 dark:hover:bg-gray-700 flex items-center space-x-2"
                     >
                       <LogOut className="w-4 h-4" />

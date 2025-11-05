@@ -1,14 +1,69 @@
 import { Pool, PoolClient } from 'pg';
 import { config } from 'dotenv';
+import * as monitor from 'pg-monitor';
+import { AppLogger } from './logger';
 
 // Load environment variables
 config();
 
+// Configure pg-monitor to use unified logger
+const enablePgMonitor = process.env.ENABLE_PG_MONITOR !== 'false'; // Default: enabled
+
+if (enablePgMonitor) {
+  // Configure pg-monitor
+  monitor.setTheme('matrix'); // Choose theme: 'matrix', 'default', 'monochrome'
+  
+  // Attach monitor to all events, routing through unified logger
+  monitor.attach({
+    // Log all queries through unified logger
+    query: (e: any) => {
+      AppLogger.dbQuery(e.query, e.params, e.duration);
+    },
+    
+    // Log errors through unified logger
+    error: (err: any, e: any) => {
+      const error = err instanceof Error ? err : new Error(String(err));
+      (error as any).code = err.code;
+      (error as any).detail = err.detail;
+      (error as any).hint = err.hint;
+      AppLogger.dbError(error, e.query, e.params);
+    },
+    
+    // Log connection events through unified logger
+    connect: (client: any, e: any) => {
+      AppLogger.dbConnect(client?.processID);
+    },
+    
+    // Log transaction events through unified logger
+    task: (e: any) => {
+      if (e.event === 'start') {
+        AppLogger.dbTransaction('start');
+      } else if (e.event === 'finish') {
+        AppLogger.dbTransaction('finish', e.duration);
+      } else if (e.event === 'rollback') {
+        AppLogger.dbTransaction('rollback');
+      }
+    },
+    
+    // Log disconnect events through unified logger
+    disconnect: (client: any, e: any) => {
+      AppLogger.dbDisconnect(client?.processID);
+    }
+  });
+  
+  AppLogger.info('✅ pg-monitor enabled - PostgreSQL logging integrated with unified logger');
+} else {
+  AppLogger.warn('⚠️ pg-monitor disabled - no database logging');
+}
+
+// Create pool with basic configuration
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  // Connection timeout in milliseconds
+  connectionTimeoutMillis: 10000,
 });
 
 export interface Recipe {
@@ -62,9 +117,28 @@ export class DatabaseService {
 
   async query(text: string, params?: any[]): Promise<any> {
     const client = await this.pool.connect();
+    const startTime = Date.now();
+    
     try {
+      // pg-monitor will automatically log the query through unified logger
       const result = await client.query(text, params);
+      
+      // Calculate duration manually (pg QueryResult doesn't have duration property)
+      const duration = Date.now() - startTime;
+      
+      // Log slow queries as warnings (additional check)
+      // pg-monitor already logs duration, but we can add custom slow query detection
+      if (duration > 1000) {
+        AppLogger.warn('⚠️ Slow query detected', {
+          duration: `${duration.toFixed(2)}ms`,
+          query: text.length > 200 ? text.substring(0, 200) + '...' : text,
+        });
+      }
+      
       return result;
+    } catch (error: any) {
+      // pg-monitor will automatically log the error through unified logger
+      throw error;
     } finally {
       client.release();
     }
@@ -282,7 +356,7 @@ export class DatabaseService {
     params.push(maxResults);
 
     const result = await this.query(query, params);
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       recipe_id: row.id,
       title: row.title,
       description: row.description,

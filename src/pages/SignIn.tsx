@@ -27,7 +27,15 @@ const SignIn: React.FC = () => {
         
         <LoginForm onSuccess={handleAuthSuccess} />
         
-        <div className="mt-6 text-center">
+        <div className="mt-6 space-y-3 text-center">
+          <p className="text-sm">
+            <Link 
+              to="/forgot-password" 
+              className="text-primary hover:underline font-medium"
+            >
+              Forgot your password?
+            </Link>
+          </p>
           <p className="text-sm text-muted-foreground">
             Don't have an account?{' '}
             <Link to="/signup" className="text-primary hover:underline font-medium">
