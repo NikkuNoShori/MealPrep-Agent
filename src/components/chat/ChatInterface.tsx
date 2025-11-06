@@ -21,14 +21,22 @@ import {
   X,
   Search,
   BookOpen,
+  Save,
+  Check,
 } from "lucide-react";
 import { ChatHistoryResponse, ChatMessageResponse } from "../../types";
+import { useCreateRecipe } from "../../services/api";
+import { ToastService } from "../../services/toast";
+import { parseRecipeFromText, formatRecipeForStorage, ParsedRecipe } from "../../utils/recipeParser";
+import { Logger } from "../../services/logger";
 
 interface Message {
   id: string;
   content: string;
   sender: "user" | "ai";
   timestamp: Date;
+  recipe?: ParsedRecipe | null; // Optional parsed recipe data
+  recipeStored?: boolean; // Track if recipe has been stored
 }
 
 interface Conversation {
@@ -61,6 +69,7 @@ export const ChatInterface: React.FC = () => {
     data: ChatHistoryResponse | undefined;
   };
   const sendMessageMutation = useSendMessage();
+  const createRecipeMutation = useCreateRecipe();
 
   // Load conversations from localStorage on component mount
   useEffect(() => {
@@ -87,12 +96,15 @@ export const ChatInterface: React.FC = () => {
         console.log("Parsed conversations:", parsedConversations);
 
         // Convert timestamp strings back to Date objects and ensure isTemporary is set
+        // Also preserve recipe data if present
         const conversationsWithDates = parsedConversations.map((conv: any) => ({
           ...conv,
           timestamp: new Date(conv.timestamp),
           messages: conv.messages.map((msg: any) => ({
             ...msg,
             timestamp: new Date(msg.timestamp),
+            recipe: msg.recipe || null, // Preserve recipe data if present
+            recipeStored: msg.recipeStored || false, // Preserve stored status
           })),
           isTemporary: conv.isTemporary || false, // Ensure isTemporary is set
         }));
@@ -383,11 +395,16 @@ export const ChatInterface: React.FC = () => {
         })) as ChatMessageResponse;
       }
 
+      // Try to parse recipe from AI response
+      const parsedRecipe = parseRecipeFromText(response.response.content);
+      
       const aiMessage: Message = {
         id: response.response.id,
         content: response.response.content,
         sender: "ai",
         timestamp: new Date(response.response.timestamp),
+        recipe: parsedRecipe || null,
+        recipeStored: false,
       };
 
       // Update conversation with AI response
@@ -424,6 +441,34 @@ export const ChatInterface: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleStoreRecipe = async (messageId: string, recipe: ParsedRecipe) => {
+    try {
+      Logger.info('🔵 ChatInterface: Storing recipe from chat', { messageId, recipeTitle: recipe.title });
+      
+      const recipeData = formatRecipeForStorage(recipe);
+      
+      await createRecipeMutation.mutateAsync(recipeData);
+      
+      // Update message to mark recipe as stored
+      setConversations((prev) =>
+        prev.map((conv) => ({
+          ...conv,
+          messages: conv.messages.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, recipeStored: true }
+              : msg
+          ),
+        }))
+      );
+      
+      ToastService.success(`Recipe "${recipe.title}" saved successfully!`);
+      Logger.info('✅ ChatInterface: Recipe stored successfully', { messageId, recipeTitle: recipe.title });
+    } catch (error: any) {
+      Logger.error('🔴 ChatInterface: Failed to store recipe', error);
+      ToastService.error(`Failed to save recipe: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -662,31 +707,69 @@ export const ChatInterface: React.FC = () => {
                         <Bot className="h-4 w-4 text-primary" />
                       </div>
                     )}
-                    <div
-                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                        message.sender === "user"
-                          ? "bg-primary text-white"
-                          : "bg-gray-100 dark:bg-gray-800"
-                      }`}
-                    >
-                      <p
-                        className={`text-sm whitespace-pre-wrap ${
+                    <div className="flex flex-col gap-2">
+                      <div
+                        className={`max-w-[70%] rounded-lg px-4 py-2 ${
                           message.sender === "user"
-                            ? "text-white"
-                            : "text-gray-900 dark:text-gray-100"
+                            ? "bg-primary text-white"
+                            : "bg-gray-100 dark:bg-gray-800"
                         }`}
                       >
-                        {message.content}
-                      </p>
-                      <p
-                        className={`text-xs opacity-70 mt-1 ${
-                          message.sender === "user"
-                            ? "text-white"
-                            : "text-gray-600 dark:text-gray-400"
-                        }`}
-                      >
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
+                        <p
+                          className={`text-sm whitespace-pre-wrap ${
+                            message.sender === "user"
+                              ? "text-white"
+                              : "text-gray-900 dark:text-gray-100"
+                          }`}
+                        >
+                          {message.content}
+                        </p>
+                        <p
+                          className={`text-xs opacity-70 mt-1 ${
+                            message.sender === "user"
+                              ? "text-white"
+                              : "text-gray-600 dark:text-gray-400"
+                          }`}
+                        >
+                          {message.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+                      
+                      {/* Show "Store Recipe" button if recipe is detected and not yet stored */}
+                      {message.sender === "ai" && message.recipe && !message.recipeStored && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={() => handleStoreRecipe(message.id, message.recipe!)}
+                            disabled={createRecipeMutation.isPending}
+                            size="sm"
+                            variant="outline"
+                            className="text-xs"
+                          >
+                            {createRecipeMutation.isPending ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-3 w-3 mr-1" />
+                                Store Recipe
+                              </>
+                            )}
+                          </Button>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {message.recipe.title}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Show success indicator if recipe was stored */}
+                      {message.sender === "ai" && message.recipe && message.recipeStored && (
+                        <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                          <Check className="h-3 w-3" />
+                          <span>Recipe "{message.recipe.title}" saved</span>
+                        </div>
+                      )}
                     </div>
                     {message.sender === "user" && (
                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">

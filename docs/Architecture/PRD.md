@@ -125,7 +125,7 @@ Create an intuitive, AI-powered kitchen companion that transforms how families d
 - **Automation**: N8N for workflow orchestration ✅
 - **Real-time**: HTTP polling for chat interface (WebSocket future enhancement)
 - **External APIs**: OpenRouter for AI ✅, future OCR services, nutrition APIs
-- **Authentication**: JWT-based authentication with family account support ✅
+- **Authentication**: Stack Auth (cookie-based sessions) with user account support ✅
 
 ## Success Metrics
 
