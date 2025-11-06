@@ -33,10 +33,19 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // Check if request was aborted
+      if (options.signal?.aborted) {
+        throw new Error("Request aborted");
+      }
       const error = await response
         .json()
         .catch(() => ({ error: "Network error" }));
       throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    // Check if request was aborted before parsing
+    if (options.signal?.aborted) {
+      throw new Error("Request aborted");
     }
 
     return response.json();
@@ -79,10 +88,11 @@ class ApiClient {
     sessionId?: string;
     clearMemory?: boolean;
     intent?: string;
-  }) {
+  }, signal?: AbortSignal) {
     return this.request("/api/chat/message", {
       method: "POST",
       body: JSON.stringify(data),
+      signal,
     });
   }
 

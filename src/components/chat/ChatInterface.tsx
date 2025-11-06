@@ -26,7 +26,7 @@ import {
   Copy,
 } from "lucide-react";
 import { ChatHistoryResponse, ChatMessageResponse } from "../../types";
-import { useCreateRecipe } from "../../services/api";
+import { useCreateRecipe, apiClient } from "../../services/api";
 import { ToastService } from "../../services/toast";
 import { parseRecipeFromText, formatRecipeForStorage, ParsedRecipe } from "../../utils/recipeParser";
 import { Logger } from "../../services/logger";
@@ -65,6 +65,8 @@ export const ChatInterface: React.FC = () => {
   >(new Set());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const ragAbortControllerRef = useRef<AbortController | null>(null);
 
   const { data: chatHistory } = useChatHistory(50) as {
     data: ChatHistoryResponse | undefined;
@@ -300,27 +302,53 @@ export const ChatInterface: React.FC = () => {
     );
   };
 
+  const handleCancelMessage = () => {
+    // Abort any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (ragAbortControllerRef.current) {
+      ragAbortControllerRef.current.abort();
+      ragAbortControllerRef.current = null;
+    }
+    
+    // Reset loading state immediately
+    setIsLoading(false);
+    
+    // Remove the "Thinking..." indicator by removing the last pending message
+    // The user message is already added, so we just need to reset state
+    ToastService.info("Request cancelled");
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !currentConversationId) return;
 
     const currentConversation = getCurrentConversation();
     if (!currentConversation) return;
 
+    // Create abort controllers for this request
+    abortControllerRef.current = new AbortController();
+    ragAbortControllerRef.current = new AbortController();
+
     // Detect intent
     const intent = detectIntent(inputMessage);
     console.log("Detected intent:", intent);
 
+    // Save the message text before clearing input
+    const messageText = inputMessage;
+
     // Add message to history
     setMessageHistory((prev) => [
-      inputMessage,
-      ...prev.filter((msg) => msg !== inputMessage),
+      messageText,
+      ...prev.filter((msg) => msg !== messageText),
     ]);
     setHistoryIndex(-1);
     setTempInput("");
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputMessage,
+      content: messageText,
       sender: "user",
       timestamp: new Date(),
     };
@@ -332,11 +360,11 @@ export const ChatInterface: React.FC = () => {
           ? {
               ...conv,
               messages: [...conv.messages, userMessage],
-              lastMessage: inputMessage,
+              lastMessage: messageText,
               timestamp: new Date(),
               title:
                 conv.messages.length === 0
-                  ? inputMessage.slice(0, 30) + "..."
+                  ? messageText.slice(0, 30) + "..."
                   : conv.title,
               isTemporary: false, // Persist the session when first message is sent
             }
@@ -351,49 +379,91 @@ export const ChatInterface: React.FC = () => {
       let response: ChatMessageResponse;
 
       if (intent === "recipe_extraction") {
-        // Handle recipe extraction
-        response = (await sendMessageMutation.mutateAsync({
-          message: inputMessage,
+        // Handle recipe extraction - use direct API call with abort signal
+        response = (await apiClient.sendMessage({
+          message: messageText,
           sessionId: currentConversation.sessionId,
           intent: "recipe_extraction",
           context: {
             recentMessages: currentConversation.messages.slice(-5),
           },
-        })) as ChatMessageResponse;
+        }, abortControllerRef.current.signal)) as ChatMessageResponse;
       } else {
         // Handle RAG-based queries
         let recipeContext = "";
 
+        // Only run RAG search for queries that explicitly need recipe context
+        // Skip RAG for general_chat to improve response times
         if (
           intent === "recipe_search" ||
           intent === "ingredient_search" ||
           intent === "cooking_advice"
         ) {
           try {
-            const ragResults = await ragService.searchRecipes({
-              query: inputMessage,
+            // Check if request was aborted before starting RAG search
+            if (abortControllerRef.current?.signal.aborted) {
+              throw new Error("Request aborted");
+            }
+
+            // Run RAG search with timeout and abort support
+            const ragPromise = ragService.searchRecipes({
+              query: messageText,
               userId: "test-user", // TODO: Get actual user ID
               limit: 5,
               searchType: "hybrid",
             });
-            recipeContext = formatRecipeContext(ragResults.results);
-          } catch (ragError) {
-            console.warn(
-              "RAG search failed, proceeding without context:",
-              ragError
+
+            // Set a timeout for RAG search (5 seconds max)
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("RAG search timeout")), 5000)
             );
+
+            // Race between RAG search, timeout, and abort signal
+            const ragResults = await Promise.race([
+              ragPromise,
+              timeoutPromise,
+              new Promise((_, reject) => {
+                if (ragAbortControllerRef.current) {
+                  ragAbortControllerRef.current.signal.addEventListener('abort', () => {
+                    reject(new Error("RAG search aborted"));
+                  });
+                }
+              })
+            ]) as any;
+            
+            recipeContext = formatRecipeContext(ragResults.results);
+          } catch (ragError: any) {
+            // Don't show error if it was aborted - that's expected
+            if (ragError.message !== "RAG search aborted" && ragError.message !== "Request aborted") {
+              console.warn(
+                "RAG search failed or timed out, proceeding without context:",
+                ragError
+              );
+            }
+            // Continue without RAG context - AI can still respond
           }
         }
 
-        response = (await sendMessageMutation.mutateAsync({
-          message: inputMessage,
+        // Check if request was aborted before sending to API
+        if (abortControllerRef.current?.signal.aborted) {
+          throw new Error("Request aborted");
+        }
+
+        // Use direct API call with abort signal
+        response = (await apiClient.sendMessage({
+          message: messageText,
           sessionId: currentConversation.sessionId,
           intent: intent,
           context: {
             recentMessages: currentConversation.messages.slice(-5),
             recipeContext: recipeContext,
           },
-        })) as ChatMessageResponse;
+        }, abortControllerRef.current.signal)) as ChatMessageResponse;
+      }
+
+      // Check if request was aborted after receiving response
+      if (abortControllerRef.current?.signal.aborted) {
+        return; // Don't process the response if it was cancelled
       }
 
       // Try to parse recipe from AI response
@@ -420,7 +490,13 @@ export const ChatInterface: React.FC = () => {
             : conv
         )
       );
-    } catch (error) {
+    } catch (error: any) {
+      // Don't show error message if request was aborted - that's expected
+      if (error.message === "Request aborted" || error.name === "AbortError") {
+        console.log("Request was cancelled by user");
+        return;
+      }
+      
       console.error("Failed to send message:", error);
       const errorMessage: Message = {
         id: Date.now().toString(),
@@ -442,6 +518,9 @@ export const ChatInterface: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
+      // Clean up abort controllers
+      abortControllerRef.current = null;
+      ragAbortControllerRef.current = null;
     }
   };
 
@@ -862,16 +941,24 @@ export const ChatInterface: React.FC = () => {
                   onKeyPress={handleKeyPress}
                   onKeyDown={handleKeyDown}
                   placeholder="Type your message... (↑/↓ to navigate history)"
-                  disabled={isLoading}
                   className="flex-1 rounded-2xl border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary/50 shadow-sm bg-gray-100 dark:bg-gray-800"
                 />
                 <Button
-                  onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || isLoading}
+                  onClick={isLoading ? handleCancelMessage : handleSendMessage}
+                  disabled={!isLoading && !inputMessage.trim()}
                   size="icon"
-                  className="rounded-2xl h-10 w-10 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+                  className={`rounded-2xl h-10 w-10 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 ${
+                    isLoading 
+                      ? "bg-red-500 hover:bg-red-600 text-white" 
+                      : ""
+                  }`}
+                  variant={isLoading ? "destructive" : "default"}
                 >
-                  <Send className="h-4 w-4" />
+                  {isLoading ? (
+                    <div className="h-4 w-4 bg-white rounded-sm" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </div>
