@@ -24,6 +24,8 @@ import {
   Save,
   Check,
   Copy,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { ChatHistoryResponse, ChatMessageResponse } from "../../types";
 import { useCreateRecipe, apiClient } from "../../services/api";
@@ -38,6 +40,7 @@ interface Message {
   timestamp: Date;
   recipe?: ParsedRecipe | null; // Optional parsed recipe data
   recipeStored?: boolean; // Track if recipe has been stored
+  feedback?: "thumbsUp" | "thumbsDown" | null; // User feedback on AI messages
 }
 
 interface Conversation {
@@ -64,6 +67,8 @@ export const ChatInterface: React.FC = () => {
     Set<string>
   >(new Set());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [feedbackFilter, setFeedbackFilter] = useState<"all" | "thumbsUp" | "thumbsDown">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const ragAbortControllerRef = useRef<AbortController | null>(null);
@@ -108,6 +113,7 @@ export const ChatInterface: React.FC = () => {
             timestamp: new Date(msg.timestamp),
             recipe: msg.recipe || null, // Preserve recipe data if present
             recipeStored: msg.recipeStored || false, // Preserve stored status
+            feedback: msg.feedback || null, // Preserve feedback if present
           })),
           isTemporary: conv.isTemporary || false, // Ensure isTemporary is set
         }));
@@ -193,6 +199,24 @@ export const ChatInterface: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [conversations, currentConversationId]);
+
+  // Update message history when conversation changes
+  useEffect(() => {
+    const currentConversation = getCurrentConversation();
+    if (currentConversation && currentConversation.messages.length > 0) {
+      // Extract all user messages from current conversation and populate history
+      const userMessages = currentConversation.messages
+        .filter((msg) => msg.sender === "user")
+        .map((msg) => msg.content)
+        .reverse(); // Reverse to have newest first (index 0 = most recent)
+      
+      if (userMessages.length > 0) {
+        setMessageHistory(userMessages);
+        setHistoryIndex(-1);
+        setTempInput("");
+      }
+    }
+  }, [currentConversationId, conversations]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -604,6 +628,73 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  const handleMessageFeedback = async (messageId: string, feedback: "thumbsUp" | "thumbsDown") => {
+    const currentConversation = getCurrentConversation();
+    if (!currentConversation) return;
+
+    const message = currentConversation.messages.find((msg) => msg.id === messageId);
+    if (!message || message.sender !== "ai") return;
+
+    // Toggle: if clicking the same feedback, remove it; otherwise set it
+    const newFeedback = message.feedback === feedback ? null : feedback;
+
+    // Update local state immediately
+    setConversations((prev) =>
+      prev.map((conv) => ({
+        ...conv,
+        messages: conv.messages.map((msg) => {
+          if (msg.id === messageId) {
+            return { ...msg, feedback: newFeedback };
+          }
+          return msg;
+        }),
+      }))
+    );
+
+    // Send feedback to backend for analytics/improvement
+    try {
+      await apiClient.sendFeedback({
+        messageId,
+        conversationId: currentConversationId,
+        sessionId: currentConversation.sessionId,
+        feedback: newFeedback,
+        messageContent: message.content,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      // Don't show error to user - feedback is optional
+      Logger.warn('Failed to send feedback to backend:', error);
+    }
+  };
+
+  // Filter conversations based on feedback and search query
+  const filteredConversations = conversations.filter((conv) => {
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchesTitle = conv.title.toLowerCase().includes(query);
+      const matchesLastMessage = conv.lastMessage.toLowerCase().includes(query);
+      const matchesMessages = conv.messages.some((msg) =>
+        msg.content.toLowerCase().includes(query)
+      );
+      if (!matchesTitle && !matchesLastMessage && !matchesMessages) {
+        return false;
+      }
+    }
+
+    // Feedback filter
+    if (feedbackFilter !== "all") {
+      const hasFeedback = conv.messages.some(
+        (msg) => msg.sender === "ai" && msg.feedback === feedbackFilter
+      );
+      if (!hasFeedback) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
   const currentConversation = getCurrentConversation();
 
   return (
@@ -680,11 +771,60 @@ export const ChatInterface: React.FC = () => {
               Clean Up Unused Chats
             </Button>
           )}
+
+          {/* Search and Filter */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
+            </div>
+            <div className="flex gap-1">
+              <Button
+                onClick={() => setFeedbackFilter("all")}
+                variant={feedbackFilter === "all" ? "default" : "outline"}
+                size="sm"
+                className="flex-1 text-xs"
+              >
+                All
+              </Button>
+              <Button
+                onClick={() => setFeedbackFilter("thumbsUp")}
+                variant={feedbackFilter === "thumbsUp" ? "default" : "outline"}
+                size="sm"
+                className="flex-1 text-xs"
+              >
+                <ThumbsUp className="h-3 w-3 mr-1" />
+                Up
+              </Button>
+              <Button
+                onClick={() => setFeedbackFilter("thumbsDown")}
+                variant={feedbackFilter === "thumbsDown" ? "default" : "outline"}
+                size="sm"
+                className="flex-1 text-xs"
+              >
+                <ThumbsDown className="h-3 w-3 mr-1" />
+                Down
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Conversation List */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden chat-container">
-          {conversations.map((conversation) => (
+          {filteredConversations.length === 0 ? (
+            <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              {searchQuery || feedbackFilter !== "all"
+                ? "No conversations match your filters"
+                : "No conversations yet"}
+            </div>
+          ) : (
+            filteredConversations.map((conversation) => (
             <div
               key={conversation.id}
               className={`p-3 border-b border-gray-100/50 dark:border-gray-700/50 cursor-pointer transition-all duration-200 group ${
@@ -761,7 +901,7 @@ export const ChatInterface: React.FC = () => {
                 )}
               </div>
             </div>
-          ))}
+          )))}
         </div>
       </div>
 
@@ -869,6 +1009,36 @@ export const ChatInterface: React.FC = () => {
                         </p>
                       </div>
                       
+                      {/* Feedback buttons for AI messages */}
+                      {message.sender === "ai" && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <button
+                            onClick={() => handleMessageFeedback(message.id, "thumbsUp")}
+                            className={`p-1.5 rounded-md transition-colors ${
+                              message.feedback === "thumbsUp"
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                                : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                            }`}
+                            title="Thumbs up"
+                            aria-label="Thumbs up"
+                          >
+                            <ThumbsUp className={`h-3.5 w-3.5 ${message.feedback === "thumbsUp" ? "fill-current" : ""}`} />
+                          </button>
+                          <button
+                            onClick={() => handleMessageFeedback(message.id, "thumbsDown")}
+                            className={`p-1.5 rounded-md transition-colors ${
+                              message.feedback === "thumbsDown"
+                                ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                            }`}
+                            title="Thumbs down"
+                            aria-label="Thumbs down"
+                          >
+                            <ThumbsDown className={`h-3.5 w-3.5 ${message.feedback === "thumbsDown" ? "fill-current" : ""}`} />
+                          </button>
+                        </div>
+                      )}
+
                       {/* Show "Store Recipe" button if recipe is detected and not yet stored */}
                       {message.sender === "ai" && message.recipe && !message.recipeStored && (
                         <div className="flex items-center gap-2">

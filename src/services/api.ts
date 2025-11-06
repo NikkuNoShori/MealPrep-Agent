@@ -103,6 +103,20 @@ class ApiClient {
     });
   }
 
+  async sendFeedback(data: {
+    messageId: string;
+    conversationId: string | null;
+    sessionId: string;
+    feedback: "thumbsUp" | "thumbsDown" | null;
+    messageContent: string;
+    timestamp: string;
+  }) {
+    return this.request("/api/chat/feedback", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
   async getChatHistory(limit?: number) {
     const searchParams = new URLSearchParams();
     if (limit) searchParams.append("limit", limit.toString());

@@ -303,6 +303,48 @@ app.post('/api/chat/message', async (req, res) => {
   }
 });
 
+// Feedback endpoint - store user feedback on AI messages
+app.post('/api/chat/feedback', async (req, res) => {
+  try {
+    const { messageId, conversationId, sessionId, feedback, messageContent, timestamp } = req.body;
+    const user = getTestUser();
+
+    console.log('📊 Received feedback:', {
+      messageId,
+      conversationId,
+      sessionId,
+      feedback,
+      timestamp,
+      messagePreview: messageContent?.substring(0, 100)
+    });
+
+    // TODO: Store feedback in database for analytics
+    // For now, just log it
+    // Future: Use this feedback to:
+    // 1. Improve AI responses (fine-tuning data)
+    // 2. Identify problematic patterns
+    // 3. Track user satisfaction
+    // 4. A/B test different response styles
+
+    res.json({
+      success: true,
+      message: 'Feedback received',
+      feedback: {
+        messageId,
+        feedback,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Feedback error:', error);
+    res.status(500).json({ 
+      error: 'Failed to process feedback',
+      message: error.message
+    });
+  }
+});
+
 // Recipe storage endpoint
 app.post('/api/recipes', 
   recipeCreationLimiter, // Apply stricter rate limiting for recipe creation

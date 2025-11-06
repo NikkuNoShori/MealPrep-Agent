@@ -192,43 +192,73 @@ export default async function handler(req, res) {
     });
   }
 
-  // Verify authentication
-  let authenticatedUserId = null;
+  // Parse request body first to check for userId
+  let requestBody = {};
   try {
-    const { verifyAuthToken } = await import('./auth.js');
-    const { user, error } = await verifyAuthToken(req);
-    
-    if (error && process.env.NODE_ENV === 'production') {
-      return res.status(401).json({
-        error: 'Authentication required',
-        message: error,
-      });
+    if (req.body) {
+      requestBody = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    } else {
+      // Parse body from request if not already parsed
+      const bodyText = await req.text();
+      if (bodyText) {
+        requestBody = JSON.parse(bodyText);
+      }
     }
-    
-    // Use authenticated user ID if available
-    authenticatedUserId = user?.id || null;
-  } catch (authError) {
-    console.error('Authentication verification error:', authError);
-    // In development, continue with warning
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(401).json({
-        error: 'Authentication failed',
-        message: 'Failed to verify authentication',
-      });
+  } catch (parseError) {
+    console.error('Error parsing request body:', parseError);
+    return res.status(400).json({
+      error: 'Bad request',
+      message: 'Invalid JSON in request body',
+    });
+  }
+
+  // Check if userId is provided in body (for n8n requests)
+  // If userId is provided, skip authentication check
+  const hasUserIdInBody = requestBody?.userId && requestBody.userId !== '';
+
+  // Verify authentication (only if userId not provided in body)
+  let authenticatedUserId = null;
+  if (!hasUserIdInBody) {
+    try {
+      const { verifyAuthToken } = await import('./auth.js');
+      const { user, error } = await verifyAuthToken(req);
+      
+      // Require auth if no userId in body (for direct API calls)
+      if (error && process.env.NODE_ENV === 'production') {
+        return res.status(401).json({
+          error: 'Authentication required',
+          message: error,
+        });
+      }
+      
+      // Use authenticated user ID if available
+      authenticatedUserId = user?.id || null;
+    } catch (authError) {
+      console.error('Authentication verification error:', authError);
+      // In production, fail if no userId in body
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(401).json({
+          error: 'Authentication failed',
+          message: 'Failed to verify authentication',
+        });
+      }
     }
+  } else {
+    console.log('✅ Skipping authentication - userId provided in body (n8n request)');
   }
 
   try {
-    const { query, userId: bodyUserId, limit = 10, searchType = 'semantic' } = req.body;
+    const { query, userId: bodyUserId, limit = 10, searchType = 'semantic' } = requestBody;
     
     // Use authenticated user ID if available, otherwise use body userId
     // In development, allow test user if no auth
+    // For n8n requests, bodyUserId should be provided
     const userId = authenticatedUserId || bodyUserId || (process.env.NODE_ENV === 'development' ? 'test-user' : null);
     
     if (!userId && process.env.NODE_ENV === 'production') {
       return res.status(401).json({
         error: 'Authentication required',
-        message: 'User ID is required for RAG search',
+        message: 'User ID is required for RAG search. Provide userId in request body or authenticate.',
       });
     }
     

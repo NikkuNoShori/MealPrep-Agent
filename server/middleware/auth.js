@@ -1,31 +1,63 @@
-import { StackServerApp } from '@stackframe/stack';
 import { config } from 'dotenv';
 
 // Load environment variables
 config();
 
-// Initialize Stack Auth server SDK
+// Initialize Stack Auth server SDK lazily to avoid importing 'next' dependency
 // Stack Auth requires server secret key for server-side verification
 const projectId = process.env.STACK_PROJECT_ID || process.env.VITE_STACK_PROJECT_ID;
 const serverSecretKey = process.env.STACK_SERVER_SECRET_KEY;
 
 let stackServerApp = null;
+let stackModule = null;
 
-if (projectId && serverSecretKey) {
+// Lazy load Stack Auth to avoid importing 'next' dependency
+async function initializeStackAuth() {
+  if (stackServerApp !== null) {
+    return stackServerApp; // Already initialized or attempted
+  }
+
+  if (!projectId || !serverSecretKey) {
+    console.warn('⚠️ Stack Auth server not configured. Missing environment variables:', {
+      missingProjectId: !projectId,
+      missingServerSecretKey: !serverSecretKey,
+    });
+    stackServerApp = false; // Mark as attempted but not configured
+    return null;
+  }
+
   try {
+    // Dynamic import to avoid loading 'next' dependency at module load time
+    if (!stackModule) {
+      try {
+        stackModule = await import('@stackframe/stack');
+      } catch (importError) {
+        // Handle case where @stackframe/stack requires 'next' but it's not installed
+        if (importError.code === 'ERR_MODULE_NOT_FOUND' && importError.message.includes('next')) {
+          console.warn('⚠️ Stack Auth requires Next.js but it is not installed. Stack Auth will not be available.');
+          console.warn('   To use Stack Auth, install Next.js: npm install next');
+          stackServerApp = false;
+          return null;
+        }
+        throw importError; // Re-throw other import errors
+      }
+    }
+    
+    const { StackServerApp } = stackModule;
     stackServerApp = new StackServerApp({
       projectId,
       secretKey: serverSecretKey,
     });
     console.log('✅ Stack Auth server initialized successfully');
+    return stackServerApp;
   } catch (error) {
-    console.error('❌ Stack Auth server initialization failed:', error);
+    console.error('❌ Stack Auth server initialization failed:', error.message);
+    if (error.code === 'ERR_MODULE_NOT_FOUND' && error.message.includes('next')) {
+      console.warn('   Stack Auth requires Next.js. Install it with: npm install next');
+    }
+    stackServerApp = false; // Mark as failed
+    return null;
   }
-} else {
-  console.warn('⚠️ Stack Auth server not configured. Missing environment variables:', {
-    missingProjectId: !projectId,
-    missingServerSecretKey: !serverSecretKey,
-  });
 }
 
 /**
@@ -34,8 +66,11 @@ if (projectId && serverSecretKey) {
  */
 export const authenticateRequest = async (req, res, next) => {
   try {
+    // Initialize Stack Auth if not already done
+    const authApp = await initializeStackAuth();
+    
     // In development mode, allow test user if Stack Auth not configured
-    if (process.env.NODE_ENV === 'development' && !stackServerApp) {
+    if (process.env.NODE_ENV === 'development' && !authApp) {
       console.warn('⚠️ Development mode: Using test user (Stack Auth not configured)');
       req.user = {
         id: '11111111-1111-1111-1111-111111111111',
@@ -46,7 +81,7 @@ export const authenticateRequest = async (req, res, next) => {
     }
 
     // Require Stack Auth configuration in production
-    if (!stackServerApp) {
+    if (!authApp) {
       return res.status(500).json({
         error: 'Authentication service not configured',
         message: 'Stack Auth server SDK not initialized',
@@ -96,7 +131,7 @@ export const authenticateRequest = async (req, res, next) => {
     try {
       // Stack Auth server SDK should verify the token and return user
       // Note: Actual API may differ - this is based on common auth patterns
-      const user = await stackServerApp.getUserFromToken(authToken);
+      const user = await authApp.getUserFromToken(authToken);
       
       if (!user) {
         return res.status(401).json({
@@ -135,7 +170,10 @@ export const authenticateRequest = async (req, res, next) => {
  */
 export const optionalAuth = async (req, res, next) => {
   try {
-    if (!stackServerApp) {
+    // Initialize Stack Auth if not already done
+    const authApp = await initializeStackAuth();
+    
+    if (!authApp) {
       // In development, use test user if available
       if (process.env.NODE_ENV === 'development') {
         req.user = {
@@ -175,7 +213,7 @@ export const optionalAuth = async (req, res, next) => {
 
     if (authToken) {
       try {
-        const user = await stackServerApp.getUserFromToken(authToken);
+        const user = await authApp.getUserFromToken(authToken);
         if (user) {
           req.user = {
             id: user.id,

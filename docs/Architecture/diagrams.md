@@ -359,6 +359,240 @@ graph TB
     Edge --> OpenRouter
 ```
 
+## Optimized n8n Workflow Architecture
+
+### Current Workflow (Baseline)
+
+```mermaid
+flowchart TD
+    Start([Webhook Trigger]) --> Intent[Intent Router]
+    
+    Intent -->|recipe_extraction| RecipeExtract[Recipe Extractor]
+    Intent -->|chat| RAGSearch[RAG Search<br/>500-2000ms]
+    
+    RecipeExtract --> FastModel1[Fast Model<br/>gemma-2-9b-it]
+    FastModel1 --> RecipeExtract
+    RecipeExtract --> RecipeResp[Recipe Response<br/>⚠️ Recipe Not Saved]
+    
+    RAGSearch --> RAGChat[RAG Chat Agent]
+    RAGChat --> RAGModel[RAG Model<br/>gemma-2-9b-it]
+    RAGChat --> Memory[Postgres Memory]
+    RAGModel --> RAGChat
+    Memory --> RAGChat
+    RAGChat --> ChatResp[Chat Response]
+    
+    RecipeResp --> End([Response])
+    ChatResp --> End
+    
+    style Start fill:#2563eb,stroke:#1e40af,stroke-width:3px,color:#fff
+    style Intent fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+    style RecipeExtract fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    style FastModel1 fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#fff
+    style RecipeResp fill:#dc2626,stroke:#b91c1c,stroke-width:3px,color:#fff
+    style RAGSearch fill:#ea580c,stroke:#c2410c,stroke-width:2px,color:#fff
+    style RAGChat fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+    style RAGModel fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#fff
+    style Memory fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    style ChatResp fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+    style End fill:#2563eb,stroke:#1e40af,stroke-width:3px,color:#fff
+```
+
+### Optimized Workflow (Proposed)
+
+```mermaid
+flowchart TD
+    Start([Webhook Trigger]) --> Intent[Intent Router]
+    
+    Intent -->|recipe_extraction| RecipeExtract[Recipe Extractor]
+    Intent -->|chat| CheckRAG{Check if RAG<br/>Needed?}
+    
+    RecipeExtract --> FastModel1[Fast Model<br/>gemma-2-9b-it]
+    FastModel1 --> RecipeExtract
+    RecipeExtract --> SaveRecipe[Save Recipe<br/>HTTP POST /api/recipes<br/>✅ Auto-Save]
+    SaveRecipe --> RecipeResp[Recipe Response]
+    
+    CheckRAG -->|Yes: recipe-related| RAGSearch[RAG Search<br/>500-2000ms]
+    CheckRAG -->|No: general chat| MemoryOnly[Postgres Memory<br/>100-300ms]
+    
+    RAGSearch --> Merge[Merge Results<br/>Parallel Execution]
+    MemoryOnly --> Merge
+    
+    Merge --> RAGChat[RAG Chat Agent]
+    RAGChat --> RAGModel[RAG Model<br/>gemma-2-9b-it]
+    RAGChat --> Memory[Postgres Memory]
+    RAGModel --> RAGChat
+    Memory --> RAGChat
+    RAGChat --> ChatResp[Chat Response]
+    
+    RecipeResp --> End([Response])
+    ChatResp --> End
+    
+    style Start fill:#2563eb,stroke:#1e40af,stroke-width:3px,color:#fff
+    style Intent fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+    style RecipeExtract fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    style FastModel1 fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#fff
+    style SaveRecipe fill:#16a34a,stroke:#15803d,stroke-width:3px,color:#fff
+    style RecipeResp fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    style CheckRAG fill:#f59e0b,stroke:#d97706,stroke-width:3px,color:#fff
+    style RAGSearch fill:#ea580c,stroke:#c2410c,stroke-width:2px,color:#fff
+    style MemoryOnly fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#fff
+    style Merge fill:#16a34a,stroke:#15803d,stroke-width:3px,color:#fff
+    style RAGChat fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+    style RAGModel fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#fff
+    style Memory fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    style ChatResp fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+    style End fill:#2563eb,stroke:#1e40af,stroke-width:3px,color:#fff
+```
+
+### Performance Comparison Timeline
+
+```mermaid
+gantt
+    title Workflow Execution Time Comparison (milliseconds)
+    dateFormat X
+    axisFormat %Ls
+    
+    section Current Flow
+    Webhook Trigger           :0, 10
+    Intent Router            :10, 20
+    Recipe Extraction Path   :20, 3000
+    RAG Search Sequential    :20, 2000
+    RAG Chat Agent           :2020, 2000
+    Response                 :4020, 10
+    
+    section Optimized Flow
+    Webhook Trigger           :0, 10
+    Intent Router            :10, 20
+    Recipe Extraction Path   :20, 3000
+    Recipe Save              :3020, 500
+    RAG Check                :20, 20
+    RAG Search Parallel      :40, 2000
+    Memory Retrieval Parallel :40, 300
+    Merge Results            :2040, 20
+    RAG Chat Agent           :2060, 2000
+    Response                 :4060, 10
+```
+
+### Detailed Optimized Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Webhook
+    participant IntentRouter
+    participant RecipeExtract
+    participant SaveRecipe
+    participant CheckRAG
+    participant RAGSearch
+    participant Memory
+    participant Merge
+    participant RAGChat
+    participant Response
+    
+    User->>Webhook: POST /webhook
+    Webhook->>IntentRouter: Route by intent
+    
+    alt Recipe Extraction Intent
+        IntentRouter->>RecipeExtract: Extract recipe
+        RecipeExtract->>RecipeExtract: Use Fast Model
+        RecipeExtract->>SaveRecipe: POST /api/recipes
+        SaveRecipe->>Response: Recipe saved
+        Response->>User: Recipe extracted & saved
+    else Chat Intent
+        IntentRouter->>CheckRAG: Check if RAG needed
+        alt RAG Needed
+            par Parallel Execution
+                CheckRAG->>RAGSearch: Search recipes
+            and
+                CheckRAG->>Memory: Retrieve memory
+            end
+            RAGSearch->>Merge: Recipe context
+            Memory->>Merge: Conversation memory
+            Merge->>RAGChat: Combined context
+        else General Chat
+            CheckRAG->>Memory: Retrieve memory only
+            Memory->>RAGChat: Conversation memory
+        end
+        RAGChat->>RAGChat: Generate response
+        RAGChat->>Response: AI response
+        Response->>User: Chat response
+    end
+```
+
+### Complete System Architecture with Optimizations
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        UI[React Frontend]
+        ChatUI[Chat Interface]
+        RecipeUI[Recipe Management]
+    end
+    
+    subgraph "API Layer"
+        Express[Express Server]
+        EdgeFunc[Vercel Edge Functions]
+    end
+    
+    subgraph "n8n Workflow - Optimized"
+        Webhook[n8n Webhook]
+        IntentRouter[Intent Router]
+        RecipeExtract[Recipe Extractor]
+        SaveRecipe[Save Recipe<br/>✅ NEW]
+        CheckRAG{Check RAG<br/>✅ NEW}
+        RAGSearch[RAG Search]
+        Memory[Postgres Memory]
+        Merge[Merge Node<br/>✅ NEW]
+        RAGChat[RAG Chat Agent]
+    end
+    
+    subgraph "Services Layer"
+        RAGService[RAG Service]
+        EmbedService[Embedding Service]
+        DBService[Database Service]
+    end
+    
+    subgraph "External Services"
+        NeonDB[(Neon PostgreSQL)]
+        OpenRouter[OpenRouter API]
+    end
+    
+    UI --> ChatUI
+    UI --> RecipeUI
+    ChatUI --> Express
+    RecipeUI --> Express
+    Express --> Webhook
+    Express --> EdgeFunc
+    EdgeFunc --> RAGService
+    
+    Webhook --> IntentRouter
+    IntentRouter -->|recipe_extraction| RecipeExtract
+    IntentRouter -->|chat| CheckRAG
+    RecipeExtract --> SaveRecipe
+    SaveRecipe --> Express
+    CheckRAG -->|Yes| RAGSearch
+    CheckRAG -->|No| Memory
+    RAGSearch --> Merge
+    Memory --> Merge
+    Merge --> RAGChat
+    
+    RAGService --> EmbedService
+    RAGService --> DBService
+    DBService --> NeonDB
+    EmbedService --> OpenRouter
+    RAGSearch --> EdgeFunc
+    EdgeFunc --> RAGService
+    
+    style SaveRecipe fill:#16a34a,stroke:#15803d,stroke-width:3px,color:#fff
+    style CheckRAG fill:#f59e0b,stroke:#d97706,stroke-width:3px,color:#fff
+    style Merge fill:#16a34a,stroke:#15803d,stroke-width:3px,color:#fff
+    style Webhook fill:#2563eb,stroke:#1e40af,stroke-width:2px,color:#fff
+    style IntentRouter fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+    style RecipeExtract fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    style RAGSearch fill:#ea580c,stroke:#c2410c,stroke-width:2px,color:#fff
+    style RAGChat fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+```
+
 ---
 
 **Note**: These diagrams can be viewed in:
