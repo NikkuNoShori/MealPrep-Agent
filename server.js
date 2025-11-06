@@ -8,6 +8,8 @@ import { embeddingService } from './src/services/embeddingService.js';
 import { authenticateRequest, optionalAuth } from './server/middleware/auth.js';
 import { apiLimiter, recipeCreationLimiter, searchLimiter } from './server/middleware/rateLimit.js';
 import { validateRecipeCreation, validateRecipeUpdate, validateRecipeId, validateRAGSearch } from './server/middleware/validation.js';
+import { sanitizeRecipe, sanitizeSearchQuery, sanitizeUrlParams } from './server/middleware/sanitization.js';
+import { securityHeaders, requestSizeLimits, secureErrorHandler } from './server/middleware/security.js';
 
 // Load environment variables
 config();
@@ -24,7 +26,10 @@ const allowedOrigins = [
   ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
 ];
 
-// Middleware
+// Security middleware (must be applied early)
+app.use(securityHeaders);
+
+// CORS middleware
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -36,8 +41,13 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(cookieParser()); // Parse cookies for Stack Auth
-app.use(express.json());
+
+// Cookie parser with secure settings
+app.use(cookieParser());
+
+// Body parser with size limits to prevent DoS
+app.use(express.json(requestSizeLimits.json));
+app.use(express.urlencoded(requestSizeLimits.urlencoded));
 
 // Apply general rate limiting to all API routes
 app.use('/api/', apiLimiter);
@@ -297,6 +307,7 @@ app.post('/api/chat/message', async (req, res) => {
 app.post('/api/recipes', 
   recipeCreationLimiter, // Apply stricter rate limiting for recipe creation
   authenticateRequest, // Require authentication
+  sanitizeRecipe, // Sanitize input to prevent XSS
   validateRecipeCreation, // Validate request body
   async (req, res) => {
   try {
@@ -407,6 +418,7 @@ app.get('/api/recipes',
 // Route supports both UUID and slug: /api/recipes/:idOrSlug
 app.get('/api/recipes/:idOrSlug', 
   optionalAuth, // Optional authentication - allows unauthenticated access for public recipes
+  sanitizeUrlParams, // Sanitize URL parameters
   async (req, res) => {
   try {
     const user = req.user || null; // May be null if unauthenticated
@@ -445,6 +457,8 @@ app.get('/api/recipes/:idOrSlug',
 // Update recipe endpoint
 app.put('/api/recipes/:id', 
   authenticateRequest, // Require authentication
+  sanitizeUrlParams, // Sanitize URL parameters
+  sanitizeRecipe, // Sanitize input to prevent XSS
   validateRecipeId, // Validate recipe ID format
   validateRecipeUpdate, // Validate request body
   async (req, res) => {
@@ -513,6 +527,7 @@ app.delete('/api/recipes/:id',
 app.post('/api/rag/search', 
   searchLimiter, // Apply rate limiting for search
   authenticateRequest, // Require authentication
+  sanitizeSearchQuery, // Sanitize search query to prevent XSS
   validateRAGSearch, // Validate request body
   async (req, res) => {
   try {
@@ -725,6 +740,9 @@ app.post('/api/rag/embedding', async (req, res) => {
   }
 });
 
+// Secure error handler (must be last middleware)
+app.use(secureErrorHandler);
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Local development server running on http://localhost:${PORT}`);
@@ -732,5 +750,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📡 n8n webhook URL: ${N8N_WEBHOOK_URL}`);
   console.log(`🔧 Webhook enabled: ${WEBHOOK_ENABLED}`);
   console.log(`🌐 CORS enabled for localhost:5173`);
+  console.log(`🔒 Security headers enabled`);
   console.log(`🔗 Server listening on all interfaces (0.0.0.0:${PORT})`);
 });

@@ -287,7 +287,7 @@ export class DatabaseService {
       const currentRecipe = await this.getRecipe(recipeId, userId);
       const existingSlugs = existingRecipes
         .map(r => r.slug)
-        .filter(Boolean)
+        .filter((s): s is string => !!s) // Type guard to filter out undefined/null
         .filter(s => currentRecipe && s !== currentRecipe.slug); // Exclude current recipe's slug
       
       updates.slug = generateUniqueSlug(updates.title, existingSlugs);
