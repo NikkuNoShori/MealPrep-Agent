@@ -2,31 +2,37 @@
 
 ## 📁 Documentation Structure
 
-This folder contains organized documentation for the MealPrep Agent project, sorted into logical categories. Outdated documentation has been moved to the `Archived/` subfolder.
+This folder contains organized documentation for the MealPrep Agent project.
 
 ## 🏗️ **Architecture/** - System Design & Architecture
+
+- **`ARCHITECTURE_SUMMARY.md`** - Complete architecture overview and system design
 - **`PRD.md`** - Product Requirements Document
-- **`SDD.md`** - System Design Document  
-- **`RAG_ARCHITECTURE_DESIGN.md`** - RAG system architecture design
-- **`RAG_IMPLEMENTATION_GUIDE.md`** - Step-by-step RAG implementation guide
-- **`RAG_SYSTEM_SUMMARY.md`** - Complete RAG system summary and benefits
+- **`SDD.md`** - System Design Document
+- **`RAG.md`** - RAG system architecture and implementation
+- **`SECURITY.md`** - Security and performance implementation status
+- **`diagrams.md`** - Mermaid diagrams for architecture visualization
+- **`n8n-config.md`** - n8n workflow configuration
 
 ## 🛠️ **Development/** - Setup & Configuration
+
 - **`LOCAL_DEVELOPMENT.md`** - Local development setup guide
+- **`RAG_SEARCH_EDGE_FUNCTION.md`** - RAG search edge function deployment and usage
+- **`N8N_RAG_SEARCH_CONFIGURATION.md`** - n8n RAG search configuration
+- **`N8N_URL_OPTIONS.md`** - n8n URL configuration options
+- **`DEPLOY_TO_N8N_SERVER.md`** - Deployment guide for n8n server
 - **`EDGE_FUNCTION_README.md`** - Edge function documentation
-- **`n8n-config.md`** - Current n8n workflow configuration
+- **`FIXES_TRACKER.md`** - Bug fixes and issue tracking
 - **`n8n-rag-config.md`** - n8n configuration with RAG support
+- **`n8n-rag-search-config.json`** - n8n RAG search configuration JSON
 
-## ⭐ **Features/** - Feature-Specific Documentation
-- **`CHAT_SESSION_MANAGEMENT.md`** - Chat session management implementation
-- **`TEMPORARY_SESSION_SYSTEM.md`** - Temporary session system documentation
-- **`ENHANCED_SYSTEM_PROMPT.md`** - AI system prompt for Chef Marcus
-- **`THEME.md`** - Theme system documentation
+## ⭐ **core/** - Core System Documentation
 
-## 🗄️ **Database/** - Database & Migrations
-- **`CLEAN_MIGRATION_FILES.md`** - Clean SQL migration files for Neon compatibility
+- **`STACK_AUTH_EMAIL_SETUP.md`** - Stack Auth email configuration
+- **`STACK_AUTH_TRUSTED_DOMAINS.md`** - Stack Auth trusted domains setup
+- **`SERVER_LOGGING_GUIDE.md`** - Server logging configuration
 
-## 📦 Archived Documentation
+## 🗄️ **Archived/** - Historical Documentation
 
 The `Archived/` folder contains outdated documentation that explains previous architecture decisions and implementation status:
 
@@ -37,32 +43,44 @@ The `Archived/` folder contains outdated documentation that explains previous ar
 - **`PRIORITY_ASSESSMENT.md`** - Outdated priority assessment
 - **`DEPLOYMENT_GUIDE.md`** - Outdated deployment guide
 
-## 🎯 **Key Features Implemented**
+## 🎯 **Key Features**
 
 ### ✅ **RAG-Enhanced Chat System**
 - Natural text to recipe conversion
 - Vector-based recipe search
 - Database-aware intelligent responses
-- Temporary session management
+- Context-aware AI responses
 
 ### ✅ **Recipe Management**
 - Structured recipe storage in PostgreSQL
 - Vector embeddings for semantic search
 - Recipe categories and tagging system
 - Full-text and semantic search capabilities
+- SEO-friendly URLs with slugs
 
-### ✅ **Session Management**
-- Temporary sessions for unused chats
-- Persistent sessions for active conversations
-- Multi-select chat deletion
-- Automatic cleanup of unused sessions
+### ✅ **User Authentication**
+- Stack Auth (cookie-based sessions)
+- Sign up, sign in, sign out
+- Password reset and forgot password flows
+- Session persistence across page refreshes
+- Protected routes with automatic redirects
+
+### ✅ **Security & Performance**
+- Authentication middleware on all endpoints
+- RLS policies for database-level security
+- Rate limiting and input validation
+- Security headers (Helmet.js)
+- XSS protection and input sanitization
+- Optimized connection pooling
+- Query performance monitoring
 
 ## 🚀 **Getting Started**
 
-1. **Database Setup**: See `Database/CLEAN_MIGRATION_FILES.md` for database setup
-2. **RAG Implementation**: Follow `Architecture/RAG_IMPLEMENTATION_GUIDE.md`
-3. **Local Development**: Use `Development/LOCAL_DEVELOPMENT.md` for setup
+1. **Database Setup**: Run migrations in `migrations/` folder
+2. **Local Development**: See `Development/LOCAL_DEVELOPMENT.md`
+3. **RAG Setup**: See `Architecture/RAG.md` and `Development/RAG_SEARCH_EDGE_FUNCTION.md`
 4. **n8n Configuration**: Import `Development/n8n-rag-config.md` for AI workflows
+5. **Authentication**: See `core/STACK_AUTH_EMAIL_SETUP.md` and `core/STACK_AUTH_TRUSTED_DOMAINS.md`
 
 ## 📈 **Architecture Evolution**
 
@@ -71,27 +89,27 @@ The project has evolved from a basic chat interface to a sophisticated RAG-enhan
 - **Phase 1**: Basic chat interface with n8n integration
 - **Phase 2**: Recipe extraction and storage
 - **Phase 3**: RAG system with vector search (current)
-- **Phase 4**: Advanced session management (current)
+- **Phase 4**: Security and performance improvements (current)
 
 ## 🔧 **Current Tech Stack**
 
 - **Frontend**: React + TypeScript + Tailwind CSS
 - **Backend**: Express.js + Vercel Edge Functions
-- **Database**: PostgreSQL (Neon) with vector extensions
+- **Database**: PostgreSQL (Neon) with pgvector extension
 - **AI**: OpenRouter via n8n workflows
 - **Search**: Vector similarity + full-text search
+- **Auth**: Stack Auth (cookie-based sessions)
 - **Deployment**: Vercel for production
 
 ## 📝 **Documentation Guidelines**
 
 - **Architecture docs**: System design, requirements, and RAG documentation
 - **Development docs**: Setup guides, configuration, and deployment
-- **Feature docs**: Specific feature implementations and user-facing functionality
-- **Database docs**: Migration files and database-related documentation
+- **Core docs**: Core system features (auth, logging, etc.)
 - **Outdated docs**: Move to `Archived/` folder
 - **New features**: Create documentation in appropriate subfolder
 - **Updates**: Update existing docs when architecture changes
 
 ---
 
-*Last updated: September 2024*
+*Last updated: November 2025*
