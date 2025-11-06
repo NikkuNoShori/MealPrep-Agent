@@ -70,6 +70,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/recipes/:slug"
+        element={
+          <Layout>
+            <Recipes />
+          </Layout>
+        }
+      />
+      <Route
         path="/meal-planner"
         element={
           <ProtectedRoute>

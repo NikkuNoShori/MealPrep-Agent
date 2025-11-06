@@ -56,20 +56,28 @@ if (enablePgMonitor) {
   AppLogger.warn('⚠️ pg-monitor disabled - no database logging');
 }
 
-// Create pool with basic configuration
+// Create pool with optimized configuration
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false
+    // Enable SSL certificate validation in production
+    rejectUnauthorized: process.env.NODE_ENV === 'production',
   },
   // Connection timeout in milliseconds
   connectionTimeoutMillis: 10000,
+  // Optimize pool size for production
+  max: 20, // Maximum connections in pool
+  min: 2, // Minimum idle connections
+  idleTimeoutMillis: 30000, // Close idle connections after 30s
+  // Statement timeout (5 seconds)
+  statement_timeout: 5000,
 });
 
 export interface Recipe {
   id: string;
   user_id: string;
   title: string;
+  slug?: string; // URL-friendly slug (e.g., "chocolate-chip-cookies")
   description?: string;
   ingredients: any[];
   instructions: any[];
@@ -83,6 +91,7 @@ export interface Recipe {
   source_name?: string;
   rating?: number;
   is_favorite: boolean;
+  is_public?: boolean; // If true, recipe is visible to all users
   created_at: string;
   updated_at: string;
   searchable_text?: string;
@@ -115,11 +124,32 @@ export class DatabaseService {
     this.pool = pool;
   }
 
-  async query(text: string, params?: any[]): Promise<any> {
+  /**
+   * Execute a query with optional user context for RLS
+   * @param text SQL query text
+   * @param params Query parameters
+   * @param userId Optional user ID for RLS context
+   */
+  async query(text: string, params?: any[], userId?: string): Promise<any> {
     const client = await this.pool.connect();
     const startTime = Date.now();
     
     try {
+      // Set user context for RLS if userId is provided
+      if (userId) {
+        try {
+          await client.query('SELECT set_user_id($1::uuid)', [userId]);
+          AppLogger.debug('🔵 DatabaseService: Set user context for RLS', { userId });
+        } catch (rlsError: any) {
+          // If RLS function doesn't exist, log warning but continue
+          // This allows the app to work before migration is applied
+          AppLogger.warn('⚠️ DatabaseService: RLS function not found, skipping user context', {
+            error: rlsError.message,
+            hint: 'Run migration 009_fix_rls_for_stack_auth.sql to enable RLS',
+          });
+        }
+      }
+      
       // pg-monitor will automatically log the query through unified logger
       const result = await client.query(text, params);
       
@@ -132,12 +162,18 @@ export class DatabaseService {
         AppLogger.warn('⚠️ Slow query detected', {
           duration: `${duration.toFixed(2)}ms`,
           query: text.length > 200 ? text.substring(0, 200) + '...' : text,
+          userId: userId || 'none',
         });
       }
       
       return result;
     } catch (error: any) {
       // pg-monitor will automatically log the error through unified logger
+      AppLogger.error('🔴 DatabaseService: Query error', {
+        error: error.message,
+        query: text.substring(0, 200),
+        userId: userId || 'none',
+      });
       throw error;
     } finally {
       client.release();
@@ -149,41 +185,114 @@ export class DatabaseService {
   }
 
   // Recipe CRUD operations
-  async getRecipes(userId: string, limit: number = 50, offset: number = 0): Promise<Recipe[]> {
-    const result = await this.query(
-      'SELECT * FROM recipes WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-      [userId, limit, offset]
-    );
-    return result.rows;
+  async getRecipes(userId: string | null, limit: number = 50, offset: number = 0, includePublic: boolean = true): Promise<Recipe[]> {
+    // If userId is null, we're querying public recipes only
+    // If userId is provided, RLS will show user's recipes + public recipes
+    if (userId) {
+      // Set user context for RLS (will show user's recipes + public recipes)
+      const result = await this.query(
+        'SELECT * FROM recipes ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+        [limit, offset],
+        userId // Pass userId for RLS context
+      );
+      return result.rows;
+    } else {
+      // No user context - only show public recipes
+      // Don't set user context, RLS will only show public recipes
+      const result = await this.query(
+        'SELECT * FROM recipes WHERE is_public = true ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+        [limit, offset]
+        // No userId passed - unauthenticated query
+      );
+      return result.rows;
+    }
   }
 
-  async getRecipe(recipeId: string, userId: string): Promise<Recipe | null> {
-    const result = await this.query(
-      'SELECT * FROM recipes WHERE id = $1 AND user_id = $2',
-      [recipeId, userId]
-    );
-    return result.rows[0] || null;
+  async getRecipe(recipeId: string, userId: string | null = null): Promise<Recipe | null> {
+    // If userId is provided, RLS will check if user owns it or if it's public
+    // If userId is null, RLS will only allow access if recipe is public
+    if (userId) {
+      // Set user context for RLS (will show user's recipes + public recipes)
+      const result = await this.query(
+        'SELECT * FROM recipes WHERE id = $1',
+        [recipeId],
+        userId // Pass userId for RLS context
+      );
+      return result.rows[0] || null;
+    } else {
+      // No user context - only check if recipe is public
+      const result = await this.query(
+        'SELECT * FROM recipes WHERE id = $1 AND is_public = true',
+        [recipeId]
+        // No userId passed - unauthenticated query
+      );
+      return result.rows[0] || null;
+    }
+  }
+
+  /**
+   * Get recipe by slug
+   * Supports both authenticated and unauthenticated access for public recipes
+   */
+  async getRecipeBySlug(slug: string, userId: string | null = null): Promise<Recipe | null> {
+    // If userId is provided, RLS will check if user owns it or if it's public
+    // If userId is null, RLS will only allow access if recipe is public
+    if (userId) {
+      // Set user context for RLS (will show user's recipes + public recipes)
+      const result = await this.query(
+        'SELECT * FROM recipes WHERE slug = $1',
+        [slug],
+        userId // Pass userId for RLS context
+      );
+      return result.rows[0] || null;
+    } else {
+      // No user context - only check if recipe is public
+      const result = await this.query(
+        'SELECT * FROM recipes WHERE slug = $1 AND is_public = true',
+        [slug]
+        // No userId passed - unauthenticated query
+      );
+      return result.rows[0] || null;
+    }
   }
 
   async createRecipe(recipe: Omit<Recipe, 'id' | 'created_at' | 'updated_at'>): Promise<Recipe> {
+    // RLS will verify that user_id matches the authenticated user
     const result = await this.query(
-      `INSERT INTO recipes (user_id, title, description, ingredients, instructions, 
+      `INSERT INTO recipes (user_id, title, slug, description, ingredients, instructions, 
        prep_time, cook_time, servings, difficulty, cuisine, dietary_tags, 
-       source_url, source_name, rating, is_favorite)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       source_url, source_name, rating, is_favorite, is_public)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
-        recipe.user_id, recipe.title, recipe.description, 
+        recipe.user_id, recipe.title, recipe.slug || null, recipe.description, 
         JSON.stringify(recipe.ingredients), JSON.stringify(recipe.instructions),
         recipe.prep_time, recipe.cook_time, recipe.servings, recipe.difficulty,
         recipe.cuisine, recipe.dietary_tags, recipe.source_url, recipe.source_name,
-        recipe.rating, recipe.is_favorite
-      ]
+        recipe.rating, recipe.is_favorite, recipe.is_public || false
+      ],
+      recipe.user_id // Pass userId for RLS context
     );
     return result.rows[0];
   }
 
   async updateRecipe(recipeId: string, userId: string, updates: Partial<Recipe>): Promise<Recipe | null> {
+    // If title is being updated, regenerate slug (unless slug is explicitly provided)
+    if (updates.title && !updates.slug) {
+      // Import slugify function
+      const { generateUniqueSlug } = await import('../utils/slugify.js');
+      
+      // Get existing recipes to check for slug uniqueness
+      const existingRecipes = await this.getRecipes(userId, 1000, 0);
+      const currentRecipe = await this.getRecipe(recipeId, userId);
+      const existingSlugs = existingRecipes
+        .map(r => r.slug)
+        .filter(Boolean)
+        .filter(s => currentRecipe && s !== currentRecipe.slug); // Exclude current recipe's slug
+      
+      updates.slug = generateUniqueSlug(updates.title, existingSlugs);
+    }
+
     const setClause = Object.keys(updates)
       .filter(key => key !== 'id' && key !== 'user_id' && key !== 'created_at')
       .map((key, index) => `${key} = $${index + 3}`)
@@ -194,17 +303,21 @@ export class DatabaseService {
     }
 
     const values = [recipeId, userId, ...Object.values(updates).filter(v => v !== undefined)];
+    // RLS will verify that user_id matches the authenticated user
     const result = await this.query(
       `UPDATE recipes SET ${setClause} WHERE id = $1 AND user_id = $2 RETURNING *`,
-      values
+      values,
+      userId // Pass userId for RLS context
     );
     return result.rows[0] || null;
   }
 
   async deleteRecipe(recipeId: string, userId: string): Promise<boolean> {
+    // RLS will verify that user_id matches the authenticated user
     const result = await this.query(
       'DELETE FROM recipes WHERE id = $1 AND user_id = $2',
-      [recipeId, userId]
+      [recipeId, userId],
+      userId // Pass userId for RLS context
     );
     return result.rowCount > 0;
   }
@@ -245,7 +358,8 @@ export class DatabaseService {
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
     const result = await this.query(
       `SELECT * FROM search_similar_recipes($1, $2, $3, $4)`,
-      [embeddingStr, userId, similarityThreshold, maxResults]
+      [embeddingStr, userId, similarityThreshold, maxResults],
+      userId // Pass userId for RLS context
     );
     return result.rows;
   }
@@ -258,7 +372,8 @@ export class DatabaseService {
   ): Promise<SearchResult[]> {
     const result = await this.query(
       `SELECT * FROM search_recipes_text($1, $2, $3)`,
-      [searchQuery, userId, maxResults]
+      [searchQuery, userId, maxResults],
+      userId // Pass userId for RLS context
     );
     return result.rows;
   }
@@ -355,7 +470,7 @@ export class DatabaseService {
     query += ` ORDER BY rating DESC NULLS LAST, created_at DESC LIMIT $${paramIndex}`;
     params.push(maxResults);
 
-    const result = await this.query(query, params);
+    const result = await this.query(query, params, userId); // Pass userId for RLS context
     return result.rows.map((row: any) => ({
       recipe_id: row.id,
       title: row.title,

@@ -42,9 +42,9 @@ class ApiClient {
     return response.json();
   }
 
-  // Recipe endpoints - now using direct Neon database access
+  // Recipe endpoints - using centralized service layer
   async getRecipes(params?: { limit?: number; offset?: number }) {
-    return await recipeService.getRecipes();
+    return await recipeService.getRecipes(params);
   }
 
   async getRecipe(id: string) {

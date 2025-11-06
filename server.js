@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import fetch from 'node-fetch';
 import { config } from 'dotenv';
 import { db } from './src/services/database.js';
 import { embeddingService } from './src/services/embeddingService.js';
+import { authenticateRequest, optionalAuth } from './server/middleware/auth.js';
+import { apiLimiter, recipeCreationLimiter, searchLimiter } from './server/middleware/rateLimit.js';
+import { validateRecipeCreation, validateRecipeUpdate, validateRecipeId, validateRAGSearch } from './server/middleware/validation.js';
 
 // Load environment variables
 config();
@@ -11,9 +15,32 @@ config();
 const app = express();
 const PORT = 3000;
 
+// Configure CORS - restrict to trusted origins
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://meal-prep-agent-delta.vercel.app',
+  // Add your production domains here
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
+];
+
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
+app.use(cookieParser()); // Parse cookies for Stack Auth
 app.use(express.json());
+
+// Apply general rate limiting to all API routes
+app.use('/api/', apiLimiter);
 
 // Environment variables (set these for local development)
 const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED || 'true';
@@ -98,18 +125,19 @@ const webhookService = {
   }
 };
 
-// Test user for development
-const getTestUser = () => ({
-  id: '11111111-1111-1111-1111-111111111111',
-  neonUserId: 'test-user-123',
-  email: 'test@example.com',
-  displayName: 'Test User',
-  familyId: '11111111-1111-1111-1111-111111111111',
-  householdSize: 4
-});
-
-// Note: Recipe storage moved to direct Neon database access
-// This server now only handles chat functionality
+// Note: getTestUser() is deprecated - use req.user from authentication middleware instead
+// This is kept for backward compatibility during migration
+const getTestUser = () => {
+  console.warn('⚠️ getTestUser() is deprecated - use req.user from authentication middleware');
+  return {
+    id: '11111111-1111-1111-1111-111111111111',
+    neonUserId: 'test-user-123',
+    email: 'test@example.com',
+    displayName: 'Test User',
+    familyId: '11111111-1111-1111-1111-111111111111',
+    householdSize: 4
+  };
+};
 
 // Routes
 app.get('/api/health', (req, res) => {
@@ -266,30 +294,55 @@ app.post('/api/chat/message', async (req, res) => {
 });
 
 // Recipe storage endpoint
-app.post('/api/recipes', async (req, res) => {
+app.post('/api/recipes', 
+  recipeCreationLimiter, // Apply stricter rate limiting for recipe creation
+  authenticateRequest, // Require authentication
+  validateRecipeCreation, // Validate request body
+  async (req, res) => {
   try {
     const { recipe } = req.body;
-    const user = getTestUser();
+    const user = req.user; // Get authenticated user from middleware
 
     console.log('Received recipe for storage:', recipe.title);
+
+    // Helper function to handle both camelCase and snake_case
+    const getValue = (obj, camelKey, snakeKey) => {
+      return obj[snakeKey] !== undefined ? obj[snakeKey] : obj[camelKey];
+    };
+
+    // Generate slug from title if not provided
+    let slug = recipe.slug;
+    if (!slug && recipe.title) {
+      // Import slugify function (dynamic import for ES modules)
+      const slugifyModule = await import('./src/utils/slugify.js');
+      const { generateUniqueSlug } = slugifyModule;
+      
+      // Check for existing slugs to ensure uniqueness
+      const existingRecipes = await db.getRecipes(user.id, 1000, 0);
+      const existingSlugs = existingRecipes.map(r => r.slug).filter(Boolean);
+      
+      slug = generateUniqueSlug(recipe.title, existingSlugs);
+    }
 
     // Create the recipe in the database
     const storedRecipe = await db.createRecipe({
       user_id: user.id,
       title: recipe.title,
+      slug: slug || null,
       description: recipe.description,
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],
-      prep_time: recipe.prep_time,
-      cook_time: recipe.cook_time,
+      prep_time: getValue(recipe, 'prepTime', 'prep_time'),
+      cook_time: getValue(recipe, 'cookTime', 'cook_time'),
       servings: recipe.servings,
-      difficulty: recipe.difficulty,
-      cuisine: recipe.cuisine,
-      dietary_tags: recipe.dietary_tags,
-      source_url: recipe.source_url,
-      source_name: recipe.source_name,
-      rating: recipe.rating,
-      is_favorite: recipe.is_favorite || false
+      difficulty: recipe.difficulty || 'medium',
+      cuisine: recipe.cuisine || null,
+      dietary_tags: recipe.dietary_tags || recipe.tags || [],
+      source_url: getValue(recipe, 'sourceUrl', 'source_url') || getValue(recipe, 'imageUrl', 'image_url'),
+      source_name: recipe.source_name || null,
+      rating: recipe.rating || null,
+      is_favorite: recipe.is_favorite || false,
+      is_public: recipe.is_public || recipe.isPublic || false // Support both snake_case and camelCase
     });
 
     // Generate and store embedding for the recipe
@@ -318,15 +371,22 @@ app.post('/api/recipes', async (req, res) => {
   }
 });
 
-// Get similar recipes
-app.get('/api/rag/similar/:recipeId', async (req, res) => {
+// Get all recipes endpoint
+// Supports both authenticated (user's recipes + public) and unauthenticated (public only) access
+app.get('/api/recipes', 
+  optionalAuth, // Optional authentication - allows unauthenticated access for public recipes
+  async (req, res) => {
   try {
-    const user = getTestUser();
+    const user = req.user || null; // May be null if unauthenticated
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
+    const publicOnly = req.query.publicOnly === 'true'; // Optional: only public recipes
 
     // Get recipes from database
-    const recipes = await db.getRecipes(user.id, limit, offset);
+    // If user is authenticated: RLS will show user's recipes + public recipes
+    // If user is not authenticated: RLS will only show public recipes
+    const userId = publicOnly ? null : (user?.id || null);
+    const recipes = await db.getRecipes(userId, limit, offset, true);
 
     res.json({
       recipes,
@@ -342,10 +402,123 @@ app.get('/api/rag/similar/:recipeId', async (req, res) => {
   }
 });
 
-// RAG Search endpoint
-app.post('/api/rag/search', async (req, res) => {
+// Get single recipe endpoint (by ID or slug)
+// Supports both authenticated and unauthenticated access for public recipes
+// Route supports both UUID and slug: /api/recipes/:idOrSlug
+app.get('/api/recipes/:idOrSlug', 
+  optionalAuth, // Optional authentication - allows unauthenticated access for public recipes
+  async (req, res) => {
   try {
-    const { query, userId, limit = 10, searchType = 'semantic' } = req.body;
+    const user = req.user || null; // May be null if unauthenticated
+    const idOrSlug = req.params.idOrSlug;
+
+    // Check if it's a UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+
+    let recipe;
+    if (isUUID) {
+      // Lookup by ID
+      recipe = await db.getRecipe(idOrSlug, user?.id || null);
+    } else {
+      // Lookup by slug
+      recipe = await db.getRecipeBySlug(idOrSlug, user?.id || null);
+    }
+
+    if (!recipe) {
+      return res.status(404).json({ 
+        error: 'Recipe not found',
+        message: 'Recipe does not exist or is not publicly available'
+      });
+    }
+
+    res.json({ recipe });
+
+  } catch (error) {
+    console.error('Recipe retrieval error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// Update recipe endpoint
+app.put('/api/recipes/:id', 
+  authenticateRequest, // Require authentication
+  validateRecipeId, // Validate recipe ID format
+  validateRecipeUpdate, // Validate request body
+  async (req, res) => {
+  try {
+    const user = req.user; // Get authenticated user from middleware
+    const recipeId = req.params.id;
+    const updates = req.body;
+
+    // Update recipe in database (RLS will verify ownership)
+    const updatedRecipe = await db.updateRecipe(recipeId, user.id, updates);
+
+    if (!updatedRecipe) {
+      return res.status(404).json({ 
+        error: 'Recipe not found',
+        message: 'Recipe does not exist or you do not have access to it'
+      });
+    }
+
+    res.json({
+      message: 'Recipe updated successfully',
+      recipe: updatedRecipe
+    });
+
+  } catch (error) {
+    console.error('Recipe update error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// Delete recipe endpoint
+app.delete('/api/recipes/:id', 
+  authenticateRequest, // Require authentication
+  validateRecipeId, // Validate recipe ID format
+  async (req, res) => {
+  try {
+    const user = req.user; // Get authenticated user from middleware
+    const recipeId = req.params.id;
+
+    // Delete recipe from database (RLS will verify ownership)
+    const deleted = await db.deleteRecipe(recipeId, user.id);
+
+    if (!deleted) {
+      return res.status(404).json({ 
+        error: 'Recipe not found',
+        message: 'Recipe does not exist or you do not have access to it'
+      });
+    }
+
+    res.json({
+      message: 'Recipe deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Recipe deletion error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
+});
+
+// RAG Search endpoint
+app.post('/api/rag/search', 
+  searchLimiter, // Apply rate limiting for search
+  authenticateRequest, // Require authentication
+  validateRAGSearch, // Validate request body
+  async (req, res) => {
+  try {
+    const user = req.user; // Get authenticated user from middleware
+    const { query, limit = 10, searchType = 'semantic' } = req.body;
+    const userId = user.id; // Use authenticated user ID
     
     console.log('RAG Search request:', { query, userId, limit, searchType });
     
@@ -397,24 +570,32 @@ app.post('/api/rag/search', async (req, res) => {
 });
 
 // RAG Similar recipes endpoint
-app.get('/api/rag/similar/:recipeId', async (req, res) => {
+app.get('/api/rag/similar/:recipeId', 
+  authenticateRequest, // Require authentication
+  validateRecipeId, // Validate recipe ID format
+  async (req, res) => {
   try {
-    const { recipeId } = req.params;
-    const { userId, limit = 5 } = req.query;
+    const user = req.user; // Get authenticated user from middleware
+    const recipeId = req.params.id;
+    const limit = parseInt(req.query.limit) || 5;
+    const userId = user.id; // Use authenticated user ID
     
     console.log('RAG Similar request:', { recipeId, userId, limit });
     
-    // Get the recipe to find similar ones
+    // Get the recipe to find similar ones (RLS will verify ownership)
     const recipe = await db.getRecipe(recipeId, userId);
     if (!recipe) {
-      return res.status(404).json({ error: 'Recipe not found' });
+      return res.status(404).json({ 
+        error: 'Recipe not found',
+        message: 'Recipe does not exist or you do not have access to it'
+      });
     }
     
     // Generate embedding for the recipe
     const { embedding } = await embeddingService.generateRecipeEmbedding(recipe);
     
-    // Find similar recipes
-    const results = await db.searchSimilarRecipes(embedding, userId, 0.6, parseInt(limit));
+    // Find similar recipes (RLS will filter by user_id)
+    const results = await db.searchSimilarRecipes(embedding, userId, 0.6, limit);
     
     // Filter out the original recipe
     const similarResults = results.filter(result => result.recipe_id !== recipeId);
@@ -438,9 +619,14 @@ app.get('/api/rag/similar/:recipeId', async (req, res) => {
 });
 
 // RAG Ingredients search endpoint
-app.post('/api/rag/ingredients', async (req, res) => {
+app.post('/api/rag/ingredients', 
+  searchLimiter, // Apply rate limiting for search
+  authenticateRequest, // Require authentication
+  async (req, res) => {
   try {
-    const { ingredients, userId, limit = 10 } = req.body;
+    const user = req.user; // Get authenticated user from middleware
+    const { ingredients, limit = 10 } = req.body;
+    const userId = user.id; // Use authenticated user ID
     
     console.log('RAG Ingredients request:', { ingredients, userId, limit });
     
@@ -470,9 +656,14 @@ app.post('/api/rag/ingredients', async (req, res) => {
 });
 
 // RAG Recommendations endpoint
-app.post('/api/rag/recommendations', async (req, res) => {
+app.post('/api/rag/recommendations', 
+  searchLimiter, // Apply rate limiting for search
+  authenticateRequest, // Require authentication
+  async (req, res) => {
   try {
-    const { userId, preferences, limit = 10 } = req.body;
+    const user = req.user; // Get authenticated user from middleware
+    const { preferences, limit = 10 } = req.body;
+    const userId = user.id; // Use authenticated user ID
     
     console.log('RAG Recommendations request:', { userId, preferences, limit });
     

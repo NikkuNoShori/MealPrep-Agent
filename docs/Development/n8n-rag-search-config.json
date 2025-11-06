@@ -1,0 +1,44 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.ragEndpoint || 'https://meal-prep-agent-delta.vercel.app/api/rag/search' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ {\n  \"query\": $json.body.content || $json.content || $json.query,\n  \"userId\": $json.body.userId || $json.body.user.id || $json.user.id || $json.userId,\n  \"limit\": $json.body.limit || $json.limit || 5,\n  \"searchType\": $json.body.searchType || $json.searchType || 'hybrid'\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        176,
+        272
+      ],
+      "id": "73bae83f-ae1f-4066-80db-ac5c675f5a1e",
+      "name": "RAG Search"
+    }
+  ],
+  "connections": {
+    "RAG Search": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "08630ae7b427ed7d6b1d3c523269a960430d4334e91eaf1e8918ed5e76d5afbc"
+  }
+}
+

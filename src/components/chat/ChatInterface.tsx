@@ -23,6 +23,7 @@ import {
   BookOpen,
   Save,
   Check,
+  Copy,
 } from "lucide-react";
 import { ChatHistoryResponse, ChatMessageResponse } from "../../types";
 import { useCreateRecipe } from "../../services/api";
@@ -476,35 +477,60 @@ export const ChatInterface: React.FC = () => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
-    } else if (e.key === "ArrowUp") {
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle arrow key navigation through message history
+    // History is stored with newest messages at index 0
+    // ArrowUp goes to older messages (higher indices), ArrowDown goes to newer messages (lower indices)
+    if (e.key === "ArrowUp") {
       e.preventDefault();
+      if (messageHistory.length === 0) return;
+      
+      // Save current input if we're starting navigation
+      if (historyIndex === -1 && inputMessage.trim()) {
+        setTempInput(inputMessage);
+      }
+      
+      // Navigate to older message (higher index)
       if (historyIndex < messageHistory.length - 1) {
         const newIndex = historyIndex + 1;
         setHistoryIndex(newIndex);
-        if (newIndex === 0) {
-          setTempInput(inputMessage);
-        }
         setInputMessage(messageHistory[newIndex]);
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
+      
+      // Navigate to newer message (lower index) or back to original input
       if (historyIndex > 0) {
         const newIndex = historyIndex - 1;
         setHistoryIndex(newIndex);
         setInputMessage(messageHistory[newIndex]);
       } else if (historyIndex === 0) {
+        // Return to original input
         setHistoryIndex(-1);
         setInputMessage(tempInput);
       }
     }
   };
 
+  const handleCopyMessage = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      ToastService.success('Message copied to clipboard!');
+    } catch (error) {
+      Logger.error('Failed to copy message:', error);
+      ToastService.error('Failed to copy message');
+    }
+  };
+
   const currentConversation = getCurrentConversation();
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       {/* Sidebar - Conversation History */}
-      <div className="w-80 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col min-h-0">
+      <div className="w-80 bg-gray-50/90 dark:bg-gray-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-gray-700 flex flex-col min-h-0 shadow-lg">
         {/* Header with New Chat and Multi-select */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-2">
           <Button
@@ -578,14 +604,14 @@ export const ChatInterface: React.FC = () => {
         </div>
 
         {/* Conversation List */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden chat-container">
           {conversations.map((conversation) => (
             <div
               key={conversation.id}
-              className={`p-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group ${
+              className={`p-3 border-b border-gray-100/50 dark:border-gray-700/50 cursor-pointer transition-all duration-200 group ${
                 currentConversationId === conversation.id
-                  ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700"
-                  : ""
+                  ? "bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 dark:from-primary/20 dark:to-primary/10 dark:border-primary/40 shadow-sm"
+                  : "hover:bg-gray-100/80 dark:hover:bg-gray-700/80"
               } ${
                 selectedConversations.has(conversation.id)
                   ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700"
@@ -662,61 +688,90 @@ export const ChatInterface: React.FC = () => {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-h-0">
-        <Card className="flex-1 flex flex-col min-h-0">
+        <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-xl bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
           <CardContent className="flex-1 flex flex-col p-0 min-h-0">
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6 min-h-0 chat-container">
               {!currentConversation ||
               currentConversation.messages.length === 0 ? (
-                <div className="text-center py-8">
-                  <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                <div className="text-center py-12 px-4">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-lg border border-primary/20">
+                    <Bot className="h-10 w-10 text-primary" />
+                  </div>
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent mb-2">
                     Welcome to MealPrep Assistant!
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                    Ask me anything about recipes, meal planning, or cooking tips.
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Ask me anything about recipes, meal planning, or cooking
-                    tips.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-md mx-auto">
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <BookOpen className="h-5 w-5 mx-auto mb-2 text-blue-600" />
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md mx-auto">
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl shadow-sm border border-blue-200/50 dark:border-blue-700/30 hover:shadow-md transition-shadow">
+                      <BookOpen className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
+                      <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
                         "Add this recipe to my collection"
                       </p>
                     </div>
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <Search className="h-5 w-5 mx-auto mb-2 text-green-600" />
-                      <p className="text-xs text-green-700 dark:text-green-300">
+                    <div className="p-4 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-900/20 dark:to-green-800/20 rounded-xl shadow-sm border border-green-200/50 dark:border-green-700/30 hover:shadow-md transition-shadow">
+                      <Search className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
+                      <p className="text-xs font-medium text-green-700 dark:text-green-300">
                         "Find recipes with chicken"
                       </p>
                     </div>
                   </div>
                 </div>
               ) : (
-                currentConversation.messages.map((message) => (
+                currentConversation.messages.map((message, index) => {
+                  // Subtle stagger for visual variety (much smaller offset)
+                  const staggerOffset = (index % 3) * 4;
+                  
+                  return (
                   <div
                     key={message.id}
-                    className={`flex gap-3 ${
+                    className={`flex gap-3 group transition-all duration-300 ${
                       message.sender === "user"
                         ? "justify-end"
                         : "justify-start"
                     }`}
+                    style={{
+                      transform: message.sender === "user" 
+                        ? `translateX(-${staggerOffset}px)` 
+                        : `translateX(${staggerOffset}px)`,
+                      maxWidth: '100%',
+                    }}
                   >
                     {message.sender === "ai" && (
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Bot className="h-4 w-4 text-primary" />
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 shadow-md border border-primary/20">
+                        <Bot className="h-5 w-5 text-primary" />
                       </div>
                     )}
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 relative max-w-full">
                       <div
-                        className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                        className={`${
                           message.sender === "user"
-                            ? "bg-primary text-white"
-                            : "bg-gray-100 dark:bg-gray-800"
+                            ? "max-w-[75%] min-w-[200px] w-fit"
+                            : "max-w-[75%] min-w-[250px]"
+                        } rounded-2xl px-5 py-3 relative transition-all duration-200 hover:shadow-lg ${
+                          message.sender === "user"
+                            ? "bg-gradient-to-br from-primary to-primary/90 text-white shadow-md"
+                            : "bg-gray-300 dark:bg-gray-700 border border-gray-400 dark:border-gray-600 shadow-sm text-gray-900 dark:text-gray-100"
                         }`}
                       >
+                        {/* Copy button - appears on hover */}
+                        <button
+                          onClick={() => handleCopyMessage(message.content)}
+                          className={`absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 ${
+                            message.sender === "user"
+                              ? "text-white/80 hover:text-white"
+                              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                          }`}
+                          title="Copy message"
+                          aria-label="Copy message"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                        
                         <p
-                          className={`text-sm whitespace-pre-wrap ${
+                          className={`text-sm whitespace-pre-wrap pr-8 ${
                             message.sender === "user"
                               ? "text-white"
                               : "text-gray-900 dark:text-gray-100"
@@ -772,12 +827,13 @@ export const ChatInterface: React.FC = () => {
                       )}
                     </div>
                     {message.sender === "user" && (
-                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                        <User className="h-4 w-4 text-primary-foreground" />
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/90 flex items-center justify-center flex-shrink-0 shadow-md">
+                        <User className="h-5 w-5 text-primary-foreground" />
                       </div>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
               {isLoading && (
                 <div className="flex gap-3 justify-start">
@@ -798,20 +854,22 @@ export const ChatInterface: React.FC = () => {
             </div>
 
             {/* Input Area */}
-            <div className="border-t p-4 flex-shrink-0">
-              <div className="flex gap-2">
+            <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50/90 dark:bg-gray-900/90 backdrop-blur-sm p-4 flex-shrink-0 shadow-lg">
+              <div className="flex gap-3 items-end">
                 <Input
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type your message... (↑/↓ to navigate history)"
                   disabled={isLoading}
-                  className="flex-1"
+                  className="flex-1 rounded-2xl border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary/50 shadow-sm bg-gray-100 dark:bg-gray-800"
                 />
                 <Button
                   onClick={handleSendMessage}
                   disabled={!inputMessage.trim() || isLoading}
                   size="icon"
+                  className="rounded-2xl h-10 w-10 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
@@ -823,3 +881,4 @@ export const ChatInterface: React.FC = () => {
     </div>
   );
 };
+

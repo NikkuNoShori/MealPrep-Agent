@@ -5,14 +5,25 @@ import OpenAI from 'openai';
 const sql = neon(process.env.DATABASE_URL);
 
 // OpenAI client (edge-compatible)
+// Detect if API key is OpenRouter (starts with sk-or-v1) or OpenAI
+const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+const isOpenRouter = apiKey?.startsWith('sk-or-v1-') || !!process.env.OPENROUTER_API_KEY;
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined,
+  apiKey: apiKey,
+  baseURL: isOpenRouter ? 'https://openrouter.ai/api/v1' : undefined,
 });
 
-// CORS headers
+// CORS headers - restrict to trusted origins
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://meal-prep-agent-delta.vercel.app',
+  // Add your production domains here
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
+];
+
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Credentials': 'true',
@@ -32,71 +43,72 @@ async function generateEmbedding(text) {
   }
 }
 
-// Vector similarity search using stored procedure
+// Vector similarity search using direct SQL (fallback if stored procedures don't exist)
 async function searchSimilarRecipes(embedding, userId, threshold = 0.5, limit = 10) {
   try {
     // Format embedding as PostgreSQL array string: [1,2,3,...]
     const embeddingStr = `[${embedding.join(',')}]`;
     
-    // Call stored procedure: search_similar_recipes(query_embedding, user_uuid, similarity_threshold, max_results)
-    // Neon edge SQL uses tagged template literals with proper casting
-    const results = await sql`
-      SELECT * FROM search_similar_recipes(
-        ${embeddingStr}::vector, 
-        ${userId}::uuid, 
-        ${threshold}::float, 
-        ${limit}::integer
-      )
-    `;
-    
-    // Map results to include all fields from recipe_embeddings
-    const enrichedResults = await Promise.all(results.map(async (result) => {
-      // Get additional fields from recipe_embeddings
-      const embeddingInfo = await sql`
-        SELECT text_content 
-        FROM recipe_embeddings 
-        WHERE recipe_id = ${result.recipe_id}
-        LIMIT 1
+    // Direct SQL query - try recipe_embeddings first, fallback to recipes table if it doesn't exist
+    try {
+      const results = await sql`
+        SELECT 
+          r.id as recipe_id,
+          r.title,
+          r.description,
+          r.ingredients,
+          r.instructions,
+          COALESCE(re.text_content, r.searchable_text) as searchable_text,
+          1 - (re.embedding <=> ${embeddingStr}::vector) as similarity_score,
+          0.0 as rank_score
+        FROM recipes r
+        INNER JOIN recipe_embeddings re ON r.id = re.recipe_id
+        WHERE r.user_id::text = ${userId}
+          AND 1 - (re.embedding <=> ${embeddingStr}::vector) >= ${threshold}::float
+        ORDER BY re.embedding <=> ${embeddingStr}::vector
+        LIMIT ${limit}::integer
       `;
-      
-      return {
-        ...result,
-        searchable_text: embeddingInfo[0]?.text_content || null,
-      };
-    }));
-    
-    return enrichedResults;
+      return results;
+    } catch (vectorError) {
+      // If recipe_embeddings doesn't exist, fall back to text search
+      console.warn('Vector search failed (recipe_embeddings may not exist), falling back to text search:', vectorError.message);
+      return [];
+    }
   } catch (error) {
     console.error('Error in vector search:', error);
     throw error;
   }
 }
 
-// Text search using stored procedure
+// Text search using direct SQL (fallback if stored procedures don't exist)
 async function searchRecipesText(query, userId, limit = 10) {
   try {
-    // Call stored procedure: search_recipes_text(search_query, user_uuid, max_results)
+    // Direct SQL query - search in recipes table using searchable_text or title/description
     const results = await sql`
-      SELECT * FROM search_recipes_text(${query}, ${userId}::uuid, ${limit}::integer)
+      SELECT 
+        r.id as recipe_id,
+        r.title,
+        r.description,
+        r.ingredients,
+        r.instructions,
+        COALESCE(r.searchable_text, r.title || ' ' || COALESCE(r.description, '')) as searchable_text,
+        ts_rank(
+          to_tsvector('english', COALESCE(r.searchable_text, r.title || ' ' || COALESCE(r.description, ''), '')), 
+          plainto_tsquery('english', ${query})
+        ) as rank_score,
+        0.0 as similarity_score
+      FROM recipes r
+      WHERE r.user_id::text = ${userId}
+        AND (
+          to_tsvector('english', COALESCE(r.searchable_text, r.title || ' ' || COALESCE(r.description, ''), '')) @@ plainto_tsquery('english', ${query})
+          OR r.title ILIKE ${'%' + query + '%'}
+          OR r.description ILIKE ${'%' + query + '%'}
+        )
+      ORDER BY rank_score DESC
+      LIMIT ${limit}::integer
     `;
     
-    // Map results to include searchable_text
-    const enrichedResults = await Promise.all(results.map(async (result) => {
-      const embeddingInfo = await sql`
-        SELECT text_content 
-        FROM recipe_embeddings 
-        WHERE recipe_id = ${result.recipe_id}
-        LIMIT 1
-      `;
-      
-      return {
-        ...result,
-        searchable_text: embeddingInfo[0]?.text_content || null,
-        similarity_score: 0.0, // Text search doesn't have similarity score
-      };
-    }));
-    
-    return enrichedResults;
+    return results;
   } catch (error) {
     console.error('Error in text search:', error);
     throw error;
@@ -155,7 +167,13 @@ async function hybridSearch(embedding, query, userId, limit = 10) {
 }
 
 export default async function handler(req, res) {
-  // Set CORS headers
+  // Get origin from request
+  const origin = req.headers.origin || req.headers.referer || '';
+  
+  // Set CORS headers with dynamic origin
+  const originToAllow = allowedOrigins.find(allowed => origin.includes(allowed)) || allowedOrigins[0];
+  res.setHeader('Access-Control-Allow-Origin', originToAllow || '*');
+  
   Object.entries(corsHeaders).forEach(([key, value]) => {
     res.setHeader(key, value);
   });
@@ -165,6 +183,11 @@ export default async function handler(req, res) {
     res.status(200).end();
     return;
   }
+  
+  // TODO: Add authentication to edge function
+  // For now, we rely on the userId being passed in the request body
+  // In a production environment, you should verify the user's authentication token
+  // This is a security concern - edge functions should verify authentication
 
   // Only allow POST
   if (req.method !== 'POST') {
