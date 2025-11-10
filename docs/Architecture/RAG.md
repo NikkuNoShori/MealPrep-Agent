@@ -44,7 +44,7 @@ User Query → RAG Search → Vector/Text Search → Recipe Context → AI Respo
 
 **Features**:
 - Vercel Edge Function compatible
-- Uses `@neondatabase/serverless` for database access
+- Uses `pg` (node-postgres) for database access
 - Supports semantic, text, and hybrid search
 - Auto-detects OpenRouter API keys
 - Direct SQL queries (no stored procedures required)
@@ -105,7 +105,7 @@ Update your n8n workflow HTTP Request node:
 ## Environment Variables
 
 Required in Vercel:
-- `DATABASE_URL`: Neon PostgreSQL connection string
+- `DATABASE_URL`: Supabase PostgreSQL connection string
 - `OPENROUTER_API_KEY` or `OPENAI_API_KEY`: For embeddings
 - `STACK_PROJECT_ID`: For authentication (production)
 - `STACK_SERVER_SECRET_KEY`: For authentication (production)
@@ -118,7 +118,7 @@ Required in Vercel:
 
 ### Database Connection Errors
 - Verify `DATABASE_URL` is set correctly in Vercel
-- Check Neon database is accessible from Vercel's edge network
+- Check Supabase database is accessible from Vercel's edge network
 
 ### Embedding Generation Errors
 - Verify API key is set correctly

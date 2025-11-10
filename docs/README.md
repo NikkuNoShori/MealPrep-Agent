@@ -11,6 +11,10 @@ This folder contains organized documentation for the MealPrep Agent project.
 - **`SDD.md`** - System Design Document
 - **`RAG.md`** - RAG system architecture and implementation
 - **`SECURITY.md`** - Security and performance implementation status
+- **`USER_AUTHENTICATION_ARCHITECTURE.md`** - Authentication and profile architecture
+- **`PROFILE_CREATION_FLOW.md`** - Profile creation flow documentation
+- **`STACK_AUTH_REST_API.md`** - Stack Auth REST API implementation
+- **`ENV_LOADING_OPTIMIZATION.md`** - Environment variable loading optimization
 - **`diagrams.md`** - Mermaid diagrams for architecture visualization
 - **`n8n-config.md`** - n8n workflow configuration
 
@@ -31,6 +35,15 @@ This folder contains organized documentation for the MealPrep Agent project.
 - **`STACK_AUTH_EMAIL_SETUP.md`** - Stack Auth email configuration
 - **`STACK_AUTH_TRUSTED_DOMAINS.md`** - Stack Auth trusted domains setup
 - **`SERVER_LOGGING_GUIDE.md`** - Server logging configuration
+
+## 📚 **Root Documentation** - Quick Reference Guides
+
+- **`DATABASE_SETUP.md`** - Supabase database setup guide
+- **`RLS_AND_OAUTH_SETUP.md`** - Row Level Security and OAuth setup
+- **`STACK_AUTH_GOOGLE_OAUTH_CONFIG.md`** - Google OAuth configuration guide
+- **`GOOGLE_OAUTH_SETUP.md`** - General Google OAuth setup
+- **`SUPABASE_CONNECTION_STRING.md`** - Supabase connection string guide
+- **`CLEANUP_SUMMARY.md`** - Documentation cleanup summary
 
 ## 🗄️ **Archived/** - Historical Documentation
 
@@ -76,11 +89,12 @@ The `Archived/` folder contains outdated documentation that explains previous ar
 
 ## 🚀 **Getting Started**
 
-1. **Database Setup**: Run migrations in `migrations/` folder
+1. **Database Setup**: See `DATABASE_SETUP.md` for Supabase configuration
 2. **Local Development**: See `Development/LOCAL_DEVELOPMENT.md`
-3. **RAG Setup**: See `Architecture/RAG.md` and `Development/RAG_SEARCH_EDGE_FUNCTION.md`
-4. **n8n Configuration**: Import `Development/n8n-rag-config.md` for AI workflows
-5. **Authentication**: See `core/STACK_AUTH_EMAIL_SETUP.md` and `core/STACK_AUTH_TRUSTED_DOMAINS.md`
+3. **Authentication**: See `core/STACK_AUTH_EMAIL_SETUP.md` and `STACK_AUTH_GOOGLE_OAUTH_CONFIG.md`
+4. **RLS Setup**: See `RLS_AND_OAUTH_SETUP.md` for Row Level Security configuration
+5. **RAG Setup**: See `Architecture/RAG.md` and `Development/RAG_SEARCH_EDGE_FUNCTION.md`
+6. **n8n Configuration**: Import `Development/n8n-rag-config.md` for AI workflows
 
 ## 📈 **Architecture Evolution**
 
@@ -95,7 +109,7 @@ The project has evolved from a basic chat interface to a sophisticated RAG-enhan
 
 - **Frontend**: React + TypeScript + Tailwind CSS
 - **Backend**: Express.js + Vercel Edge Functions
-- **Database**: PostgreSQL (Neon) with pgvector extension
+- **Database**: PostgreSQL (Supabase) with pgvector extension
 - **AI**: OpenRouter via n8n workflows
 - **Search**: Vector similarity + full-text search
 - **Auth**: Stack Auth (cookie-based sessions)

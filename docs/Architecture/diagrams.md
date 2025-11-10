@@ -26,7 +26,7 @@ graph TB
     subgraph "External Services"
         N8N[n8n Workflow]
         OpenAI[OpenAI/OpenRouter]
-        Neon[Neon PostgreSQL]
+        Supabase[Supabase PostgreSQL]
     end
     
     UI --> Auth
@@ -42,7 +42,7 @@ graph TB
     RAG --> Embed
     RAG --> DB
     Embed --> OpenAI
-    DB --> Neon
+    DB --> Supabase
     N8N --> OpenAI
 ```
 
@@ -63,7 +63,7 @@ graph LR
         APIService[API Service]
         ChatAPI[Chat API]
         RAGService[RAG Service]
-        NeonService[Neon Service]
+        DatabaseService[Database Service]
         EmbedService[Embedding Service]
     end
     
@@ -82,8 +82,8 @@ graph LR
     AuthComp --> AuthStore
     ChatAPI --> RAGService
     RAGService --> EmbedService
-    APIService --> NeonService
-    AuthStore --> NeonService
+    APIService --> DatabaseService
+    AuthStore --> DatabaseService
 ```
 
 ## Data Flow Sequence
@@ -344,16 +344,16 @@ graph TB
     end
     
     subgraph "External Services"
-        NeonDB[Neon Database]
+        SupabaseDB[Supabase Database]
         N8NServer[n8n Server]
         OpenRouter[OpenRouter API]
     end
     
     Frontend --> Edge
     Frontend --> Serverless
-    Edge --> NeonDB
+    Edge --> SupabaseDB
     Edge --> N8NServer
-    Serverless --> NeonDB
+    Serverless --> SupabaseDB
     Serverless --> N8NServer
     N8NServer --> OpenRouter
     Edge --> OpenRouter
@@ -553,7 +553,7 @@ graph TB
     end
     
     subgraph "External Services"
-        NeonDB[(Neon PostgreSQL)]
+        SupabaseDB[(Supabase PostgreSQL)]
         OpenRouter[OpenRouter API]
     end
     
@@ -578,7 +578,7 @@ graph TB
     
     RAGService --> EmbedService
     RAGService --> DBService
-    DBService --> NeonDB
+    DBService --> SupabaseDB
     EmbedService --> OpenRouter
     RAGSearch --> EdgeFunc
     EdgeFunc --> RAGService

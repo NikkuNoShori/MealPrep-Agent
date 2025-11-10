@@ -8,6 +8,8 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
+import OAuthCallback from "./pages/OAuthCallback";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import Recipes from "./pages/Recipes";
@@ -39,6 +41,9 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/handler/password-reset" element={<ResetPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/handler/email-verification" element={<VerifyEmail />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/auth/callback" element={<OAuthCallback />} />
       <Route
         path="/dashboard"
         element={

@@ -1,8 +1,68 @@
+import { config } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join, resolve } from 'path';
+import { existsSync } from 'fs';
+
+// Get the directory of the current file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables from .env file in project root
+// Try multiple possible locations
+const envPaths = [
+  join(__dirname, '.env'),           // Same directory as server.js
+  resolve(process.cwd(), '.env'),   // Current working directory
+  join(process.cwd(), '.env'),      // Current working directory (alternative)
+];
+
+let envLoaded = false;
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    const result = config({ path: envPath });
+    if (!result.error) {
+      console.log(`✅ Loaded .env file from: ${envPath}`);
+      envLoaded = true;
+      break;
+    }
+  }
+}
+
+if (!envLoaded) {
+  // Fallback to default behavior (current working directory)
+  const result = config();
+  if (result.error) {
+    console.warn('⚠️ No .env file found. Tried:', envPaths);
+    console.warn('   Using environment variables from system or default behavior');
+  } else {
+    console.log('✅ Loaded .env file from current working directory');
+  }
+}
+
+// Log DATABASE_URL status (without exposing the actual value)
+if (process.env.DATABASE_URL) {
+  const dbUrl = process.env.DATABASE_URL;
+  const maskedUrl = dbUrl.length > 20 
+    ? dbUrl.substring(0, 10) + '...' + dbUrl.substring(dbUrl.length - 10)
+    : '***';
+  console.log(`✅ DATABASE_URL is set: ${maskedUrl}`);
+} else {
+  console.error('❌ DATABASE_URL is NOT set!');
+  console.error('   Please create a .env file in the project root with DATABASE_URL');
+}
+
+// Log Stack Auth environment variables status
+const stackProjectId = process.env.STACK_PROJECT_ID || process.env.VITE_STACK_PROJECT_ID;
+const stackServerSecretKey = process.env.STACK_SERVER_SECRET_KEY;
+console.log('🔵 Stack Auth Configuration:', {
+  hasProjectId: !!stackProjectId,
+  hasServerSecretKey: !!stackServerSecretKey,
+  projectIdSource: stackProjectId ? (process.env.STACK_PROJECT_ID ? 'STACK_PROJECT_ID' : 'VITE_STACK_PROJECT_ID') : 'none'
+});
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import fetch from 'node-fetch';
-import { config } from 'dotenv';
 import { db } from './src/services/database.js';
 import { embeddingService } from './src/services/embeddingService.js';
 import { authenticateRequest, optionalAuth } from './server/middleware/auth.js';
@@ -10,9 +70,6 @@ import { apiLimiter, recipeCreationLimiter, searchLimiter } from './server/middl
 import { validateRecipeCreation, validateRecipeUpdate, validateRecipeId, validateRAGSearch } from './server/middleware/validation.js';
 import { sanitizeRecipe, sanitizeSearchQuery, sanitizeUrlParams } from './server/middleware/sanitization.js';
 import { securityHeaders, requestSizeLimits, secureErrorHandler } from './server/middleware/security.js';
-
-// Load environment variables
-config();
 
 const app = express();
 const PORT = 3000;
@@ -73,10 +130,16 @@ const webhookService = {
     try {
       console.log('🌐 Attempting to reach webhook at:', N8N_WEBHOOK_URL);
 
+      // Determine timeout based on intent - recipe extraction needs more time for large text
+      const isRecipeExtraction = data.intent === 'recipe_extraction';
+      const timeoutMs = isRecipeExtraction ? 120000 : 30000; // 120s for recipe extraction, 30s for general chat
+      console.log(`Using timeout: ${timeoutMs}ms for intent: ${data.intent || 'general_chat'}`);
+
       const webhookPayload = {
         content: data.content,
-        sessionId: user.id || 'default-session',
-        userId: user.id
+        intent: data.intent || null,
+        sessionId: data.sessionId || user.id || 'default-session',
+        userId: data.userId || user.id
       };
       
       console.log('Sending webhook payload:', JSON.stringify(webhookPayload, null, 2));
@@ -87,7 +150,7 @@ const webhookService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(webhookPayload),
-        signal: AbortSignal.timeout(30000)
+        signal: AbortSignal.timeout(timeoutMs) // Dynamic timeout based on intent
       });
 
       console.log('Webhook response status:', response.status);
@@ -246,10 +309,11 @@ app.get('/api/chat/history', (req, res) => {
 
 app.post('/api/chat/message', async (req, res) => {
   try {
-    const { message, context } = req.body;
+    const { message, context, intent } = req.body;
     const user = getTestUser();
 
     console.log('Received chat message:', message);
+    console.log('Detected intent:', intent);
 
     // Send webhook event for chat message and wait for n8n response
     console.log('Sending message to n8n webhook and waiting for response...');
@@ -257,34 +321,71 @@ app.post('/api/chat/message', async (req, res) => {
         id: Date.now().toString(),
         content: message,
         type: 'text',
+        intent: intent || null, // Pass intent to webhook service
         context,
         userId: user.id,
         sessionId: context?.sessionId || 'default-session' // Use sessionId from context
       }, user);
     
     let aiResponse;
+    let recipe = null;
 
     if (webhookResponse && webhookResponse.output) {
       aiResponse = webhookResponse.output;
       console.log('Using n8n AI response (output field):', aiResponse);
+      
+      // Try to extract recipe from output if it's JSON
+      try {
+        // Check if output is a JSON string containing a recipe
+        const parsedOutput = JSON.parse(aiResponse);
+        if (parsedOutput.recipe) {
+          recipe = parsedOutput.recipe;
+          console.log('✅ Extracted recipe from output JSON:', recipe.title || 'Untitled');
+          // Use a user-friendly message instead of raw JSON
+          aiResponse = `I've extracted the recipe: ${recipe.title || 'Untitled Recipe'}. You can save it to your recipe collection!`;
+        }
+      } catch (parseError) {
+        // Not JSON or doesn't contain recipe - use output as-is
+        // Also check if webhookResponse has a recipe field directly
+        if (webhookResponse.recipe) {
+          recipe = webhookResponse.recipe;
+          console.log('✅ Found recipe in webhookResponse:', recipe.title || 'Untitled');
+        }
+      }
     } else if (webhookResponse && webhookResponse.content) {
       aiResponse = webhookResponse.content;
       console.log('Using n8n AI response (content field):', aiResponse);
+      if (webhookResponse.recipe) {
+        recipe = webhookResponse.recipe;
+      }
     } else if (webhookResponse && webhookResponse.message) {
       aiResponse = webhookResponse.message;
       console.log('Using n8n AI response (message field):', aiResponse);
+      if (webhookResponse.recipe) {
+        recipe = webhookResponse.recipe;
+      }
     } else if (webhookResponse && typeof webhookResponse === 'string') {
       aiResponse = webhookResponse;
       console.log('Using n8n AI response (string):', aiResponse);
     } else {
-      console.log('No response from n8n webhook - n8n may not be running or returned empty response');
+      console.error('❌ No response from n8n webhook - n8n may not be running or returned empty response');
+      console.error('Webhook response:', webhookResponse);
       
-      // Provide a fallback response instead of failing completely
-      aiResponse = "I'm sorry, but I'm having trouble connecting to my AI service right now. Please try again in a moment, or check if the n8n workflow is properly configured and running.";
-      console.log('Using fallback response:', aiResponse);
+      // Return proper error status instead of fallback message
+      return res.status(503).json({
+        error: 'AI service unavailable',
+        message: 'The AI service (n8n) is currently unavailable. Please make sure n8n is running and the workflow is active.',
+        details: {
+          webhookUrl: N8N_WEBHOOK_URL,
+          webhookEnabled: WEBHOOK_ENABLED,
+          responseReceived: !!webhookResponse,
+          responseType: webhookResponse ? typeof webhookResponse : 'null'
+        }
+      });
     }
 
-    res.json({
+    // Build response with recipe if available
+    const responseData = {
       message: 'Message processed successfully',
       response: {
         id: Date.now().toString(),
@@ -292,7 +393,15 @@ app.post('/api/chat/message', async (req, res) => {
         sender: 'ai',
         timestamp: new Date().toISOString()
       }
-    });
+    };
+
+    // Add recipe to response if extracted
+    if (recipe) {
+      responseData.recipe = recipe;
+      console.log('✅ Including recipe in response:', recipe.title || 'Untitled');
+    }
+
+    res.json(responseData);
 
   } catch (error) {
     console.error('Chat message error:', error);
@@ -345,6 +454,44 @@ app.post('/api/chat/feedback', async (req, res) => {
   }
 });
 
+// Helper function to check for duplicate recipes using semantic similarity
+async function checkForDuplicateRecipe(recipe, userId) {
+  try {
+    // Create searchable text from recipe
+    const recipeText = [
+      recipe.title,
+      recipe.description || '',
+      JSON.stringify(recipe.ingredients || []),
+      JSON.stringify(recipe.instructions || [])
+    ].join(' ');
+
+    // Generate embedding for new recipe
+    const embedding = await embeddingService.generateEmbedding(recipeText);
+    
+    // Search for similar recipes using semantic similarity (threshold: 0.85 = 85% similar)
+    const similarRecipes = await db.searchSimilarRecipes(embedding, userId, 0.85, 5);
+    
+    if (similarRecipes.length > 0) {
+      // Found potential duplicates
+      return {
+        isDuplicate: true,
+        similarRecipes: similarRecipes.map(r => ({
+          id: r.recipe_id,
+          title: r.title,
+          description: r.description,
+          similarity: Math.round((r.similarity_score || 0) * 100) // Convert to percentage
+        }))
+      };
+    }
+    
+    return { isDuplicate: false, similarRecipes: [] };
+  } catch (error) {
+    console.error('Duplicate check error:', error);
+    // Don't block recipe creation if duplicate check fails
+    return { isDuplicate: false, similarRecipes: [], error: error.message };
+  }
+}
+
 // Recipe storage endpoint
 app.post('/api/recipes', 
   recipeCreationLimiter, // Apply stricter rate limiting for recipe creation
@@ -353,10 +500,29 @@ app.post('/api/recipes',
   validateRecipeCreation, // Validate request body
   async (req, res) => {
   try {
-    const { recipe } = req.body;
+    const { recipe, forceSave = false } = req.body;
     const user = req.user; // Get authenticated user from middleware
 
     console.log('Received recipe for storage:', recipe.title);
+
+    // Check for duplicates before saving (unless forceSave is true)
+    if (!forceSave) {
+      const duplicateCheck = await checkForDuplicateRecipe(recipe, user.id);
+      
+      if (duplicateCheck.isDuplicate && duplicateCheck.similarRecipes.length > 0) {
+        // Found potential duplicate - return duplicate info instead of saving
+        return res.json({
+          message: 'Potential duplicate recipe found',
+          isDuplicate: true,
+          existingRecipe: duplicateCheck.similarRecipes[0], // Most similar recipe
+          allSimilar: duplicateCheck.similarRecipes, // All similar recipes
+          newRecipe: {
+            title: recipe.title,
+            description: recipe.description
+          }
+        });
+      }
+    }
 
     // Helper function to handle both camelCase and snake_case
     const getValue = (obj, camelKey, snakeKey) => {
@@ -447,10 +613,37 @@ app.get('/api/recipes',
     });
 
   } catch (error) {
+    const currentUser = req.user || null; // Get user from request, may be null
     console.error('Recipe retrieval error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('User context:', { userId: currentUser?.id, hasUser: !!currentUser });
+    
+    // Check for database connection errors
+    const isConnectionError = error.code === 'ECONNREFUSED' || 
+                              error.code === 'ENOTFOUND' ||
+                              (error.message && error.message.includes('ECONNREFUSED')) ||
+                              (error.message && error.message.includes('connection')) ||
+                              (error.errors && error.errors.some((e) => e.code === 'ECONNREFUSED'));
+    
+    if (isConnectionError) {
+      return res.status(503).json({ 
+        error: 'Database connection failed',
+        message: 'Unable to connect to the database. Please check your DATABASE_URL environment variable and ensure the database server is running.',
+        hint: 'Set DATABASE_URL in your .env file. For NeonDB: postgresql://user:password@host.neon.tech/dbname?sslmode=require',
+        code: error.code || 'ECONNREFUSED',
+        details: process.env.NODE_ENV === 'development' ? {
+          error: error.message,
+          stack: error.stack,
+          userId: currentUser?.id,
+          hasUser: !!currentUser
+        } : undefined
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Internal server error',
-      message: error.message 
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -519,6 +712,26 @@ app.put('/api/recipes/:id',
       });
     }
 
+    // Regenerate embedding for the updated recipe
+    // This ensures search and duplicate detection work with the latest recipe content
+    try {
+      // Delete old embeddings
+      await db.deleteEmbeddings(recipeId);
+      
+      // Generate new embedding for updated recipe
+      const { embedding, textContent } = await embeddingService.generateRecipeEmbedding(updatedRecipe);
+      await db.createEmbedding({
+        recipe_id: recipeId,
+        embedding: embedding,
+        text_content: textContent,
+        embedding_type: 'recipe_content'
+      });
+      console.log('✅ Regenerated embedding for updated recipe:', recipeId);
+    } catch (embeddingError) {
+      console.error('⚠️ Failed to regenerate embedding for updated recipe:', embeddingError);
+      // Don't fail the recipe update if embedding generation fails
+    }
+
     res.json({
       message: 'Recipe updated successfully',
       recipe: updatedRecipe
@@ -561,6 +774,392 @@ app.delete('/api/recipes/:id',
     res.status(500).json({ 
       error: 'Internal server error',
       message: error.message 
+    });
+  }
+});
+
+// Create profile endpoint (called after Stack Auth signup)
+app.post('/api/profile',
+  authenticateRequest, // Require authentication
+  async (req, res) => {
+  try {
+    const user = req.user; // Get authenticated user from middleware
+    const { userId, firstName, lastName, email } = req.body;
+
+    // Validate input
+    if (!firstName || typeof firstName !== 'string' || firstName.trim().length === 0) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'First name is required and must be a non-empty string'
+      });
+    }
+
+    if (!lastName || typeof lastName !== 'string' || lastName.trim().length === 0) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'Last name is required and must be a non-empty string'
+      });
+    }
+
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'Valid email address is required'
+      });
+    }
+
+    // Use the authenticated user's ID, not the userId from body (security)
+    const profileUserId = user.id;
+
+    // Create profile in database (using profiles table after migration)
+    // Use stack_auth_id for Stack Auth user IDs (UUID), fallback to id if column doesn't exist
+    let result = null;
+    try {
+      // Check if stack_auth_id column exists
+      const columnCheck = await db.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'stack_auth_id'
+        ) as exists;
+      `);
+      
+      if (columnCheck.rows[0].exists) {
+        // Use stack_auth_id for Stack Auth user IDs (UUID)
+        result = await db.query(
+          `INSERT INTO profiles (stack_auth_id, email, first_name, last_name, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           ON CONFLICT (stack_auth_id) DO UPDATE 
+           SET first_name = EXCLUDED.first_name, 
+               last_name = EXCLUDED.last_name,
+               email = EXCLUDED.email,
+               updated_at = CURRENT_TIMESTAMP
+           RETURNING stack_auth_id as id, email, first_name, last_name, created_at, updated_at`,
+          [profileUserId, email.trim(), firstName.trim(), lastName.trim()],
+          profileUserId // Pass userId for RLS context
+        );
+      } else {
+        // Fallback to id column (for backward compatibility with INTEGER id)
+        result = await db.query(
+          `INSERT INTO profiles (id, email, first_name, last_name, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           ON CONFLICT (id) DO UPDATE 
+           SET first_name = EXCLUDED.first_name, 
+               last_name = EXCLUDED.last_name,
+               email = EXCLUDED.email,
+               updated_at = CURRENT_TIMESTAMP
+           RETURNING id, email, first_name, last_name, created_at, updated_at`,
+          [profileUserId, email.trim(), firstName.trim(), lastName.trim()],
+          profileUserId // Pass userId for RLS context
+        );
+      }
+    } catch (err) {
+      // If profiles table doesn't exist, try users table
+      if (err.message && err.message.includes('does not exist')) {
+        const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
+        result = await db.query(
+          `INSERT INTO users (id, email, display_name, created_at, updated_at)
+           VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           ON CONFLICT (id) DO UPDATE 
+           SET display_name = EXCLUDED.display_name,
+               email = EXCLUDED.email,
+               updated_at = CURRENT_TIMESTAMP
+           RETURNING id, email, display_name, created_at, updated_at`,
+          [profileUserId, email.trim(), displayName],
+          profileUserId
+        );
+        // Convert display_name to first_name/last_name for response
+        if (result.rows.length > 0 && result.rows[0].display_name) {
+          const parts = result.rows[0].display_name.split(' ');
+          result.rows[0].first_name = parts[0] || '';
+          result.rows[0].last_name = parts.slice(1).join(' ') || '';
+        }
+      } else {
+        throw err;
+      }
+    }
+
+    if (!result || result.rows.length === 0) {
+      return res.status(500).json({
+        error: 'Profile creation failed',
+        message: 'Failed to create user profile'
+      });
+    }
+
+    const profile = result.rows[0];
+
+    res.status(201).json({
+      message: 'Profile created successfully',
+      profile: {
+        id: profile.id,
+        email: profile.email,
+        firstName: profile.first_name || '',
+        lastName: profile.last_name || '',
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile creation error:', error);
+    
+    // Check if it's a duplicate key error (profile already exists)
+    if (error.code === '23505' || (error.message && error.message.includes('already exists'))) {
+      return res.status(409).json({
+        error: 'Profile already exists',
+        message: 'User profile already exists'
+      });
+    }
+    
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+// Get profile endpoint
+app.get('/api/profile',
+  authenticateRequest, // Require authentication
+  async (req, res) => {
+  try {
+    const user = req.user; // Get authenticated user from middleware
+
+    // Get profile from database (using profiles table after migration)
+    // Use stack_auth_id for Stack Auth user IDs (UUID), fallback to id if column doesn't exist
+    let result = null;
+    try {
+      // Check if stack_auth_id column exists
+      const columnCheck = await db.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'stack_auth_id'
+        ) as exists;
+      `);
+      
+      if (columnCheck.rows[0].exists) {
+        // Use stack_auth_id for Stack Auth user IDs (UUID)
+        result = await db.query(
+          `SELECT stack_auth_id as id, email, first_name, last_name, created_at, updated_at 
+           FROM profiles 
+           WHERE stack_auth_id = $1`,
+          [user.id],
+          user.id // Pass userId for RLS context
+        );
+      } else {
+        // Fallback to id column (for backward compatibility with INTEGER id)
+        result = await db.query(
+          `SELECT id, email, first_name, last_name, created_at, updated_at 
+           FROM profiles 
+           WHERE id = $1`,
+          [user.id],
+          user.id // Pass userId for RLS context
+        );
+      }
+    } catch (err) {
+      // If profiles table doesn't exist, try users table
+      if (err.message && err.message.includes('does not exist')) {
+        result = await db.query(
+          `SELECT id, email, display_name, created_at, updated_at 
+           FROM users 
+           WHERE id = $1`,
+          [user.id],
+          user.id
+        );
+        // Convert display_name to first_name/last_name for backward compatibility
+        if (result.rows.length > 0 && result.rows[0].display_name) {
+          const displayName = result.rows[0].display_name;
+          const parts = displayName.split(' ');
+          result.rows[0].first_name = parts[0] || '';
+          result.rows[0].last_name = parts.slice(1).join(' ') || '';
+        }
+      } else {
+        throw err;
+      }
+    }
+
+    if (!result || result.rows.length === 0) {
+      // Auto-create profile if it doesn't exist (fallback for users who signed up before profile creation was working)
+      console.log('🔵 Profile not found, auto-creating profile for user:', user.id);
+      try {
+        // Get user email from Stack Auth token (if available)
+        const userEmail = user.email || `${user.id}@unknown.local`;
+        
+        // Auto-create profile with default values
+        let createResult = null;
+        const columnCheck = await db.query(`
+          SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'stack_auth_id'
+          ) as exists;
+        `);
+        
+        if (columnCheck.rows[0].exists) {
+          createResult = await db.query(
+            `INSERT INTO profiles (stack_auth_id, email, first_name, last_name, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             ON CONFLICT (stack_auth_id) DO UPDATE 
+             SET updated_at = CURRENT_TIMESTAMP
+             RETURNING stack_auth_id as id, email, first_name, last_name, created_at, updated_at`,
+            [user.id, userEmail, 'User', ''],
+            user.id
+          );
+        } else {
+          createResult = await db.query(
+            `INSERT INTO profiles (id, email, first_name, last_name, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             ON CONFLICT (id) DO UPDATE 
+             SET updated_at = CURRENT_TIMESTAMP
+             RETURNING id, email, first_name, last_name, created_at, updated_at`,
+            [user.id, userEmail, 'User', ''],
+            user.id
+          );
+        }
+        
+        if (createResult && createResult.rows.length > 0) {
+          console.log('✅ Auto-created profile for user:', user.id);
+          const profile = createResult.rows[0];
+          return res.json({
+            profile: {
+              id: profile.id,
+              email: profile.email,
+              firstName: profile.first_name || '',
+              lastName: profile.last_name || '',
+              createdAt: profile.created_at,
+              updatedAt: profile.updated_at
+            }
+          });
+        }
+      } catch (createError) {
+        console.error('❌ Failed to auto-create profile:', createError);
+        // Fall through to 404 error
+      }
+      
+      return res.status(404).json({
+        error: 'Profile not found',
+        message: 'User profile does not exist and could not be auto-created'
+      });
+    }
+
+    const profile = result.rows[0];
+
+    res.json({
+      profile: {
+        id: profile.id,
+        email: profile.email,
+        firstName: profile.first_name || '',
+        lastName: profile.last_name || '',
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile retrieval error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+// Update profile endpoint
+app.put('/api/profile',
+  authenticateRequest, // Require authentication
+  async (req, res) => {
+  try {
+    const user = req.user; // Get authenticated user from middleware
+    const { firstName, lastName } = req.body;
+
+    // Validate input
+    if (!firstName || typeof firstName !== 'string' || firstName.trim().length === 0) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'First name is required and must be a non-empty string'
+      });
+    }
+
+    // Update profile in database (using profiles table after migration)
+    // Use stack_auth_id for Stack Auth user IDs (UUID), fallback to id if column doesn't exist
+    let result = null;
+    try {
+      // Check if stack_auth_id column exists
+      const columnCheck = await db.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'stack_auth_id'
+        ) as exists;
+      `);
+      
+      if (columnCheck.rows[0].exists) {
+        // Use stack_auth_id for Stack Auth user IDs (UUID)
+        result = await db.query(
+          `UPDATE profiles 
+           SET first_name = $1, last_name = $2, updated_at = CURRENT_TIMESTAMP 
+           WHERE stack_auth_id = $3 
+           RETURNING stack_auth_id as id, email, first_name, last_name, created_at, updated_at`,
+          [firstName.trim(), (lastName || '').trim(), user.id],
+          user.id // Pass userId for RLS context
+        );
+      } else {
+        // Fallback to id column (for backward compatibility with INTEGER id)
+        result = await db.query(
+          `UPDATE profiles 
+           SET first_name = $1, last_name = $2, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $3 
+           RETURNING id, email, first_name, last_name, created_at, updated_at`,
+          [firstName.trim(), (lastName || '').trim(), user.id],
+          user.id // Pass userId for RLS context
+        );
+      }
+    } catch (err) {
+      // If profiles table doesn't exist, try users table
+      if (err.message && err.message.includes('does not exist')) {
+        const displayName = `${firstName.trim()} ${(lastName || '').trim()}`.trim();
+        result = await db.query(
+          `UPDATE users 
+           SET display_name = $1, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $2 
+           RETURNING id, email, display_name, created_at, updated_at`,
+          [displayName, user.id],
+          user.id
+        );
+        // Convert display_name to first_name/last_name for response
+        if (result.rows.length > 0 && result.rows[0].display_name) {
+          const parts = result.rows[0].display_name.split(' ');
+          result.rows[0].first_name = parts[0] || '';
+          result.rows[0].last_name = parts.slice(1).join(' ') || '';
+        }
+      } else {
+        throw err;
+      }
+    }
+
+    if (!result || result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Profile not found',
+        message: 'User profile does not exist'
+      });
+    }
+
+    const updatedProfile = result.rows[0];
+
+    res.json({
+      message: 'Profile updated successfully',
+      profile: {
+        id: updatedProfile.id,
+        email: updatedProfile.email,
+        firstName: updatedProfile.first_name || '',
+        lastName: updatedProfile.last_name || '',
+        createdAt: updatedProfile.created_at,
+        updatedAt: updatedProfile.updated_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
     });
   }
 });

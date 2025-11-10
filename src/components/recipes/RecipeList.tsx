@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
-import { useRecipes, useCreateRecipe, useDeleteRecipe } from '@/services/api'
+import { useRecipes, useDeleteRecipe } from '@/services/api'
 import { RecipeCard } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Plus, Grid, List, TestTube, CheckCircle } from 'lucide-react'
+import { Plus, Grid, List } from 'lucide-react'
 
 interface RecipeListProps {
   onRecipeSelect?: (recipe: any) => void
@@ -26,10 +26,8 @@ export const RecipeList: React.FC<RecipeListProps> = ({
     difficulty: '' as string,
     tags: [] as string[]
   })
-  const [testRecipeSuccess, setTestRecipeSuccess] = useState(false)
 
   const { data: recipes, isLoading, error } = useRecipes({ limit: 50 })
-  const createRecipeMutation = useCreateRecipe()
   const deleteRecipeMutation = useDeleteRecipe()
 
   const filteredRecipes =
@@ -69,48 +67,6 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 
       return true;
     }) || [];
-
-  const createTestRecipe = async () => {
-    const testRecipe = {
-      title: 'Quick Test Pasta',
-      description: 'A simple test recipe for development and testing purposes.',
-      prepTime: 10,
-      cookTime: 15,
-      servings: 2,
-      difficulty: 'easy',
-      tags: ['Test', 'Quick', 'Pasta', 'Easy'],
-      ingredients: [
-        { name: 'Pasta', amount: 200, unit: 'g' },
-        { name: 'Tomato sauce', amount: 1, unit: 'cup' },
-        { name: 'Garlic', amount: 2, unit: 'cloves' },
-        { name: 'Olive oil', amount: 2, unit: 'tbsp' }
-      ],
-      instructions: [
-        'Boil water and cook pasta according to package directions.',
-        'Heat olive oil in a pan and sauté minced garlic.',
-        'Add tomato sauce and simmer for 5 minutes.',
-        'Drain pasta and mix with sauce.',
-        'Serve hot with grated cheese if desired.'
-      ],
-      imageUrl: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&h=600&fit=crop'
-    }
-
-    console.log('Creating test recipe with data:', testRecipe)
-    
-    try {
-      const result = await createRecipeMutation.mutateAsync(testRecipe)
-      console.log('Test recipe created successfully:', result)
-      setTestRecipeSuccess(true)
-      setTimeout(() => setTestRecipeSuccess(false), 3000) // Hide success message after 3 seconds
-    } catch (error) {
-      console.error('Failed to create test recipe:', error)
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        status: (error as any)?.status,
-        response: (error as any)?.response
-      })
-    }
-  }
 
   const handleDeleteRecipe = async (recipeId: string) => {
     if (window.confirm('Are you sure you want to delete this recipe? This action cannot be undone.')) {
@@ -186,22 +142,6 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             </Button>
           </div>
           
-          <Button 
-            onClick={createTestRecipe}
-            disabled={createRecipeMutation.isPending}
-            className={`px-4 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 ${
-              testRecipeSuccess 
-                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' 
-                : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
-            }`}
-          >
-            {testRecipeSuccess ? (
-              <CheckCircle className="h-4 w-4 mr-2" />
-            ) : (
-              <TestTube className="h-4 w-4 mr-2" />
-            )}
-            {testRecipeSuccess ? 'Added!' : createRecipeMutation.isPending ? 'Adding...' : 'Quick Test'}
-          </Button>
           {onAddRecipe && (
             <Button 
               onClick={onAddRecipe}
@@ -253,23 +193,6 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                onClick={createTestRecipe}
-                disabled={createRecipeMutation.isPending}
-                size="lg"
-                className={`px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 ${
-                  testRecipeSuccess 
-                    ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' 
-                    : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
-                }`}
-              >
-                {testRecipeSuccess ? (
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                ) : (
-                  <TestTube className="h-5 w-5 mr-2" />
-                )}
-                {testRecipeSuccess ? 'Test Recipe Added!' : createRecipeMutation.isPending ? 'Adding Test Recipe...' : 'Add Test Recipe'}
-              </Button>
               {onAddRecipe && (
                 <Button 
                   onClick={onAddRecipe}

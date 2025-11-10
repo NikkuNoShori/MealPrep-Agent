@@ -3,7 +3,7 @@
 ## Current Setup
 
 Your Stack Auth is configured with:
-- **Database**: Neon PostgreSQL
+- **Database**: Supabase PostgreSQL
 - **Email Service**: Stack Auth default (`noreply@stackframe.co`)
 - **Status**: Email service is configured and should be working
 

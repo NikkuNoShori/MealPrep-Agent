@@ -153,7 +153,8 @@ export const detectIntent = (message: string): string => {
   // Recipe extraction keywords
   const recipeKeywords = [
     'recipe', 'ingredients', 'instructions', 'cook', 'bake', 'prepare',
-    'add recipe', 'save recipe', 'extract recipe', 'recipe from'
+    'add recipe', 'save recipe', 'extract recipe', 'recipe from',
+    'save it', 'save this', 'can you save', 'save that', 'save the recipe'
   ];
   
   // Recipe search keywords

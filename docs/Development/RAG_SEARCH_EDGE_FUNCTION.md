@@ -10,14 +10,14 @@ The RAG search endpoint is deployed as a Vercel Edge Function at `/api/rag/searc
 
 Install required packages:
 ```bash
-npm install @neondatabase/serverless openai
+npm install pg openai
 ```
 
 ### Environment Variables
 
 Set in Vercel project settings:
 ```
-DATABASE_URL=your-neon-connection-string
+DATABASE_URL=your-supabase-connection-string
 OPENROUTER_API_KEY=your-openrouter-api-key  # OR
 OPENAI_API_KEY=your-openai-api-key           # Alternative to OpenRouter
 STACK_PROJECT_ID=your-stack-project-id      # For authentication (production)
@@ -122,7 +122,7 @@ vercel --prod
 
 ### Database Connection Errors
 - Verify `DATABASE_URL` is set correctly in Vercel
-- Check Neon database is accessible
+- Check Supabase database is accessible
 
 ### Embedding Generation Errors
 - Verify API key is set correctly

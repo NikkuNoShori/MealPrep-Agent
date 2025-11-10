@@ -80,7 +80,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
       if (isEditing) {
         await updateRecipeMutation.mutateAsync({ id: recipe.id, data: recipeData })
       } else {
-        await createRecipeMutation.mutateAsync(recipeData)
+        await createRecipeMutation.mutateAsync({ data: recipeData })
       }
       onSave()
     } catch (error) {

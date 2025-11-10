@@ -25,9 +25,9 @@ const Header = () => {
     { name: "Settings", href: "/settings" },
   ];
 
-  // Get first name from display name
-  const getFirstName = (displayName: string) => {
-    return displayName.split(" ")[0] || displayName;
+  // Get first name from user object
+  const getFirstName = (user: any) => {
+    return user?.firstName || user?.first_name || user?.displayName?.split(" ")[0] || user?.email?.split("@")[0] || 'User';
   };
 
   // Handle user menu hover

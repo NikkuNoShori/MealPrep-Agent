@@ -116,7 +116,7 @@ Create an intuitive, AI-powered kitchen companion that transforms how families d
 ### Backend Requirements
 - **Cloud Platform**: Vercel (production) + Local Express (development)
 - **AI/ML**: OpenRouter integration via n8n workflows ✅
-- **Database**: NeonDB (PostgreSQL) for recipe storage ✅
+- **Database**: Supabase (PostgreSQL) for recipe storage ✅
 - **API**: Express.js server (local) + Vercel Edge Functions (production) ✅
 - **Processing**: n8n workflows for AI agent services ✅
 - **Storage**: Local file system (future: Vercel storage for images)

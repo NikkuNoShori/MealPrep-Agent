@@ -6,6 +6,11 @@ import { stackClientApp } from '@/stack/client'
 export interface AuthUser {
   id: string
   email?: string
+  firstName?: string
+  first_name?: string
+  lastName?: string
+  last_name?: string
+  displayName?: string
   [key: string]: any
 }
 
@@ -16,7 +21,7 @@ interface AuthState {
   initialize: () => Promise<void>
   refreshUser: () => Promise<void>
   signIn: (email: string, password: string) => Promise<AuthUser>
-  signUp: (email: string, password: string) => Promise<AuthUser>
+  signUp: (firstName: string, lastName: string, email: string, password: string) => Promise<AuthUser>
   signOut: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<void>
   setupAuthListener: () => void
@@ -71,6 +76,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       Logger.info('🔵 AuthStore: SignIn successful', { userId: user.id })
       Logger.auth('signin', user.id, email)
       
+      // Stop any existing polling since we now have a user
+      const existingInterval = (useAuthStore as any).pollInterval
+      if (existingInterval) {
+        Logger.debug('🔍 AuthStore: Stopping polling after signin')
+        clearInterval(existingInterval)
+        ;(useAuthStore as any).pollInterval = null
+      }
+      
+      // Clear any existing chat state and set flag to create a new chat on next visit
+      localStorage.removeItem("chat-current-conversation-id");
+      localStorage.setItem("chat-create-temporary-session", "true");
+      Logger.info('🔵 AuthStore: Set flag to create new chat on next visit')
+      
       // Update state with user
       set({ user, isLoading: false })
       
@@ -82,14 +100,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  signUp: async (email: string, password: string) => {
-    Logger.info('🔵 AuthStore: Starting signUp', { email })
+  signUp: async (firstName: string, lastName: string, email: string, password: string) => {
+    Logger.info('🔵 AuthStore: Starting signUp', { email, firstName, lastName })
     set({ isLoading: true, error: null })
     try {
       Logger.info('🔵 AuthStore: Calling authService.signUp...')
       
       // signUp now returns the user directly, with retry logic built-in
-      const user = await authService.signUp(email, password)
+      const user = await authService.signUp(firstName, lastName, email, password)
       
       if (!user) {
         throw new Error('Sign up successful but user not found. Please try signing in.')
@@ -97,6 +115,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       
       Logger.info('🔵 AuthStore: SignUp successful', { userId: user.id })
       Logger.auth('signup', user.id, email)
+      
+      // Stop any existing polling since we now have a user
+      const existingInterval = (useAuthStore as any).pollInterval
+      if (existingInterval) {
+        Logger.debug('🔍 AuthStore: Stopping polling after signup')
+        clearInterval(existingInterval)
+        ;(useAuthStore as any).pollInterval = null
+      }
+      
+      // Clear any existing chat state and set flag to create a new chat on next visit
+      localStorage.removeItem("chat-current-conversation-id");
+      localStorage.setItem("chat-create-temporary-session", "true");
+      Logger.info('🔵 AuthStore: Set flag to create new chat on next visit')
       
       // Update state with user
       set({ user, isLoading: false })
@@ -117,6 +148,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       
       // Clear user state
       set({ user: null, isLoading: false })
+      
+      // Restart polling to detect when user logs in again
+      const existingInterval = (useAuthStore as any).pollInterval
+      if (!existingInterval) {
+        Logger.debug('🔍 AuthStore: Restarting polling after signout')
+        // Polling will be restarted by setupAuthListener if needed
+        // But we need to check if listener is already set up
+        if ((useAuthStore as any).listenerSetup) {
+          // Re-setup listener to restart polling
+          ;(useAuthStore as any).listenerSetup = false
+          useAuthStore.getState().setupAuthListener()
+        }
+      }
       
       Logger.auth('signout', userId)
       Logger.info('🔵 AuthStore: Sign out successful')
@@ -176,23 +220,56 @@ export const useAuthStore = create<AuthState>((set) => ({
         })
       } else {
         // Fallback: Poll for user changes periodically (less efficient but works)
-        Logger.info('🔵 AuthStore: Setting up polling for auth state changes')
+        // Clear any existing polling interval first to prevent duplicates
+        const existingInterval = (useAuthStore as any).pollInterval
+        if (existingInterval) {
+          Logger.debug('🔍 AuthStore: Clearing existing polling interval')
+          clearInterval(existingInterval)
+          ;(useAuthStore as any).pollInterval = null
+        }
+        
+        // Only set up polling if we don't already have a user
+        // If user is already loaded, no need to poll
+        const currentState = useAuthStore.getState()
+        if (currentState.user) {
+          Logger.info('🔵 AuthStore: User already loaded, skipping polling setup')
+          return
+        }
+        
+        Logger.info('🔵 AuthStore: Setting up polling for auth state changes (no user detected)')
         const pollInterval = setInterval(async () => {
           try {
-            const currentUser = await authService.getUser()
             const currentState = useAuthStore.getState()
-            // Only update if user changed
+            
+            // Skip polling if we already have a user - only poll to detect login
+            // This prevents unnecessary calls when user is already authenticated
+            if (currentState.user) {
+              Logger.info('🔵 AuthStore: User detected during poll, stopping polling')
+              clearInterval(pollInterval)
+              ;(useAuthStore as any).pollInterval = null
+              return
+            }
+            
+            // Only poll if we don't have a user (to detect when they log in)
+            const currentUser = await authService.getUser()
             if (currentUser?.id !== currentState.user?.id) {
               Logger.info('🔵 AuthStore: User changed via polling', { 
                 hasUser: !!currentUser, 
                 userId: currentUser?.id 
               })
               set({ user: currentUser, isLoading: false })
+              
+              // Stop polling once we have a user
+              if (currentUser) {
+                Logger.info('🔵 AuthStore: User detected, stopping polling')
+                clearInterval(pollInterval)
+                ;(useAuthStore as any).pollInterval = null
+              }
             }
           } catch (err) {
             Logger.debug('🔍 AuthStore: Polling error (non-critical)', err)
           }
-        }, 5000) // Check every 5 seconds
+        }, 30000) // Check every 30 seconds (only when no user is loaded)
 
         // Store interval ID for cleanup (if needed)
         ;(useAuthStore as any).pollInterval = pollInterval

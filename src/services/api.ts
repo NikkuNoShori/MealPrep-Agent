@@ -30,6 +30,7 @@ class ApiClient {
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include', // Include cookies for cross-origin requests
     });
 
     if (!response.ok) {
@@ -37,10 +38,24 @@ class ApiClient {
       if (options.signal?.aborted) {
         throw new Error("Request aborted");
       }
-      const error = await response
-        .json()
-        .catch(() => ({ error: "Network error" }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (parseError) {
+        // If response body is not JSON, create a generic error
+        errorData = { 
+          error: `HTTP ${response.status}`, 
+          message: `Server returned ${response.status} ${response.statusText}` 
+        };
+      }
+      
+      // Create a custom error with full details for better debugging
+      const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`;
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      (error as any).statusText = response.statusText;
+      (error as any).details = errorData.details || errorData;
+      throw error;
     }
 
     // Check if request was aborted before parsing
@@ -60,8 +75,8 @@ class ApiClient {
     return await recipeService.getRecipe(id);
   }
 
-  async createRecipe(data: any) {
-    return await recipeService.createRecipe(data);
+  async createRecipe(data: any, forceSave: boolean = false) {
+    return await recipeService.createRecipe(data, forceSave);
   }
 
   async updateRecipe(id: string, data: any) {
@@ -164,6 +179,25 @@ class ApiClient {
     });
   }
 
+  // Profile endpoints
+  async getProfile() {
+    return this.request<{ profile: { id: string; email: string; firstName: string; lastName: string; createdAt: string; updatedAt: string } }>("/api/profile");
+  }
+
+  async createProfile(data: { userId: string; firstName: string; lastName: string; email: string }) {
+    return this.request<{ message: string; profile: { id: string; email: string; firstName: string; lastName: string; createdAt: string; updatedAt: string } }>("/api/profile", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateProfile(data: { firstName: string; lastName?: string }) {
+    return this.request<{ message: string; profile: { id: string; email: string; firstName: string; lastName: string; createdAt: string; updatedAt: string } }>("/api/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
   // Preferences endpoints
   async getPreferences() {
     return this.request("/api/preferences");
@@ -236,7 +270,8 @@ export const useCreateRecipe = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: any) => apiClient.createRecipe(data),
+    mutationFn: ({ data, forceSave = false }: { data: any; forceSave?: boolean }) => 
+      apiClient.createRecipe(data, forceSave),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
     },

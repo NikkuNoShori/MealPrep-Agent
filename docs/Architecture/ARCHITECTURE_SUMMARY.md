@@ -6,7 +6,7 @@
 MealPrep Agent is a full-stack AI-powered meal planning application built with:
 - **Frontend**: React + TypeScript + Vite
 - **Backend**: Express.js + Node.js
-- **Database**: PostgreSQL (Neon) with pgvector
+- **Database**: PostgreSQL (Supabase) with pgvector
 - **AI**: OpenAI embeddings + n8n workflows
 - **Auth**: StackFrame (Stack Auth)
 - **Deployment**: Vercel
@@ -39,7 +39,7 @@ MealPrep Agent is a full-stack AI-powered meal planning application built with:
         │                    │                    │
         ▼                    ▼                    ▼
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│   Neon DB    │  │    n8n       │  │   OpenAI     │
+│  Supabase DB │  │    n8n       │  │   OpenAI     │
 │  PostgreSQL  │  │  Workflows   │  │  Embeddings  │
 └──────────────┘  └──────────────┘  └──────────────┘
 ```
@@ -75,7 +75,7 @@ User → Page Refresh → Stack Auth Cookies → Zustand Store → Protected Rou
 | Build Tool | Vite | Fast development, optimized builds |
 | State Management | Zustand | Lightweight, simple API |
 | Data Fetching | React Query | Caching, automatic refetching |
-| Database | PostgreSQL (Neon) | Relational + vector support |
+| Database | PostgreSQL (Supabase) | Relational + vector support |
 | Vector Search | pgvector | Native PostgreSQL extension |
 | AI Embeddings | OpenAI | High-quality embeddings |
 | Workflow | n8n | Visual workflow automation |
@@ -196,7 +196,7 @@ chat_messages
 ### Scalability
 
 - **Horizontal**: Serverless functions scale automatically
-- **Database**: Neon supports horizontal scaling
+- **Database**: Supabase supports horizontal scaling
 - **Caching**: React Query reduces database load
 - **Vector Search**: Optimized with proper indexes
 
@@ -205,7 +205,7 @@ chat_messages
 1. **Local Development**
    - Frontend: `npm run dev` (Vite)
    - Backend: `npm run server` (Express)
-   - Database: Neon cloud instance
+   - Database: Supabase cloud instance
 
 2. **Build & Deploy**
    - TypeScript compilation

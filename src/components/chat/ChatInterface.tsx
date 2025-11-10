@@ -28,7 +28,7 @@ import {
   ThumbsDown,
 } from "lucide-react";
 import { ChatHistoryResponse, ChatMessageResponse } from "../../types";
-import { useCreateRecipe, apiClient } from "../../services/api";
+import { useCreateRecipe, useUpdateRecipe, apiClient } from "../../services/api";
 import { ToastService } from "../../services/toast";
 import { parseRecipeFromText, formatRecipeForStorage, ParsedRecipe } from "../../utils/recipeParser";
 import { Logger } from "../../services/logger";
@@ -78,6 +78,7 @@ export const ChatInterface: React.FC = () => {
   };
   const sendMessageMutation = useSendMessage();
   const createRecipeMutation = useCreateRecipe();
+  const updateRecipeMutation = useUpdateRecipe();
 
   // Load conversations from localStorage on component mount
   useEffect(() => {
@@ -355,8 +356,25 @@ export const ChatInterface: React.FC = () => {
     abortControllerRef.current = new AbortController();
     ragAbortControllerRef.current = new AbortController();
 
-    // Detect intent
-    const intent = detectIntent(inputMessage);
+    // Detect intent - check current message and recent conversation context
+    let intent = detectIntent(inputMessage);
+    
+    // If intent is general_chat but message contains "save", check recent messages for recipe context
+    if (intent === 'general_chat' && inputMessage.toLowerCase().includes('save')) {
+      const recentMessages = currentConversation.messages.slice(-3);
+      const hasRecipeContext = recentMessages.some(msg => 
+        msg.sender === 'user' && 
+        (msg.content.toLowerCase().includes('recipe') || 
+         msg.content.toLowerCase().includes('ingredient') ||
+         msg.content.toLowerCase().includes('cook') ||
+         msg.content.toLowerCase().includes('bake'))
+      );
+      if (hasRecipeContext) {
+        intent = 'recipe_extraction';
+        console.log("Detected recipe_extraction from conversation context");
+      }
+    }
+    
     console.log("Detected intent:", intent);
 
     // Save the message text before clearing input
@@ -490,8 +508,51 @@ export const ChatInterface: React.FC = () => {
         return; // Don't process the response if it was cancelled
       }
 
-      // Try to parse recipe from AI response
-      const parsedRecipe = parseRecipeFromText(response.response.content);
+      // Check if response contains an error (from 503 or other error responses)
+      if ((response as any).error) {
+        const errorMessage = (response as any).message || (response as any).error || 'AI service unavailable';
+        Logger.error('🔴 ChatInterface: Error response from server', { 
+          error: (response as any).error,
+          message: errorMessage,
+          details: (response as any).details
+        });
+        throw new Error(errorMessage);
+      }
+
+      // Validate response structure - check for expected ChatMessageResponse format
+      if (!response || typeof response !== 'object') {
+        Logger.error('🔴 ChatInterface: Invalid response type from server', { response });
+        throw new Error('Invalid response format from server');
+      }
+
+      // Check if response has the expected structure
+      if (!response.response || !response.response.content) {
+        Logger.error('🔴 ChatInterface: Invalid response structure from server', { 
+          response,
+          hasResponse: !!response.response,
+          hasContent: !!(response.response && response.response.content)
+        });
+        throw new Error('Invalid response format from server - missing response.content');
+      }
+
+      // Extract recipe from response - check for structured recipe first (from n8n)
+      let parsedRecipe: ParsedRecipe | null = null;
+      
+      // Check if response has a recipe field (from n8n recipe extraction)
+      if ((response as any).recipe) {
+        parsedRecipe = (response as any).recipe as ParsedRecipe;
+        Logger.info('🔵 ChatInterface: Found structured recipe in response', { recipeTitle: parsedRecipe.title });
+      } else if ((response as any).response?.recipe) {
+        // Check nested response.recipe
+        parsedRecipe = (response as any).response.recipe as ParsedRecipe;
+        Logger.info('🔵 ChatInterface: Found structured recipe in nested response', { recipeTitle: parsedRecipe.title });
+      } else {
+        // Fall back to parsing from text content
+        parsedRecipe = parseRecipeFromText(response.response.content);
+        if (parsedRecipe) {
+          Logger.info('🔵 ChatInterface: Parsed recipe from text content', { recipeTitle: parsedRecipe.title });
+        }
+      }
       
       const aiMessage: Message = {
         id: response.response.id,
@@ -521,10 +582,32 @@ export const ChatInterface: React.FC = () => {
         return;
       }
       
-      console.error("Failed to send message:", error);
+      Logger.error("🔴 ChatInterface: Failed to send message", {
+        error: error.message,
+        status: (error as any).status,
+        statusText: (error as any).statusText,
+        details: (error as any).details
+      });
+      
+      // Extract error message from error object
+      let errorContent = "Sorry, I encountered an error. Please try again.";
+      
+      // Priority: error.message > error.details.message > error.details.error > default
+      if (error.message) {
+        errorContent = error.message;
+      } else if ((error as any).details?.message) {
+        errorContent = (error as any).details.message;
+      } else if ((error as any).details?.error) {
+        errorContent = (error as any).details.error;
+      } else if ((error as any).response?.data?.message) {
+        errorContent = (error as any).response.data.message;
+      } else if ((error as any).response?.data?.error) {
+        errorContent = (error as any).response.data.error;
+      }
+      
       const errorMessage: Message = {
         id: Date.now().toString(),
-        content: "Sorry, I encountered an error. Please try again.",
+        content: errorContent,
         sender: "ai",
         timestamp: new Date(),
       };
@@ -548,15 +631,34 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
-  const handleStoreRecipe = async (messageId: string, recipe: ParsedRecipe) => {
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    messageId: string;
+    recipe: ParsedRecipe;
+    existingRecipe: any;
+    allSimilar: any[];
+  } | null>(null);
+
+  const handleStoreRecipe = async (messageId: string, recipe: ParsedRecipe, forceSave: boolean = false) => {
     try {
-      Logger.info('🔵 ChatInterface: Storing recipe from chat', { messageId, recipeTitle: recipe.title });
+      Logger.info('🔵 ChatInterface: Storing recipe from chat', { messageId, recipeTitle: recipe.title, forceSave });
       
       const recipeData = formatRecipeForStorage(recipe);
       
-      await createRecipeMutation.mutateAsync(recipeData);
+      const result = await createRecipeMutation.mutateAsync({ data: recipeData, forceSave });
       
-      // Update message to mark recipe as stored
+      // Check if duplicate was found
+      if (result && typeof result === 'object' && 'isDuplicate' in result && result.isDuplicate) {
+        // Show duplicate warning dialog
+        setDuplicateWarning({
+          messageId,
+          recipe,
+          existingRecipe: result.existingRecipe,
+          allSimilar: result.allSimilar || []
+        });
+        return;
+      }
+      
+      // Recipe saved successfully
       setConversations((prev) =>
         prev.map((conv) => ({
           ...conv,
@@ -574,6 +676,62 @@ export const ChatInterface: React.FC = () => {
       Logger.error('🔴 ChatInterface: Failed to store recipe', error);
       ToastService.error(`Failed to save recipe: ${error?.message || 'Unknown error'}`);
     }
+  };
+
+  const handleForceSave = async () => {
+    if (!duplicateWarning) return;
+    
+    const { messageId, recipe } = duplicateWarning;
+    setDuplicateWarning(null);
+    await handleStoreRecipe(messageId, recipe, true); // Force save
+  };
+
+  const handleUpdateExisting = async () => {
+    if (!duplicateWarning) return;
+    
+    const { messageId, recipe, existingRecipe } = duplicateWarning;
+    
+    try {
+      Logger.info('🔵 ChatInterface: Updating existing recipe', { 
+        messageId, 
+        recipeTitle: recipe.title, 
+        existingRecipeId: existingRecipe.id 
+      });
+      
+      const recipeData = formatRecipeForStorage(recipe);
+      
+      const updatedRecipe = await updateRecipeMutation.mutateAsync({ 
+        id: existingRecipe.id, 
+        data: recipeData 
+      });
+      
+      // Update the message to show recipe was updated
+      setConversations((prev) =>
+        prev.map((conv) => ({
+          ...conv,
+          messages: conv.messages.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, recipeStored: true }
+              : msg
+          ),
+        }))
+      );
+      
+      setDuplicateWarning(null);
+      ToastService.success(`Recipe "${recipe.title}" updated successfully!`);
+      Logger.info('✅ ChatInterface: Recipe updated successfully', { 
+        messageId, 
+        recipeTitle: recipe.title,
+        recipeId: existingRecipe.id 
+      });
+    } catch (error: any) {
+      Logger.error('🔴 ChatInterface: Failed to update recipe', error);
+      ToastService.error(`Failed to update recipe: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleCancelDuplicate = () => {
+    setDuplicateWarning(null);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -1039,15 +1197,15 @@ export const ChatInterface: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Show "Store Recipe" button if recipe is detected and not yet stored */}
+                      {/* Show "Save Recipe" button if recipe is detected and not yet stored */}
                       {message.sender === "ai" && message.recipe && !message.recipeStored && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                           <Button
                             onClick={() => handleStoreRecipe(message.id, message.recipe!)}
                             disabled={createRecipeMutation.isPending}
                             size="sm"
-                            variant="outline"
-                            className="text-xs"
+                            variant="default"
+                            className="text-xs bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             {createRecipeMutation.isPending ? (
                               <>
@@ -1057,21 +1215,86 @@ export const ChatInterface: React.FC = () => {
                             ) : (
                               <>
                                 <Save className="h-3 w-3 mr-1" />
-                                Store Recipe
+                                Save Recipe
                               </>
                             )}
                           </Button>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">
                             {message.recipe.title}
                           </span>
                         </div>
                       )}
                       
+                      {/* Show duplicate warning if duplicate detected */}
+                      {message.sender === "ai" && message.recipe && duplicateWarning && duplicateWarning.messageId === message.id && (
+                        <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                          <div className="flex items-start gap-2 mb-2">
+                            <span className="text-xs font-semibold text-yellow-800 dark:text-yellow-200">
+                              ⚠️ Similar recipe already exists
+                            </span>
+                          </div>
+                          <div className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
+                            <p className="font-medium mb-1">
+                              "{duplicateWarning.existingRecipe.title}" ({duplicateWarning.existingRecipe.similarity}% similar)
+                            </p>
+                            {duplicateWarning.existingRecipe.description && (
+                              <p className="text-yellow-600 dark:text-yellow-400 text-xs">
+                                {duplicateWarning.existingRecipe.description.substring(0, 100)}...
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={handleUpdateExisting}
+                              disabled={updateRecipeMutation.isPending || createRecipeMutation.isPending}
+                              size="sm"
+                              variant="default"
+                              className="text-xs bg-yellow-600 dark:bg-yellow-700 text-white hover:bg-yellow-700 dark:hover:bg-yellow-800"
+                            >
+                              {updateRecipeMutation.isPending ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Updating...
+                                </>
+                              ) : (
+                                "Update Existing"
+                              )}
+                            </Button>
+                            <Button
+                              onClick={handleForceSave}
+                              disabled={createRecipeMutation.isPending || updateRecipeMutation.isPending}
+                              size="sm"
+                              variant="outline"
+                              className="text-xs border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
+                            >
+                              {createRecipeMutation.isPending ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                "Save Anyway"
+                              )}
+                            </Button>
+                            <Button
+                              onClick={handleCancelDuplicate}
+                              size="sm"
+                              variant="ghost"
+                              className="text-xs text-yellow-700 dark:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Show success indicator if recipe was stored */}
                       {message.sender === "ai" && message.recipe && message.recipeStored && (
-                        <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
-                          <Check className="h-3 w-3" />
-                          <span>Recipe "{message.recipe.title}" saved</span>
+                        <div className="flex items-center gap-2 mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                          <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                          <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                            Recipe "{message.recipe.title}" saved successfully!
+                          </span>
                         </div>
                       )}
                     </div>

@@ -164,7 +164,11 @@ export interface AuthResponse {
   user: {
     id: string
     email: string
-    displayName: string
+    firstName?: string
+    first_name?: string
+    lastName?: string
+    last_name?: string
+    displayName?: string
     uid: string
   }
 }

@@ -1,19 +1,101 @@
 import { Pool } from 'pg';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
+// Note: .env is loaded by server.js (entry point)
+// No need to load it again here - process.env is already populated
+// This module is only used server-side, so server.js will have already loaded .env
+
+// Lazy initialization - pool is created on first use, not at module load time
+// This allows .env to be loaded before database initialization
+let pool = null;
+
+/**
+ * Initialize database pool (lazy initialization)
+ * Called automatically on first database operation
+ */
+function initializePool() {
+  if (pool) {
+    return pool; // Already initialized
   }
-});
+
+  // Validate DATABASE_URL is set (at runtime, after .env is loaded)
+  if (!process.env.DATABASE_URL) {
+    console.error('❌ DATABASE_URL is NOT set!');
+    console.error('   Please create a .env file in the project root with DATABASE_URL');
+    throw new Error('DATABASE_URL environment variable is not set. Please configure your database connection string.');
+  }
+
+  // Parse and validate DATABASE_URL
+  const databaseUrl = process.env.DATABASE_URL.trim();
+  if (!databaseUrl) {
+    console.error('❌ DATABASE_URL is empty or not set');
+    throw new Error('DATABASE_URL environment variable is not set. Please configure your database connection string.');
+  }
+
+  // Log connection details (masked for security)
+  try {
+    const url = new URL(databaseUrl);
+    const maskedUrl = `${url.protocol}//${url.username ? url.username.substring(0, 3) + '***' : '***'}:${url.password ? '***' : ''}@${url.hostname}${url.port ? ':' + url.port : ''}${url.pathname}${url.search ? '?' + url.searchParams.toString().substring(0, 20) + '...' : ''}`;
+    console.log('🔵 DatabaseService: Parsed DATABASE_URL', {
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port || 'default (5432)',
+      database: url.pathname?.replace('/', '') || 'default',
+      hasSSL: url.searchParams.has('sslmode') || url.searchParams.has('ssl'),
+      maskedUrl: maskedUrl
+    });
+  } catch (urlError) {
+    console.error('🔴 DatabaseService: Invalid DATABASE_URL format', {
+      error: urlError.message,
+      hint: 'DATABASE_URL should be in format: postgresql://user:password@host:port/dbname?sslmode=require'
+    });
+    throw new Error(`Invalid DATABASE_URL format: ${urlError.message}`);
+  }
+
+  // Create pool
+  pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  });
+
+  // Test connection on startup
+  pool.on('error', (err) => {
+    console.error('🔴 DatabaseService: PostgreSQL pool error', {
+      error: err.message,
+      code: err.code,
+      hint: 'Check if DATABASE_URL is correct and the database server is accessible',
+    });
+  });
+
+  // Log successful connection
+  pool.on('connect', () => {
+    console.log('✅ DatabaseService: PostgreSQL connection established');
+  });
+
+  console.log('✅ DatabaseService: Pool initialized');
+  return pool;
+}
 
 export class DatabaseService {
   constructor() {
-    this.pool = pool;
+    // Don't initialize pool in constructor - use lazy initialization
+    this.pool = null;
+  }
+
+  /**
+   * Get or initialize the database pool
+   * Lazy initialization ensures .env is loaded before database connection
+   */
+  getPool() {
+    if (!this.pool) {
+      this.pool = initializePool();
+    }
+    return this.pool;
   }
 
   async query(text, params) {
-    const client = await this.pool.connect();
+    const client = await this.getPool().connect();
     try {
       const result = await client.query(text, params);
       return result;
@@ -23,7 +105,7 @@ export class DatabaseService {
   }
 
   async getClient() {
-    return await this.pool.connect();
+    return await this.getPool().connect();
   }
 
   // Recipe CRUD operations

@@ -11,10 +11,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const location = useLocation()
   const { user, isLoading, refreshUser } = useAuthStore()
   
-  // Refresh auth state when ProtectedRoute mounts to ensure we have latest session
+  // Only refresh auth state if user is not already loaded and not currently loading
+  // This prevents unnecessary calls when navigating between protected routes
   useEffect(() => {
-    Logger.debug('🔵 ProtectedRoute: Refreshing auth state on mount')
-    refreshUser()
+    if (!isLoading && !user) {
+      Logger.debug('🔵 ProtectedRoute: User not loaded, refreshing auth state')
+      refreshUser()
+    } else {
+      Logger.debug('🔵 ProtectedRoute: User already loaded or loading, skipping refresh', { 
+        hasUser: !!user, 
+        isLoading 
+      })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

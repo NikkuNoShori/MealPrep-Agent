@@ -24,13 +24,33 @@ const webhookService = {
     }
 
     try {
+      // Flatten payload structure for n8n webhook - ensures all fields are at top level
+      // This prevents data loss and makes it easier for n8n nodes to access fields
       const payload = {
+        // Core message data (flattened from data object)
+        content: data.content || data.message || '',
+        messageId: data.id || null,
+        type: data.type || 'text',
+        intent: data.intent || null,
+        sessionId: data.sessionId || null,
+        userId: user?.id || data.userId || null,
+        context: data.context || {},
+        
+        // Metadata (kept separate for reference)
         event: eventType,
         timestamp: new Date().toISOString(),
-        data,
-        user,
-        metadata
+        user: user ? {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        } : null,
+        metadata: metadata || {}
       };
+
+      // Determine timeout based on intent - recipe extraction needs more time for large text
+      const isRecipeExtraction = data.intent === 'recipe_extraction';
+      const timeoutMs = isRecipeExtraction ? 120000 : 30000; // 120s for recipe extraction, 30s for general chat
+      console.log(`Using timeout: ${timeoutMs}ms for intent: ${data.intent || 'general_chat'}`);
 
       console.log('Sending webhook payload:', JSON.stringify(payload, null, 2));
       console.log('Webhook URL:', process.env.N8N_WEBHOOK_URL);
@@ -41,7 +61,7 @@ const webhookService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30000) // 30 second timeout for AI processing
+        signal: AbortSignal.timeout(timeoutMs) // Dynamic timeout based on intent
       });
 
       console.log('Webhook response status:', response.status);
@@ -194,7 +214,7 @@ export default async function handler(request) {
 // Handle sending a chat message
 async function handleSendMessage(body, user) {
   try {
-    const { message, context } = JSON.parse(body);
+    const { message, context, intent, sessionId } = JSON.parse(body);
 
     // Save user message first
     const userMessageResult = await sql`
@@ -211,20 +231,38 @@ async function handleSendMessage(body, user) {
       id: userMessageId,
       content: message,
       type: 'text',
-      context
+      intent: intent || null, // Add intent to webhook payload
+      sessionId: sessionId || context?.sessionId || null,
+      context: context || {}
     }, user);
 
     // Determine the AI response based on webhook response
     let aiResponse;
+    let recipe = null;
 
-    if (webhookResponse && webhookResponse.content) {
-      // Use the response from n8n
+    if (webhookResponse && webhookResponse.output) {
+      // Use the response from n8n (primary format)
+      aiResponse = webhookResponse.output;
+      console.log('Using n8n AI response (output field):', aiResponse);
+      // Check if recipe is included in the response
+      if (webhookResponse.recipe) {
+        recipe = webhookResponse.recipe;
+        console.log('Found recipe in n8n response:', recipe.title || 'Untitled');
+      }
+    } else if (webhookResponse && webhookResponse.content) {
+      // Alternative response format
       aiResponse = webhookResponse.content;
-      console.log('Using n8n AI response:', aiResponse);
+      console.log('Using n8n AI response (content field):', aiResponse);
+      if (webhookResponse.recipe) {
+        recipe = webhookResponse.recipe;
+      }
     } else if (webhookResponse && webhookResponse.message) {
       // Alternative response format
       aiResponse = webhookResponse.message;
       console.log('Using n8n AI response (message field):', aiResponse);
+      if (webhookResponse.recipe) {
+        recipe = webhookResponse.recipe;
+      }
     } else if (webhookResponse && typeof webhookResponse === 'string') {
       // Direct string response
       aiResponse = webhookResponse;
@@ -232,6 +270,7 @@ async function handleSendMessage(body, user) {
     } else {
       // No webhook response - return error
       console.log('No response from n8n webhook');
+      console.log('Webhook response:', JSON.stringify(webhookResponse, null, 2));
       return new Response(JSON.stringify({ 
         error: 'AI service unavailable',
         message: 'The AI service is currently unavailable. Please try again later.'
@@ -250,7 +289,8 @@ async function handleSendMessage(body, user) {
 
     const aiMessageId = aiMessageResult[0].id;
 
-    return new Response(JSON.stringify({
+    // Build response object with optional recipe
+    const responseData = {
       message: 'Message processed successfully',
       response: {
         id: aiMessageId,
@@ -258,7 +298,15 @@ async function handleSendMessage(body, user) {
         sender: 'ai',
         timestamp: new Date()
       }
-    }), {
+    };
+
+    // Include recipe in response if present
+    if (recipe) {
+      responseData.recipe = recipe;
+      console.log('Including recipe in API response:', recipe.title || 'Untitled');
+    }
+
+    return new Response(JSON.stringify(responseData), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

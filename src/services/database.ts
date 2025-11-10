@@ -1,77 +1,144 @@
 import { Pool, PoolClient } from 'pg';
-import { config } from 'dotenv';
 import * as monitor from 'pg-monitor';
 import { AppLogger } from './logger';
 
-// Load environment variables
-config();
+// Note: .env is loaded by server.js (entry point)
+// No need to load it again here - process.env is already populated
+// This module is only used server-side, so server.js will have already loaded .env
 
-// Configure pg-monitor to use unified logger
-const enablePgMonitor = process.env.ENABLE_PG_MONITOR !== 'false'; // Default: enabled
+// Lazy initialization - pool is created on first use, not at module load time
+// This allows .env to be loaded before database initialization
+let pool: Pool | null = null;
 
-if (enablePgMonitor) {
-  // Configure pg-monitor
-  monitor.setTheme('matrix'); // Choose theme: 'matrix', 'default', 'monochrome'
-  
-  // Attach monitor to all events, routing through unified logger
-  monitor.attach({
-    // Log all queries through unified logger
-    query: (e: any) => {
-      AppLogger.dbQuery(e.query, e.params, e.duration);
-    },
+/**
+ * Initialize database pool (lazy initialization)
+ * Called automatically on first database operation
+ */
+function initializePool(): Pool {
+  if (pool) {
+    return pool; // Already initialized
+  }
+
+  // Validate DATABASE_URL is set (at runtime, after .env is loaded)
+  if (!process.env.DATABASE_URL) {
+    AppLogger.error('🔴 DatabaseService: DATABASE_URL environment variable is not set', {
+      hint: 'Please set DATABASE_URL in your .env file. For NeonDB, it should look like: postgresql://user:password@host.neon.tech/dbname?sslmode=require',
+    });
+    throw new Error('DATABASE_URL environment variable is not set. Please configure your database connection string.');
+  }
+
+  // Parse and validate DATABASE_URL
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    AppLogger.error('🔴 DatabaseService: DATABASE_URL is empty or not set');
+    throw new Error('DATABASE_URL environment variable is not set. Please configure your database connection string.');
+  }
+
+  // Log connection details (masked for security)
+  try {
+    const url = new URL(databaseUrl);
+    const maskedUrl = `${url.protocol}//${url.username ? url.username.substring(0, 3) + '***' : '***'}:${url.password ? '***' : ''}@${url.hostname}${url.port ? ':' + url.port : ''}${url.pathname}${url.search ? '?' + url.searchParams.toString().substring(0, 20) + '...' : ''}`;
+    AppLogger.info('🔵 DatabaseService: Parsed DATABASE_URL', {
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port || 'default (5432)',
+      database: url.pathname?.replace('/', '') || 'default',
+      hasSSL: url.searchParams.has('sslmode') || url.searchParams.has('ssl'),
+      maskedUrl: maskedUrl
+    });
+  } catch (urlError: any) {
+    AppLogger.error('🔴 DatabaseService: Invalid DATABASE_URL format', {
+      error: urlError.message,
+      hint: 'DATABASE_URL should be in format: postgresql://user:password@host:port/dbname?sslmode=require'
+    });
+    throw new Error(`Invalid DATABASE_URL format: ${urlError.message}`);
+  }
+
+  // Configure pg-monitor to use unified logger
+  const enablePgMonitor = process.env.ENABLE_PG_MONITOR !== 'false'; // Default: enabled
+
+  if (enablePgMonitor) {
+    // Configure pg-monitor
+    monitor.setTheme('matrix'); // Choose theme: 'matrix', 'default', 'monochrome'
     
-    // Log errors through unified logger
-    error: (err: any, e: any) => {
-      const error = err instanceof Error ? err : new Error(String(err));
-      (error as any).code = err.code;
-      (error as any).detail = err.detail;
-      (error as any).hint = err.hint;
-      AppLogger.dbError(error, e.query, e.params);
-    },
-    
-    // Log connection events through unified logger
-    connect: (client: any, e: any) => {
-      AppLogger.dbConnect(client?.processID);
-    },
-    
-    // Log transaction events through unified logger
-    task: (e: any) => {
-      if (e.event === 'start') {
-        AppLogger.dbTransaction('start');
-      } else if (e.event === 'finish') {
-        AppLogger.dbTransaction('finish', e.duration);
-      } else if (e.event === 'rollback') {
-        AppLogger.dbTransaction('rollback');
+    // Attach monitor to all events, routing through unified logger
+    monitor.attach({
+      // Log all queries through unified logger
+      query: (e: any) => {
+        AppLogger.dbQuery(e.query, e.params, e.duration);
+      },
+      
+      // Log errors through unified logger
+      error: (err: any, e: any) => {
+        const error = err instanceof Error ? err : new Error(String(err));
+        (error as any).code = err.code;
+        (error as any).detail = err.detail;
+        (error as any).hint = err.hint;
+        AppLogger.dbError(error, e.query, e.params);
+      },
+      
+      // Log connection events through unified logger
+      connect: (client: any, e: any) => {
+        AppLogger.dbConnect(client?.processID);
+      },
+      
+      // Log transaction events through unified logger
+      task: (e: any) => {
+        if (e.event === 'start') {
+          AppLogger.dbTransaction('start');
+        } else if (e.event === 'finish') {
+          AppLogger.dbTransaction('finish', e.duration);
+        } else if (e.event === 'rollback') {
+          AppLogger.dbTransaction('rollback');
+        }
+      },
+      
+      // Log disconnect events through unified logger
+      disconnect: (client: any, e: any) => {
+        AppLogger.dbDisconnect(client?.processID);
       }
-    },
+    });
     
-    // Log disconnect events through unified logger
-    disconnect: (client: any, e: any) => {
-      AppLogger.dbDisconnect(client?.processID);
-    }
-  });
-  
-  AppLogger.info('✅ pg-monitor enabled - PostgreSQL logging integrated with unified logger');
-} else {
-  AppLogger.warn('⚠️ pg-monitor disabled - no database logging');
-}
+    AppLogger.info('✅ pg-monitor enabled - PostgreSQL logging integrated with unified logger');
+  } else {
+    AppLogger.warn('⚠️ pg-monitor disabled - no database logging');
+  }
 
-// Create pool with optimized configuration
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    // Enable SSL certificate validation in production
-    rejectUnauthorized: process.env.NODE_ENV === 'production',
-  },
-  // Connection timeout in milliseconds
-  connectionTimeoutMillis: 10000,
-  // Optimize pool size for production
-  max: 20, // Maximum connections in pool
-  min: 2, // Minimum idle connections
-  idleTimeoutMillis: 30000, // Close idle connections after 30s
-  // Statement timeout (5 seconds)
-  statement_timeout: 5000,
-});
+  // Create pool with optimized configuration
+  pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: {
+      // Enable SSL certificate validation in production
+      // For NeonDB and other cloud databases, SSL is required
+      rejectUnauthorized: process.env.NODE_ENV === 'production',
+    },
+    // Connection timeout in milliseconds
+    connectionTimeoutMillis: 10000,
+    // Optimize pool size for production
+    max: 20, // Maximum connections in pool
+    min: 2, // Minimum idle connections
+    idleTimeoutMillis: 30000, // Close idle connections after 30s
+    // Statement timeout (5 seconds)
+    statement_timeout: 5000,
+  });
+
+  // Test connection on startup
+  pool.on('error', (err) => {
+    AppLogger.error('🔴 DatabaseService: PostgreSQL pool error', {
+      error: err.message,
+      code: err.code,
+      hint: 'Check if DATABASE_URL is correct and the database server is accessible',
+    });
+  });
+
+  // Log successful connection
+  pool.on('connect', () => {
+    AppLogger.info('✅ DatabaseService: PostgreSQL connection established');
+  });
+
+  AppLogger.info('✅ DatabaseService: Pool initialized');
+  return pool;
+}
 
 export interface Recipe {
   id: string;
@@ -118,10 +185,21 @@ export interface SearchResult {
 }
 
 export class DatabaseService {
-  private pool: Pool;
+  private pool: Pool | null = null;
 
   constructor() {
-    this.pool = pool;
+    // Don't initialize pool in constructor - use lazy initialization
+  }
+
+  /**
+   * Get or initialize the database pool
+   * Lazy initialization ensures .env is loaded before database connection
+   */
+  private getPool(): Pool {
+    if (!this.pool) {
+      this.pool = initializePool();
+    }
+    return this.pool;
   }
 
   /**
@@ -131,7 +209,7 @@ export class DatabaseService {
    * @param userId Optional user ID for RLS context
    */
   async query(text: string, params?: any[], userId?: string): Promise<any> {
-    const client = await this.pool.connect();
+    const client = await this.getPool().connect();
     const startTime = Date.now();
     
     try {
@@ -147,11 +225,12 @@ export class DatabaseService {
             error: rlsError.message,
             hint: 'Run migration 009_fix_rls_for_stack_auth.sql to enable RLS',
           });
+          // Continue without RLS - query will work but RLS won't be applied
         }
       }
       
       // pg-monitor will automatically log the query through unified logger
-      const result = await client.query(text, params);
+      const result = await client.query(text, params || []);
       
       // Calculate duration manually (pg QueryResult doesn't have duration property)
       const duration = Date.now() - startTime;
@@ -171,8 +250,13 @@ export class DatabaseService {
       // pg-monitor will automatically log the error through unified logger
       AppLogger.error('🔴 DatabaseService: Query error', {
         error: error.message,
+        errorCode: error.code,
+        errorDetail: error.detail,
+        errorHint: error.hint,
         query: text.substring(0, 200),
+        params: params?.slice(0, 3), // Log first 3 params for debugging
         userId: userId || 'none',
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
       throw error;
     } finally {
@@ -181,7 +265,7 @@ export class DatabaseService {
   }
 
   async getClient(): Promise<PoolClient> {
-    return await this.pool.connect();
+    return await this.getPool().connect();
   }
 
   // Recipe CRUD operations

@@ -82,17 +82,36 @@ export const recipeService = {
   /**
    * Create a new recipe
    * @param recipeData Recipe data object
-   * @returns Promise with created recipe
+   * @param forceSave If true, skip duplicate check and save anyway
+   * @returns Promise with created recipe or duplicate info
    */
-  async createRecipe(recipeData: any) {
+  async createRecipe(recipeData: any, forceSave: boolean = false) {
     if (!recipeData) {
       throw new Error('Recipe data is required');
     }
     
-    const response = await request<{ message: string; recipe: any }>('/api/recipes', {
+    const response = await request<{ 
+      message: string; 
+      recipe?: any;
+      isDuplicate?: boolean;
+      existingRecipe?: any;
+      allSimilar?: any[];
+      newRecipe?: any;
+    }>('/api/recipes', {
       method: 'POST',
-      body: JSON.stringify({ recipe: recipeData }),
+      body: JSON.stringify({ recipe: recipeData, forceSave }),
     });
+    
+    // If duplicate found, return duplicate info instead of throwing error
+    if (response.isDuplicate) {
+      return {
+        isDuplicate: true,
+        existingRecipe: response.existingRecipe,
+        allSimilar: response.allSimilar || [],
+        newRecipe: response.newRecipe,
+        message: response.message
+      };
+    }
     
     return response.recipe;
   },
