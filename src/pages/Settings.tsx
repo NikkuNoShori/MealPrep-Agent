@@ -51,7 +51,7 @@ const Settings = () => {
       setFirstName(profileData.firstName || '');
       setLastName(profileData.lastName || '');
       setEmail(profileData.email || '');
-      // Email verification status comes from Stack Auth user, not database
+      // Email verification status comes from Supabase Auth user, not database
       setIsEmailVerified(user?.emailVerified || user?.primaryEmailVerified || false);
     }
   }, [profileData, user]);

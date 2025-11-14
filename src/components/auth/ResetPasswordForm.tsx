@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getStackClientApp } from '@/stack/client'
+import { supabase } from '@/lib/supabase'
 import { ToastService } from '@/services/toast'
 import { Logger } from '@/services/logger'
 import { Loader2, Lock } from 'lucide-react'
@@ -40,205 +40,39 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ code, onSu
     Logger.info('🔵 ResetPasswordForm: Resetting password with code', { code })
 
     try {
-      const stackClientApp = getStackClientApp()
-      const client = stackClientApp as any
-
-      // Log available methods for debugging
-      const availableMethods = Object.getOwnPropertyNames(client).filter(
-        name => typeof client[name] === 'function' && 
-        (name.toLowerCase().includes('password') || name.toLowerCase().includes('reset'))
-      )
-      Logger.debug('🔍 ResetPasswordForm: Available password reset methods', { methods: availableMethods })
+      // Supabase Auth: Password reset flow
+      // The code is the OTP token from the password reset email
+      // First, verify the OTP code, then update the password
       
-      // Check if updatePassword exists
-      const hasUpdatePassword = typeof client.updatePassword === 'function'
-      const hasVerifyPasswordResetCode = typeof client.verifyPasswordResetCode === 'function'
-      Logger.debug('🔍 ResetPasswordForm: Method availability', { 
-        hasUpdatePassword,
-        hasVerifyPasswordResetCode,
-        canDoTwoStep: hasUpdatePassword && hasVerifyPasswordResetCode
+      // Method 1: Verify OTP and update password in one call
+      // Supabase's verifyOtp with type='recovery' handles password reset
+      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: code,
+        type: 'recovery'
       })
 
-      // Try different Stack Auth password reset methods
-      // Method 1: resetPassword({ code, password }) - object parameter with 'password' key
-      // The API expects 'password' not 'newPassword'!
-      if (typeof client.resetPassword === 'function') {
-        Logger.debug('🔵 ResetPasswordForm: Trying resetPassword({ code, password })')
-        try {
-          const result = await client.resetPassword({ code, password })
-          Logger.debug('🔵 ResetPasswordForm: resetPassword result', { result: JSON.stringify(result) })
-          
-          if (result && typeof result === 'object' && 'status' in result && result.status === 'error') {
-            const errorMessage = (result as any).error?.message || 
-                                (result as any).error?.toString() || 
-                                'Failed to reset password'
-            Logger.error('🔴 ResetPasswordForm: Password reset failed', { error: errorMessage })
-            ToastService.error(errorMessage)
-            setIsLoading(false)
-            return
-          }
-
-          Logger.info('✅ ResetPasswordForm: Password reset successful via resetPassword({ code, password })')
-          ToastService.success('Password reset successful! You can now sign in with your new password.')
-          onSuccess?.()
-          return
-        } catch (methodError: any) {
-          const errorDetails = {
-            message: methodError?.message || 'Unknown error',
-            name: methodError?.name,
-            stack: methodError?.stack,
-            toString: methodError?.toString(),
-            fullError: methodError
-          }
-          Logger.error('🔴 ResetPasswordForm: resetPassword({ code, password }) error', errorDetails)
-          Logger.error('🔴 ResetPasswordForm: Full error object', { error: methodError })
-        }
+      if (verifyError) {
+        Logger.error('🔴 ResetPasswordForm: OTP verification failed', { error: verifyError.message })
+        ToastService.error(verifyError.message || 'Invalid or expired reset code')
+        setIsLoading(false)
+        return
       }
 
-      // Method 2: resetPassword(code, newPassword) - two parameters
-      if (typeof client.resetPassword === 'function') {
-        Logger.debug('🔵 ResetPasswordForm: Trying resetPassword(code, newPassword)')
-        try {
-          const result = await client.resetPassword(code, password)
-          Logger.debug('🔵 ResetPasswordForm: resetPassword(code, password) result', { result: JSON.stringify(result) })
-          
-          if (result && typeof result === 'object' && 'status' in result && result.status === 'error') {
-            const errorMessage = (result as any).error?.message || 
-                                (result as any).error?.toString() || 
-                                'Failed to reset password'
-            Logger.error('🔴 ResetPasswordForm: Password reset failed', { error: errorMessage })
-            ToastService.error(errorMessage)
-            setIsLoading(false)
-            return
-          }
-
-          Logger.info('✅ ResetPasswordForm: Password reset successful via resetPassword(code, password)')
-          ToastService.success('Password reset successful! You can now sign in with your new password.')
-          onSuccess?.()
-          return
-        } catch (methodError: any) {
-          const errorDetails = {
-            message: methodError?.message || 'Unknown error',
-            name: methodError?.name,
-            stack: methodError?.stack,
-            toString: methodError?.toString(),
-            fullError: methodError
-          }
-          Logger.error('🔴 ResetPasswordForm: resetPassword(code, password) error', errorDetails)
-          Logger.error('🔴 ResetPasswordForm: Full error object', { error: methodError })
-        }
-      }
-
-      // Method 3: resetPasswordWithCode(code, newPassword) - alternative method name
-      if (typeof client.resetPasswordWithCode === 'function') {
-        Logger.debug('🔵 ResetPasswordForm: Trying resetPasswordWithCode(code, newPassword)')
-        try {
-          const result = await client.resetPasswordWithCode(code, password)
-          Logger.debug('🔵 ResetPasswordForm: resetPasswordWithCode result', { result: JSON.stringify(result) })
-          
-          if (result && typeof result === 'object' && 'status' in result && result.status === 'error') {
-            const errorMessage = (result as any).error?.message || 
-                                (result as any).error?.toString() || 
-                                'Failed to reset password'
-            Logger.error('🔴 ResetPasswordForm: Password reset failed', { error: errorMessage })
-            ToastService.error(errorMessage)
-            setIsLoading(false)
-            return
-          }
-
-          Logger.info('✅ ResetPasswordForm: Password reset successful via resetPasswordWithCode')
-          ToastService.success('Password reset successful! You can now sign in with your new password.')
-          onSuccess?.()
-          return
-        } catch (methodError: any) {
-          Logger.debug('⚠️ ResetPasswordForm: resetPasswordWithCode failed', { error: methodError.message })
-        }
-      }
-
-      // Method 4: verifyPasswordResetCode(code) then updatePassword(password) - two-step process
-      // This is likely the correct flow: verify code first, then update password
-      if (typeof client.verifyPasswordResetCode === 'function' && typeof client.updatePassword === 'function') {
-        Logger.debug('🔵 ResetPasswordForm: Trying verifyPasswordResetCode(code) then updatePassword(password)')
-        try {
-          // Step 1: Verify the reset code (this may establish a session)
-          const verifyResult = await client.verifyPasswordResetCode(code)
-          Logger.debug('🔵 ResetPasswordForm: verifyPasswordResetCode(code) result', { result: JSON.stringify(verifyResult) })
-          
-          if (verifyResult && typeof verifyResult === 'object' && 'status' in verifyResult && verifyResult.status === 'error') {
-            const errorMessage = (verifyResult as any).error?.message || 'Code verification failed'
-            Logger.error('🔴 ResetPasswordForm: Code verification failed', { error: errorMessage })
-            ToastService.error(errorMessage)
-            setIsLoading(false)
-            return
-          }
-
-          // Step 2: Update password using the verified session
-          const updateResult = await client.updatePassword(password)
-          Logger.debug('🔵 ResetPasswordForm: updatePassword(password) result', { result: JSON.stringify(updateResult) })
-          
-          if (updateResult && typeof updateResult === 'object' && 'status' in updateResult && updateResult.status === 'error') {
-            const errorMessage = (updateResult as any).error?.message || 'Password update failed'
-            Logger.error('🔴 ResetPasswordForm: Password update failed', { error: errorMessage })
-            ToastService.error(errorMessage)
-            setIsLoading(false)
-            return
-          }
-
-          Logger.info('✅ ResetPasswordForm: Password reset successful via verify + update')
-          ToastService.success('Password reset successful! You can now sign in with your new password.')
-          onSuccess?.()
-          return
-        } catch (methodError: any) {
-          Logger.error('🔴 ResetPasswordForm: verify + update error', { 
-            error: methodError?.message || 'Unknown error',
-            name: methodError?.name,
-            stack: methodError?.stack,
-            fullError: methodError
-          })
-        }
-      } else {
-        Logger.debug('⚠️ ResetPasswordForm: Two-step method not available', {
-          hasVerifyPasswordResetCode: typeof client.verifyPasswordResetCode === 'function',
-          hasUpdatePassword: typeof client.updatePassword === 'function'
-        })
-      }
-
-      // Method 5: verifyPasswordResetCode(code, newPassword) - verify and reset in one call
-      // NOTE: This might only verify the code, not reset the password (based on logs)
-      if (typeof client.verifyPasswordResetCode === 'function') {
-        Logger.debug('🔵 ResetPasswordForm: Trying verifyPasswordResetCode(code, password)')
-        Logger.warn('⚠️ ResetPasswordForm: This method may only verify the code, not reset the password')
-        try {
-          const result = await client.verifyPasswordResetCode(code, password)
-          Logger.debug('🔵 ResetPasswordForm: verifyPasswordResetCode result', { result: JSON.stringify(result) })
-          
-          if (result && typeof result === 'object' && 'status' in result && result.status === 'error') {
-            const errorMessage = (result as any).error?.message || 
-                                (result as any).error?.toString() || 
-                                'Failed to reset password'
-            Logger.error('🔴 ResetPasswordForm: Password reset failed', { error: errorMessage })
-            ToastService.error(errorMessage)
-            setIsLoading(false)
-            return
-          }
-
-          // WARNING: This method may only verify, not reset
-          Logger.warn('⚠️ ResetPasswordForm: verifyPasswordResetCode returned success, but password may not be reset')
-          Logger.error('🔴 ResetPasswordForm: Password reset may have failed - verifyPasswordResetCode may only verify, not reset')
-          ToastService.error('Password reset completed but may not have worked. Please try signing in, or request a new reset link.')
-          setIsLoading(false)
-          return
-        } catch (methodError: any) {
-          Logger.debug('⚠️ ResetPasswordForm: verifyPasswordResetCode failed', { error: methodError.message })
-        }
-      }
-
-      // If we get here, no method worked
-      Logger.error('🔴 ResetPasswordForm: No working password reset method found')
-      Logger.debug('🔍 ResetPasswordForm: Client object methods', { 
-        allMethods: Object.getOwnPropertyNames(client).filter(name => typeof client[name] === 'function')
+      // After verifying OTP, update the password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password
       })
-      throw new Error('Password reset method not available. Please check Stack Auth configuration.')
+
+      if (updateError) {
+        Logger.error('🔴 ResetPasswordForm: Password update failed', { error: updateError.message })
+        ToastService.error(updateError.message || 'Failed to update password')
+        setIsLoading(false)
+        return
+      }
+
+      Logger.info('✅ ResetPasswordForm: Password reset successful')
+      ToastService.success('Password reset successful! You can now sign in with your new password.')
+      onSuccess?.()
     } catch (error: any) {
       Logger.error('🔴 ResetPasswordForm: Password reset error', error)
       const errorMessage = error?.message || error?.toString() || 'Failed to reset password'

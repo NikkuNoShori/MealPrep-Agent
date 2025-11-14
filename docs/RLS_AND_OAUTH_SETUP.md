@@ -1,109 +1,140 @@
-# RLS and Google OAuth Setup Summary
+# RLS and OAuth Setup for Supabase
 
-## ✅ Completed Tasks
+## Overview
 
-### 1. Row Level Security (RLS) Setup
+This document explains how Row Level Security (RLS) and OAuth are configured in Supabase for the MealPrep Agent application.
 
-**Status**: ✅ Complete
+## Key Points
 
-**What was done**:
-- Created `scripts/setup-rls-supabase.js` to set up RLS on all tables
-- Enabled RLS on all 7 tables:
-  - `profiles`
-  - `recipes`
-  - `chat_messages`
-  - `family_members`
-  - `meal_plans`
-  - `receipts`
-  - `user_preferences`
+1. **Auto-Profile Creation**: When a user is created in `auth.users` (via signup, OAuth, magic link, or invitation), a profile is automatically created in the `profiles` table via a database trigger.
 
-**RLS Policies Created**:
+2. **RLS Policies**: All tables use Supabase's `auth.uid()` function for RLS, which automatically uses the authenticated user's ID from Supabase Auth.
+
+3. **OAuth**: Google OAuth is configured in Supabase Dashboard. See `SUPABASE_GOOGLE_OAUTH_SETUP.md` for detailed setup instructions.
+
+## Row Level Security (RLS)
+
+### How RLS Works
+
+1. **Automatic User Context**: Supabase Auth automatically sets `auth.uid()` in the session context when a user is authenticated.
+
+2. **RLS Policies**: All tables have RLS policies that use `auth.uid()`:
+   ```sql
+   CREATE POLICY "Users can view own recipes" ON recipes
+     FOR SELECT USING (user_id = auth.uid() OR is_public = true);
+   ```
+
+3. **No Manual Setup**: Unlike custom session variables, `auth.uid()` is automatically available - no need to call `set_user_id()`.
+
+### RLS Policies
+
+All tables have RLS policies for:
 - **SELECT**: Users can view their own data (recipes also allow public viewing)
 - **INSERT**: Users can only insert data with their own `user_id`
 - **UPDATE**: Users can only update their own data
 - **DELETE**: Users can only delete their own data
 
-**Helper Functions**:
-- `get_user_id_from_stack_auth_id(UUID)`: Converts `stack_auth_id` (UUID) to `user_id` (integer)
-- `set_user_id(UUID)`: Sets the current user context for RLS using `stack_auth_id`
+### Migration
 
-**How RLS Works**:
-1. Before each database query, call `set_user_id(stack_auth_id)` to set the user context
-2. RLS policies automatically filter queries based on `app.current_user_id` session variable
-3. Users can only see/modify their own data (except public recipes)
+RLS policies are set up in migration `016_update_rls_for_supabase_auth.sql`:
 
-**Next Steps for RLS**:
-- Update `src/services/database.ts` to call `set_user_id()` before queries
-- Test RLS policies with different user contexts
-- Verify that public recipes are accessible to unauthenticated users
+```bash
+node scripts/run-migration.js migrations/016_update_rls_for_supabase_auth.sql
+```
 
-### 2. Google OAuth Setup
+## OAuth Setup
 
-**Status**: ✅ Complete
+### Google OAuth Configuration
 
-**What was done**:
-- Added `signInWithGoogle()` method to `src/services/authService.ts`
-- Added Google OAuth buttons to `LoginForm.tsx` and `SignupForm.tsx`
-- Created `OAuthCallback.tsx` page to handle OAuth callbacks
-- Added `/auth/callback` route to `App.tsx`
-- Created setup documentation in `docs/GOOGLE_OAUTH_SETUP.md`
-
-**OAuth Flow**:
-1. User clicks "Continue with Google" button
-2. Redirects to Google OAuth consent screen
-3. After authorization, redirects to `/auth/callback`
-4. Callback page processes OAuth response
-5. User is signed in and redirected to dashboard
-6. Profile is automatically created if it doesn't exist
-
-**Files Modified**:
-- `src/services/authService.ts`: Added `signInWithGoogle()` method
-- `src/components/auth/LoginForm.tsx`: Added Google OAuth button
-- `src/components/auth/SignupForm.tsx`: Added Google OAuth button
-- `src/pages/OAuthCallback.tsx`: New OAuth callback handler
-- `src/App.tsx`: Added `/auth/callback` route
-
-**Next Steps for OAuth**:
-1. Configure Google OAuth in Google Cloud Console:
+1. **Google Cloud Console**:
    - Create OAuth 2.0 credentials
-   - Add redirect URIs: `http://localhost:5173/auth/callback` (dev) and production URL
-2. Configure Google OAuth in Stack Auth Dashboard:
-   - Add Google OAuth provider
-   - Enter Client ID and Client Secret
-   - Add redirect URLs
-3. Test OAuth flow end-to-end
+   - Add redirect URI: `https://[your-project-ref].supabase.co/auth/v1/callback`
+   - Get Client ID and Client Secret
 
-## 🔧 Configuration Required
+2. **Supabase Dashboard**:
+   - Go to **Authentication** → **Providers**
+   - Enable **Google** provider
+   - Add Client ID and Client Secret
+   - Save configuration
 
-### Stack Auth Dashboard
+3. **Frontend**:
+   - Already configured in `src/services/authService.ts`
+   - Uses `supabase.auth.signInWithOAuth({ provider: 'google' })`
 
-1. **Enable Google OAuth**:
-   - Go to Stack Auth Dashboard → OAuth Providers
-   - Add Google OAuth provider
-   - Enter Google OAuth Client ID and Client Secret
+### OAuth Flow
 
-2. **Add Redirect URLs**:
-   - `http://localhost:5173/auth/callback` (development)
-   - `https://yourdomain.com/auth/callback` (production)
+1. User clicks "Sign in with Google"
+2. Redirects to Google OAuth consent screen
+3. After authorization, redirects to Supabase callback
+4. Supabase creates user in `auth.users` table
+5. Database trigger automatically creates profile in `profiles` table
+6. User is signed in and redirected to dashboard
 
-3. **Enable "Allow all localhost callbacks for development"** (if not already enabled)
+### Detailed Setup
 
-### Google Cloud Console
+See `SUPABASE_GOOGLE_OAUTH_SETUP.md` for complete setup instructions.
 
-1. **Create OAuth 2.0 Credentials**:
-   - Go to Google Cloud Console → APIs & Services → Credentials
-   - Create OAuth client ID (Web application)
-   - Add authorized redirect URIs:
-     - `https://api.stack-auth.com/api/v1/oauth/google/callback`
-     - `http://localhost:5173/auth/callback` (development)
-     - `https://yourdomain.com/auth/callback` (production)
+## Auto-Profile Creation
 
-2. **Enable Google+ API**:
-   - Go to APIs & Services → Library
-   - Search for "Google+ API"
-   - Click "Enable"
+### Database Trigger
 
-## 📋 Testing Checklist
+A PostgreSQL trigger automatically creates a profile when a user is created:
+
+```sql
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+```
+
+### Trigger Function
+
+The `handle_new_user()` function:
+1. Extracts `first_name` and `last_name` from user metadata
+2. Creates profile in `profiles` table
+3. Handles conflicts with `ON CONFLICT DO UPDATE`
+
+### Migration
+
+Auto-profile creation is set up in migration `018_auto_create_profile_trigger.sql`:
+
+```bash
+node scripts/run-migration.js migrations/018_auto_create_profile_trigger.sql
+```
+
+### Detailed Documentation
+
+See `SUPABASE_AUTO_PROFILE_CREATION.md` for complete documentation.
+
+## Email Templates
+
+Supabase uses its own email templates for:
+- **Magic Links**: Passwordless login
+- **Email Verification**: Email confirmation
+- **Password Reset**: Password reset links
+- **User Invitations**: Admin-invited users
+
+### Customize Email Templates
+
+1. Go to **Authentication** → **Email Templates**
+2. Customize templates:
+   - **Confirm signup**: Email verification
+   - **Magic Link**: Passwordless login
+   - **Change Email Address**: Email change confirmation
+   - **Reset Password**: Password reset
+   - **Invite user**: User invitation
+
+### Email Template Variables
+
+Available variables:
+- `{{ .ConfirmationURL }}` - Confirmation link
+- `{{ .Email }}` - User email
+- `{{ .Token }}` - Verification token
+- `{{ .TokenHash }}` - Token hash
+- `{{ .SiteURL }}` - Site URL
+- `{{ .RedirectTo }}` - Redirect URL
+
+## Testing Checklist
 
 ### RLS Testing
 
@@ -111,32 +142,36 @@
 - [ ] Test that users can only modify their own recipes
 - [ ] Test that public recipes are visible to unauthenticated users
 - [ ] Test that users can only see their own chat messages
-- [ ] Test that users can only see their own family members
-- [ ] Test that users can only see their own meal plans
-- [ ] Test that users can only see their own receipts
-- [ ] Test that users can only see their own preferences
+- [ ] Test that users can only see their own profiles
 
 ### OAuth Testing
 
 - [ ] Test Google OAuth sign in flow
 - [ ] Test Google OAuth sign up flow
-- [ ] Verify user profile is created after OAuth
+- [ ] Verify user is created in `auth.users` after OAuth
+- [ ] Verify profile is auto-created in `profiles` after OAuth
 - [ ] Verify user can access protected routes after OAuth
 - [ ] Test OAuth error handling
-- [ ] Test OAuth callback with invalid code
-- [ ] Test OAuth callback with error parameter
 
-## 🚀 Next Steps
+### Auto-Profile Creation Testing
 
-1. **Update Database Service**: Modify `src/services/database.ts` to call `set_user_id()` before queries
-2. **Test RLS**: Verify that RLS policies work correctly with authenticated users
-3. **Configure OAuth**: Set up Google OAuth in Stack Auth Dashboard and Google Cloud Console
-4. **Test OAuth**: Test the complete OAuth flow end-to-end
-5. **Documentation**: Update main README with RLS and OAuth information
+- [ ] Test profile creation on email/password signup
+- [ ] Test profile creation on OAuth signup
+- [ ] Test profile creation on magic link signup
+- [ ] Test profile creation on user invitation
+- [ ] Verify profile data is extracted correctly from metadata
 
-## 📚 Documentation
+## Next Steps
 
-- **RLS Setup**: `scripts/setup-rls-supabase.js` (includes inline documentation)
-- **OAuth Setup**: `docs/GOOGLE_OAUTH_SETUP.md`
+1. ✅ **Run RLS Migration**: `migrations/016_update_rls_for_supabase_auth.sql`
+2. ✅ **Run Auto-Profile Trigger Migration**: `migrations/018_auto_create_profile_trigger.sql`
+3. ✅ **Configure Google OAuth**: See `SUPABASE_GOOGLE_OAUTH_SETUP.md`
+4. ✅ **Test OAuth Flow**: Test complete OAuth flow end-to-end
+5. ✅ **Customize Email Templates**: (Optional) Customize Supabase email templates
+
+## Documentation
+
+- **RLS Setup**: `migrations/016_update_rls_for_supabase_auth.sql`
+- **OAuth Setup**: `docs/SUPABASE_GOOGLE_OAUTH_SETUP.md`
+- **Auto-Profile Creation**: `docs/SUPABASE_AUTO_PROFILE_CREATION.md`
 - **This Summary**: `docs/RLS_AND_OAUTH_SETUP.md`
-

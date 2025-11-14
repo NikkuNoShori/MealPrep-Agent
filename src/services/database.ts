@@ -213,19 +213,26 @@ export class DatabaseService {
     const startTime = Date.now();
     
     try {
-      // Set user context for RLS if userId is provided
+      // With Supabase Auth, RLS uses auth.uid() automatically
+      // For direct PostgreSQL connections, we need to set the JWT token in the connection
+      // This is handled by Supabase's connection pool, but for direct connections,
+      // we can set the role to authenticated user
       if (userId) {
         try {
-          await client.query('SELECT set_user_id($1::uuid)', [userId]);
+          // Set the role to authenticated user for RLS
+          // Supabase Auth uses auth.uid() which is automatically available in the session
+          // For direct connections, we set the role to match the user
+          await client.query('SET LOCAL role authenticated');
+          await client.query('SET LOCAL request.jwt.claim.sub = $1', [userId]);
           AppLogger.debug('🔵 DatabaseService: Set user context for RLS', { userId });
         } catch (rlsError: any) {
-          // If RLS function doesn't exist, log warning but continue
-          // This allows the app to work before migration is applied
-          AppLogger.warn('⚠️ DatabaseService: RLS function not found, skipping user context', {
+          // If setting role fails, log warning but continue
+          // RLS will still work if using Supabase's connection pool
+          AppLogger.warn('⚠️ DatabaseService: Could not set user context for RLS', {
             error: rlsError.message,
-            hint: 'Run migration 009_fix_rls_for_stack_auth.sql to enable RLS',
+            hint: 'RLS will use auth.uid() if using Supabase connection pool',
           });
-          // Continue without RLS - query will work but RLS won't be applied
+          // Continue - RLS may still work depending on connection type
         }
       }
       

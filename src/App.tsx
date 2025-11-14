@@ -24,7 +24,7 @@ function AppRoutes() {
   
   useEffect(() => {
     // Initialize auth on app startup to check for existing session
-    // This will check Stack Auth cookies and set user state if logged in
+    // This will check Supabase Auth session and set user state if logged in
     Logger.info('🚀 AppRoutes: Initializing auth on startup...')
     initialize().then(() => {
       // Set up listener for auth state changes after initialization

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { authService } from '@/services/authService'
 import { Logger } from '@/services/logger'
-import { stackClientApp } from '@/stack/client'
+import { supabase } from '@/lib/supabase'
 
 export interface AuthUser {
   id: string
@@ -33,17 +33,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   initialize: async () => {
-    Logger.info('🔵 AuthStore: Initializing auth, checking Stack Auth cookies for existing session...')
+    Logger.info('🔵 AuthStore: Initializing auth, checking Supabase session...')
     set({ isLoading: true, error: null })
     try {
-      // Check for existing user session from Stack Auth cookies
-      // Stack Auth with tokenStore: "cookie" automatically reads from cookies
-      // No localStorage needed - cookies persist across page refreshes
+      // Check for existing user session from Supabase
+      // Supabase automatically handles session persistence
       const currentUser = await authService.getUser()
       Logger.info('🔵 AuthStore: User found during initialization', { 
         found: currentUser ? 'Yes' : 'No',
         userId: currentUser?.id,
-        source: 'Stack Auth cookies'
+        source: 'Supabase Auth'
       })
       set({ user: currentUser || null, isLoading: false })
     } catch (err: any) {
@@ -186,13 +185,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   setupAuthListener: () => {
-    if (!stackClientApp) {
-      Logger.warn('⚠️ AuthStore: Cannot setup auth listener - Stack Auth not configured')
-      return
-    }
-
     // Prevent duplicate listener setup
-    const store = useAuthStore.getState()
     if ((useAuthStore as any).listenerSetup) {
       Logger.debug('🔍 AuthStore: Listener already setup, skipping')
       return
@@ -201,79 +194,36 @@ export const useAuthStore = create<AuthState>((set) => ({
     ;(useAuthStore as any).listenerSetup = true
 
     try {
-      // Check if Stack Auth has an onUserChange or similar listener
-      const client = stackClientApp as any
+      // Set up Supabase auth state change listener
+      Logger.info('🔵 AuthStore: Setting up Supabase auth state listener')
       
-      // Try to set up a listener for auth state changes
-      if (typeof client.onUserChange === 'function') {
-        Logger.info('🔵 AuthStore: Setting up onUserChange listener')
-        client.onUserChange(async (user: AuthUser | null) => {
-          Logger.info('🔵 AuthStore: User changed via listener', { hasUser: !!user, userId: user?.id })
-          set({ user, isLoading: false })
-        })
-      } else if (typeof client.subscribe === 'function') {
-        // Alternative: subscribe to auth state changes
-        Logger.info('🔵 AuthStore: Setting up subscribe listener')
-        client.subscribe((user: AuthUser | null) => {
-          Logger.info('🔵 AuthStore: User changed via subscribe', { hasUser: !!user, userId: user?.id })
-          set({ user, isLoading: false })
-        })
-      } else {
-        // Fallback: Poll for user changes periodically (less efficient but works)
-        // Clear any existing polling interval first to prevent duplicates
-        const existingInterval = (useAuthStore as any).pollInterval
-        if (existingInterval) {
-          Logger.debug('🔍 AuthStore: Clearing existing polling interval')
-          clearInterval(existingInterval)
-          ;(useAuthStore as any).pollInterval = null
-        }
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        Logger.info('🔵 AuthStore: Auth state changed', { event, hasSession: !!session })
         
-        // Only set up polling if we don't already have a user
-        // If user is already loaded, no need to poll
-        const currentState = useAuthStore.getState()
-        if (currentState.user) {
-          Logger.info('🔵 AuthStore: User already loaded, skipping polling setup')
-          return
-        }
-        
-        Logger.info('🔵 AuthStore: Setting up polling for auth state changes (no user detected)')
-        const pollInterval = setInterval(async () => {
-          try {
-            const currentState = useAuthStore.getState()
-            
-            // Skip polling if we already have a user - only poll to detect login
-            // This prevents unnecessary calls when user is already authenticated
-            if (currentState.user) {
-              Logger.info('🔵 AuthStore: User detected during poll, stopping polling')
-              clearInterval(pollInterval)
-              ;(useAuthStore as any).pollInterval = null
-              return
-            }
-            
-            // Only poll if we don't have a user (to detect when they log in)
-            const currentUser = await authService.getUser()
-            if (currentUser?.id !== currentState.user?.id) {
-              Logger.info('🔵 AuthStore: User changed via polling', { 
-                hasUser: !!currentUser, 
-                userId: currentUser?.id 
-              })
-              set({ user: currentUser, isLoading: false })
-              
-              // Stop polling once we have a user
-              if (currentUser) {
-                Logger.info('🔵 AuthStore: User detected, stopping polling')
-                clearInterval(pollInterval)
-                ;(useAuthStore as any).pollInterval = null
-              }
-            }
-          } catch (err) {
-            Logger.debug('🔍 AuthStore: Polling error (non-critical)', err)
+        if (session?.user) {
+          // Transform Supabase user to match expected format
+          const user: AuthUser = {
+            id: session.user.id,
+            email: session.user.email,
+            emailVerified: session.user.email_confirmed_at ? true : false,
+            firstName: session.user.user_metadata?.first_name,
+            first_name: session.user.user_metadata?.first_name,
+            lastName: session.user.user_metadata?.last_name,
+            last_name: session.user.user_metadata?.last_name,
+            displayName: session.user.user_metadata?.full_name || session.user.email,
+            ...session.user
           }
-        }, 30000) // Check every 30 seconds (only when no user is loaded)
-
-        // Store interval ID for cleanup (if needed)
-        ;(useAuthStore as any).pollInterval = pollInterval
-      }
+          set({ user, isLoading: false })
+        } else {
+          // User signed out
+          set({ user: null, isLoading: false })
+        }
+      })
+      
+      // Store subscription for cleanup if needed
+      ;(useAuthStore as any).authSubscription = subscription
+      
+      Logger.info('✅ AuthStore: Supabase auth listener setup successfully')
     } catch (err: any) {
       Logger.error('🔴 AuthStore: Error setting up auth listener', err)
       ;(useAuthStore as any).listenerSetup = false // Reset on error

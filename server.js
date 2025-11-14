@@ -50,19 +50,22 @@ if (process.env.DATABASE_URL) {
   console.error('   Please create a .env file in the project root with DATABASE_URL');
 }
 
-// Log Stack Auth environment variables status
-const stackProjectId = process.env.STACK_PROJECT_ID || process.env.VITE_STACK_PROJECT_ID;
-const stackServerSecretKey = process.env.STACK_SERVER_SECRET_KEY;
-console.log('🔵 Stack Auth Configuration:', {
-  hasProjectId: !!stackProjectId,
-  hasServerSecretKey: !!stackServerSecretKey,
-  projectIdSource: stackProjectId ? (process.env.STACK_PROJECT_ID ? 'STACK_PROJECT_ID' : 'VITE_STACK_PROJECT_ID') : 'none'
+// Log Supabase environment variables status
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+console.log('🔵 Supabase Configuration:', {
+  hasUrl: !!supabaseUrl,
+  hasAnonKey: !!supabaseAnonKey,
+  hasServiceKey: !!supabaseServiceKey,
+  urlSource: supabaseUrl ? (process.env.SUPABASE_URL ? 'SUPABASE_URL' : 'VITE_SUPABASE_URL') : 'none'
 });
 
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import fetch from 'node-fetch';
+import { createClient } from '@supabase/supabase-js';
 import { db } from './src/services/database.js';
 import { embeddingService } from './src/services/embeddingService.js';
 import { authenticateRequest, optionalAuth } from './server/middleware/auth.js';
@@ -70,6 +73,31 @@ import { apiLimiter, recipeCreationLimiter, searchLimiter } from './server/middl
 import { validateRecipeCreation, validateRecipeUpdate, validateRecipeId, validateRAGSearch } from './server/middleware/validation.js';
 import { sanitizeRecipe, sanitizeSearchQuery, sanitizeUrlParams } from './server/middleware/sanitization.js';
 import { securityHeaders, requestSizeLimits, secureErrorHandler } from './server/middleware/security.js';
+
+// Initialize Supabase client for RPC calls (uses anon key)
+let supabaseClient = null;
+function getSupabaseClient() {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    console.warn('⚠️ Supabase not configured for RPC calls');
+    return null;
+  }
+
+  supabaseClient = createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  return supabaseClient;
+}
 
 const app = express();
 const PORT = 3000;
@@ -778,7 +806,7 @@ app.delete('/api/recipes/:id',
   }
 });
 
-// Create profile endpoint (called after Stack Auth signup)
+// Create profile endpoint (called after Supabase Auth signup)
 app.post('/api/profile',
   authenticateRequest, // Require authentication
   async (req, res) => {
@@ -808,37 +836,36 @@ app.post('/api/profile',
       });
     }
 
-    // Use the authenticated user's ID, not the userId from body (security)
+    // Use the authenticated user's ID (Supabase Auth UUID)
     const profileUserId = user.id;
 
-    // Create profile in database (using profiles table after migration)
-    // Use stack_auth_id for Stack Auth user IDs (UUID), fallback to id if column doesn't exist
+    // Create profile in database using Supabase user ID
+    // Check if id column is UUID or if we need to use a different column
     let result = null;
     try {
-      // Check if stack_auth_id column exists
+      // Check if id column is UUID type
       const columnCheck = await db.query(`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'stack_auth_id'
-        ) as exists;
+        SELECT data_type 
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'id';
       `);
       
-      if (columnCheck.rows[0].exists) {
-        // Use stack_auth_id for Stack Auth user IDs (UUID)
+      if (columnCheck.rows.length > 0 && columnCheck.rows[0].data_type === 'uuid') {
+        // Use id column directly (UUID type for Supabase Auth)
         result = await db.query(
-          `INSERT INTO profiles (stack_auth_id, email, first_name, last_name, created_at, updated_at)
+          `INSERT INTO profiles (id, email, first_name, last_name, created_at, updated_at)
            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-           ON CONFLICT (stack_auth_id) DO UPDATE 
+           ON CONFLICT (id) DO UPDATE 
            SET first_name = EXCLUDED.first_name, 
                last_name = EXCLUDED.last_name,
                email = EXCLUDED.email,
                updated_at = CURRENT_TIMESTAMP
-           RETURNING stack_auth_id as id, email, first_name, last_name, created_at, updated_at`,
+           RETURNING id, email, first_name, last_name, created_at, updated_at`,
           [profileUserId, email.trim(), firstName.trim(), lastName.trim()],
           profileUserId // Pass userId for RLS context
         );
       } else {
-        // Fallback to id column (for backward compatibility with INTEGER id)
+        // Use id column (UUID from Supabase Auth)
         result = await db.query(
           `INSERT INTO profiles (id, email, first_name, last_name, created_at, updated_at)
            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -853,7 +880,7 @@ app.post('/api/profile',
         );
       }
     } catch (err) {
-      // If profiles table doesn't exist, try users table
+      // If profiles table doesn't exist, try users table (legacy)
       if (err.message && err.message.includes('does not exist')) {
         const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
         result = await db.query(
@@ -917,140 +944,145 @@ app.post('/api/profile',
   }
 });
 
-// Get profile endpoint
+// Get profile endpoint - uses Supabase RPC for secure database access
 app.get('/api/profile',
   authenticateRequest, // Require authentication
   async (req, res) => {
   try {
     const user = req.user; // Get authenticated user from middleware
+    const supabase = getSupabaseClient();
 
-    // Get profile from database (using profiles table after migration)
-    // Use stack_auth_id for Stack Auth user IDs (UUID), fallback to id if column doesn't exist
-    let result = null;
-    try {
-      // Check if stack_auth_id column exists
-      const columnCheck = await db.query(`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'stack_auth_id'
-        ) as exists;
-      `);
-      
-      if (columnCheck.rows[0].exists) {
-        // Use stack_auth_id for Stack Auth user IDs (UUID)
-        result = await db.query(
-          `SELECT stack_auth_id as id, email, first_name, last_name, created_at, updated_at 
-           FROM profiles 
-           WHERE stack_auth_id = $1`,
-          [user.id],
-          user.id // Pass userId for RLS context
-        );
-      } else {
-        // Fallback to id column (for backward compatibility with INTEGER id)
-        result = await db.query(
-          `SELECT id, email, first_name, last_name, created_at, updated_at 
-           FROM profiles 
-           WHERE id = $1`,
-          [user.id],
-          user.id // Pass userId for RLS context
-        );
-      }
-    } catch (err) {
-      // If profiles table doesn't exist, try users table
-      if (err.message && err.message.includes('does not exist')) {
-        result = await db.query(
-          `SELECT id, email, display_name, created_at, updated_at 
-           FROM users 
-           WHERE id = $1`,
-          [user.id],
-          user.id
-        );
-        // Convert display_name to first_name/last_name for backward compatibility
-        if (result.rows.length > 0 && result.rows[0].display_name) {
-          const displayName = result.rows[0].display_name;
-          const parts = displayName.split(' ');
-          result.rows[0].first_name = parts[0] || '';
-          result.rows[0].last_name = parts.slice(1).join(' ') || '';
-        }
-      } else {
-        throw err;
-      }
-    }
-
-    if (!result || result.rows.length === 0) {
-      // Auto-create profile if it doesn't exist (fallback for users who signed up before profile creation was working)
-      console.log('🔵 Profile not found, auto-creating profile for user:', user.id);
-      try {
-        // Get user email from Stack Auth token (if available)
-        const userEmail = user.email || `${user.id}@unknown.local`;
-        
-        // Auto-create profile with default values
-        let createResult = null;
-        const columnCheck = await db.query(`
-          SELECT EXISTS (
-            SELECT 1 FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'stack_auth_id'
-          ) as exists;
-        `);
-        
-        if (columnCheck.rows[0].exists) {
-          createResult = await db.query(
-            `INSERT INTO profiles (stack_auth_id, email, first_name, last_name, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-             ON CONFLICT (stack_auth_id) DO UPDATE 
-             SET updated_at = CURRENT_TIMESTAMP
-             RETURNING stack_auth_id as id, email, first_name, last_name, created_at, updated_at`,
-            [user.id, userEmail, 'User', ''],
-            user.id
-          );
-        } else {
-          createResult = await db.query(
-            `INSERT INTO profiles (id, email, first_name, last_name, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-             ON CONFLICT (id) DO UPDATE 
-             SET updated_at = CURRENT_TIMESTAMP
-             RETURNING id, email, first_name, last_name, created_at, updated_at`,
-            [user.id, userEmail, 'User', ''],
-            user.id
-          );
-        }
-        
-        if (createResult && createResult.rows.length > 0) {
-          console.log('✅ Auto-created profile for user:', user.id);
-          const profile = createResult.rows[0];
-          return res.json({
-            profile: {
-              id: profile.id,
-              email: profile.email,
-              firstName: profile.first_name || '',
-              lastName: profile.last_name || '',
-              createdAt: profile.created_at,
-              updatedAt: profile.updated_at
-            }
-          });
-        }
-      } catch (createError) {
-        console.error('❌ Failed to auto-create profile:', createError);
-        // Fall through to 404 error
-      }
-      
-      return res.status(404).json({
-        error: 'Profile not found',
-        message: 'User profile does not exist and could not be auto-created'
+    if (!supabase) {
+      return res.status(500).json({
+        error: 'Supabase not configured',
+        message: 'Please configure SUPABASE_URL and SUPABASE_ANON_KEY (or VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY).'
       });
     }
 
-    const profile = result.rows[0];
-
-    res.json({
-      profile: {
-        id: profile.id,
-        email: profile.email,
-        firstName: profile.first_name || '',
-        lastName: profile.last_name || '',
-        createdAt: profile.created_at,
-        updatedAt: profile.updated_at
+    // Use Supabase RPC function for secure profile retrieval
+    // The RPC function uses auth.uid() automatically and respects RLS
+    // We need to set the access token in the Supabase client for the RPC call
+    // Extract access token from request (same logic as auth middleware)
+    let accessToken = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      accessToken = authHeader.replace('Bearer ', '');
+    } else {
+      // Check cookies (Supabase stores tokens in cookies)
+      const cookies = req.cookies || {};
+      const supabaseCookieNames = Object.keys(cookies).filter(name => 
+        name.startsWith('sb-') && name.endsWith('-auth-token')
+      );
+      const possibleCookieNames = [
+        ...supabaseCookieNames,
+        'sb-access-token',
+        'sb-refresh-token',
+        'supabase-auth-token',
+        'supabase.auth.token',
+      ];
+      for (const cookieName of possibleCookieNames) {
+        if (cookies[cookieName]) {
+          try {
+            const parsed = JSON.parse(cookies[cookieName]);
+            if (parsed.access_token) {
+              accessToken = parsed.access_token;
+              break;
+            }
+            if (parsed.token) {
+              accessToken = parsed.token;
+              break;
+            }
+            if (Array.isArray(parsed) && parsed.length > 1) {
+              accessToken = parsed[1];
+              break;
+            }
+            accessToken = cookies[cookieName];
+            break;
+          } catch {
+            accessToken = cookies[cookieName];
+            break;
+          }
+        }
       }
+    }
+
+    if (accessToken) {
+      // Create a client with the user's access token for RPC calls
+      const userSupabase = createClient(
+        process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+        process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+          global: {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+        }
+      );
+
+      // Call RPC function to get user profile
+      const { data, error } = await userSupabase.rpc('get_user_profile');
+
+      if (error) {
+        console.error('❌ RPC get_user_profile error:', error);
+        // Fallback to direct database query if RPC fails
+        return res.status(500).json({
+          error: 'Failed to retrieve profile',
+          message: error.message
+        });
+      }
+
+      if (!data || data.length === 0) {
+        // Profile doesn't exist - auto-create using RPC
+        const userEmail = user.email || `${user.id}@unknown.local`;
+        const { data: createData, error: createError } = await userSupabase.rpc('create_or_update_profile', {
+          p_first_name: 'User',
+          p_last_name: '',
+          p_email: userEmail
+        });
+
+        if (createError || !createData || createData.length === 0) {
+          console.error('❌ Failed to auto-create profile:', createError);
+          return res.status(404).json({
+            error: 'Profile not found',
+            message: 'User profile does not exist and could not be auto-created'
+          });
+        }
+
+        const profile = createData[0];
+        return res.json({
+          profile: {
+            id: profile.id,
+            email: profile.email,
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        });
+      }
+
+      const profile = data[0];
+      return res.json({
+        profile: {
+          id: profile.id,
+          email: profile.email,
+          firstName: profile.first_name || '',
+          lastName: profile.last_name || '',
+          createdAt: profile.created_at,
+          updatedAt: profile.updated_at
+        }
+      });
+    }
+
+    // Fallback: If no access token, return error
+    return res.status(401).json({
+      error: 'Authentication required',
+      message: 'No access token found'
     });
 
   } catch (error) {
@@ -1062,7 +1094,7 @@ app.get('/api/profile',
   }
 });
 
-// Update profile endpoint
+// Update profile endpoint - uses Supabase RPC for secure database access
 app.put('/api/profile',
   authenticateRequest, // Require authentication
   async (req, res) => {
@@ -1078,70 +1110,119 @@ app.put('/api/profile',
       });
     }
 
-    // Update profile in database (using profiles table after migration)
-    // Use stack_auth_id for Stack Auth user IDs (UUID), fallback to id if column doesn't exist
-    let result = null;
-    try {
-      // Check if stack_auth_id column exists
-      const columnCheck = await db.query(`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'stack_auth_id'
-        ) as exists;
-      `);
-      
-      if (columnCheck.rows[0].exists) {
-        // Use stack_auth_id for Stack Auth user IDs (UUID)
-        result = await db.query(
-          `UPDATE profiles 
-           SET first_name = $1, last_name = $2, updated_at = CURRENT_TIMESTAMP 
-           WHERE stack_auth_id = $3 
-           RETURNING stack_auth_id as id, email, first_name, last_name, created_at, updated_at`,
-          [firstName.trim(), (lastName || '').trim(), user.id],
-          user.id // Pass userId for RLS context
-        );
-      } else {
-        // Fallback to id column (for backward compatibility with INTEGER id)
-        result = await db.query(
-          `UPDATE profiles 
-           SET first_name = $1, last_name = $2, updated_at = CURRENT_TIMESTAMP 
-           WHERE id = $3 
-           RETURNING id, email, first_name, last_name, created_at, updated_at`,
-          [firstName.trim(), (lastName || '').trim(), user.id],
-          user.id // Pass userId for RLS context
-        );
-      }
-    } catch (err) {
-      // If profiles table doesn't exist, try users table
-      if (err.message && err.message.includes('does not exist')) {
-        const displayName = `${firstName.trim()} ${(lastName || '').trim()}`.trim();
-        result = await db.query(
-          `UPDATE users 
-           SET display_name = $1, updated_at = CURRENT_TIMESTAMP 
-           WHERE id = $2 
-           RETURNING id, email, display_name, created_at, updated_at`,
-          [displayName, user.id],
-          user.id
-        );
-        // Convert display_name to first_name/last_name for response
-        if (result.rows.length > 0 && result.rows[0].display_name) {
-          const parts = result.rows[0].display_name.split(' ');
-          result.rows[0].first_name = parts[0] || '';
-          result.rows[0].last_name = parts.slice(1).join(' ') || '';
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      return res.status(500).json({
+        error: 'Supabase not configured',
+        message: 'Please configure SUPABASE_URL and SUPABASE_ANON_KEY (or VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY).'
+      });
+    }
+
+    // Get access token for RPC call
+    // Extract access token from request (same logic as auth middleware)
+    let accessToken = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      accessToken = authHeader.replace('Bearer ', '');
+    } else {
+      // Check cookies (Supabase stores tokens in cookies)
+      const cookies = req.cookies || {};
+      const supabaseCookieNames = Object.keys(cookies).filter(name => 
+        name.startsWith('sb-') && name.endsWith('-auth-token')
+      );
+      const possibleCookieNames = [
+        ...supabaseCookieNames,
+        'sb-access-token',
+        'sb-refresh-token',
+        'supabase-auth-token',
+        'supabase.auth.token',
+      ];
+      for (const cookieName of possibleCookieNames) {
+        if (cookies[cookieName]) {
+          try {
+            const parsed = JSON.parse(cookies[cookieName]);
+            if (parsed.access_token) {
+              accessToken = parsed.access_token;
+              break;
+            }
+            if (parsed.token) {
+              accessToken = parsed.token;
+              break;
+            }
+            if (Array.isArray(parsed) && parsed.length > 1) {
+              accessToken = parsed[1];
+              break;
+            }
+            accessToken = cookies[cookieName];
+            break;
+          } catch {
+            accessToken = cookies[cookieName];
+            break;
+          }
         }
-      } else {
-        throw err;
       }
     }
 
-    if (!result || result.rows.length === 0) {
+    if (!accessToken) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'No access token found'
+      });
+    }
+
+    // Create a client with the user's access token for RPC calls
+    const userSupabase = createClient(
+      process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      }
+    );
+
+    // Get current profile to get email
+    const { data: currentProfile, error: getError } = await userSupabase.rpc('get_user_profile');
+
+    if (getError || !currentProfile || currentProfile.length === 0) {
       return res.status(404).json({
         error: 'Profile not found',
         message: 'User profile does not exist'
       });
     }
 
-    const updatedProfile = result.rows[0];
+    const profileEmail = currentProfile[0].email || user.email || `${user.id}@unknown.local`;
+
+    // Use RPC function to update profile
+    const { data, error } = await userSupabase.rpc('create_or_update_profile', {
+      p_first_name: firstName.trim(),
+      p_last_name: (lastName || '').trim(),
+      p_email: profileEmail
+    });
+
+    if (error) {
+      console.error('❌ RPC create_or_update_profile error:', error);
+      return res.status(500).json({
+        error: 'Failed to update profile',
+        message: error.message
+      });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({
+        error: 'Profile not found',
+        message: 'User profile does not exist'
+      });
+    }
+
+    const updatedProfile = data[0];
 
     res.json({
       message: 'Profile updated successfully',

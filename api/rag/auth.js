@@ -1,24 +1,22 @@
 /**
  * Authentication helper for Vercel Edge Functions
- * Verifies Stack Auth tokens in edge function context
+ * Verifies Supabase Auth tokens in edge function context
  */
 
-// Initialize Stack Auth server SDK for edge functions
-// Note: Edge functions have limited Node.js API access
-// We'll use a simplified token verification approach
+import { createClient } from '@supabase/supabase-js';
 
 /**
- * Verify Stack Auth token in edge function
+ * Verify Supabase Auth token in edge function
  * @param {Request} request - The incoming request
  * @returns {Promise<{user: object | null, error: string | null}>}
  */
 export async function verifyAuthToken(request) {
   try {
-    // Get Stack Auth project ID and secret key from environment
-    const projectId = process.env.STACK_PROJECT_ID;
-    const serverSecretKey = process.env.STACK_SERVER_SECRET_KEY;
+    // Get Supabase URL and anon key from environment
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
-    if (!projectId || !serverSecretKey) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       // In development, allow requests without auth
       if (process.env.NODE_ENV === 'development') {
         return { user: { id: 'test-user' }, error: null };
@@ -26,11 +24,19 @@ export async function verifyAuthToken(request) {
       return { user: null, error: 'Authentication not configured' };
     }
 
+    // Create Supabase client for edge function
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
     // Extract token from cookies or Authorization header
     const cookies = request.headers.get('cookie') || '';
     const authHeader = request.headers.get('authorization') || '';
 
-    let authToken = null;
+    let accessToken = null;
 
     // Parse cookies
     const cookieMap = {};
@@ -41,65 +47,52 @@ export async function verifyAuthToken(request) {
       }
     });
 
-    // Check for Stack Auth cookie (common names)
+    // Check for Supabase Auth cookie (common names)
     const possibleCookieNames = [
-      `stack-auth-${projectId}`,
-      'stack-auth-token',
-      'stack-auth',
-      'sf-access-token', // Stack Auth default cookie name
-      'auth-token',
+      'sb-access-token',
+      'sb-refresh-token',
+      'supabase-auth-token',
+      'supabase.auth.token',
     ];
 
     for (const cookieName of possibleCookieNames) {
       if (cookieMap[cookieName]) {
-        authToken = cookieMap[cookieName];
+        try {
+          // Cookie might be JSON
+          const parsed = JSON.parse(cookieMap[cookieName]);
+          accessToken = parsed.access_token || parsed.token || cookieMap[cookieName];
+        } catch {
+          // If not JSON, use directly
+          accessToken = cookieMap[cookieName];
+        }
         break;
       }
     }
 
     // Check Authorization header
-    if (!authToken && authHeader.startsWith('Bearer ')) {
-      authToken = authHeader.replace('Bearer ', '');
+    if (!accessToken && authHeader.startsWith('Bearer ')) {
+      accessToken = authHeader.replace('Bearer ', '');
     }
 
-    if (!authToken) {
+    if (!accessToken) {
       return { user: null, error: 'No authentication token found' };
     }
 
-    // Verify token with Stack Auth API
-    // Note: In edge functions, we need to make an HTTP request to verify
-    // For production, you should use Stack Auth's verification endpoint
-    try {
-      const verifyUrl = `https://api.stack-auth.com/api/v1/verify-token`;
-      const verifyResponse = await fetch(verifyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serverSecretKey}`,
-        },
-        body: JSON.stringify({
-          token: authToken,
-          projectId: projectId,
-        }),
-      });
+    // Verify token with Supabase Auth
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
 
-      if (!verifyResponse.ok) {
-        return { user: null, error: 'Invalid authentication token' };
-      }
-
-      const userData = await verifyResponse.json();
-      return { user: userData.user || { id: userData.userId }, error: null };
-    } catch (verifyError) {
-      console.error('Token verification error:', verifyError);
-      // In development, allow with warning
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ Development mode: Allowing request without token verification');
-        return { user: { id: 'test-user' }, error: null };
-      }
-      return { user: null, error: 'Token verification failed' };
+    if (error || !user) {
+      return { user: null, error: error?.message || 'Invalid authentication token' };
     }
+
+    return { user: { id: user.id, email: user.email }, error: null };
   } catch (error) {
     console.error('Authentication error:', error);
+    // In development, allow with warning
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Development mode: Allowing request without token verification');
+      return { user: { id: 'test-user' }, error: null };
+    }
     return { user: null, error: 'Authentication failed' };
   }
 }
@@ -112,4 +105,3 @@ export async function optionalAuthEdge(request) {
   const { user, error } = await verifyAuthToken(request);
   return { user, error };
 }
-

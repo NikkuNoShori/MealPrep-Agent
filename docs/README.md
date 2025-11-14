@@ -13,7 +13,6 @@ This folder contains organized documentation for the MealPrep Agent project.
 - **`SECURITY.md`** - Security and performance implementation status
 - **`USER_AUTHENTICATION_ARCHITECTURE.md`** - Authentication and profile architecture
 - **`PROFILE_CREATION_FLOW.md`** - Profile creation flow documentation
-- **`STACK_AUTH_REST_API.md`** - Stack Auth REST API implementation
 - **`ENV_LOADING_OPTIMIZATION.md`** - Environment variable loading optimization
 - **`diagrams.md`** - Mermaid diagrams for architecture visualization
 - **`n8n-config.md`** - n8n workflow configuration
@@ -32,15 +31,13 @@ This folder contains organized documentation for the MealPrep Agent project.
 
 ## ⭐ **core/** - Core System Documentation
 
-- **`STACK_AUTH_EMAIL_SETUP.md`** - Stack Auth email configuration
-- **`STACK_AUTH_TRUSTED_DOMAINS.md`** - Stack Auth trusted domains setup
 - **`SERVER_LOGGING_GUIDE.md`** - Server logging configuration
 
 ## 📚 **Root Documentation** - Quick Reference Guides
 
 - **`DATABASE_SETUP.md`** - Supabase database setup guide
 - **`RLS_AND_OAUTH_SETUP.md`** - Row Level Security and OAuth setup
-- **`STACK_AUTH_GOOGLE_OAUTH_CONFIG.md`** - Google OAuth configuration guide
+- **`SUPABASE_GOOGLE_OAUTH_SETUP.md`** - Supabase Google OAuth configuration guide
 - **`GOOGLE_OAUTH_SETUP.md`** - General Google OAuth setup
 - **`SUPABASE_CONNECTION_STRING.md`** - Supabase connection string guide
 - **`CLEANUP_SUMMARY.md`** - Documentation cleanup summary
@@ -72,7 +69,7 @@ The `Archived/` folder contains outdated documentation that explains previous ar
 - SEO-friendly URLs with slugs
 
 ### ✅ **User Authentication**
-- Stack Auth (cookie-based sessions)
+- Supabase Auth (cookie-based sessions)
 - Sign up, sign in, sign out
 - Password reset and forgot password flows
 - Session persistence across page refreshes
@@ -91,7 +88,7 @@ The `Archived/` folder contains outdated documentation that explains previous ar
 
 1. **Database Setup**: See `DATABASE_SETUP.md` for Supabase configuration
 2. **Local Development**: See `Development/LOCAL_DEVELOPMENT.md`
-3. **Authentication**: See `core/STACK_AUTH_EMAIL_SETUP.md` and `STACK_AUTH_GOOGLE_OAUTH_CONFIG.md`
+3. **Authentication**: See `SUPABASE_GOOGLE_OAUTH_SETUP.md` and `RLS_AND_OAUTH_SETUP.md`
 4. **RLS Setup**: See `RLS_AND_OAUTH_SETUP.md` for Row Level Security configuration
 5. **RAG Setup**: See `Architecture/RAG.md` and `Development/RAG_SEARCH_EDGE_FUNCTION.md`
 6. **n8n Configuration**: Import `Development/n8n-rag-config.md` for AI workflows
@@ -112,7 +109,7 @@ The project has evolved from a basic chat interface to a sophisticated RAG-enhan
 - **Database**: PostgreSQL (Supabase) with pgvector extension
 - **AI**: OpenRouter via n8n workflows
 - **Search**: Vector similarity + full-text search
-- **Auth**: Stack Auth (cookie-based sessions)
+- **Auth**: Supabase Auth (cookie-based sessions)
 - **Deployment**: Vercel for production
 
 ## 📝 **Documentation Guidelines**

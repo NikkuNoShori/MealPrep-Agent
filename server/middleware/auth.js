@@ -1,195 +1,195 @@
 import { config } from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables
 config();
 
-// Initialize Stack Auth server SDK lazily to avoid importing 'next' dependency
-// Stack Auth requires server secret key for server-side verification
-const projectId = process.env.STACK_PROJECT_ID || process.env.VITE_STACK_PROJECT_ID;
-const serverSecretKey = process.env.STACK_SERVER_SECRET_KEY;
+// Initialize Supabase client
+// Server-side can use anon key for token verification (service role key only needed for admin operations)
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Optional - only needed for admin operations
 
-let stackServerApp = null;
-let stackModule = null;
+// Log configuration status (without exposing secrets)
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('⚠️ Supabase Auth Middleware: Missing environment variables:', {
+    hasUrl: !!supabaseUrl,
+    hasAnonKey: !!supabaseAnonKey,
+    hasServiceKey: !!supabaseServiceKey,
+    urlSource: supabaseUrl ? (process.env.SUPABASE_URL ? 'SUPABASE_URL' : 'VITE_SUPABASE_URL') : 'none',
+    urlPreview: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : 'none'
+  });
+}
 
-// Lazy load Stack Auth to avoid importing 'next' dependency
-async function initializeStackAuth() {
-  if (stackServerApp !== null) {
-    return stackServerApp; // Already initialized or attempted
+let supabaseClient = null;
+
+// Initialize Supabase client for server-side token verification
+// Uses anon key (service role key only needed for admin operations that bypass RLS)
+function initializeSupabase() {
+  if (supabaseClient) {
+    return supabaseClient;
   }
 
-  if (!projectId || !serverSecretKey) {
-    console.warn('⚠️ Stack Auth server not configured. Missing environment variables:', {
-      missingProjectId: !projectId,
-      missingServerSecretKey: !serverSecretKey,
-      checkedEnvVars: {
-        STACK_PROJECT_ID: !!process.env.STACK_PROJECT_ID,
-        VITE_STACK_PROJECT_ID: !!process.env.VITE_STACK_PROJECT_ID,
-        STACK_SERVER_SECRET_KEY: !!process.env.STACK_SERVER_SECRET_KEY
-      }
+  // Prefer anon key (sufficient for token verification)
+  // Service role key is only needed for admin operations
+  const supabaseKey = supabaseAnonKey || supabaseServiceKey;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.warn('⚠️ Supabase not configured. Missing environment variables:', {
+      missingUrl: !supabaseUrl,
+      missingAnonKey: !supabaseAnonKey,
+      missingServiceKey: !supabaseServiceKey,
     });
-    console.warn('   Please set STACK_PROJECT_ID and STACK_SERVER_SECRET_KEY in your .env file');
-    stackServerApp = false; // Mark as attempted but not configured
+    console.warn('   Please set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_ANON_KEY (or VITE_SUPABASE_ANON_KEY) in your .env file');
+    console.warn('   Note: SUPABASE_SERVICE_ROLE_KEY is optional (only needed for admin operations)');
     return null;
   }
 
   try {
-    // Dynamic import to avoid loading 'next' dependency at module load time
-    if (!stackModule) {
-      try {
-        stackModule = await import('@stackframe/stack');
-      } catch (importError) {
-        // Handle case where @stackframe/stack requires 'next' but it's not installed
-        if (importError.code === 'ERR_MODULE_NOT_FOUND' && importError.message.includes('next')) {
-          console.warn('⚠️ Stack Auth requires Next.js but it is not installed. Stack Auth will not be available.');
-          console.warn('   To use Stack Auth, install Next.js: npm install next');
-          stackServerApp = false;
-          return null;
-        }
-        throw importError; // Re-throw other import errors
-      }
-    }
-    
-    const { StackServerApp } = stackModule;
-    stackServerApp = new StackServerApp({
-      projectId,
-      secretKey: serverSecretKey,
+    // Use anon key for token verification (respects RLS)
+    // Service role key can be used if provided, but anon key is sufficient
+    supabaseClient = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
     });
-    console.log('✅ Stack Auth server initialized successfully');
-    return stackServerApp;
+    console.log('✅ Supabase client initialized successfully', {
+      usingServiceKey: !!supabaseServiceKey && !supabaseAnonKey,
+      usingAnonKey: !!supabaseAnonKey
+    });
+    return supabaseClient;
   } catch (error) {
-    console.error('❌ Stack Auth server initialization failed:', error.message);
-    if (error.code === 'ERR_MODULE_NOT_FOUND' && error.message.includes('next')) {
-      console.warn('   Stack Auth requires Next.js. Install it with: npm install next');
-    }
-    stackServerApp = false; // Mark as failed
+    console.error('❌ Supabase client initialization failed:', error.message);
     return null;
   }
 }
 
 /**
+ * Extract access token from request
+ */
+function getAccessToken(req) {
+  // Check Authorization header first
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.replace('Bearer ', '');
+  }
+
+  // Check cookies (Supabase stores tokens in cookies)
+  // Supabase uses cookie format: sb-<project-ref>-auth-token
+  // The cookie contains: { access_token, refresh_token, expires_at, token_type, user }
+  const cookies = req.cookies || {};
+  
+  // Try to find Supabase auth cookie
+  // Supabase cookie format: sb-<project-ref>-auth-token
+  // We need to check all cookies that start with 'sb-' and end with '-auth-token'
+  const supabaseCookieNames = Object.keys(cookies).filter(name => 
+    name.startsWith('sb-') && name.endsWith('-auth-token')
+  );
+  
+  // Also check common cookie names
+  const possibleCookieNames = [
+    ...supabaseCookieNames,
+    'sb-access-token',
+    'sb-refresh-token',
+    'supabase-auth-token',
+    'supabase.auth.token',
+  ];
+
+  for (const cookieName of possibleCookieNames) {
+    if (cookies[cookieName]) {
+      try {
+        // Supabase cookie is JSON with structure: { access_token, refresh_token, expires_at, token_type, user }
+        const parsed = JSON.parse(cookies[cookieName]);
+        
+        // Extract access token from parsed cookie
+        if (parsed.access_token) {
+          return parsed.access_token;
+        }
+        
+        // Fallback to token field
+        if (parsed.token) {
+          return parsed.token;
+        }
+        
+        // If it's an array (legacy format), get the access token
+        if (Array.isArray(parsed) && parsed.length > 1) {
+          return parsed[1]; // access_token is typically the second element
+        }
+        
+        // Last resort: use the cookie value directly
+        return cookies[cookieName];
+      } catch {
+        // If not JSON, use directly (might be the token itself)
+        return cookies[cookieName];
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Authentication middleware for Express
- * Verifies Stack Auth cookies and attaches user to request
+ * Verifies Supabase Auth tokens and attaches user to request
  */
 export const authenticateRequest = async (req, res, next) => {
   try {
-    // Initialize Stack Auth if not already done
-    const authApp = await initializeStackAuth();
+    const supabase = initializeSupabase();
     
-    // Log for debugging
-    console.log('🔵 Auth Middleware:', {
-      NODE_ENV: process.env.NODE_ENV || 'not set',
-      hasAuthApp: !!authApp,
-      authAppType: typeof authApp,
-      cookies: Object.keys(req.cookies || {}).length > 0 ? Object.keys(req.cookies) : 'none'
-    });
-    
-    // Require Stack Auth configuration - no test user fallback
-    if (!authApp) {
-      console.error('❌ Stack Auth not configured - authentication required');
+    if (!supabase) {
+      console.error('❌ Supabase not configured - authentication required');
       return res.status(500).json({
         error: 'Authentication service not configured',
-        message: 'Stack Auth server SDK not initialized. Please configure STACK_PROJECT_ID and STACK_SERVER_SECRET_KEY.',
+        message: 'Supabase not initialized. Please configure SUPABASE_URL and SUPABASE_ANON_KEY (or VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY).',
       });
     }
 
-    // Stack Auth server SDK should have a method to get user from request
-    // Try different Stack Auth API methods to get user from cookies/request
-    try {
-      let user = null;
+    // Get access token from request
+    const accessToken = getAccessToken(req);
+    
+    if (!accessToken) {
+      // Log available cookies for debugging
+      const cookies = req.cookies || {};
+      const cookieNames = Object.keys(cookies);
+      console.warn('⚠️ No authentication token found in cookies or headers');
+      console.warn('   Available cookies:', cookieNames);
+      console.warn('   Cookie values (first 50 chars):', 
+        Object.entries(cookies).reduce((acc, [name, value]) => {
+          acc[name] = typeof value === 'string' ? value.substring(0, 50) : value;
+          return acc;
+        }, {})
+      );
       
-      // Try Stack Auth's getUserFromRequest or similar method
-      // Stack Auth server SDK typically handles cookies automatically
-      if (typeof authApp.getUserFromRequest === 'function') {
-        user = await authApp.getUserFromRequest(req);
-      } else if (typeof authApp.getUser === 'function') {
-        // getUser might work with request object or cookies
-        user = await authApp.getUser(req);
-      } else {
-        // Fallback: Extract token manually and use getUserFromToken
-        const cookies = req.cookies || {};
-        
-        // Stack Auth cookie names - check common patterns
-        const possibleCookieNames = [
-          `sf-access-token-${projectId}`, // Stack Auth default pattern
-          `stack-auth-${projectId}`,
-          'sf-access-token',
-          'stack-auth-token',
-          'stack-auth',
-          'auth-token',
-          'session',
-        ];
-        
-        let authToken = null;
-        for (const cookieName of possibleCookieNames) {
-          if (cookies[cookieName]) {
-            authToken = cookies[cookieName];
-            console.log(`🔵 Found auth token in cookie: ${cookieName}`);
-            break;
-          }
-        }
-        
-        // Also check Authorization header
-        if (!authToken) {
-          const authHeader = req.headers.authorization;
-          if (authHeader && authHeader.startsWith('Bearer ')) {
-            authToken = authHeader.replace('Bearer ', '');
-            console.log('🔵 Found auth token in Authorization header');
-          }
-        }
-        
-        if (!authToken) {
-          console.warn('⚠️ No authentication token found in cookies or headers');
-          console.log('Available cookies:', Object.keys(cookies));
-          return res.status(401).json({
-            error: 'Authentication required',
-            message: 'No authentication token found in cookies or Authorization header',
-          });
-        }
-        
-        // Try getUserFromToken
-        if (typeof authApp.getUserFromToken === 'function') {
-          user = await authApp.getUserFromToken(authToken);
-        } else if (typeof authApp.verifyToken === 'function') {
-          const tokenData = await authApp.verifyToken(authToken);
-          if (tokenData && tokenData.userId) {
-            user = await authApp.getUserById(tokenData.userId);
-          }
-        }
-      }
-      
-      if (!user) {
-        console.warn('⚠️ Stack Auth could not verify user from token/cookies');
-        return res.status(401).json({
-          error: 'Invalid token',
-          message: 'Authentication token is invalid or expired',
-        });
-      }
-
-      console.log('✅ Authenticated user:', { id: user.id, email: user.email });
-      
-      // Attach user to request
-      req.user = {
-        id: user.id || user.userId,
-        email: user.email,
-        displayName: user.displayName || user.name || user.displayName,
-      };
-
-      return next();
-    } catch (authError) {
-      console.error('❌ Authentication verification error:', authError);
-      console.error('Error details:', {
-        message: authError.message,
-        stack: authError.stack,
-        name: authError.name
-      });
       return res.status(401).json({
-        error: 'Authentication failed',
-        message: 'Failed to verify authentication token',
-        details: process.env.NODE_ENV === 'development' ? authError.message : undefined
+        error: 'Authentication required',
+        message: 'No authentication token found in cookies or Authorization header',
       });
     }
+
+    // Verify token and get user
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    
+    if (error || !user) {
+      console.warn('⚠️ Supabase could not verify user from token', { error: error?.message });
+      return res.status(401).json({
+        error: 'Invalid token',
+        message: 'Authentication token is invalid or expired',
+      });
+    }
+
+    console.log('✅ Authenticated user:', { id: user.id, email: user.email });
+    
+    // Attach user to request
+    req.user = {
+      id: user.id,
+      email: user.email,
+      displayName: user.user_metadata?.first_name || user.user_metadata?.full_name || user.email,
+    };
+
+    return next();
   } catch (error) {
-    console.error('Authentication middleware error:', error);
+    console.error('❌ Authentication middleware error:', error);
     return res.status(500).json({
       error: 'Authentication error',
       message: 'An error occurred during authentication',
@@ -203,70 +203,24 @@ export const authenticateRequest = async (req, res, next) => {
  */
 export const optionalAuth = async (req, res, next) => {
   try {
-    // Initialize Stack Auth if not already done
-    const authApp = await initializeStackAuth();
+    const supabase = initializeSupabase();
     
-    if (!authApp) {
-      // No test user fallback - if Stack Auth is not configured, user remains null
-      // This allows RLS to handle public vs private access correctly
-      // Unauthenticated users will only see public records via RLS
+    if (!supabase) {
+      // If Supabase is not configured, continue without authentication
       return next();
     }
 
-    const cookies = req.cookies || {};
-    const projectId = process.env.STACK_PROJECT_ID || process.env.VITE_STACK_PROJECT_ID;
+    const accessToken = getAccessToken(req);
     
-    let authToken = null;
-    const possibleCookieNames = [
-      `stack-auth-${projectId}`,
-      'stack-auth-token',
-      'stack-auth',
-      'auth-token',
-      'session',
-    ];
-    
-    for (const cookieName of possibleCookieNames) {
-      if (cookies[cookieName]) {
-        authToken = cookies[cookieName];
-        break;
-      }
-    }
-    
-    if (!authToken) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        authToken = authHeader.replace('Bearer ', '');
-      }
-    }
-
-    if (authToken) {
+    if (accessToken) {
       try {
-        // Stack Auth SDK methods may vary - try common patterns
-        let user = null;
+        const { data: { user }, error } = await supabase.auth.getUser(accessToken);
         
-        // Try different Stack Auth API methods
-        if (typeof authApp.getUserFromToken === 'function') {
-          user = await authApp.getUserFromToken(authToken);
-        } else if (typeof authApp.getUser === 'function') {
-          user = await authApp.getUser(authToken);
-        } else if (typeof authApp.verifyToken === 'function') {
-          const tokenData = await authApp.verifyToken(authToken);
-          if (tokenData && tokenData.userId) {
-            user = await authApp.getUserById(tokenData.userId);
-          }
-        } else {
-          // Try to get user from session
-          const session = await authApp.getSession(authToken);
-          if (session && session.userId) {
-            user = await authApp.getUserById(session.userId);
-          }
-        }
-        
-        if (user) {
+        if (!error && user) {
           req.user = {
-            id: user.id || user.userId,
+            id: user.id,
             email: user.email,
-            displayName: user.displayName || user.name,
+            displayName: user.user_metadata?.first_name || user.user_metadata?.full_name || user.email,
           };
         }
       } catch (error) {
@@ -281,4 +235,3 @@ export const optionalAuth = async (req, res, next) => {
     return next();
   }
 };
-

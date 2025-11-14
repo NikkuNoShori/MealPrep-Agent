@@ -33,6 +33,13 @@ The following outdated docs were removed:
 1. **`docs/MIGRATION_NEON_TO_SUPABASE.md`** - Migration guide (migration complete)
 2. **`docs/Architecture/USERS_SYNC_DUPLICATES.md`** - Neon-specific documentation
 
+### Documentation Archived
+
+The following troubleshooting docs were archived:
+
+1. **`docs/Archived/SIGNUP_FLOW_DEBUG.md`** - Outdated troubleshooting (moved to REST API)
+2. **`docs/Archived/SIGNUP_FLOW_FIX.md`** - Outdated troubleshooting (moved to REST API)
+
 ### Documentation Updated
 
 The following docs were updated to reflect Supabase:

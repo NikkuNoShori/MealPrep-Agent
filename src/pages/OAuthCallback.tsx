@@ -19,11 +19,14 @@ export default function OAuthCallback() {
       try {
         Logger.info('🟡 OAuthCallback: Handling OAuth callback');
 
-        // Get OAuth code and state from URL parameters
-        const code = searchParams.get('code');
-        const state = searchParams.get('state');
-        const error = searchParams.get('error');
-
+        // Supabase OAuth uses hash fragments (#access_token=...) not query parameters
+        // The Supabase client automatically processes hash fragments when detectSessionInUrl is enabled
+        const { supabase } = await import('@/lib/supabase');
+        
+        // Check for error in hash fragments
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const error = hashParams.get('error') || searchParams.get('error');
+        
         if (error) {
           Logger.error('🔴 OAuthCallback: OAuth error from provider', { error });
           setError(`OAuth error: ${error}`);
@@ -33,42 +36,43 @@ export default function OAuthCallback() {
           return;
         }
 
-        if (!code) {
-          Logger.error('🔴 OAuthCallback: No OAuth code in callback');
-          setError('No authorization code received from OAuth provider');
+        // Supabase automatically processes hash fragments (#access_token=...)
+        // Wait a moment for Supabase to process the hash fragments
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Get the session (Supabase has already processed the hash fragments)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          Logger.error('🔴 OAuthCallback: Error getting session', { error: sessionError.message });
+          setError(`OAuth error: ${sessionError.message}`);
           setStatus('error');
-          ToastService.error('OAuth callback failed: No authorization code');
+          ToastService.error(`OAuth error: ${sessionError.message}`);
           setTimeout(() => navigate('/signin'), 3000);
           return;
         }
-
-        // Stack Auth should handle the OAuth callback automatically via cookies
-        // Wait a moment for Stack Auth to process the callback
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Verify user session was established
-        const user = await authService.getUser();
-        if (!user || !user.id) {
-          Logger.warn('⚠️ OAuthCallback: User not found after OAuth, waiting...');
-          // Wait a bit longer and retry
+        
+        if (!session || !session.user) {
+          // Wait a bit longer and retry (hash processing might take time)
+          Logger.warn('⚠️ OAuthCallback: No session found, waiting and retrying...');
           await new Promise(resolve => setTimeout(resolve, 1000));
-          const retryUser = await authService.getUser();
-          if (!retryUser || !retryUser.id) {
-            throw new Error('OAuth successful but session not established. Please try again.');
-          }
-          Logger.info('✅ OAuthCallback: User found after retry', { userId: retryUser.id });
           
-          // Create profile if it doesn't exist
-          try {
-            await authService.createProfile(
-              retryUser.id,
-              retryUser.displayName?.split(' ')[0] || '',
-              retryUser.displayName?.split(' ').slice(1).join(' ') || '',
-              retryUser.email || ''
-            );
-          } catch (profileError: any) {
-            Logger.warn('⚠️ OAuthCallback: Profile creation failed (may already exist)', { error: profileError.message });
+          const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession();
+          
+          if (retryError || !retrySession || !retrySession.user) {
+            Logger.error('🔴 OAuthCallback: No session found after retry');
+            setError('OAuth successful but session not established. Please try again.');
+            setStatus('error');
+            ToastService.error('OAuth callback failed: No session');
+            setTimeout(() => navigate('/signin'), 3000);
+            return;
           }
+          
+          Logger.info('✅ OAuthCallback: OAuth successful (after retry)', { userId: retrySession.user.id });
+          
+          // Profile is automatically created by database trigger when user is created in auth.users
+          // The trigger extracts first_name and last_name from user_metadata
+          // No need to manually create profile - trigger handles it automatically
 
           setStatus('success');
           ToastService.success('Signed in with Google successfully');
@@ -76,19 +80,11 @@ export default function OAuthCallback() {
           return;
         }
 
-        Logger.info('✅ OAuthCallback: OAuth successful', { userId: user.id });
+        Logger.info('✅ OAuthCallback: OAuth successful', { userId: session.user.id });
 
-        // Create profile if it doesn't exist
-        try {
-          await authService.createProfile(
-            user.id,
-            user.displayName?.split(' ')[0] || '',
-            user.displayName?.split(' ').slice(1).join(' ') || '',
-            user.email || ''
-          );
-        } catch (profileError: any) {
-          Logger.warn('⚠️ OAuthCallback: Profile creation failed (may already exist)', { error: profileError.message });
-        }
+        // Profile is automatically created by database trigger when user is created in auth.users
+        // The trigger extracts first_name and last_name from user_metadata
+        // No need to manually create profile - trigger handles it automatically
 
         setStatus('success');
         ToastService.success('Signed in with Google successfully');
