@@ -6,9 +6,14 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('recipe-images', 'recipe-images', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Enable RLS on storage.objects
--- Note: RLS is typically enabled by default, but we ensure it's on
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- Note: RLS on storage.objects is already enabled by Supabase by default
+-- We only need to create the policies below
+
+-- Drop existing policies if they exist (for idempotency)
+DROP POLICY IF EXISTS "Users can upload recipe images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update their own recipe images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete their own recipe images" ON storage.objects;
+DROP POLICY IF EXISTS "Public can view recipe images" ON storage.objects;
 
 -- Policy: Allow authenticated users to upload images to their own folder
 CREATE POLICY "Users can upload recipe images"
@@ -50,7 +55,4 @@ ON storage.objects
 FOR SELECT
 TO public
 USING (bucket_id = 'recipe-images');
-
--- Add comment
-COMMENT ON TABLE storage.objects IS 'Storage objects table - recipe images are stored in the recipe-images bucket';
 

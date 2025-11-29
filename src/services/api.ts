@@ -507,15 +507,42 @@ class ApiClient {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data, error } = await supabase
+    // Try to get preferences - handle case where measurement_system column might not exist yet
+    let { data, error } = await supabase
       .from("user_preferences")
       .select("*")
       .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
-      .single();
+      .maybeSingle();
+
+    // If error is due to missing column (measurement_system), try without it
+    if (
+      error &&
+      (error.code === "42703" ||
+        error.message?.includes("column") ||
+        error.message?.includes("does not exist"))
+    ) {
+      // Column doesn't exist yet - try selecting without it
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("user_preferences")
+        .select(
+          "id, user_id, global_restrictions, cuisine_preferences, cooking_skill_level, dietary_goals, spice_tolerance, meal_prep_preference, budget_range, time_constraints, created_at, updated_at"
+        )
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!fallbackError) {
+        return fallbackData;
+      }
+    }
 
     if (error) {
-      if (error.code === "PGRST116") return null; // Not found
-      throw error;
+      // Handle 406 (Not Acceptable) or not found
+      if (error.code === "PGRST116" || error.code === "PGRST301") {
+        return null; // Not found - this is OK
+      }
+      // Log other errors but don't crash the app
+      console.warn("Error fetching preferences:", error.message);
+      return null;
     }
     return data;
   }

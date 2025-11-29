@@ -15,8 +15,30 @@ import {
   TestTube,
   Upload,
   Image as ImageIcon,
+  GripVertical,
+  Edit2,
+  Check,
+  ArrowUpDown,
 } from "lucide-react";
 import { apiClient } from "@/services/api";
+import { useMeasurementUnits } from "@/hooks/useMeasurementUnits";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface RecipeFormProps {
   recipe?: any;
@@ -30,6 +52,145 @@ interface Ingredient {
   unit: string;
   category?: string;
 }
+
+// Sortable Instruction Item Component
+interface SortableInstructionItemProps {
+  id: string;
+  index: number;
+  instruction: string;
+  onRemove: () => void;
+  onEdit: (newInstruction: string) => void;
+}
+
+const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
+  id,
+  index,
+  instruction,
+  onRemove,
+  onEdit,
+}) => {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editValue, setEditValue] = React.useState(instruction);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: isEditing });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  React.useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    if (editValue.trim()) {
+      onEdit(editValue.trim());
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditValue(instruction);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === "Escape") {
+      handleCancel();
+    }
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex gap-4 p-3 bg-muted rounded ${
+        isDragging ? "shadow-lg" : ""
+      }`}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="Drag to reorder"
+        disabled={isEditing}
+      >
+        <GripVertical className="h-5 w-5" />
+      </button>
+      <div className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold">
+        {index + 1}
+      </div>
+      {isEditing ? (
+        <div className="flex-1 flex gap-2">
+          <Textarea
+            ref={textareaRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="flex-1 min-h-[60px] resize-none"
+            rows={2}
+          />
+          <div className="flex flex-col gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleSave}
+              className="h-8 w-8"
+            >
+              <Check className="h-4 w-4 text-green-600" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleCancel}
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p
+            className="flex-1 cursor-pointer hover:bg-muted/50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+            onClick={() => setIsEditing(true)}
+            title="Click to edit"
+          >
+            {instruction}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onRemove}
+            className="h-8 w-8"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+    </div>
+  );
+};
 
 export const RecipeForm: React.FC<RecipeFormProps> = ({
   recipe,
@@ -63,9 +224,40 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [ingredientSort, setIngredientSort] = useState<string>("none");
 
   const createRecipeMutation = useCreateRecipe();
   const updateRecipeMutation = useUpdateRecipe();
+  const measurementUnits = useMeasurementUnits();
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end for instructions
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setFormData((prev) => {
+        const oldIndex = prev.instructions.findIndex(
+          (_, index) => `instruction-${index}` === active.id
+        );
+        const newIndex = prev.instructions.findIndex(
+          (_, index) => `instruction-${index}` === over.id
+        );
+
+        return {
+          ...prev,
+          instructions: arrayMove(prev.instructions, oldIndex, newIndex),
+        };
+      });
+    }
+  };
 
   useEffect(() => {
     if (recipe) {
@@ -271,6 +463,33 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     }));
   };
 
+  const editInstruction = (index: number, newInstruction: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      instructions: prev.instructions.map((inst, i) =>
+        i === index ? newInstruction : inst
+      ),
+    }));
+  };
+
+  // Get sorted ingredients based on selected sort option
+  const getSortedIngredients = (): Ingredient[] => {
+    const ingredients = [...formData.ingredients];
+
+    switch (ingredientSort) {
+      case "name-asc":
+        return ingredients.sort((a, b) => a.name.localeCompare(b.name));
+      case "name-desc":
+        return ingredients.sort((a, b) => b.name.localeCompare(a.name));
+      case "amount-asc":
+        return ingredients.sort((a, b) => a.amount - b.amount);
+      case "amount-desc":
+        return ingredients.sort((a, b) => b.amount - a.amount);
+      default:
+        return ingredients;
+    }
+  };
+
   const populateTestData = () => {
     setFormData({
       title: "Classic Spaghetti Carbonara",
@@ -467,17 +686,40 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                 <div className="space-y-3">
                   {/* Image Preview */}
                   {imagePreview && (
-                    <div className="relative w-full h-48 rounded-lg overflow-hidden border border-input">
-                      <img
-                        src={imagePreview}
-                        alt="Recipe preview"
-                        className="w-full h-full object-cover"
-                      />
-                      {imageFile && isUploadingImage && (
-                        <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                          Uploading...
-                        </div>
-                      )}
+                    <div className="relative w-full rounded-lg overflow-hidden border border-input bg-muted/50">
+                      <div
+                        className="relative w-full"
+                        style={{
+                          aspectRatio: "16/9",
+                          minHeight: "200px",
+                          maxHeight: "400px",
+                        }}
+                      >
+                        <img
+                          src={imagePreview}
+                          alt="Recipe preview"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            console.error(
+                              "Image failed to load:",
+                              imagePreview
+                            );
+                            setError(
+                              "Failed to load image. Please check the URL or try uploading a file."
+                            );
+                            setImagePreview(null);
+                          }}
+                          loading="lazy"
+                        />
+                        {imageFile && isUploadingImage && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <div className="bg-black/70 text-white text-sm px-4 py-2 rounded-lg flex items-center gap-2">
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Uploading...
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -536,9 +778,30 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Ingredients</CardTitle>
-              <Button type="button" onClick={addIngredient} size="icon">
-                <Plus className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button type="button" onClick={addIngredient} size="icon">
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Select
+                  value={ingredientSort}
+                  onValueChange={setIngredientSort}
+                >
+                  <SelectTrigger className="w-8 h-8 p-0 justify-center [&>svg:last-child]:hidden">
+                    <ArrowUpDown className="h-4 w-4" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No sorting</SelectItem>
+                    <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                    <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                    <SelectItem value="amount-asc">
+                      Quantity (Low to High)
+                    </SelectItem>
+                    <SelectItem value="amount-desc">
+                      Quantity (High to Low)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-2">
@@ -576,50 +839,67 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                     <SelectValue placeholder="Unit" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cup">cup</SelectItem>
-                    <SelectItem value="tbsp">tbsp</SelectItem>
-                    <SelectItem value="tsp">tsp</SelectItem>
-                    <SelectItem value="fl oz">fl oz</SelectItem>
-                    <SelectItem value="ml">ml</SelectItem>
-                    <SelectItem value="l">l</SelectItem>
-                    <SelectItem value="oz">oz</SelectItem>
-                    <SelectItem value="lb">lb</SelectItem>
-                    <SelectItem value="g">g</SelectItem>
-                    <SelectItem value="kg">kg</SelectItem>
-                    <SelectItem value="piece">piece</SelectItem>
-                    <SelectItem value="whole">whole</SelectItem>
-                    <SelectItem value="slice">slice</SelectItem>
-                    <SelectItem value="clove">clove</SelectItem>
-                    <SelectItem value="head">head</SelectItem>
-                    <SelectItem value="bunch">bunch</SelectItem>
-                    <SelectItem value="can">can</SelectItem>
-                    <SelectItem value="package">package</SelectItem>
+                    {/* Weight units */}
+                    {measurementUnits.weight.length > 0 && (
+                      <>
+                        {measurementUnits.weight.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {/* Volume units */}
+                    {measurementUnits.volume.length > 0 && (
+                      <>
+                        {measurementUnits.volume.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {/* Countable units */}
+                    {measurementUnits.countable.map((unit) => (
+                      <SelectItem key={unit} value={unit}>
+                        {unit}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                {formData.ingredients.map((ingredient, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-muted rounded"
-                  >
-                    <span className="font-medium">{ingredient.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">
-                        {ingredient.amount} {ingredient.unit}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeIngredient(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                {getSortedIngredients().map((ingredient: Ingredient) => {
+                  // Find the original index for removal
+                  const actualIndex = formData.ingredients.findIndex(
+                    (ing) =>
+                      ing.name === ingredient.name &&
+                      ing.amount === ingredient.amount &&
+                      ing.unit === ingredient.unit
+                  );
+                  return (
+                    <div
+                      key={`${actualIndex}-${ingredient.name}`}
+                      className="flex items-center justify-between p-2 bg-muted rounded"
+                    >
+                      <span className="font-medium">{ingredient.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                          {ingredient.amount} {ingredient.unit}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeIngredient(actualIndex)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -647,24 +927,33 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                 }
               />
 
-              <div className="space-y-2">
-                {formData.instructions.map((instruction, index) => (
-                  <div key={index} className="flex gap-4 p-3 bg-muted rounded">
-                    <div className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold">
-                      {index + 1}
-                    </div>
-                    <p className="flex-1">{instruction}</p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeInstruction(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={formData.instructions.map(
+                    (_, index) => `instruction-${index}`
+                  )}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {formData.instructions.map((instruction, index) => (
+                      <SortableInstructionItem
+                        key={`instruction-${index}`}
+                        id={`instruction-${index}`}
+                        index={index}
+                        instruction={instruction}
+                        onRemove={() => removeInstruction(index)}
+                        onEdit={(newInstruction) =>
+                          editInstruction(index, newInstruction)
+                        }
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             </CardContent>
           </Card>
 
@@ -688,19 +977,22 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
               />
 
               {formData.tags.length > 0 && (
-                <div className="flex flex-col gap-1.5">
-                  {formData.tags.map((tag, index) => (
+                <div className="grid grid-cols-3 gap-2">
+                  {[...formData.tags].sort().map((tag, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between text-sm py-1"
+                      className="flex items-center gap-1.5 text-sm"
                     >
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge
+                        variant="secondary"
+                        className="text-xs flex-1 truncate"
+                      >
                         {tag}
                       </Badge>
                       <button
                         type="button"
                         onClick={() => removeTag(tag)}
-                        className="text-muted-foreground hover:text-foreground p-1 rounded"
+                        className="text-muted-foreground hover:text-foreground p-1 rounded -ml-1 flex-shrink-0"
                         aria-label={`Remove ${tag} tag`}
                       >
                         <X className="h-3 w-3" />

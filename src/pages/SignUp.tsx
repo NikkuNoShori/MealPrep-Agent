@@ -2,8 +2,11 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { SignupForm } from '@/components/auth/SignupForm'
 import { BackButton } from '@/components/common/BackButton'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 const SignUp: React.FC = () => {
+  useDocumentTitle()
+  
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
       <div className="w-full max-w-md">

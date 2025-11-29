@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { 
   MessageSquare, 
   ChefHat, 
@@ -11,6 +12,8 @@ import {
 } from 'lucide-react'
 
 const LandingPage = () => {
+  useDocumentTitle()
+  
   const features = [
     {
       icon: MessageSquare,

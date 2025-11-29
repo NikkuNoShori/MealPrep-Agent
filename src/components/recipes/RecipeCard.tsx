@@ -71,6 +71,11 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                     src={recipe.imageUrl} 
                     alt={recipe.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    loading="lazy"
+                    onError={(e) => {
+                      // Hide broken images gracefully
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -202,11 +207,16 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       <Card className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800 h-full group-hover:scale-[1.03] group-hover:-translate-y-1">
         <CardHeader className="p-0">
           {/* Enhanced Recipe Image */}
-          <div className="relative aspect-video rounded-t-2xl overflow-hidden">
+          <div className="relative aspect-video rounded-t-2xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
             {recipe.imageUrl ? (
               <img 
                 src={recipe.imageUrl} 
                 alt={recipe.title}
+                loading="lazy"
+                onError={(e) => {
+                  // Hide broken images gracefully
+                  e.currentTarget.style.display = 'none';
+                }}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
             ) : (

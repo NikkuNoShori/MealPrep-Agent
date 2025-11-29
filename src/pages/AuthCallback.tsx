@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { authService } from '@/services/supabase'
 import { Loader2 } from 'lucide-react'
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const AuthCallback: React.FC = () => {
+  useDocumentTitle();
   const navigate = useNavigate()
   const { refreshUser } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
