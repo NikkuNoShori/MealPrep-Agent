@@ -1,17 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 
-// Supabase configuration
-const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL;
+// Supabase configuration - reuse from supabase.ts
+// @ts-ignore - Vite environment variables
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || '';
+// @ts-ignore - Vite environment variables  
 const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('⚠️  Supabase credentials not configured. API operations may fail.');
-  console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables');
-}
-
-// Supabase client for direct database access
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Supabase Edge Functions base URL
 const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
@@ -101,13 +95,10 @@ const camelToSnake = (obj: any): any => {
 
 // API client
 class ApiClient {
-  private async request<T>(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async request<T>(url: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "apikey": SUPABASE_ANON_KEY,
+      apikey: SUPABASE_ANON_KEY,
       ...(options.headers as Record<string, string>),
     };
 
@@ -134,7 +125,9 @@ class ApiClient {
 
   private async getAuthToken(): Promise<string | null> {
     // Get auth token from Supabase session
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     return session?.access_token || null;
   }
 
@@ -143,95 +136,170 @@ class ApiClient {
   async getRecipes(params?: { limit?: number; offset?: number }) {
     const limit = params?.limit || 50;
     const offset = params?.offset || 0;
-    
+
     // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     const { data, error } = await supabase
-      .from('recipes')
-      .select('*')
-      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
-      .order('created_at', { ascending: false })
+      .from("recipes")
+      .select("*")
+      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
+      .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    
+
     // Transform snake_case to camelCase
     const camelRecipes = (data || []).map(snakeToCamel);
     return { recipes: camelRecipes, total: camelRecipes.length };
   }
 
   async getRecipe(id: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     const { data, error } = await supabase
-      .from('recipes')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .from("recipes")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') return null;
+      if (error.code === "PGRST116") return null;
       throw error;
     }
-    
+
     // Transform snake_case to camelCase
     return snakeToCamel(data);
   }
 
+  async checkDuplicateRecipe(
+    title: string,
+    excludeId?: string
+  ): Promise<boolean> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Normalize title to match database constraint (trim and lowercase)
+    const normalizedTitle = title.trim().toLowerCase();
+
+    let query = supabase
+      .from("recipes")
+      .select("id")
+      .eq("user_id", user.id)
+      .ilike("title", normalizedTitle);
+
+    if (excludeId) {
+      query = query.neq("id", excludeId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error && error.code !== "PGRST116") throw error;
+
+    return !!data; // Returns true if duplicate exists
+  }
+
   async createRecipe(data: any) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Check for duplicate recipe name
+    const isDuplicate = await this.checkDuplicateRecipe(data.title);
+    if (isDuplicate) {
+      throw new Error(
+        `A recipe with the name "${data.title}" already exists. Please choose a different name.`
+      );
+    }
 
     // Transform camelCase to snake_case for database
     const dbData = camelToSnake(data);
     dbData.user_id = user.id;
 
     const { data: recipe, error } = await supabase
-      .from('recipes')
+      .from("recipes")
       .insert(dbData)
       .select()
       .single();
 
-    if (error) throw error;
-    
+    if (error) {
+      // Handle unique constraint violation with a user-friendly message
+      if (error.code === "23505" || error.message?.includes("unique")) {
+        throw new Error(
+          `A recipe with the name "${data.title}" already exists. Please choose a different name.`
+        );
+      }
+      throw error;
+    }
+
     // Transform snake_case response to camelCase
     return snakeToCamel(recipe);
   }
 
   async updateRecipe(id: string, data: any) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Check for duplicate recipe name (excluding the current recipe)
+    if (data.title) {
+      const isDuplicate = await this.checkDuplicateRecipe(data.title, id);
+      if (isDuplicate) {
+        throw new Error(
+          `A recipe with the name "${data.title}" already exists. Please choose a different name.`
+        );
+      }
+    }
 
     // Transform camelCase to snake_case for database
     const dbData = camelToSnake(data);
 
     const { data: recipe, error } = await supabase
-      .from('recipes')
+      .from("recipes")
       .update(dbData)
-      .eq('id', id)
-      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .eq("id", id)
+      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
       .select()
       .single();
 
-    if (error) throw error;
-    
+    if (error) {
+      // Handle unique constraint violation with a user-friendly message
+      if (error.code === "23505" || error.message?.includes("unique")) {
+        throw new Error(
+          `A recipe with the name "${
+            data.title || "this name"
+          }" already exists. Please choose a different name.`
+        );
+      }
+      throw error;
+    }
+
     // Transform snake_case response to camelCase
     return snakeToCamel(recipe);
   }
 
   async deleteRecipe(id: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     const { error } = await supabase
-      .from('recipes')
+      .from("recipes")
       .delete()
-      .eq('id', id)
-      .eq('user_id', user.id); // user_id references profiles(id) = auth.users(id)
+      .eq("id", id)
+      .eq("user_id", user.id); // user_id references profiles(id) = auth.users(id)
 
     if (error) throw error;
     return { success: true };
@@ -241,9 +309,9 @@ class ApiClient {
     // Use RAG search for recipe search
     return this.ragSearch({
       query,
-      userId: (await supabase.auth.getUser()).data.user?.id || 'anonymous',
+      userId: (await supabase.auth.getUser()).data.user?.id || "anonymous",
       limit: limit || 10,
-      searchType: 'hybrid'
+      searchType: "hybrid",
     });
   }
 
@@ -268,8 +336,8 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify({
         message: `Add recipe: ${data.recipeText}`,
-        intent: 'recipe_extraction',
-        context: { recipeText: data.recipeText }
+        intent: "recipe_extraction",
+        context: { recipeText: data.recipeText },
       }),
     });
   }
@@ -279,7 +347,9 @@ class ApiClient {
     if (limit) searchParams.append("limit", limit.toString());
 
     // Supabase edge function path: /functions/v1/chat-api/history
-    return this.request(`${SUPABASE_FUNCTIONS_URL}/chat-api/history?${searchParams.toString()}`);
+    return this.request(
+      `${SUPABASE_FUNCTIONS_URL}/chat-api/history?${searchParams.toString()}`
+    );
   }
 
   async clearChatHistory() {
@@ -292,14 +362,16 @@ class ApiClient {
   // Meal planning endpoints - using Supabase client directly
   // Note: user_id references profiles(id), which references auth.users(id)
   async getMealPlans(limit?: number) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     let query = supabase
-      .from('meal_plans')
-      .select('*')
-      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
-      .order('created_at', { ascending: false });
+      .from("meal_plans")
+      .select("*")
+      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
+      .order("created_at", { ascending: false });
 
     if (limit) {
       query = query.limit(limit);
@@ -315,14 +387,16 @@ class ApiClient {
     endDate: string;
     preferences: any;
   }) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     const { data: mealPlan, error } = await supabase
-      .from('meal_plans')
+      .from("meal_plans")
       .insert({
         ...data,
-        user_id: user.id // user_id references profiles(id) = auth.users(id)
+        user_id: user.id, // user_id references profiles(id) = auth.users(id)
       })
       .select()
       .single();
@@ -334,14 +408,16 @@ class ApiClient {
   // Receipt endpoints - using Supabase client directly
   // Note: user_id references profiles(id), which references auth.users(id)
   async getReceipts(limit?: number) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     let query = supabase
-      .from('receipts')
-      .select('*')
-      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
-      .order('created_at', { ascending: false });
+      .from("receipts")
+      .select("*")
+      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
+      .order("created_at", { ascending: false });
 
     if (limit) {
       query = query.limit(limit);
@@ -352,15 +428,69 @@ class ApiClient {
     return { receipts: data || [] };
   }
 
+  async uploadImage(file: File, folder: string = "recipes"): Promise<string> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      throw new Error("File must be an image");
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new Error("Image size must be less than 5MB");
+    }
+
+    // Generate unique filename
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${user.id}/${folder}/${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2)}.${fileExt}`;
+
+    // Upload file to Supabase storage
+    const { data, error } = await supabase.storage
+      .from("recipe-images")
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (error) {
+      console.error("Upload error:", error);
+      if (
+        error.message?.includes("Bucket not found") ||
+        error.message?.includes("not found")
+      ) {
+        throw new Error(
+          "Storage bucket 'recipe-images' not found. Please create it in your Supabase dashboard under Storage."
+        );
+      }
+      throw new Error(`Failed to upload image: ${error.message}`);
+    }
+
+    // Get public URL
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("recipe-images").getPublicUrl(fileName);
+
+    return publicUrl;
+  }
+
   async uploadReceipt(data: { imageUrl: string; storeInfo: any }) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     const { data: receipt, error } = await supabase
-      .from('receipts')
+      .from("receipts")
       .insert({
         ...data,
-        user_id: user.id // user_id references profiles(id) = auth.users(id)
+        user_id: user.id, // user_id references profiles(id) = auth.users(id)
       })
       .select()
       .single();
@@ -372,45 +502,49 @@ class ApiClient {
   // Preferences endpoints - using Supabase client directly
   // Note: user_id references profiles(id), which references auth.users(id)
   async getPreferences() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     const { data, error } = await supabase
-      .from('user_preferences')
-      .select('*')
-      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .from("user_preferences")
+      .select("*")
+      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') return null; // Not found
+      if (error.code === "PGRST116") return null; // Not found
       throw error;
     }
     return data;
   }
 
   async updatePreferences(data: any) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
     // Try to update first, if not found, insert
     const { data: existing } = await supabase
-      .from('user_preferences')
-      .select('id')
-      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .from("user_preferences")
+      .select("id")
+      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
       .single();
 
     if (existing) {
       const { data: updated, error } = await supabase
-        .from('user_preferences')
+        .from("user_preferences")
         .update(data)
-        .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+        .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
         .select()
         .single();
       if (error) throw error;
       return updated;
     } else {
       const { data: created, error } = await supabase
-        .from('user_preferences')
+        .from("user_preferences")
         .insert({ ...data, user_id: user.id }) // user_id references profiles(id) = auth.users(id)
         .select()
         .single();
@@ -423,7 +557,7 @@ class ApiClient {
   async ragSearch(request: any) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
     return this.request(`${baseUrl}/rag/search`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(request),
     });
   }
@@ -431,28 +565,38 @@ class ApiClient {
   async ragEmbedding(request: any) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
     return this.request(`${baseUrl}/rag/embedding`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(request),
     });
   }
 
   async ragSimilar(recipeId: string, userId: string, limit: number = 5) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    return this.request(`${baseUrl}/rag/similar/${recipeId}?userId=${userId}&limit=${limit}`);
+    return this.request(
+      `${baseUrl}/rag/similar/${recipeId}?userId=${userId}&limit=${limit}`
+    );
   }
 
-  async ragIngredients(ingredients: string[], userId: string, limit: number = 10) {
+  async ragIngredients(
+    ingredients: string[],
+    userId: string,
+    limit: number = 10
+  ) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
     return this.request(`${baseUrl}/rag/ingredients`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ ingredients, userId, limit }),
     });
   }
 
-  async ragRecommendations(userId: string, preferences?: any, limit: number = 10) {
+  async ragRecommendations(
+    userId: string,
+    preferences?: any,
+    limit: number = 10
+  ) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
     return this.request(`${baseUrl}/rag/recommendations`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ userId, preferences, limit }),
     });
   }

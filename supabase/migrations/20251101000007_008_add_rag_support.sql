@@ -28,11 +28,18 @@ RETURNS TRIGGER AS $$
 BEGIN
     NEW.searchable_text = COALESCE(NEW.title, '') || ' ' ||
                          COALESCE(NEW.description, '') || ' ' ||
-                         COALESCE(NEW.cuisine, '') || ' ' ||
                          COALESCE(NEW.difficulty, '') || ' ' ||
-                         COALESCE(array_to_string(NEW.dietary_tags, ' '), '') || ' ' ||
-                         COALESCE(jsonb_array_elements_text(NEW.ingredients), '') || ' ' ||
-                         COALESCE(jsonb_array_elements_text(NEW.instructions), '');
+                         COALESCE(array_to_string(NEW.tags, ' '), '') || ' ' ||
+                         COALESCE(
+                             (SELECT string_agg(value::text, ' ')
+                              FROM jsonb_array_elements_text(NEW.ingredients)), 
+                             ''
+                         ) || ' ' ||
+                         COALESCE(
+                             (SELECT string_agg(value::text, ' ')
+                              FROM jsonb_array_elements_text(NEW.instructions)), 
+                             ''
+                         );
     
     RETURN NEW;
 END;

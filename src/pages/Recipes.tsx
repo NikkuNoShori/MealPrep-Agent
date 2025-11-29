@@ -7,24 +7,14 @@ const Recipes = () => {
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<any>(null);
-  const [initialRecipeData, setInitialRecipeData] = useState<any>(null);
 
   const handleRecipeSelect = (recipe: any) => {
     setSelectedRecipe(recipe);
     setShowAddForm(false);
     setEditingRecipe(null);
-    setInitialRecipeData(null);
   };
 
   const handleAddRecipe = () => {
-    setShowAddForm(true);
-    setSelectedRecipe(null);
-    setEditingRecipe(null);
-    setInitialRecipeData(null);
-  };
-
-  const handleAddRecipeWithData = (recipeData: any) => {
-    setInitialRecipeData(recipeData);
     setShowAddForm(true);
     setSelectedRecipe(null);
     setEditingRecipe(null);
@@ -32,9 +22,8 @@ const Recipes = () => {
 
   const handleEditRecipe = (recipe: any) => {
     setEditingRecipe(recipe);
-    setShowAddForm(false);
+    setShowAddForm(true);
     setSelectedRecipe(null);
-    setInitialRecipeData(null);
   };
 
   const handleCloseForm = () => {
@@ -50,10 +39,10 @@ const Recipes = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {showAddForm && (
+        {(showAddForm || editingRecipe) && (
           <div className="animate-fade-in">
             <RecipeForm
-              recipe={editingRecipe || initialRecipeData}
+              recipe={editingRecipe}
               onSave={() => {
                 handleCloseForm();
                 // Refresh recipe list
@@ -63,23 +52,20 @@ const Recipes = () => {
           </div>
         )}
 
-        {selectedRecipe && (
-          <div className="animate-fade-in">
-            <RecipeDetail
-              recipe={selectedRecipe}
-              onEdit={() => handleEditRecipe(selectedRecipe)}
-              onClose={handleCloseDetail}
-            />
-          </div>
+        {selectedRecipe && !showAddForm && !editingRecipe && (
+          <RecipeDetail
+            recipe={selectedRecipe}
+            onEdit={() => handleEditRecipe(selectedRecipe)}
+            onClose={handleCloseDetail}
+          />
         )}
 
-        {!showAddForm && !selectedRecipe && (
+        {!showAddForm && !selectedRecipe && !editingRecipe && (
           <div className="animate-fade-in">
             <RecipeList
               onRecipeSelect={handleRecipeSelect}
               onAddRecipe={handleAddRecipe}
               onEditRecipe={handleEditRecipe}
-              onAddRecipeWithData={handleAddRecipeWithData}
             />
           </div>
         )}

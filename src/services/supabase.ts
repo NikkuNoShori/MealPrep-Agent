@@ -53,18 +53,29 @@ export const recipeService = {
 
 // Auth service using Supabase Auth
 export const authService = {
-  // Get current user
+  // Get current user with profile data
   async getUser() {
     try {
       const { data: { user }, error } = await supabase.auth.getUser()
-      if (error) {
+      if (error || !user) {
         return null
       }
-      return user ? {
+
+      // Fetch profile data
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name, first_name, last_name, avatar_url')
+        .eq('id', user.id)
+        .single()
+
+      return {
         id: user.id,
         email: user.email,
+        display_name: profile?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+        first_name: profile?.first_name || user.user_metadata?.first_name || user.user_metadata?.given_name || profile?.display_name?.split(' ')[0] || user.email?.split('@')[0] || 'User',
+        avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture,
         ...user
-      } : null
+      }
     } catch (err) {
       return null
     }
@@ -335,18 +346,30 @@ export const authService = {
           // Ensure profile exists
           if (session?.user) {
             const { error: profileError } = await supabase
-              .from('profiles')
-              .upsert({
-                id: session.user.id,
-                email: session.user.email,
-                display_name: session.user.user_metadata?.full_name || 
-                             session.user.user_metadata?.name ||
-                             session.user.email?.split('@')[0] || 'User',
-                avatar_url: session.user.user_metadata?.avatar_url,
-                updated_at: new Date().toISOString()
-              }, {
-                onConflict: 'id'
-              })
+              .from("profiles")
+              .upsert(
+                {
+                  id: session.user.id,
+                  email: session.user.email,
+                  display_name:
+                    session.user.user_metadata?.full_name ||
+                    session.user.user_metadata?.name ||
+                    session.user.email?.split("@")[0] ||
+                    "User",
+                  first_name:
+                    session.user.user_metadata?.first_name ||
+                    session.user.user_metadata?.given_name ||
+                    session.user.user_metadata?.full_name?.split(" ")[0] ||
+                    "",
+                  avatar_url:
+                    session.user.user_metadata?.avatar_url ||
+                    session.user.user_metadata?.picture,
+                  updated_at: new Date().toISOString(),
+                },
+                {
+                  onConflict: "id",
+                }
+              );
             
             if (profileError) {
               console.error('Error syncing user profile:', profileError)

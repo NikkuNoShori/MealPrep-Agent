@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_recipe_embeddings_recipe_id ON recipe_embeddings(
 CREATE INDEX IF NOT EXISTS idx_recipe_embeddings_type ON recipe_embeddings(embedding_type);
 
 -- Add updated_at trigger
+DROP TRIGGER IF EXISTS update_recipe_embeddings_updated_at ON recipe_embeddings;
 CREATE TRIGGER update_recipe_embeddings_updated_at 
     BEFORE UPDATE ON recipe_embeddings 
     FOR EACH ROW 
@@ -42,9 +43,10 @@ CREATE TABLE IF NOT EXISTS roles (
 );
 
 -- Add updated_at trigger
-CREATE TRIGGER update_roles_updated_at 
-    BEFORE UPDATE ON roles 
-    FOR EACH ROW 
+DROP TRIGGER IF EXISTS update_roles_updated_at ON roles;
+CREATE TRIGGER update_roles_updated_at
+    BEFORE UPDATE ON roles
+    FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert default roles
@@ -100,9 +102,8 @@ RETURNS TRIGGER AS $$
 BEGIN
     NEW.searchable_text = COALESCE(NEW.title, '') || ' ' ||
                          COALESCE(NEW.description, '') || ' ' ||
-                         COALESCE(NEW.cuisine, '') || ' ' ||
                          COALESCE(NEW.difficulty, '') || ' ' ||
-                         COALESCE(array_to_string(NEW.dietary_tags, ' '), '') || ' ' ||
+                         COALESCE(array_to_string(NEW.tags, ' '), '') || ' ' ||
                          COALESCE(
                              (SELECT string_agg(value::text, ' ')
                               FROM jsonb_array_elements_text(NEW.ingredients)), 

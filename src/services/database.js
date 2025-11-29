@@ -1,19 +1,5 @@
 // Database service using Supabase client
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const SUPABASE_URL = process.env.SUPABASE_URL || import.meta.env?.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('⚠️  Supabase credentials not configured. Database operations may fail.');
-}
-
-const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
-  auth: {
-    persistSession: false
-  }
-});
+import { supabase } from './supabase';
 
 export class DatabaseService {
   constructor() {

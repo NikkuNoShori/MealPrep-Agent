@@ -10,16 +10,15 @@ RETURNS TABLE (
     description TEXT,
     ingredients JSONB,
     instructions JSONB,
-    prep_time VARCHAR(50),
-    cook_time VARCHAR(50),
+    prep_time INTEGER,
+    cook_time INTEGER,
     servings INTEGER,
     difficulty VARCHAR(20),
-    cuisine VARCHAR(100),
-    dietary_tags TEXT[],
-    source_url VARCHAR(500),
-    source_name VARCHAR(100),
+    tags TEXT[],
+    image_url TEXT,
+    source_url TEXT,
     rating DECIMAL(3,2),
-    is_favorite BOOLEAN,
+    is_public BOOLEAN,
     created_at TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE,
     searchable_text TEXT,
@@ -39,12 +38,11 @@ BEGIN
         r.cook_time,
         r.servings,
         r.difficulty,
-        r.cuisine,
-        r.dietary_tags,
+        r.tags,
+        r.image_url,
         r.source_url,
-        r.source_name,
         r.rating,
-        r.is_favorite,
+        r.is_public,
         r.created_at,
         r.updated_at,
         r.searchable_text,
@@ -70,16 +68,15 @@ RETURNS TABLE (
     description TEXT,
     ingredients JSONB,
     instructions JSONB,
-    prep_time VARCHAR(50),
-    cook_time VARCHAR(50),
+    prep_time INTEGER,
+    cook_time INTEGER,
     servings INTEGER,
     difficulty VARCHAR(20),
-    cuisine VARCHAR(100),
-    dietary_tags TEXT[],
-    source_url VARCHAR(500),
-    source_name VARCHAR(100),
+    tags TEXT[],
+    image_url TEXT,
+    source_url TEXT,
     rating DECIMAL(3,2),
-    is_favorite BOOLEAN,
+    is_public BOOLEAN,
     created_at TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE,
     searchable_text TEXT,
@@ -109,12 +106,11 @@ BEGIN
         r.cook_time,
         r.servings,
         r.difficulty,
-        r.cuisine,
-        r.dietary_tags,
+        r.tags,
+        r.image_url,
         r.source_url,
-        r.source_name,
         r.rating,
-        r.is_favorite,
+        r.is_public,
         r.created_at,
         r.updated_at,
         r.searchable_text,
@@ -141,16 +137,15 @@ RETURNS TABLE (
     description TEXT,
     ingredients JSONB,
     instructions JSONB,
-    prep_time VARCHAR(50),
-    cook_time VARCHAR(50),
+    prep_time INTEGER,
+    cook_time INTEGER,
     servings INTEGER,
     difficulty VARCHAR(20),
-    cuisine VARCHAR(100),
-    dietary_tags TEXT[],
-    source_url VARCHAR(500),
-    source_name VARCHAR(100),
+    tags TEXT[],
+    image_url TEXT,
+    source_url TEXT,
     rating DECIMAL(3,2),
-    is_favorite BOOLEAN,
+    is_public BOOLEAN,
     created_at TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE,
     searchable_text TEXT,
@@ -175,12 +170,11 @@ BEGIN
         r.cook_time,
         r.servings,
         r.difficulty,
-        r.cuisine,
-        r.dietary_tags,
+        r.tags,
+        r.image_url,
         r.source_url,
-        r.source_name,
         r.rating,
-        r.is_favorite,
+        r.is_public,
         r.created_at,
         r.updated_at,
         r.searchable_text,
@@ -197,8 +191,7 @@ $$;
 CREATE OR REPLACE FUNCTION get_recipe_recommendations(
     user_id UUID,
     preference_difficulty VARCHAR(20) DEFAULT NULL,
-    preference_cuisine VARCHAR(100) DEFAULT NULL,
-    preference_dietary_tags TEXT[] DEFAULT NULL,
+    preference_tags TEXT[] DEFAULT NULL,
     max_prep_time_minutes INT DEFAULT NULL,
     limit_count INT DEFAULT 10
 )
@@ -208,16 +201,15 @@ RETURNS TABLE (
     description TEXT,
     ingredients JSONB,
     instructions JSONB,
-    prep_time VARCHAR(50),
-    cook_time VARCHAR(50),
+    prep_time INTEGER,
+    cook_time INTEGER,
     servings INTEGER,
     difficulty VARCHAR(20),
-    cuisine VARCHAR(100),
-    dietary_tags TEXT[],
-    source_url VARCHAR(500),
-    source_name VARCHAR(100),
+    tags TEXT[],
+    image_url TEXT,
+    source_url TEXT,
     rating DECIMAL(3,2),
-    is_favorite BOOLEAN,
+    is_public BOOLEAN,
     created_at TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE,
     searchable_text TEXT,
@@ -237,27 +229,25 @@ BEGIN
         r.cook_time,
         r.servings,
         r.difficulty,
-        r.cuisine,
-        r.dietary_tags,
+        r.tags,
+        r.image_url,
         r.source_url,
-        r.source_name,
         r.rating,
-        r.is_favorite,
+        r.is_public,
         r.created_at,
         r.updated_at,
         r.searchable_text,
         (
             CASE WHEN preference_difficulty IS NULL OR r.difficulty = preference_difficulty THEN 1.0 ELSE 0.5 END +
-            CASE WHEN preference_cuisine IS NULL OR r.cuisine = preference_cuisine THEN 1.0 ELSE 0.5 END +
-            CASE WHEN preference_dietary_tags IS NULL OR r.dietary_tags && preference_dietary_tags THEN 1.0 ELSE 0.5 END +
+            CASE WHEN preference_tags IS NULL OR r.tags && preference_tags THEN 1.0 ELSE 0.5 END +
             CASE WHEN r.rating IS NOT NULL THEN r.rating / 5.0 ELSE 0.5 END +
-            CASE WHEN r.is_favorite THEN 0.5 ELSE 0.0 END
-        ) / 5.0 AS recommendation_score
+            CASE WHEN (max_prep_time_minutes IS NULL OR r.prep_time IS NULL OR r.prep_time <= max_prep_time_minutes) THEN 1.0 ELSE 0.3 END
+        ) / 4.0 AS recommendation_score
     FROM recipes r
     WHERE r.user_id = get_recipe_recommendations.user_id
         AND (preference_difficulty IS NULL OR r.difficulty = preference_difficulty)
-        AND (preference_cuisine IS NULL OR r.cuisine = preference_cuisine)
-        AND (preference_dietary_tags IS NULL OR r.dietary_tags && preference_dietary_tags)
+        AND (preference_tags IS NULL OR r.tags && preference_tags)
+        AND (max_prep_time_minutes IS NULL OR r.prep_time IS NULL OR r.prep_time <= max_prep_time_minutes)
     ORDER BY recommendation_score DESC, r.created_at DESC
     LIMIT limit_count;
 END;
@@ -279,8 +269,7 @@ CREATE TRIGGER trigger_update_recipe_embedding
           OLD.description IS DISTINCT FROM NEW.description OR
           OLD.ingredients IS DISTINCT FROM NEW.ingredients OR
           OLD.instructions IS DISTINCT FROM NEW.instructions OR
-          OLD.cuisine IS DISTINCT FROM NEW.cuisine OR
-          OLD.dietary_tags IS DISTINCT FROM NEW.dietary_tags)
+          OLD.tags IS DISTINCT FROM NEW.tags)
     EXECUTE FUNCTION update_recipe_embedding();
 
 CREATE INDEX IF NOT EXISTS idx_recipes_embedding_cosine 

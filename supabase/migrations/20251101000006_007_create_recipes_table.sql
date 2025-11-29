@@ -21,9 +21,21 @@ CREATE TABLE IF NOT EXISTS recipes (
 
 CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes(user_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_title ON recipes(title);
-CREATE INDEX IF NOT EXISTS idx_recipes_cuisine ON recipes(cuisine);
 CREATE INDEX IF NOT EXISTS idx_recipes_difficulty ON recipes(difficulty);
 CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes(created_at);
+
+-- Only create cuisine index if cuisine column exists
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'recipes' 
+        AND column_name = 'cuisine'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_recipes_cuisine ON recipes(cuisine);
+    END IF;
+END $$;
 CREATE OR REPLACE FUNCTION update_recipes_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

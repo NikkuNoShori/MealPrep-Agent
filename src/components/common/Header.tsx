@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X, LogOut, User } from "lucide-react";
+import { Menu, X, LogOut, User, Settings } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useState, useRef } from "react";
 import { useAuthStore } from "@/stores/authStore";
@@ -20,12 +20,14 @@ const Header = () => {
     { name: "Chat", href: "/chat" },
     { name: "Recipes", href: "/recipes" },
     { name: "Meal Planner", href: "/meal-planner" },
-    { name: "Settings", href: "/settings" },
   ];
 
-  // Get first name from display name
-  const getFirstName = (displayName: string) => {
-    return displayName.split(" ")[0] || displayName;
+  // Get first name from user object
+  const getFirstName = () => {
+    if (user?.first_name) return user.first_name;
+    if (user?.display_name) return user.display_name.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "User";
   };
 
   // Handle user menu hover
@@ -107,15 +109,31 @@ const Header = () => {
                 onMouseEnter={handleUserMenuMouseEnter}
                 onMouseLeave={handleUserMenuMouseLeave}
               >
-                <button className="flex items-center space-x-2 p-2 rounded-lg bg-stone-100 dark:bg-gray-700 hover:bg-stone-200 dark:hover:bg-gray-600 transition-colors">
-                  <User className="w-4 h-4 text-stone-600 dark:text-gray-300" />
+                <button className="flex items-center space-x-2 p-2 rounded-lg hover:opacity-80 transition-opacity">
+                  {user?.avatar_url ? (
+                    <img 
+                      src={user.avatar_url} 
+                      alt={getFirstName()}
+                      className="w-6 h-6 rounded-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-4 h-4 text-stone-600 dark:text-gray-300" />
+                  )}
                   <span className="text-sm font-medium text-stone-700 dark:text-gray-300">
-                    {user.email}
+                    Hey, {getFirstName()}
                   </span>
                 </button>
                 
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-stone-200 dark:border-gray-700 py-1 z-50">
+                    <Link
+                      to="/settings"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-stone-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Settings</span>
+                    </Link>
                     <button
                       onClick={signOut}
                       className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-stone-100 dark:hover:bg-gray-700 flex items-center space-x-2"
