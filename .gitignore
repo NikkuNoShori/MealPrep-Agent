@@ -122,3 +122,6 @@ coverage/
 *.tgz
 *.tar.gz
 .vercel
+
+# Supabase temp files
+supabase/.temp/

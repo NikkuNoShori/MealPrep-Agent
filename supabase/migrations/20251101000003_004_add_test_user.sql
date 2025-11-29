@@ -1,0 +1,3 @@
+-- Migration removed: Test user creation
+-- We use Supabase Auth only - users are created through the authentication flow
+-- Profiles are automatically created via the handle_new_user() trigger when auth users sign up

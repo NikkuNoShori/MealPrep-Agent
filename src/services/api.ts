@@ -1,31 +1,121 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { recipeService } from "./neon";
+import { createClient } from '@supabase/supabase-js';
 
-// Use local development API for localhost, production API for deployed app
-const API_BASE_URL =
-  window.location.hostname === "localhost" || window.location.hostname === "app.localhost"
-    ? "http://localhost:3000" // Local development API
-    : (import.meta as any).env?.VITE_API_URL ||
-      "https://meal-prep-agent-405dzxcab-nickneal1717s-projects.vercel.app";
+// Supabase configuration
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('⚠️  Supabase credentials not configured. API operations may fail.');
+  console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables');
+}
+
+// Supabase client for direct database access
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Supabase Edge Functions base URL
+const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
+
+// For local development, use local server for RAG endpoints
+const LOCAL_API_URL = "http://localhost:3000";
+const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+// Transformation utilities: Convert between camelCase (frontend) and snake_case (database)
+// Field mapping for recipe-specific transformations
+const RECIPE_FIELD_MAP: Record<string, string> = {
+  // camelCase -> snake_case
+  prepTime: 'prep_time',
+  cookTime: 'cook_time',
+  totalTime: 'total_time',
+  imageUrl: 'image_url',
+  nutritionInfo: 'nutrition_info',
+  sourceUrl: 'source_url',
+  isPublic: 'is_public',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  userId: 'user_id',
+  // snake_case -> camelCase (reverse mapping)
+  prep_time: 'prepTime',
+  cook_time: 'cookTime',
+  total_time: 'totalTime',
+  image_url: 'imageUrl',
+  nutrition_info: 'nutritionInfo',
+  source_url: 'sourceUrl',
+  is_public: 'isPublic',
+  created_at: 'createdAt',
+  updated_at: 'updatedAt',
+  user_id: 'userId',
+};
+
+const toSnakeCase = (key: string): string => {
+  // Use mapping if available
+  if (RECIPE_FIELD_MAP[key]) {
+    const mapped = RECIPE_FIELD_MAP[key];
+    // Only return if it's a snake_case mapping (contains underscore)
+    if (mapped.includes('_')) return mapped;
+  }
+  // Fallback to regex transformation
+  return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+};
+
+const toCamelCase = (key: string): string => {
+  // Use mapping if available
+  if (RECIPE_FIELD_MAP[key]) {
+    const mapped = RECIPE_FIELD_MAP[key];
+    // Only return if it's a camelCase mapping (no underscore)
+    if (!mapped.includes('_')) return mapped;
+  }
+  // Fallback to regex transformation
+  return key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+};
+
+// Transform object keys from snake_case to camelCase
+const snakeToCamel = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(snakeToCamel);
+  if (typeof obj !== 'object') return obj;
+  
+  const camelObj: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const camelKey = toCamelCase(key);
+    camelObj[camelKey] = snakeToCamel(value);
+  }
+  return camelObj;
+};
+
+// Transform object keys from camelCase to snake_case
+const camelToSnake = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(camelToSnake);
+  if (typeof obj !== 'object') return obj;
+  
+  const snakeObj: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip userId as it's handled separately in createRecipe
+    if (key === 'userId') continue;
+    const snakeKey = toSnakeCase(key);
+    snakeObj[snakeKey] = camelToSnake(value);
+  }
+  return snakeObj;
+};
 
 // API client
 class ApiClient {
-  private baseURL: string;
-
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
-  }
-
   private async request<T>(
-    endpoint: string,
+    url: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
-
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
       ...(options.headers as Record<string, string>),
     };
+
+    // Add authorization header if we have a user token
+    const token = await this.getAuthToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
 
     const response = await fetch(url, {
       ...options,
@@ -42,37 +132,122 @@ class ApiClient {
     return response.json();
   }
 
-  // Recipe endpoints - now using direct Neon database access
+  private async getAuthToken(): Promise<string | null> {
+    // Get auth token from Supabase session
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  }
+
+  // Recipe endpoints - using Supabase client directly
+  // Note: user_id references profiles(id), which references auth.users(id)
   async getRecipes(params?: { limit?: number; offset?: number }) {
-    return await recipeService.getRecipes();
+    const limit = params?.limit || 50;
+    const offset = params?.offset || 0;
+    
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+    
+    // Transform snake_case to camelCase
+    const camelRecipes = (data || []).map(snakeToCamel);
+    return { recipes: camelRecipes, total: camelRecipes.length };
   }
 
   async getRecipe(id: string) {
-    return await recipeService.getRecipe(id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    
+    // Transform snake_case to camelCase
+    return snakeToCamel(data);
   }
 
   async createRecipe(data: any) {
-    return await recipeService.createRecipe(data);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Transform camelCase to snake_case for database
+    const dbData = camelToSnake(data);
+    dbData.user_id = user.id;
+
+    const { data: recipe, error } = await supabase
+      .from('recipes')
+      .insert(dbData)
+      .select()
+      .single();
+
+    if (error) throw error;
+    
+    // Transform snake_case response to camelCase
+    return snakeToCamel(recipe);
   }
 
   async updateRecipe(id: string, data: any) {
-    return await recipeService.updateRecipe(id, data);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Transform camelCase to snake_case for database
+    const dbData = camelToSnake(data);
+
+    const { data: recipe, error } = await supabase
+      .from('recipes')
+      .update(dbData)
+      .eq('id', id)
+      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    
+    // Transform snake_case response to camelCase
+    return snakeToCamel(recipe);
   }
 
   async deleteRecipe(id: string) {
-    return await recipeService.deleteRecipe(id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('recipes')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id); // user_id references profiles(id) = auth.users(id)
+
+    if (error) throw error;
+    return { success: true };
   }
 
   async searchRecipes(query: string, limit?: number) {
-    const searchParams = new URLSearchParams({ query });
-    if (limit) searchParams.append("limit", limit.toString());
-
-    return this.request(
-      `/api/recipes/search/${query}?${searchParams.toString()}`
-    );
+    // Use RAG search for recipe search
+    return this.ragSearch({
+      query,
+      userId: (await supabase.auth.getUser()).data.user?.id || 'anonymous',
+      limit: limit || 10,
+      searchType: 'hybrid'
+    });
   }
 
-  // Chat endpoints
+  // Chat endpoints - using Supabase edge function
   async sendMessage(data: {
     message: string;
     context?: any;
@@ -80,16 +255,22 @@ class ApiClient {
     clearMemory?: boolean;
     intent?: string;
   }) {
-    return this.request("/api/chat/message", {
+    // Supabase edge function path: /functions/v1/chat-api/message
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/chat-api/message`, {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   async addRecipeViaChat(data: { recipeText: string }) {
-    return this.request("/api/chat/add-recipe", {
+    // Route through chat-api with recipe extraction intent
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/chat-api/message`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        message: `Add recipe: ${data.recipeText}`,
+        intent: 'recipe_extraction',
+        context: { recipeText: data.recipeText }
+      }),
     });
   }
 
@@ -97,21 +278,36 @@ class ApiClient {
     const searchParams = new URLSearchParams();
     if (limit) searchParams.append("limit", limit.toString());
 
-    return this.request(`/api/chat/history?${searchParams.toString()}`);
+    // Supabase edge function path: /functions/v1/chat-api/history
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/chat-api/history?${searchParams.toString()}`);
   }
 
   async clearChatHistory() {
-    return this.request("/api/chat/history", {
+    // Supabase edge function path: /functions/v1/chat-api/history
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/chat-api/history`, {
       method: "DELETE",
     });
   }
 
-  // Meal planning endpoints
+  // Meal planning endpoints - using Supabase client directly
+  // Note: user_id references profiles(id), which references auth.users(id)
   async getMealPlans(limit?: number) {
-    const searchParams = new URLSearchParams();
-    if (limit) searchParams.append("limit", limit.toString());
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
 
-    return this.request(`/api/meal-plans?${searchParams.toString()}`);
+    let query = supabase
+      .from('meal_plans')
+      .select('*')
+      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .order('created_at', { ascending: false });
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return { mealPlans: data || [] };
   }
 
   async createMealPlan(data: {
@@ -119,67 +315,143 @@ class ApiClient {
     endDate: string;
     preferences: any;
   }) {
-    return this.request("/api/meal-plans", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: mealPlan, error } = await supabase
+      .from('meal_plans')
+      .insert({
+        ...data,
+        user_id: user.id // user_id references profiles(id) = auth.users(id)
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mealPlan;
   }
 
-  // Receipt endpoints
+  // Receipt endpoints - using Supabase client directly
+  // Note: user_id references profiles(id), which references auth.users(id)
   async getReceipts(limit?: number) {
-    const searchParams = new URLSearchParams();
-    if (limit) searchParams.append("limit", limit.toString());
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
 
-    return this.request(`/api/receipts?${searchParams.toString()}`);
+    let query = supabase
+      .from('receipts')
+      .select('*')
+      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .order('created_at', { ascending: false });
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return { receipts: data || [] };
   }
 
   async uploadReceipt(data: { imageUrl: string; storeInfo: any }) {
-    return this.request("/api/receipts/upload", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: receipt, error } = await supabase
+      .from('receipts')
+      .insert({
+        ...data,
+        user_id: user.id // user_id references profiles(id) = auth.users(id)
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return receipt;
   }
 
-  // Preferences endpoints
+  // Preferences endpoints - using Supabase client directly
+  // Note: user_id references profiles(id), which references auth.users(id)
   async getPreferences() {
-    return this.request("/api/preferences");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
+    }
+    return data;
   }
 
   async updatePreferences(data: any) {
-    return this.request("/api/preferences", {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Try to update first, if not found, insert
+    const { data: existing } = await supabase
+      .from('user_preferences')
+      .select('id')
+      .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+      .single();
+
+    if (existing) {
+      const { data: updated, error } = await supabase
+        .from('user_preferences')
+        .update(data)
+        .eq('user_id', user.id) // user_id references profiles(id) = auth.users(id)
+        .select()
+        .single();
+      if (error) throw error;
+      return updated;
+    } else {
+      const { data: created, error } = await supabase
+        .from('user_preferences')
+        .insert({ ...data, user_id: user.id }) // user_id references profiles(id) = auth.users(id)
+        .select()
+        .single();
+      if (error) throw error;
+      return created;
+    }
   }
 
-  // RAG endpoints
+  // RAG endpoints - using local server for now (can be migrated to Supabase edge function later)
   async ragSearch(request: any) {
-    return this.request('/api/rag/search', {
+    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
+    return this.request(`${baseUrl}/rag/search`, {
       method: 'POST',
       body: JSON.stringify(request),
     });
   }
 
   async ragEmbedding(request: any) {
-    return this.request('/api/rag/embedding', {
+    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
+    return this.request(`${baseUrl}/rag/embedding`, {
       method: 'POST',
       body: JSON.stringify(request),
     });
   }
 
   async ragSimilar(recipeId: string, userId: string, limit: number = 5) {
-    return this.request(`/api/rag/similar/${recipeId}?userId=${userId}&limit=${limit}`);
+    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
+    return this.request(`${baseUrl}/rag/similar/${recipeId}?userId=${userId}&limit=${limit}`);
   }
 
   async ragIngredients(ingredients: string[], userId: string, limit: number = 10) {
-    return this.request('/api/rag/ingredients', {
+    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
+    return this.request(`${baseUrl}/rag/ingredients`, {
       method: 'POST',
       body: JSON.stringify({ ingredients, userId, limit }),
     });
   }
 
   async ragRecommendations(userId: string, preferences?: any, limit: number = 10) {
-    return this.request('/api/rag/recommendations', {
+    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
+    return this.request(`${baseUrl}/rag/recommendations`, {
       method: 'POST',
       body: JSON.stringify({ userId, preferences, limit }),
     });
@@ -187,7 +459,7 @@ class ApiClient {
 }
 
 // Create singleton instance
-export const apiClient = new ApiClient(API_BASE_URL);
+export const apiClient = new ApiClient();
 
 // React Query hooks
 export const useRecipes = (params?: { limit?: number; offset?: number }) => {

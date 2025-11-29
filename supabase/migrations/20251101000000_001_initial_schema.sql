@@ -1,21 +1,28 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable pgcrypto extension for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA public;
 
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    neon_user_id VARCHAR(255) UNIQUE,
+-- Enable vector extension for embedding vectors
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Create profiles table (migrated from users in later migration)
+-- This table references auth.users(id) - migration 011 will ensure the FK is correct
+CREATE TABLE IF NOT EXISTS profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email VARCHAR(255) UNIQUE NOT NULL,
     display_name VARCHAR(255) NOT NULL,
-    family_id UUID DEFAULT uuid_generate_v4(),
-    household_size INTEGER DEFAULT 1,
+    first_name VARCHAR(255) DEFAULT '',
+    last_name VARCHAR(255) DEFAULT '',
     avatar_url TEXT,
     timezone VARCHAR(50) DEFAULT 'UTC',
+    household_size INTEGER DEFAULT 1,
+    family_id UUID DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS family_members (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    family_id UUID NOT NULL REFERENCES users(family_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    family_id UUID NOT NULL, -- References profiles(family_id) - validated via trigger in migration 011
     name VARCHAR(255) NOT NULL,
     relationship VARCHAR(100),
     age INTEGER,
@@ -28,8 +35,8 @@ CREATE TABLE IF NOT EXISTS family_members (
 );
 
 CREATE TABLE IF NOT EXISTS user_preferences (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     global_restrictions TEXT[],
     cuisine_preferences TEXT[],
     cooking_skill_level VARCHAR(20) DEFAULT 'intermediate',
@@ -43,8 +50,8 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 );
 
 CREATE TABLE IF NOT EXISTS recipes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     ingredients JSONB NOT NULL,
@@ -65,20 +72,12 @@ CREATE TABLE IF NOT EXISTS recipes (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS recipe_ratings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    family_member_id UUID REFERENCES family_members(id) ON DELETE CASCADE,
-    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(recipe_id, user_id, family_member_id)
-);
+-- Skip recipe_ratings creation - it already exists
+-- Migration 011 will fix all foreign keys for existing tables including recipe_ratings
 
 CREATE TABLE IF NOT EXISTS meal_plans (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     title VARCHAR(255),
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
@@ -91,8 +90,8 @@ CREATE TABLE IF NOT EXISTS meal_plans (
 );
 
 CREATE TABLE IF NOT EXISTS chat_messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     session_id UUID NOT NULL,
     content TEXT NOT NULL,
     sender VARCHAR(10) NOT NULL CHECK (sender IN ('user', 'ai')),
@@ -103,8 +102,8 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 CREATE TABLE IF NOT EXISTS receipts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     store_name VARCHAR(255),
     store_info JSONB,
     raw_ocr_text TEXT,
@@ -120,8 +119,8 @@ CREATE TABLE IF NOT EXISTS receipts (
 );
 
 CREATE TABLE IF NOT EXISTS ingredients (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) UNIQUE NOT NULL,
     category VARCHAR(100),
     subcategory VARCHAR(100),
     common_names TEXT[],
@@ -134,8 +133,8 @@ CREATE TABLE IF NOT EXISTS ingredients (
 );
 
 CREATE TABLE IF NOT EXISTS user_ingredients (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     ingredient_id UUID REFERENCES ingredients(id) ON DELETE SET NULL,
     ingredient_name VARCHAR(255) NOT NULL,
     quantity DECIMAL(10,3),
@@ -147,22 +146,32 @@ CREATE TABLE IF NOT EXISTS user_ingredients (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS shopping_lists (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    meal_plan_id UUID REFERENCES meal_plans(id) ON DELETE SET NULL,
-    title VARCHAR(255),
-    items JSONB NOT NULL,
-    store_preference VARCHAR(255),
-    estimated_cost DECIMAL(10,2),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Skip shopping_lists if it exists - migration 011 will fix foreign keys
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'shopping_lists'
+    ) THEN
+        CREATE TABLE shopping_lists (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL,
+            meal_plan_id UUID,
+            title VARCHAR(255),
+            items JSONB NOT NULL,
+            store_preference VARCHAR(255),
+            estimated_cost DECIMAL(10,2),
+            status VARCHAR(20) DEFAULT 'active',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        -- Foreign keys will be added/fixed by migration 011
+        -- Skip adding them here to avoid conflicts with existing tables
+    END IF;
+END $$;
 
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_neon_user_id ON users(neon_user_id);
-CREATE INDEX IF NOT EXISTS idx_users_family_id ON users(family_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
+CREATE INDEX IF NOT EXISTS idx_profiles_family_id ON profiles(family_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes(user_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_recipes_tags ON recipes USING GIN(tags);
@@ -183,7 +192,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_family_members_updated_at BEFORE UPDATE ON family_members FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_recipes_updated_at BEFORE UPDATE ON recipes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

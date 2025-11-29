@@ -8,47 +8,54 @@ import { useAuthStore } from '@/stores/authStore'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Loader2, LogIn } from 'lucide-react'
+import { Loader2, LogIn, Eye, EyeOff } from "lucide-react";
 
 interface LoginFormProps {
-  onSuccess?: () => void
+  onSuccess?: () => void;
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const navigate = useNavigate()
-  const { signIn } = useAuthStore()
-  
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const { signIn } = useAuthStore();
+
   const loginMutation = useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => signIn(email, password),
+    mutationFn: async ({
+      email,
+      password,
+    }: {
+      email: string;
+      password: string;
+    }) => signIn(email, password),
     onSuccess: () => {
-      onSuccess?.()
-      navigate('/dashboard')
-      toast.success('Signed in successfully')
+      onSuccess?.();
+      navigate("/dashboard");
+      toast.success("Signed in successfully");
     },
     onError: (error: any) => {
-      const raw = error?.message || ''
+      const raw = error?.message || "";
       const friendly = /not\s*found|no\s*user|invalid/i.test(raw)
-        ? 'No account found for this email. Please sign up first.'
-        : (raw || 'Login failed')
-      setError(friendly)
-      toast.error(friendly)
-    }
-  })
+        ? "No account found for this email. Please sign up first."
+        : raw || "Login failed";
+      setError(friendly);
+      toast.error(friendly);
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    
+    e.preventDefault();
+    setError("");
+
     if (!email || !password) {
-      setError('Please fill in all fields')
-      return
+      setError("Please fill in all fields");
+      return;
     }
 
-    loginMutation.mutate({ email, password })
-  }
+    loginMutation.mutate({ email, password });
+  };
 
   return (
     <Card>
@@ -66,20 +73,37 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
+              autoComplete="email"
               required
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="pr-10"
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -88,9 +112,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
             </div>
           )}
 
-          <Button 
-            type="submit" 
-            className="w-full" 
+          <Button
+            type="submit"
+            className="w-full"
             disabled={loginMutation.isPending}
           >
             {loginMutation.isPending ? (
@@ -108,5 +132,5 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         </form>
       </CardContent>
     </Card>
-  )
-}
+  );
+};

@@ -95,20 +95,13 @@ export const RecipeList: React.FC<RecipeListProps> = ({
       imageUrl: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&h=600&fit=crop'
     }
 
-    console.log('Creating test recipe with data:', testRecipe)
-    
     try {
-      const result = await createRecipeMutation.mutateAsync(testRecipe)
-      console.log('Test recipe created successfully:', result)
+      await createRecipeMutation.mutateAsync(testRecipe)
       setTestRecipeSuccess(true)
       setTimeout(() => setTestRecipeSuccess(false), 3000) // Hide success message after 3 seconds
     } catch (error) {
-      console.error('Failed to create test recipe:', error)
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        status: (error as any)?.status,
-        response: (error as any)?.response
-      })
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Failed to create test recipe:', errorMessage)
     }
   }
 
@@ -116,9 +109,9 @@ export const RecipeList: React.FC<RecipeListProps> = ({
     if (window.confirm('Are you sure you want to delete this recipe? This action cannot be undone.')) {
       try {
         await deleteRecipeMutation.mutateAsync(recipeId)
-        console.log('Recipe deleted successfully:', recipeId)
       } catch (error) {
-        console.error('Failed to delete recipe:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('Failed to delete recipe:', errorMessage)
       }
     }
   }

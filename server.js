@@ -1,12 +1,16 @@
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
-import { config } from 'dotenv';
-import { db } from './src/services/database.js';
+import { 
+  searchRecipes, 
+  generateRecipeEmbedding, 
+  getSimilarRecipes, 
+  searchByIngredients, 
+  getRecommendations,
+  batchGenerateEmbeddings 
+} from './backend/rag-api.js';
 import { embeddingService } from './src/services/embeddingService.js';
-
-// Load environment variables
-config();
+import { db } from './src/services/database.js';
 
 const app = express();
 const PORT = 3000;
@@ -98,18 +102,9 @@ const webhookService = {
   }
 };
 
-// Test user for development
-const getTestUser = () => ({
-  id: '11111111-1111-1111-1111-111111111111',
-  neonUserId: 'test-user-123',
-  email: 'test@example.com',
-  displayName: 'Test User',
-  familyId: '11111111-1111-1111-1111-111111111111',
-  householdSize: 4
-});
-
-// Note: Recipe storage moved to direct Neon database access
+// Note: Recipe storage moved to direct Supabase database access
 // This server now only handles chat functionality
+// All endpoints require authentication via Supabase Auth
 
 // Routes
 app.get('/api/health', (req, res) => {
@@ -169,8 +164,16 @@ app.get('/api/chat/history', (req, res) => {
 
 app.post('/api/chat/message', async (req, res) => {
   try {
-    const { message, context } = req.body;
-    const user = getTestUser();
+    const { message, context, userId } = req.body;
+    
+    // Require userId from request (should come from authenticated user)
+    if (!userId) {
+      return res.status(401).json({ 
+        error: 'Authentication required. userId must be provided.' 
+      });
+    }
+    
+    const user = { id: userId };
 
     console.log('Received chat message:', message);
 
@@ -229,8 +232,16 @@ app.post('/api/chat/message', async (req, res) => {
 // Recipe storage endpoint
 app.post('/api/recipes', async (req, res) => {
   try {
-    const { recipe } = req.body;
-    const user = getTestUser();
+    const { recipe, userId } = req.body;
+    
+    // Require userId from request (should come from authenticated user)
+    if (!userId) {
+      return res.status(401).json({ 
+        error: 'Authentication required. userId must be provided.' 
+      });
+    }
+    
+    const user = { id: userId };
 
     console.log('Received recipe for storage:', recipe.title);
 
@@ -282,7 +293,16 @@ app.post('/api/recipes', async (req, res) => {
 // Get similar recipes
 app.get('/api/rag/similar/:recipeId', async (req, res) => {
   try {
-    const user = getTestUser();
+    const { userId } = req.query;
+    
+    // Require userId from query (should come from authenticated user)
+    if (!userId) {
+      return res.status(401).json({ 
+        error: 'Authentication required. userId query parameter must be provided.' 
+      });
+    }
+    
+    const user = { id: userId };
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
 
@@ -496,7 +516,6 @@ app.post('/api/rag/embedding', async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Local development server running on http://localhost:${PORT}`);
   console.log(`🌐 Server accessible on all network interfaces (including 192.168.1.143:${PORT})`);

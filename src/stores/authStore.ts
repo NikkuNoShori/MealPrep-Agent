@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { authService } from '@/services/neon'
+import { authService } from '@/services/supabase'
 
 export interface AuthUser {
   id: string
@@ -59,22 +59,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signUp: async (email: string, password: string) => {
-    console.log('🔵 AuthStore: Starting signUp for email:', email)
     set({ isLoading: true, error: null })
     try {
-      console.log('🔵 AuthStore: Calling authService.signUp...')
       const signUpResult = await authService.signUp(email, password)
-      console.log('🔵 AuthStore: signUp result:', signUpResult)
       
-      console.log('🔵 AuthStore: Getting current user...')
+      // If signup succeeded but no session (email confirmation required), 
+      // automatically sign in the user
+      if (signUpResult.user && !signUpResult.session) {
+        await authService.signIn(email, password)
+      }
+      
       const currentUser = await authService.getUser()
-      console.log('🔵 AuthStore: Current user after signup:', currentUser)
-      
       set({ user: currentUser || null })
-      console.log('🔵 AuthStore: User set in store:', currentUser?.id)
     } catch (err: any) {
-      console.error('🔴 AuthStore: SignUp error:', err)
-      set({ error: err?.message || 'Sign up failed' })
+      const errorMessage = err?.message || 'Sign up failed'
+      set({ error: errorMessage })
       throw err
     } finally {
       set({ isLoading: false })

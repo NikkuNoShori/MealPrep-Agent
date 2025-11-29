@@ -1,135 +1,169 @@
-import { Pool } from 'pg';
+// Database service using Supabase client
+import { createClient } from '@supabase/supabase-js';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
+// Initialize Supabase client
+const SUPABASE_URL = process.env.SUPABASE_URL || import.meta.env?.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('⚠️  Supabase credentials not configured. Database operations may fail.');
+}
+
+const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
+  auth: {
+    persistSession: false
   }
 });
 
 export class DatabaseService {
   constructor() {
-    this.pool = pool;
-  }
-
-  async query(text, params) {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(text, params);
-      return result;
-    } finally {
-      client.release();
-    }
-  }
-
-  async getClient() {
-    return await this.pool.connect();
+    this.supabase = supabase;
   }
 
   // Recipe CRUD operations
   async getRecipes(userId, limit = 50, offset = 0) {
-    const result = await this.query(
-      'SELECT * FROM recipes WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-      [userId, limit, offset]
-    );
-    return result.rows;
+    const { data, error } = await this.supabase
+      .from('recipes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    
+    if (error) throw error;
+    return data || [];
   }
 
   async getRecipe(recipeId, userId) {
-    const result = await this.query(
-      'SELECT * FROM recipes WHERE id = $1 AND user_id = $2',
-      [recipeId, userId]
-    );
-    return result.rows[0] || null;
+    const { data, error } = await this.supabase
+      .from('recipes')
+      .select('*')
+      .eq('id', recipeId)
+      .eq('user_id', userId)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
+    }
+    return data;
   }
 
   async createRecipe(recipe) {
-    const result = await this.query(
-      `INSERT INTO recipes (user_id, title, description, ingredients, instructions, 
-       prep_time, cook_time, servings, difficulty, cuisine, dietary_tags, 
-       source_url, source_name, rating, is_favorite)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-       RETURNING *`,
-      [
-        recipe.user_id, recipe.title, recipe.description, 
-        JSON.stringify(recipe.ingredients), JSON.stringify(recipe.instructions),
-        recipe.prep_time, recipe.cook_time, recipe.servings, recipe.difficulty,
-        recipe.cuisine, recipe.dietary_tags, recipe.source_url, recipe.source_name,
-        recipe.rating, recipe.is_favorite
-      ]
-    );
-    return result.rows[0];
+    const { data, error } = await this.supabase
+      .from('recipes')
+      .insert({
+        user_id: recipe.user_id,
+        title: recipe.title,
+        description: recipe.description,
+        ingredients: recipe.ingredients || [],
+        instructions: recipe.instructions || [],
+        prep_time: recipe.prep_time,
+        cook_time: recipe.cook_time,
+        servings: recipe.servings,
+        difficulty: recipe.difficulty,
+        cuisine: recipe.cuisine,
+        dietary_tags: recipe.dietary_tags || [],
+        source_url: recipe.source_url,
+        source_name: recipe.source_name,
+        rating: recipe.rating,
+        is_favorite: recipe.is_favorite || false
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async updateRecipe(recipeId, userId, updates) {
-    const setClause = Object.keys(updates)
-      .filter(key => key !== 'id' && key !== 'user_id' && key !== 'created_at')
-      .map((key, index) => `${key} = $${index + 3}`)
-      .join(', ');
-
-    if (!setClause) {
-      return this.getRecipe(recipeId, userId);
+    // Remove fields that shouldn't be updated
+    const { id, user_id, created_at, ...updateData } = updates;
+    
+    const { data, error } = await this.supabase
+      .from('recipes')
+      .update(updateData)
+      .eq('id', recipeId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
     }
-
-    const values = [recipeId, userId, ...Object.values(updates).filter(v => v !== undefined)];
-    const result = await this.query(
-      `UPDATE recipes SET ${setClause} WHERE id = $1 AND user_id = $2 RETURNING *`,
-      values
-    );
-    return result.rows[0] || null;
+    return data;
   }
 
   async deleteRecipe(recipeId, userId) {
-    const result = await this.query(
-      'DELETE FROM recipes WHERE id = $1 AND user_id = $2',
-      [recipeId, userId]
-    );
-    return result.rowCount > 0;
+    const { error } = await this.supabase
+      .from('recipes')
+      .delete()
+      .eq('id', recipeId)
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return true;
   }
 
   // Embedding operations
   async createEmbedding(embedding) {
-    const result = await this.query(
-      `INSERT INTO recipe_embeddings (recipe_id, embedding, text_content, embedding_type)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [embedding.recipe_id, `[${embedding.embedding.join(',')}]`, embedding.text_content, embedding.embedding_type]
-    );
-    return result.rows[0];
+    const { data, error } = await this.supabase
+      .from('recipe_embeddings')
+      .insert({
+        recipe_id: embedding.recipe_id,
+        embedding: embedding.embedding,
+        text_content: embedding.text_content,
+        embedding_type: embedding.embedding_type
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async getEmbeddings(recipeId) {
-    const result = await this.query(
-      'SELECT * FROM recipe_embeddings WHERE recipe_id = $1',
-      [recipeId]
-    );
-    return result.rows;
+    const { data, error } = await this.supabase
+      .from('recipe_embeddings')
+      .select('*')
+      .eq('recipe_id', recipeId);
+    
+    if (error) throw error;
+    return data || [];
   }
 
   async deleteEmbeddings(recipeId) {
-    await this.query(
-      'DELETE FROM recipe_embeddings WHERE recipe_id = $1',
-      [recipeId]
-    );
+    const { error } = await this.supabase
+      .from('recipe_embeddings')
+      .delete()
+      .eq('recipe_id', recipeId);
+    
+    if (error) throw error;
   }
 
-  // Vector similarity search
+  // Vector similarity search - uses Supabase RPC
   async searchSimilarRecipes(queryEmbedding, userId, similarityThreshold = 0.7, maxResults = 10) {
-    const embeddingStr = `[${queryEmbedding.join(',')}]`;
-    const result = await this.query(
-      `SELECT * FROM search_similar_recipes($1, $2, $3, $4)`,
-      [embeddingStr, userId, similarityThreshold, maxResults]
-    );
-    return result.rows;
+    const { data, error } = await this.supabase.rpc('search_recipes_semantic', {
+      query_embedding: queryEmbedding,
+      user_id: userId,
+      match_threshold: similarityThreshold,
+      match_count: maxResults
+    });
+    
+    if (error) throw error;
+    return data || [];
   }
 
-  // Full-text search
+  // Full-text search - uses Supabase RPC
   async searchRecipesText(searchQuery, userId, maxResults = 10) {
-    const result = await this.query(
-      `SELECT * FROM search_recipes_text($1, $2, $3)`,
-      [searchQuery, userId, maxResults]
-    );
-    return result.rows;
+    const { data, error } = await this.supabase.rpc('search_recipes_text', {
+      search_query: searchQuery,
+      user_id: userId,
+      max_results: maxResults
+    });
+    
+    if (error) throw error;
+    return data || [];
   }
 
   // Hybrid search (combines vector and text search)
@@ -145,7 +179,7 @@ export class DatabaseService {
     
     // Add vector search results with higher weight
     vectorResults.forEach(result => {
-      resultMap.set(result.recipe_id, {
+      resultMap.set(result.recipe_id || result.id, {
         ...result,
         similarity_score: (result.similarity_score || 0) * 0.7 // Weight vector results
       });
@@ -153,13 +187,13 @@ export class DatabaseService {
 
     // Add text search results
     textResults.forEach(result => {
-      const existing = resultMap.get(result.recipe_id);
+      const existing = resultMap.get(result.recipe_id || result.id);
       if (existing) {
         // Combine scores if recipe appears in both results
         existing.rank_score = (result.rank_score || 0) * 0.3;
         existing.similarity_score = (existing.similarity_score || 0) + (result.rank_score || 0) * 0.3;
       } else {
-        resultMap.set(result.recipe_id, {
+        resultMap.set(result.recipe_id || result.id, {
           ...result,
           rank_score: (result.rank_score || 0) * 0.3 // Weight text results
         });
@@ -185,34 +219,32 @@ export class DatabaseService {
 
   // Get recipe recommendations based on user preferences
   async getRecommendations(userId, preferences = {}, maxResults = 10) {
-    let query = 'SELECT * FROM recipes WHERE user_id = $1';
-    const params = [userId];
-    let paramIndex = 2;
+    let query = this.supabase
+      .from('recipes')
+      .select('*')
+      .eq('user_id', userId);
 
     // Add filters based on preferences
     if (preferences.cuisine) {
-      query += ` AND cuisine = $${paramIndex}`;
-      params.push(preferences.cuisine);
-      paramIndex++;
+      query = query.eq('cuisine', preferences.cuisine);
     }
 
     if (preferences.difficulty) {
-      query += ` AND difficulty = $${paramIndex}`;
-      params.push(preferences.difficulty);
-      paramIndex++;
+      query = query.eq('difficulty', preferences.difficulty);
     }
 
     if (preferences.dietary_tags && preferences.dietary_tags.length > 0) {
-      query += ` AND dietary_tags && $${paramIndex}`;
-      params.push(preferences.dietary_tags);
-      paramIndex++;
+      query = query.overlaps('dietary_tags', preferences.dietary_tags);
     }
 
-    query += ` ORDER BY rating DESC NULLS LAST, created_at DESC LIMIT $${paramIndex}`;
-    params.push(maxResults);
+    const { data, error } = await query
+      .order('rating', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(maxResults);
 
-    const result = await this.query(query, params);
-    return result.rows.map(row => ({
+    if (error) throw error;
+    
+    return (data || []).map(row => ({
       recipe_id: row.id,
       title: row.title,
       description: row.description,
