@@ -7,14 +7,24 @@ const Recipes = () => {
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<any>(null);
+  const [initialRecipeData, setInitialRecipeData] = useState<any>(null);
 
   const handleRecipeSelect = (recipe: any) => {
     setSelectedRecipe(recipe);
     setShowAddForm(false);
     setEditingRecipe(null);
+    setInitialRecipeData(null);
   };
 
   const handleAddRecipe = () => {
+    setShowAddForm(true);
+    setSelectedRecipe(null);
+    setEditingRecipe(null);
+    setInitialRecipeData(null);
+  };
+
+  const handleAddRecipeWithData = (recipeData: any) => {
+    setInitialRecipeData(recipeData);
     setShowAddForm(true);
     setSelectedRecipe(null);
     setEditingRecipe(null);
@@ -24,6 +34,7 @@ const Recipes = () => {
     setEditingRecipe(recipe);
     setShowAddForm(false);
     setSelectedRecipe(null);
+    setInitialRecipeData(null);
   };
 
   const handleCloseForm = () => {
@@ -42,7 +53,7 @@ const Recipes = () => {
         {showAddForm && (
           <div className="animate-fade-in">
             <RecipeForm
-              recipe={editingRecipe}
+              recipe={editingRecipe || initialRecipeData}
               onSave={() => {
                 handleCloseForm();
                 // Refresh recipe list
@@ -68,6 +79,7 @@ const Recipes = () => {
               onRecipeSelect={handleRecipeSelect}
               onAddRecipe={handleAddRecipe}
               onEditRecipe={handleEditRecipe}
+              onAddRecipeWithData={handleAddRecipeWithData}
             />
           </div>
         )}

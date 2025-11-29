@@ -9,7 +9,13 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables');
 }
 
-const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '')
+const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+})
 
 // Recipe service - using API endpoints (not direct database access)
 export const recipeService = {
@@ -189,6 +195,215 @@ export const authService = {
   async isAuthenticated() {
     const user = await this.getUser()
     return !!user
+  },
+
+  // Sign in with Google OAuth
+  async signInWithGoogle(redirectTo?: string) {
+    try {
+      const redirectUrl = redirectTo || `${window.location.origin}/auth/callback`
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      
+      return { url: data.url }
+    } catch (err: any) {
+      throw new Error(err.message || 'Google sign in failed')
+    }
+  },
+
+  // Link Google account to existing user
+  async linkGoogleAccount(redirectTo?: string) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('User must be signed in to link accounts')
+      }
+
+      const redirectUrl = redirectTo || `${window.location.origin}/auth/callback`
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      
+      // Note: Supabase will automatically link the account if the email matches
+      // If emails don't match, the user will need to use the same email for both accounts
+      return { url: data.url }
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to link Google account')
+    }
+  },
+
+  // Unlink Google account
+  async unlinkGoogleAccount() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      // Find Google identity
+      const googleIdentity = user.identities?.find(
+        (identity: any) => identity.provider === 'google'
+      )
+
+      if (!googleIdentity) {
+        throw new Error('Google account is not linked')
+      }
+
+      const { error } = await supabase.auth.unlinkIdentity({
+        provider: 'google',
+        identityId: googleIdentity.id,
+      })
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      return { success: true }
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to unlink Google account')
+    }
+  },
+
+  // Get linked accounts for current user
+  async getLinkedAccounts() {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error || !user) {
+        return []
+      }
+
+      return user.identities?.map((identity: any) => ({
+        provider: identity.provider,
+        id: identity.id,
+        created_at: identity.created_at,
+      })) || []
+    } catch (err) {
+      console.error('Error getting linked accounts:', err)
+      return []
+    }
+  },
+
+  // Handle OAuth callback - wait for session to be available
+  async handleOAuthCallback(): Promise<{ user: any; session: any }> {
+    return new Promise((resolve, reject) => {
+      let resolved = false
+      let subscription: any = null
+
+      // Set a timeout to avoid infinite waiting
+      const timeout = setTimeout(() => {
+        if (subscription) {
+          subscription.unsubscribe()
+        }
+        if (!resolved) {
+          resolved = true
+          reject(new Error('OAuth callback timeout - session not received. Please try signing in again.'))
+        }
+      }, 15000) // 15 second timeout
+
+      // Helper to resolve and clean up
+      const resolveCallback = async (session: any) => {
+        if (resolved) return
+        resolved = true
+        clearTimeout(timeout)
+        if (subscription) {
+          subscription.unsubscribe()
+        }
+
+        try {
+          // Ensure profile exists
+          if (session?.user) {
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .upsert({
+                id: session.user.id,
+                email: session.user.email,
+                display_name: session.user.user_metadata?.full_name || 
+                             session.user.user_metadata?.name ||
+                             session.user.email?.split('@')[0] || 'User',
+                avatar_url: session.user.user_metadata?.avatar_url,
+                updated_at: new Date().toISOString()
+              }, {
+                onConflict: 'id'
+              })
+            
+            if (profileError) {
+              console.error('Error syncing user profile:', profileError)
+              // Don't throw - profile can be created later
+            }
+          }
+
+          resolve({
+            user: session?.user ? {
+              id: session.user.id,
+              email: session.user.email,
+              ...session.user
+            } : null,
+            session: session
+          })
+        } catch (err: any) {
+          reject(new Error(err.message || 'Failed to process OAuth callback'))
+        }
+      }
+
+      // Listen for auth state changes (primary method)
+      const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (resolved) return
+
+          if (event === 'SIGNED_IN' && session) {
+            await resolveCallback(session)
+          } else if (event === 'SIGNED_OUT') {
+            if (!resolved) {
+              resolved = true
+              clearTimeout(timeout)
+              if (subscription) {
+                subscription.unsubscribe()
+              }
+              reject(new Error('OAuth callback failed - user not signed in'))
+            }
+          }
+        }
+      )
+      subscription = authSubscription
+
+      // Also try to get session immediately (in case it's already available)
+      // Wait a small delay first to let Supabase process the URL
+      setTimeout(async () => {
+        if (resolved) return
+
+        try {
+          const { data, error } = await supabase.auth.getSession()
+          if (data.session && !error && !resolved) {
+            await resolveCallback(data.session)
+          }
+        } catch (err) {
+          // Ignore errors here, let the onAuthStateChange handle it
+          console.error('Error getting session:', err)
+        }
+      }, 500) // Wait 500ms for Supabase to process the URL
+    })
   }
 }
 

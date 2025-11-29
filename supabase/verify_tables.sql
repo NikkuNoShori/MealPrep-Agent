@@ -191,3 +191,4 @@ FROM required_tables rt
 ORDER BY status DESC, rt.table_name;
 
 
+

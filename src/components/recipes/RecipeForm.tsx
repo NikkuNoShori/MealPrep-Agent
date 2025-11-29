@@ -27,7 +27,8 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
   onSave, 
   onCancel 
 }) => {
-  const isEditing = !!recipe
+  // Only treat as editing if recipe has an ID (existing recipe in database)
+  const isEditing = !!(recipe && recipe.id)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -54,14 +55,14 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
       setFormData({
         title: recipe.title || '',
         description: recipe.description || '',
-        prepTime: recipe.prepTime?.toString() || '',
-        cookTime: recipe.cookTime?.toString() || '',
+        prepTime: recipe.prepTime?.toString() || recipe.prep_time?.toString() || '',
+        cookTime: recipe.cookTime?.toString() || recipe.cook_time?.toString() || '',
         servings: recipe.servings?.toString() || '',
         difficulty: recipe.difficulty || '',
         tags: recipe.tags || [],
         ingredients: recipe.ingredients || [],
         instructions: recipe.instructions || [],
-        imageUrl: recipe.imageUrl || ''
+        imageUrl: recipe.imageUrl || recipe.image_url || ''
       })
     }
   }, [recipe])
@@ -77,7 +78,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     }
 
     try {
-      if (isEditing) {
+      if (isEditing && recipe?.id) {
         await updateRecipeMutation.mutateAsync({ id: recipe.id, data: recipeData })
       } else {
         await createRecipeMutation.mutateAsync(recipeData)
@@ -85,6 +86,8 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
       onSave()
     } catch (error) {
       console.error('Failed to save recipe:', error)
+      // Re-throw to allow UI to handle error
+      throw error
     }
   }
 
