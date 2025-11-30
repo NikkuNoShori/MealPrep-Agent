@@ -138,12 +138,26 @@ export interface ChatHistoryResponse {
   total: number
 }
 
+export interface StructuredRecipe {
+  title: string
+  description?: string
+  prepTime?: number
+  cookTime?: number
+  servings?: number
+  difficulty?: 'easy' | 'medium' | 'hard'
+  tags?: string[]
+  ingredients: Ingredient[]
+  instructions: string[]
+  imageUrl?: string
+}
+
 export interface ChatMessageResponse {
   response: {
     id: string
     content: string
     timestamp: string
   }
+  recipe?: StructuredRecipe // Optional structured recipe data
 }
 
 export interface RecipesResponse {

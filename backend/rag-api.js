@@ -2,15 +2,17 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+// Check both VITE_ prefixed and non-prefixed environment variables
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('⚠️  Supabase credentials not configured. RAG features may not work.');
-  console.warn('⚠️  Required: SUPABASE_URL and SUPABASE_ANON_KEY environment variables');
+  console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or SUPABASE_URL and SUPABASE_ANON_KEY) environment variables');
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || '', {
+// Create client with fallback empty strings to prevent errors
+const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
   auth: {
     persistSession: false
   }

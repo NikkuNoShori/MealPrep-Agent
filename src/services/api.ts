@@ -321,6 +321,7 @@ class ApiClient {
     sessionId?: string;
     clearMemory?: boolean;
     intent?: string;
+    images?: string[]; // Array of base64 data URLs
   }) {
     // Supabase edge function path: /functions/v1/chat-api/message
     return this.request(`${SUPABASE_FUNCTIONS_URL}/chat-api/message`, {
@@ -346,8 +347,16 @@ class ApiClient {
     if (limit) searchParams.append("limit", limit.toString());
 
     // Supabase edge function path: /functions/v1/chat-api/history
+    // Returns list of conversations
     return this.request(
       `${SUPABASE_FUNCTIONS_URL}/chat-api/history?${searchParams.toString()}`
+    );
+  }
+
+  async getConversationMessages(conversationId: string) {
+    // Supabase edge function path: /functions/v1/chat-api/history?conversationId=...
+    return this.request(
+      `${SUPABASE_FUNCTIONS_URL}/chat-api/history?conversationId=${conversationId}`
     );
   }
 
@@ -356,6 +365,16 @@ class ApiClient {
     return this.request(`${SUPABASE_FUNCTIONS_URL}/chat-api/history`, {
       method: "DELETE",
     });
+  }
+
+  async deleteConversation(conversationId: string) {
+    // Supabase edge function path: /functions/v1/chat-api/history?conversationId=...
+    return this.request(
+      `${SUPABASE_FUNCTIONS_URL}/chat-api/history?conversationId=${conversationId}`,
+      {
+        method: "DELETE",
+      }
+    );
   }
 
   // Meal planning endpoints - using Supabase client directly
@@ -613,7 +632,8 @@ class ApiClient {
   // RAG endpoints - using local server for now (can be migrated to Supabase edge function later)
   async ragSearch(request: any) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    return this.request(`${baseUrl}/rag/search`, {
+    const path = isLocalhost ? "/api/rag/search" : "/rag/search";
+    return this.request(`${baseUrl}${path}`, {
       method: "POST",
       body: JSON.stringify(request),
     });
@@ -621,7 +641,8 @@ class ApiClient {
 
   async ragEmbedding(request: any) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    return this.request(`${baseUrl}/rag/embedding`, {
+    const path = isLocalhost ? "/api/rag/embedding" : "/rag/embedding";
+    return this.request(`${baseUrl}${path}`, {
       method: "POST",
       body: JSON.stringify(request),
     });
@@ -629,9 +650,10 @@ class ApiClient {
 
   async ragSimilar(recipeId: string, userId: string, limit: number = 5) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    return this.request(
-      `${baseUrl}/rag/similar/${recipeId}?userId=${userId}&limit=${limit}`
-    );
+    const path = isLocalhost
+      ? `/api/rag/similar/${recipeId}`
+      : `/rag/similar/${recipeId}`;
+    return this.request(`${baseUrl}${path}?userId=${userId}&limit=${limit}`);
   }
 
   async ragIngredients(
@@ -640,7 +662,8 @@ class ApiClient {
     limit: number = 10
   ) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    return this.request(`${baseUrl}/rag/ingredients`, {
+    const path = isLocalhost ? "/api/rag/ingredients" : "/rag/ingredients";
+    return this.request(`${baseUrl}${path}`, {
       method: "POST",
       body: JSON.stringify({ ingredients, userId, limit }),
     });
@@ -652,7 +675,10 @@ class ApiClient {
     limit: number = 10
   ) {
     const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    return this.request(`${baseUrl}/rag/recommendations`, {
+    const path = isLocalhost
+      ? "/api/rag/recommendations"
+      : "/rag/recommendations";
+    return this.request(`${baseUrl}${path}`, {
       method: "POST",
       body: JSON.stringify({ userId, preferences, limit }),
     });
@@ -741,6 +767,7 @@ export const useSendMessage = () => {
       sessionId?: string;
       clearMemory?: boolean;
       intent?: string;
+      images?: string[]; // Array of base64 data URLs
     }) => apiClient.sendMessage(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chat", "history"] });

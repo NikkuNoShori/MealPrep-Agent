@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useSendMessage } from "../../services/api";
-import { ragService, formatRecipeContext } from "../../services/ragService";
-import { Card, CardContent } from "../ui/card";
+import { useSendMessage, useChatHistory } from "../../services/api";
+import { apiClient } from "../../services/api";
+import { detectIntent } from "../../services/ragService";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -15,15 +15,19 @@ import {
   CheckSquare,
   Square,
   X,
+  Image as ImageIcon,
 } from "lucide-react";
-import { ChatMessageResponse } from "../../types";
+import { ChatMessageResponse, StructuredRecipe } from "../../types";
 import { useAuthStore } from "../../stores/authStore";
+import { StructuredRecipeDisplay } from "./StructuredRecipeDisplay";
 
 interface Message {
   id: string;
   content: string;
   sender: "user" | "ai";
   timestamp: Date;
+  images?: string[]; // Array of image URLs or base64 data URLs
+  recipe?: StructuredRecipe; // Optional structured recipe data
 }
 
 interface Conversation {
@@ -51,10 +55,24 @@ export const ChatInterface: React.FC = () => {
     Set<string>
   >(new Set());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [pendingImages, setPendingImages] = useState<File[]>([]); // Images to be sent with next message
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    // Load saved width from localStorage or default to 320px (w-80)
+    const saved = localStorage.getItem("chat-sidebar-width");
+    return saved ? parseInt(saved, 10) : 320;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const sendMessageMutation = useSendMessage();
   const { user } = useAuthStore();
+  const {
+    data: chatHistoryData,
+    isLoading: isLoadingHistory,
+    refetch: refetchHistory,
+  } = useChatHistory(50);
 
   // Get user's first name
   const getFirstName = () => {
@@ -64,77 +82,87 @@ export const ChatInterface: React.FC = () => {
     return "there";
   };
 
-  // Load conversations from localStorage on component mount
+  // Load conversations from database on component mount
   useEffect(() => {
-    const savedConversations = localStorage.getItem("chat-conversations");
-    const savedCurrentId = localStorage.getItem("chat-current-conversation-id");
-    const shouldCreateTemporary = localStorage.getItem(
-      "chat-create-temporary-session"
-    );
+    if (!user || isLoadingHistory) return; // Wait for user to be loaded and data to be fetched
 
-    console.log("Loading conversations from localStorage:", {
-      savedConversations,
-      savedCurrentId,
-      shouldCreateTemporary,
-    });
-
-    // Clear the temporary session flag
-    if (shouldCreateTemporary) {
-      localStorage.removeItem("chat-create-temporary-session");
-    }
-
-    if (savedConversations) {
+    const loadConversations = async () => {
       try {
-        const parsedConversations = JSON.parse(savedConversations);
-        console.log("Parsed conversations:", parsedConversations);
-
-        // Convert timestamp strings back to Date objects and ensure isTemporary is set
-        const conversationsWithDates = parsedConversations.map((conv: any) => ({
-          ...conv,
-          timestamp: new Date(conv.timestamp),
-          messages: conv.messages.map((msg: any) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp),
-          })),
-          isTemporary: conv.isTemporary || false, // Ensure isTemporary is set
-          selectedIntent: conv.selectedIntent || null, // Restore selected intent
-          sessionId: conv.sessionId || `session-${Date.now()}`, // Ensure sessionId is preserved
-        }));
-        setConversations(conversationsWithDates);
-
-        if (shouldCreateTemporary) {
-          // Create a new temporary session when requested from navbar
-          createNewConversation();
-        } else if (
-          savedCurrentId &&
-          conversationsWithDates.find(
-            (c: Conversation) => c.id === savedCurrentId
-          )
+        const historyData = chatHistoryData as any;
+        if (
+          historyData?.conversations &&
+          Array.isArray(historyData.conversations) &&
+          historyData.conversations.length > 0
         ) {
-          // Restore the saved conversation and log sessionId for debugging
-          const restoredConversation = conversationsWithDates.find(
-            (c: Conversation) => c.id === savedCurrentId
+          // Convert database conversations to local format
+          const loadedConversations: Conversation[] = await Promise.all(
+            historyData.conversations.map(async (dbConv: any) => {
+              // Load messages for this conversation
+              let messages: Message[] = [];
+              try {
+                const messagesData = await apiClient.getConversationMessages(
+                  dbConv.id
+                );
+                const messagesResponse = messagesData as any;
+                if (
+                  messagesResponse?.messages &&
+                  Array.isArray(messagesResponse.messages)
+                ) {
+                  messages = messagesResponse.messages.map((msg: any) => ({
+                    id: msg.id,
+                    content: msg.content,
+                    sender: msg.sender as "user" | "ai",
+                    timestamp: new Date(msg.timestamp),
+                  }));
+                }
+              } catch (error) {
+                console.error(
+                  `Error loading messages for conversation ${dbConv.id}:`,
+                  error
+                );
+              }
+
+              return {
+                id: dbConv.id,
+                title: dbConv.title,
+                messages: messages,
+                lastMessage:
+                  messages.length > 0
+                    ? messages[messages.length - 1].content
+                    : "",
+                timestamp: new Date(dbConv.lastMessageAt || dbConv.createdAt),
+                sessionId: dbConv.sessionId,
+                isTemporary: false, // All loaded from DB are persistent
+                selectedIntent: dbConv.selectedIntent || null,
+              };
+            })
           );
-          console.log(
-            "Restoring conversation with sessionId:",
-            restoredConversation?.sessionId
+
+          // Filter out conversations with no messages (shouldn't exist in DB, but just in case)
+          const conversationsWithMessages = loadedConversations.filter(
+            (conv) => conv.messages.length > 0
           );
-          setCurrentConversationId(savedCurrentId);
-        } else if (conversationsWithDates.length > 0) {
-          setCurrentConversationId(conversationsWithDates[0].id);
+
+          setConversations(conversationsWithMessages);
+
+          // Set the most recent conversation as current
+          if (conversationsWithMessages.length > 0) {
+            setCurrentConversationId(conversationsWithMessages[0].id);
+          } else {
+            createDefaultConversation();
+          }
         } else {
+          // No conversations in database, create default
           createDefaultConversation();
         }
       } catch (error) {
-        console.error("Error loading conversations from localStorage:", error);
-        // Fallback to default conversation
+        console.error("Error loading conversations from database:", error);
         createDefaultConversation();
       }
-    } else {
-      console.log("No saved conversations found, creating default");
-      createDefaultConversation();
-    }
-  }, []);
+    };
+
+    loadConversations();
+  }, [user, chatHistoryData, isLoadingHistory]);
 
   const createDefaultConversation = () => {
     const newSessionId = `session-${Date.now()}`;
@@ -152,23 +180,8 @@ export const ChatInterface: React.FC = () => {
     setCurrentConversationId(defaultConversation.id);
   };
 
-  // Save conversations to localStorage whenever they change (excluding temporary ones)
-  useEffect(() => {
-    if (conversations.length > 0) {
-      // Only save non-temporary conversations to localStorage
-      const persistentConversations = conversations.filter(
-        (conv) => !conv.isTemporary
-      );
-      console.log(
-        "Saving persistent conversations to localStorage:",
-        persistentConversations
-      );
-      localStorage.setItem(
-        "chat-conversations",
-        JSON.stringify(persistentConversations)
-      );
-    }
-  }, [conversations]);
+  // Refetch conversations when messages are sent (handled by mutation invalidation)
+  // No need to save to localStorage - all conversations are stored in database
 
   // For conversations with messages but no selectedIntent (legacy conversations),
   // infer intent from first message or default to RAG queries
@@ -184,23 +197,10 @@ export const ChatInterface: React.FC = () => {
     );
   }, []);
 
-  // Clean up temporary sessions on component unmount
-  useEffect(() => {
-    return () => {
-      // Clean up any temporary sessions when component unmounts
-      setConversations((prev) => prev.filter((conv) => !conv.isTemporary));
-    };
-  }, []);
+  // No need to clean up temporary sessions - they're managed in database
 
-  // Save current conversation ID to localStorage
-  useEffect(() => {
-    if (currentConversationId) {
-      localStorage.setItem(
-        "chat-current-conversation-id",
-        currentConversationId
-      );
-    }
-  }, [currentConversationId]);
+  // No need to save current conversation ID to localStorage
+  // It's managed in component state and restored from database
 
   useEffect(() => {
     scrollToBottom();
@@ -215,6 +215,11 @@ export const ChatInterface: React.FC = () => {
   };
 
   const createNewConversation = () => {
+    // Remove any temporary conversations with no messages
+    setConversations((prev) =>
+      prev.filter((conv) => !conv.isTemporary || conv.messages.length > 0)
+    );
+
     const newSessionId = `session-${Date.now()}`;
     const newConversation: Conversation = {
       id: Date.now().toString(),
@@ -224,7 +229,7 @@ export const ChatInterface: React.FC = () => {
       timestamp: new Date(),
       sessionId: newSessionId,
       isTemporary: true, // Mark as temporary until first message
-      selectedIntent: null, // No intent selected yet
+      selectedIntent: undefined, // No intent selected yet
     };
     setConversations((prev) => [newConversation, ...prev]);
     setCurrentConversationId(newConversation.id);
@@ -244,24 +249,84 @@ export const ChatInterface: React.FC = () => {
     );
   };
 
-  const deleteConversation = (conversationId: string) => {
-    setConversations((prev) =>
-      prev.filter((conv) => conv.id !== conversationId)
+  const deleteConversation = async (conversationId: string) => {
+    const conversation = conversations.find(
+      (conv) => conv.id === conversationId
     );
-    if (currentConversationId === conversationId) {
-      const remainingConversations = conversations.filter(
-        (conv) => conv.id !== conversationId
+
+    // If it's a temporary conversation with no messages, just remove from state
+    if (conversation?.isTemporary && conversation.messages.length === 0) {
+      setConversations((prev) =>
+        prev.filter((conv) => conv.id !== conversationId)
       );
-      if (remainingConversations.length > 0) {
-        setCurrentConversationId(remainingConversations[0].id);
-      } else {
-        createNewConversation();
+      if (currentConversationId === conversationId) {
+        const remainingConversations = conversations.filter(
+          (conv) => conv.id !== conversationId
+        );
+        if (remainingConversations.length > 0) {
+          setCurrentConversationId(remainingConversations[0].id);
+        } else {
+          createNewConversation();
+        }
       }
+      return;
+    }
+
+    // If it's in the database (has messages), delete it via API
+    try {
+      await apiClient.deleteConversation(conversationId);
+
+      // Remove from state after successful API call
+      setConversations((prev) =>
+        prev.filter((conv) => conv.id !== conversationId)
+      );
+      if (currentConversationId === conversationId) {
+        const remainingConversations = conversations.filter(
+          (conv) => conv.id !== conversationId
+        );
+        if (remainingConversations.length > 0) {
+          setCurrentConversationId(remainingConversations[0].id);
+        } else {
+          createNewConversation();
+        }
+      }
+      // Refetch to sync with database
+      refetchHistory();
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      // Revert state change on error
+      refetchHistory();
     }
   };
 
-  const deleteSelectedConversations = () => {
+  const deleteSelectedConversations = async () => {
     const conversationsToDelete = Array.from(selectedConversations);
+
+    // Delete each conversation from the database
+    const deletePromises = conversationsToDelete.map(async (conversationId) => {
+      const conversation = conversations.find(
+        (conv) => conv.id === conversationId
+      );
+
+      // Only call API for non-temporary conversations with messages
+      if (
+        conversation &&
+        !(conversation.isTemporary && conversation.messages.length === 0)
+      ) {
+        try {
+          await apiClient.deleteConversation(conversationId);
+        } catch (error) {
+          console.error(
+            `Error deleting conversation ${conversationId}:`,
+            error
+          );
+        }
+      }
+    });
+
+    await Promise.all(deletePromises);
+
+    // Remove from state after successful API calls
     setConversations((prev) =>
       prev.filter((conv) => !selectedConversations.has(conv.id))
     );
@@ -284,6 +349,9 @@ export const ChatInterface: React.FC = () => {
     // Clear selection and exit multi-select mode
     setSelectedConversations(new Set());
     setIsMultiSelectMode(false);
+
+    // Refetch to sync with database
+    refetchHistory();
   };
 
   const toggleConversationSelection = (conversationId: string) => {
@@ -323,8 +391,115 @@ export const ChatInterface: React.FC = () => {
     );
   };
 
+  // Handle image file selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+
+    // Limit to 4 images total
+    const remainingSlots = 4 - pendingImages.length;
+    const filesToAdd = imageFiles.slice(0, remainingSlots);
+
+    setPendingImages((prev) => [...prev, ...filesToAdd]);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Handle paste images from clipboard
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items);
+    const imageItems = items.filter((item) => item.type.startsWith("image/"));
+
+    if (imageItems.length > 0 && pendingImages.length < 4) {
+      const remainingSlots = 4 - pendingImages.length;
+      const itemsToProcess = imageItems.slice(0, remainingSlots);
+
+      itemsToProcess.forEach((item) => {
+        const file = item.getAsFile();
+        if (file) {
+          setPendingImages((prev) => [...prev, file]);
+        }
+      });
+    }
+  };
+
+  // Remove image from pending list
+  const removeImage = (index: number) => {
+    setPendingImages((prev) => {
+      const newImages = prev.filter((_, i) => i !== index);
+      // Clean up object URL for removed image
+      if (prev[index]) {
+        URL.revokeObjectURL(URL.createObjectURL(prev[index]));
+      }
+      return newImages;
+    });
+  };
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      pendingImages.forEach((file) => {
+        URL.revokeObjectURL(URL.createObjectURL(file));
+      });
+    };
+  }, []);
+
+  // Save sidebar width to localStorage
+  useEffect(() => {
+    localStorage.setItem("chat-sidebar-width", sidebarWidth.toString());
+  }, [sidebarWidth]);
+
+  // Handle sidebar resize
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const newWidth = e.clientX;
+      // Constrain between 240px (min) and 600px (max)
+      const constrainedWidth = Math.max(240, Math.min(600, newWidth));
+      setSidebarWidth(constrainedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing]);
+
+  // Convert File to base64 data URL
+  const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || !currentConversationId) return;
+    // Allow sending if there's text OR images
+    if (
+      (!inputMessage.trim() && pendingImages.length === 0) ||
+      isLoading ||
+      !currentConversationId
+    )
+      return;
 
     const currentConversation = getCurrentConversation();
     if (!currentConversation) return;
@@ -341,11 +516,17 @@ export const ChatInterface: React.FC = () => {
     setHistoryIndex(-1);
     setTempInput("");
 
+    // Convert images to data URLs
+    const imageDataUrls = await Promise.all(
+      pendingImages.map((file) => fileToDataURL(file))
+    );
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputMessage,
       sender: "user",
       timestamp: new Date(),
+      images: imageDataUrls.length > 0 ? imageDataUrls : undefined,
     };
 
     // Update conversation with user message and persist if temporary
@@ -368,6 +549,7 @@ export const ChatInterface: React.FC = () => {
     );
 
     setInputMessage("");
+    setPendingImages([]); // Clear images after adding to message
     setIsLoading(true);
 
     try {
@@ -375,43 +557,129 @@ export const ChatInterface: React.FC = () => {
 
       if (intent === "recipe_extraction") {
         // Handle recipe extraction
-        response = (await sendMessageMutation.mutateAsync({
+        const messageData: {
+          message: string;
+          sessionId: string;
+          intent: string;
+          images?: string[];
+          context: any;
+        } = {
           message: inputMessage,
           sessionId: currentConversation.sessionId,
           intent: "recipe_extraction",
           context: {
             recentMessages: currentConversation.messages.slice(-5),
           },
-        })) as ChatMessageResponse;
-      } else {
-        // Handle RAG-based queries (all non-extraction intents)
-        let recipeContext = "";
+        };
+        if (imageDataUrls.length > 0) {
+          messageData.images = imageDataUrls;
+        }
+        const sendResponse = (await sendMessageMutation.mutateAsync(
+          messageData
+        )) as ChatMessageResponse & {
+          conversationId?: string;
+          sessionId?: string;
+        };
 
-        // Always perform RAG search for better context
-        try {
-          const ragResults = await ragService.searchRecipes({
-            query: inputMessage,
-            userId: user?.id || "test-user",
-            limit: 5,
-            searchType: "hybrid",
-          });
-          recipeContext = formatRecipeContext(ragResults.results);
-        } catch (ragError) {
-          console.warn(
-            "RAG search failed, proceeding without context:",
-            ragError
+        // Update conversation ID if this is a new conversation (from database)
+        if (sendResponse.conversationId && currentConversation.isTemporary) {
+          setConversations((prev) =>
+            prev.map((conv) =>
+              conv.id === currentConversationId
+                ? {
+                    ...conv,
+                    id: sendResponse.conversationId!,
+                    isTemporary: false,
+                  }
+                : conv
+            )
+          );
+          setCurrentConversationId(sendResponse.conversationId);
+        }
+
+        // Update sessionId if provided
+        if (
+          sendResponse.sessionId &&
+          sendResponse.sessionId !== currentConversation.sessionId
+        ) {
+          setConversations((prev) =>
+            prev.map((conv) =>
+              conv.id === (sendResponse.conversationId || currentConversationId)
+                ? { ...conv, sessionId: sendResponse.sessionId! }
+                : conv
+            )
           );
         }
 
-        response = (await sendMessageMutation.mutateAsync({
+        response = sendResponse;
+      } else {
+        // Handle RAG-based queries - let n8n intent router decide
+        // Detect intent and send it to n8n, which will handle RAG search if needed
+        const detectedIntent = detectIntent(inputMessage);
+
+        // Only send specific intent if it's recipe-related, otherwise send undefined
+        // n8n's intent router: if intent === "recipe_extraction" → extraction path, else → RAG path
+        const intentToSend =
+          detectedIntent === "recipe_extraction"
+            ? "recipe_extraction"
+            : undefined; // Let n8n handle RAG search in its RAG Query path
+
+        const messageData: {
+          message: string;
+          sessionId: string;
+          intent?: string;
+          images?: string[];
+          context: any;
+        } = {
           message: inputMessage,
           sessionId: currentConversation.sessionId,
-          intent: undefined, // No specific intent for RAG queries
+          intent: intentToSend,
           context: {
             recentMessages: currentConversation.messages.slice(-5),
-            recipeContext: recipeContext,
+            detectedIntent: detectedIntent, // Pass detected intent in context for n8n to use
           },
-        })) as ChatMessageResponse;
+        };
+        if (imageDataUrls.length > 0) {
+          messageData.images = imageDataUrls;
+        }
+        const sendResponse = (await sendMessageMutation.mutateAsync(
+          messageData
+        )) as ChatMessageResponse & {
+          conversationId?: string;
+          sessionId?: string;
+        };
+
+        // Update conversation ID if this is a new conversation (from database)
+        if (sendResponse.conversationId && currentConversation.isTemporary) {
+          setConversations((prev) =>
+            prev.map((conv) =>
+              conv.id === currentConversationId
+                ? {
+                    ...conv,
+                    id: sendResponse.conversationId!,
+                    isTemporary: false,
+                  }
+                : conv
+            )
+          );
+          setCurrentConversationId(sendResponse.conversationId);
+        }
+
+        // Update sessionId if provided
+        if (
+          sendResponse.sessionId &&
+          sendResponse.sessionId !== currentConversation.sessionId
+        ) {
+          setConversations((prev) =>
+            prev.map((conv) =>
+              conv.id === (sendResponse.conversationId || currentConversationId)
+                ? { ...conv, sessionId: sendResponse.sessionId! }
+                : conv
+            )
+          );
+        }
+
+        response = sendResponse;
       }
 
       const aiMessage: Message = {
@@ -419,6 +687,7 @@ export const ChatInterface: React.FC = () => {
         content: response.response.content,
         sender: "ai",
         timestamp: new Date(response.response.timestamp),
+        recipe: response.recipe, // Include structured recipe if present
       };
 
       // Update conversation with AI response
@@ -490,16 +759,30 @@ export const ChatInterface: React.FC = () => {
   return (
     <div className="flex h-full min-h-0">
       {/* Sidebar - Conversation History */}
-      <div className="w-80 bg-gradient-to-b from-primary-50/30 via-slate-50 to-secondary-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 border-r border-primary-200/50 dark:border-gray-700 flex flex-col min-h-0">
+      <div
+        ref={sidebarRef}
+        className="bg-gray-600 dark:bg-slate-800 border-r border-primary-200/50 dark:border-slate-700/50 flex flex-col min-h-0 relative"
+        style={{ width: `${sidebarWidth}px` }}
+      >
+        {/* Resize Handle */}
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary-500/50 dark:hover:bg-primary-400/50 transition-colors z-10 group"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsResizing(true);
+          }}
+        >
+          <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-transparent group-hover:bg-primary-500/30 dark:group-hover:bg-primary-400/30" />
+        </div>
         {/* Header with New Chat and Multi-select */}
-        <div className="p-3 border-b border-primary-200/50 dark:border-gray-700 bg-white/50 dark:bg-transparent backdrop-blur-sm">
+        <div className="p-3 border-b border-primary-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-900/30 backdrop-blur-sm">
           <div className="flex gap-2">
             <Button
               onClick={createNewConversation}
               variant="outline"
               size="icon"
               title="New Chat"
-              className="h-8 w-8 flex-1 bg-transparent dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
+              className="h-8 w-8 flex-1 bg-transparent dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600"
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -511,7 +794,7 @@ export const ChatInterface: React.FC = () => {
                     onClick={() => setIsMultiSelectMode(true)}
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8 flex-1 bg-transparent dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
+                    className="h-8 w-8 flex-1 bg-transparent dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600"
                     title="Select"
                   >
                     <CheckSquare className="h-3.5 w-3.5" />
@@ -522,7 +805,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={selectAllConversations}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600"
                       title="Select All"
                     >
                       <CheckSquare className="h-3.5 w-3.5" />
@@ -531,7 +814,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={clearSelection}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600"
                       title="Cancel"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -557,133 +840,185 @@ export const ChatInterface: React.FC = () => {
 
         {/* Conversation List */}
         <div className="flex-1 overflow-y-auto">
-          {conversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className={`p-3 border-b border-primary-100/50 dark:border-gray-700 cursor-pointer hover:bg-primary-100/50 dark:hover:bg-gray-700 transition-colors group ${
-                currentConversationId === conversation.id
-                  ? "bg-gradient-to-r from-primary-100/80 to-secondary-100/80 dark:from-primary-900/30 dark:to-secondary-900/30 border-primary-300 dark:border-primary-700 shadow-sm"
-                  : ""
-              } ${
-                selectedConversations.has(conversation.id)
-                  ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700"
-                  : ""
-              }`}
-              onClick={() => {
-                if (isMultiSelectMode) {
-                  toggleConversationSelection(conversation.id);
-                } else {
-                  setCurrentConversationId(conversation.id);
-                }
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {isMultiSelectMode ? (
-                    <button
+          {conversations
+            .filter((conv) => conv.messages.length > 0 || conv.isTemporary)
+            .map((conversation) => (
+              <div
+                key={conversation.id}
+                className={`p-3 border-b border-primary-100/50 dark:border-slate-700/50 cursor-pointer hover:bg-primary-100/50 dark:hover:bg-slate-700/60 transition-colors group ${
+                  currentConversationId === conversation.id
+                    ? "bg-gradient-to-r from-primary-100/80 to-secondary-100/80 dark:bg-slate-700/70 dark:border-slate-600/50 shadow-sm"
+                    : ""
+                } ${
+                  selectedConversations.has(conversation.id)
+                    ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700"
+                    : ""
+                }`}
+                onClick={() => {
+                  if (isMultiSelectMode) {
+                    toggleConversationSelection(conversation.id);
+                  } else {
+                    // Clean up any temporary conversations with no messages when switching
+                    setConversations((prev) =>
+                      prev.filter((conv) => {
+                        // Keep current conversation even if temporary with no messages
+                        if (conv.id === conversation.id) return true;
+                        // Remove temporary conversations with no messages
+                        return !conv.isTemporary || conv.messages.length > 0;
+                      })
+                    );
+                    setCurrentConversationId(conversation.id);
+                  }
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {isMultiSelectMode ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleConversationSelection(conversation.id);
+                        }}
+                        className="flex-shrink-0"
+                      >
+                        {selectedConversations.has(conversation.id) ? (
+                          <CheckSquare className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Square className="h-4 w-4 text-gray-400" />
+                        )}
+                      </button>
+                    ) : (
+                      <MessageSquare className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm truncate block">
+                          {conversation.title}
+                        </span>
+                      </div>
+                      {conversation.lastMessage && (
+                        <p className="text-xs text-gray-500 truncate mt-1">
+                          {conversation.lastMessage}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">
+                        {conversation.timestamp.toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {!isMultiSelectMode && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleConversationSelection(conversation.id);
+                        deleteConversation(conversation.id);
                       }}
-                      className="flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                     >
-                      {selectedConversations.has(conversation.id) ? (
-                        <CheckSquare className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Square className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                  ) : (
-                    <MessageSquare className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate block">
-                        {conversation.title}
-                      </span>
-                    </div>
-                    {conversation.lastMessage && (
-                      <p className="text-xs text-gray-500 truncate mt-1">
-                        {conversation.lastMessage}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-1">
-                      {conversation.timestamp.toLocaleDateString()}
-                    </p>
-                  </div>
                 </div>
-
-                {!isMultiSelectMode && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation(conversation.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
               </div>
+            ))}
+          {conversations.filter(
+            (conv) => conv.messages.length > 0 || conv.isTemporary
+          ).length === 0 && (
+            <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              No conversations yet. Start a new chat to begin!
             </div>
-          ))}
+          )}
         </div>
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-slate-50 via-white to-primary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
-        <Card className="flex-1 flex flex-col min-h-0 bg-transparent border-0 shadow-none">
-          <CardContent className="flex-1 flex flex-col p-0 min-h-0">
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-              {!currentConversation ||
-              currentConversation.messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full py-8">
-                  <h2 className="text-xl font-medium text-gray-900 dark:text-gray-100 mb-6">
-                    Hey {getFirstName()}, where do you want to start?
-                  </h2>
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={() => handleIntentSelection("recipe_extraction")}
-                      variant="outline"
-                      className="px-6 py-2"
-                    >
-                      Add new recipe
-                    </Button>
-                    <Button
-                      onClick={() => handleIntentSelection(null)}
-                      variant="outline"
-                      className="px-6 py-2"
-                    >
-                      Questions about an existing recipe
-                    </Button>
+      <div className="flex-1 flex flex-col min-h-0 bg-background p-2.5">
+        {/* Messages Area */}
+        <div
+          className={`flex-1 p-4 space-y-4 min-h-0 ${
+            currentConversation && currentConversation.messages.length > 0
+              ? "overflow-y-auto"
+              : "overflow-hidden"
+          }`}
+        >
+          {!currentConversation || currentConversation.messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full py-8">
+              <h2 className="text-xl font-medium text-gray-900 dark:text-gray-100 mb-6">
+                Hey {getFirstName()}, where do you want to start?
+              </h2>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => handleIntentSelection("recipe_extraction")}
+                  variant="outline"
+                  className="px-6 py-2"
+                >
+                  Add new recipe
+                </Button>
+                <Button
+                  onClick={() => handleIntentSelection(null)}
+                  variant="outline"
+                  className="px-6 py-2"
+                >
+                  Questions about an existing recipe
+                </Button>
+              </div>
+            </div>
+          ) : (
+            currentConversation.messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex gap-3 ${
+                  message.sender === "user" ? "justify-end" : "justify-start"
+                } ${message.recipe && message.sender === "ai" ? "w-full" : ""}`}
+              >
+                {message.sender === "ai" && (
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Bot className="h-4 w-4 text-primary" />
                   </div>
-                </div>
-              ) : (
-                currentConversation.messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${
-                      message.sender === "user"
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    {message.sender === "ai" && (
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Bot className="h-4 w-4 text-primary" />
+                )}
+                {message.recipe && message.sender === "ai" ? (
+                  // Full-width recipe display
+                  <div className="flex-1">
+                    {message.content && (
+                      <div className="mb-3 max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
+                        <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                          {message.content}
+                        </p>
                       </div>
                     )}
-                    <div
-                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                        message.sender === "user"
-                          ? "bg-primary text-white"
-                          : "bg-gray-100 dark:bg-gray-800"
-                      }`}
-                    >
+                    <StructuredRecipeDisplay
+                      recipe={message.recipe}
+                      onSave={(recipe) => {
+                        console.log("Recipe saved:", recipe);
+                      }}
+                    />
+                  </div>
+                ) : (
+                  // Regular message display
+                  <div
+                    className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                      message.sender === "user"
+                        ? "bg-primary text-white"
+                        : "bg-gray-100 dark:bg-gray-800"
+                    }`}
+                  >
+                    {/* Display images if present */}
+                    {message.images && message.images.length > 0 && (
+                      <div className="mb-2 grid grid-cols-2 gap-2">
+                        {message.images.map((imageUrl, idx) => (
+                          <img
+                            key={idx}
+                            src={imageUrl}
+                            alt={`Uploaded image ${idx + 1}`}
+                            className="rounded-lg max-w-full h-auto object-cover"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {message.content && (
                       <p
                         className={`text-sm whitespace-pre-wrap ${
                           message.sender === "user"
@@ -693,83 +1028,147 @@ export const ChatInterface: React.FC = () => {
                       >
                         {message.content}
                       </p>
-                      <p
-                        className={`text-xs opacity-70 mt-1 ${
-                          message.sender === "user"
-                            ? "text-white"
-                            : "text-gray-600 dark:text-gray-400"
-                        }`}
-                      >
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
-                    </div>
-                    {message.sender === "user" && (
-                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                        <User className="h-4 w-4 text-primary-foreground" />
-                      </div>
                     )}
+                    <p
+                      className={`text-xs opacity-70 mt-1 ${
+                        message.sender === "user"
+                          ? "text-white"
+                          : "text-gray-600 dark:text-gray-400"
+                      }`}
+                    >
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
                   </div>
-                ))
-              )}
-              {isLoading && (
-                <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Bot className="h-4 w-4 text-primary" />
+                )}
+                {message.sender === "user" && (
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <User className="h-4 w-4 text-primary-foreground" />
                   </div>
-                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm text-gray-900 dark:text-gray-100">
-                        Thinking...
-                      </span>
-                    </div>
-                  </div>
+                )}
+              </div>
+            ))
+          )}
+          {isLoading && (
+            <div className="flex gap-3 justify-start">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Bot className="h-4 w-4 text-primary" />
+              </div>
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-gray-900 dark:text-gray-100">
+                    Thinking...
+                  </span>
                 </div>
-              )}
-              <div ref={messagesEndRef} />
+              </div>
             </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-            {/* Input Area */}
-            <div className="border-t p-4 flex-shrink-0">
-              {currentConversation &&
-              currentConversation.selectedIntent === null &&
-              currentConversation.messages.length === 0 ? (
-                <div className="text-center py-2">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Please select an option above to start chatting
-                  </p>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <Input
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder={
-                      currentConversation?.selectedIntent ===
-                      "recipe_extraction"
-                        ? "Paste or type your recipe here..."
-                        : "Ask me about your recipes..."
-                    }
-                    disabled={isLoading || !currentConversation?.selectedIntent}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={
-                      !inputMessage.trim() ||
-                      isLoading ||
-                      !currentConversation?.selectedIntent
-                    }
-                    size="icon"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
+        {/* Input Area */}
+        <div className="border-t p-4 flex-shrink-0">
+          {currentConversation &&
+          currentConversation.selectedIntent === undefined &&
+          currentConversation.messages.length === 0 ? (
+            <div className="text-center py-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Please select an option above to start chatting
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* Image Previews */}
+              {pendingImages.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {pendingImages.map((file, index) => {
+                    const imageUrl = URL.createObjectURL(file);
+                    return (
+                      <div
+                        key={index}
+                        className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700"
+                      >
+                        <img
+                          src={imageUrl}
+                          alt={`Preview ${index + 1}`}
+                          className="w-20 h-20 object-cover"
+                        />
+                        <button
+                          onClick={() => removeImage(index)}
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Remove image"
+                        >
+                          <X className="h-3 w-3 text-white" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
+
+              {/* Input and Buttons */}
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageSelect}
+                  className="hidden"
+                  disabled={
+                    isLoading ||
+                    currentConversation?.selectedIntent === undefined ||
+                    pendingImages.length >= 4
+                  }
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  size="icon"
+                  disabled={
+                    isLoading ||
+                    currentConversation?.selectedIntent === undefined ||
+                    pendingImages.length >= 4
+                  }
+                  title={
+                    pendingImages.length >= 4
+                      ? "Maximum 4 images allowed"
+                      : "Upload images"
+                  }
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
+                <Input
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  onPaste={handlePaste}
+                  placeholder={
+                    currentConversation?.selectedIntent === "recipe_extraction"
+                      ? "Paste or type your recipe here..."
+                      : "Ask me about your recipes..."
+                  }
+                  disabled={
+                    isLoading ||
+                    currentConversation?.selectedIntent === undefined
+                  }
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={
+                    (!inputMessage.trim() && pendingImages.length === 0) ||
+                    isLoading ||
+                    currentConversation?.selectedIntent === undefined
+                  }
+                  size="icon"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </div>
     </div>
   );

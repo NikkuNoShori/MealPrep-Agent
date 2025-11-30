@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
 }
 
 serve(async (req) => {
@@ -14,25 +15,26 @@ serve(async (req) => {
   }
 
   try {
-    // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
+    
     // Get authenticated user from Supabase Auth (required)
     const authHeader = req.headers.get('Authorization')
     let user = null
+    let userToken = null
     
     if (authHeader) {
-      const token = authHeader.replace('Bearer ', '')
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token)
+      userToken = authHeader.replace('Bearer ', '')
+      // Create temporary client for auth verification
+      const tempSupabase = createClient(supabaseUrl, supabaseKey)
+      const { data: { user: authUser }, error: authError } = await tempSupabase.auth.getUser(userToken)
       if (!authError && authUser) {
         user = authUser
       }
     }
 
-    // Require authentication - no test user fallback
-    if (!user) {
+    // Require authentication
+    if (!user || !userToken) {
       return new Response(
         JSON.stringify({ error: 'Authentication required. Please sign in.' }),
         {
@@ -42,18 +44,27 @@ serve(async (req) => {
       )
     }
 
+    // Create authenticated Supabase client with user's JWT token for RLS
+    const supabaseAuth = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${userToken}`
+        }
+      }
+    })
+
     const url = new URL(req.url)
     const path = url.pathname
     const method = req.method
 
     // Route handling
     if (method === 'POST' && path.includes('/message')) {
-      return await handleSendMessage(req, supabase, user)
+      return await handleSendMessage(req, supabaseAuth, user)
     } else if (method === 'GET' && path.includes('/history')) {
       const limit = parseInt(url.searchParams.get('limit') || '50')
-      return await handleGetHistory(req, supabase, user, limit)
+      return await handleGetHistory(req, supabaseAuth, user, limit)
     } else if (method === 'DELETE' && path.includes('/history')) {
-      return await handleClearHistory(req, supabase, user)
+      return await handleClearHistory(req, supabaseAuth, user)
     } else if (method === 'GET' && path.includes('/health')) {
       return new Response(
         JSON.stringify({
@@ -91,7 +102,7 @@ serve(async (req) => {
 // Handle sending a chat message
 async function handleSendMessage(req: Request, supabase: any, user: any) {
   try {
-    const { message, context, sessionId, intent } = await req.json()
+    const { message, context, sessionId, intent, images } = await req.json()
 
     // Get or create conversation
     let conversationId: string
@@ -156,6 +167,7 @@ async function handleSendMessage(req: Request, supabase: any, user: any) {
     const webhookEnabled = Deno.env.get('WEBHOOK_ENABLED') === 'true'
     
     let aiResponse = null
+    let recipe = null
     
     if (webhookEnabled && webhookUrl) {
       try {
@@ -163,23 +175,26 @@ async function handleSendMessage(req: Request, supabase: any, user: any) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            event: 'chat.message.sent',
-            timestamp: new Date().toISOString(),
-            data: {
-              id: userMessage.id,
-              content: message,
-              type: 'text',
-              context,
-              sessionId: session_id,
-              conversationId: conversationId
-            },
-            user: user
+            message: message,
+            intent: intent,
+            images: images || [],
+            sessionId: session_id,
+            conversationId: conversationId,
+            context: context
           }),
         })
 
         if (webhookResponse.ok) {
-          const responseData = await webhookResponse.json()
-          aiResponse = responseData.content || responseData.message || responseData.output || responseData
+          // Parse response to check for structured recipe
+          const text = await webhookResponse.text()
+          try {
+            const responseData = JSON.parse(text)
+            aiResponse = responseData.content || responseData.message || responseData.output || text
+            recipe = responseData.recipe || null
+          } catch (e) {
+            // Not JSON, use as-is
+            aiResponse = text
+          }
         }
       } catch (webhookError) {
         console.error('Webhook error:', webhookError)
@@ -197,8 +212,8 @@ async function handleSendMessage(req: Request, supabase: any, user: any) {
         conversation_id: conversationId,
         content: aiResponse,
         sender: 'ai',
-        message_type: 'text',
-        metadata: {}
+        message_type: recipe ? 'recipe' : 'text',
+        metadata: recipe ? { recipe: recipe } : {}
       })
       .select()
       .single()
@@ -214,6 +229,7 @@ async function handleSendMessage(req: Request, supabase: any, user: any) {
           sender: 'ai',
           timestamp: new Date().toISOString()
         },
+        recipe: recipe, // Include structured recipe if present
         conversationId: conversationId,
         sessionId: session_id
       }),

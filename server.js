@@ -1,6 +1,14 @@
+// Load environment variables from .env file
+import 'dotenv/config';
+
+// Debug: Log if OPENROUTER_API_KEY is loaded (without exposing the key)
+console.log('🔑 OPENROUTER_API_KEY loaded:', process.env.OPENROUTER_API_KEY ? 'Yes (length: ' + process.env.OPENROUTER_API_KEY.length + ')' : 'No');
+console.log('🔑 VITE_OPENROUTER_API_KEY loaded:', process.env.VITE_OPENROUTER_API_KEY ? 'Yes (length: ' + process.env.VITE_OPENROUTER_API_KEY.length + ')' : 'No');
+
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import { createClient } from '@supabase/supabase-js';
 import { 
   searchRecipes, 
   generateRecipeEmbedding, 
@@ -326,35 +334,87 @@ app.get('/api/rag/similar/:recipeId', async (req, res) => {
 // RAG Search endpoint
 app.post('/api/rag/search', async (req, res) => {
   try {
-    const { query, userId, limit = 10, searchType = 'semantic' } = req.body;
+    // Verify JWT authentication
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: 'Authentication required. Please sign in.' 
+      });
+    }
+
+    // Get Supabase client for auth verification
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    const tempSupabase = createClient(supabaseUrl || '', supabaseKey || '');
+    
+    // Verify JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await tempSupabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: 'Invalid or expired token. Please sign in again.' 
+      });
+    }
+
+    // Use authenticated user's ID (don't trust userId from request body)
+    const { query, limit = 10, searchType = 'semantic' } = req.body;
+    const userId = user.id; // Use authenticated user's ID
     
     console.log('RAG Search request:', { query, userId, limit, searchType });
+    
+    // Validate required fields
+    if (!query) {
+      return res.status(400).json({ 
+        error: 'Bad request',
+        message: 'Query is required' 
+      });
+    }
     
     let results = [];
     
     if (searchType === 'semantic' || searchType === 'hybrid') {
-      // Generate embedding for the query
-      const queryEmbedding = await embeddingService.generateEmbedding(query);
-      
-      if (searchType === 'semantic') {
-        // Pure vector search
-        results = await db.searchSimilarRecipes(queryEmbedding, userId, 0.5, limit);
-      } else {
-        // Hybrid search (vector + text)
-        results = await db.hybridSearch(queryEmbedding, query, userId, limit);
+      try {
+        // Generate embedding for the query
+        const queryEmbedding = await embeddingService.generateEmbedding(query);
+        
+        if (searchType === 'semantic') {
+          // Pure vector search
+          results = await db.searchSimilarRecipes(queryEmbedding, userId, 0.5, limit);
+        } else {
+          // Hybrid search (vector + text)
+          results = await db.hybridSearch(queryEmbedding, query, userId, limit);
+        }
+      } catch (embeddingError) {
+        console.error('Embedding generation error:', embeddingError);
+        // Fallback to text search if embedding fails
+        console.log('⚠️ Falling back to text search due to embedding error');
+        try {
+          results = await db.searchRecipesText(query, userId, limit);
+          console.log('✅ Text search fallback successful');
+        } catch (textSearchError) {
+          console.error('❌ Text search fallback also failed:', textSearchError);
+          // Return empty results if both fail
+          results = [];
+        }
       }
     } else if (searchType === 'text') {
       // Pure text search
       results = await db.searchRecipesText(query, userId, limit);
     } else {
-      throw new Error(`Invalid search type: ${searchType}`);
+      return res.status(400).json({ 
+        error: 'Bad request',
+        message: `Invalid search type: ${searchType}` 
+      });
     }
     
     console.log(`Found ${results.length} results for query: "${query}"`);
     
     res.json({
       results: results.map(result => ({
-        id: result.recipe_id,
+        id: result.recipe_id || result.id,
         title: result.title,
         description: result.description,
         ingredients: result.ingredients,
@@ -370,9 +430,11 @@ app.post('/api/rag/search', async (req, res) => {
     
   } catch (error) {
     console.error('RAG Search error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Internal server error',
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

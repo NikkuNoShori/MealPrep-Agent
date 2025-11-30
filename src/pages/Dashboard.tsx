@@ -7,7 +7,9 @@ import {
   ChefHat,
   Clock,
   ArrowRight,
-  Loader2
+  Loader2,
+  Calendar,
+  BookOpen
 } from 'lucide-react'
 
 const Dashboard = () => {
@@ -25,69 +27,56 @@ const Dashboard = () => {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-300 mt-1">Welcome to your meal planning dashboard</p>
-      </div>
-      
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 text-center">
+      {/* Header with Stats Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+        {/* Title Section */}
+        <div className="lg:col-span-2">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-300 mt-1">Welcome to your meal planning dashboard</p>
+        </div>
+        
+        {/* Stats Cards - No Background */}
+        <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
               Total Recipes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </p>
             {recipesLoading ? (
               <div className="flex justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
               </div>
             ) : (
-              <p className="text-3xl font-bold text-gray-900 dark:text-white text-center">{recipes.length}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{recipes.length}</p>
             )}
-          </CardContent>
-        </Card>
-        
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 text-center">
+          </div>
+          
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
               This Week's Meals
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </p>
             {mealPlansLoading ? (
               <div className="flex justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
               </div>
             ) : (
-              <p className="text-3xl font-bold text-gray-900 dark:text-white text-center">{thisWeekMeals}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{thisWeekMeals}</p>
             )}
-          </CardContent>
-        </Card>
-        
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 text-center">
+          </div>
+          
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
               Family Members
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white text-center">0</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 text-center">
+            </p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">0</p>
+          </div>
+          
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
               Grocery Items
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white text-center">0</p>
-          </CardContent>
-        </Card>
+            </p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">0</p>
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions & Recent Recipes */}

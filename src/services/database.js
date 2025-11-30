@@ -1,5 +1,21 @@
 // Database service using Supabase client
-import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
+
+// Create Supabase client for Node.js backend (uses process.env instead of import.meta.env)
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('⚠️  Supabase credentials not configured. Database operations may fail.');
+  console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or SUPABASE_URL and SUPABASE_ANON_KEY) environment variables');
+}
+
+const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 export class DatabaseService {
   constructor() {
@@ -144,7 +160,7 @@ export class DatabaseService {
   async searchRecipesText(searchQuery, userId, maxResults = 10) {
     const { data, error } = await this.supabase.rpc('search_recipes_text', {
       search_query: searchQuery,
-      user_id: userId,
+      user_uuid: userId,
       max_results: maxResults
     });
     

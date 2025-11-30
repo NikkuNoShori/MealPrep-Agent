@@ -55,7 +55,7 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-gradient-to-r from-primary-50 via-slate-50 to-secondary-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 shadow-sm border-b border-primary-200/50 dark:border-gray-700">
+    <header className="bg-gradient-to-r from-primary-50 via-slate-50 to-secondary-50 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 shadow-sm border-b border-primary-200/50 dark:border-slate-700/50">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -125,18 +125,18 @@ const Header = () => {
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 backdrop-blur-sm rounded-lg shadow-lg border border-primary-200/50 dark:border-gray-700 py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-700 backdrop-blur-sm rounded-lg shadow-lg border border-primary-200/50 dark:border-slate-600/50 py-1 z-50">
                     <Link
                       to="/settings"
                       onClick={() => setIsUserMenuOpen(false)}
-                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-gray-700 flex items-center space-x-2 transition-colors"
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-slate-600 flex items-center space-x-2 transition-colors"
                     >
                       <Settings className="w-4 h-4" />
                       <span>Settings</span>
                     </Link>
                     <button
                       onClick={signOut}
-                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-gray-700 flex items-center space-x-2 transition-colors"
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-slate-600 flex items-center space-x-2 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>
@@ -149,7 +149,7 @@ const Header = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg bg-stone-100 dark:bg-gray-700 hover:bg-stone-200 dark:hover:bg-gray-600 transition-colors"
+              className="md:hidden p-2 rounded-lg bg-stone-100 dark:bg-slate-700 hover:bg-stone-200 dark:hover:bg-slate-600 transition-colors"
               aria-label="Toggle mobile menu"
             >
               {isMobileMenuOpen ? (
@@ -163,7 +163,7 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-primary-200/50 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+          <div className="md:hidden py-4 border-t border-primary-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
             <nav className="flex flex-col space-y-4">
               {navigation.map((item) =>
                 item.name === "Chat" ? (
