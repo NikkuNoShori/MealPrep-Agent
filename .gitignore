@@ -125,3 +125,10 @@ coverage/
 
 # Supabase temp files
 supabase/.temp/
+
+# Local testing scripts (may contain sensitive paths)
+serve-function-local.ps1
+setup-localhost-testing.ps1
+test-ready.ps1
+quick-test.ps1
+test-api.ps1
