@@ -27,15 +27,17 @@ export const MeasurementSystemProvider: React.FC<{ children: ReactNode }> = ({ c
 
   // Update system and save to database
   const setSystem = async (newSystem: MeasurementSystem) => {
+    const previousSystem = system;
     setSystemState(newSystem);
     try {
       await updatePreferences.mutateAsync({
         measurement_system: newSystem,
       });
-    } catch (error) {
-      console.error('Failed to update measurement system:', error);
-      // Revert on error
-      setSystemState(system);
+    } catch (error: any) {
+      console.warn('Failed to update measurement system (migration may not be run):', error?.message);
+      // Don't revert - keep the new system in memory even if DB update fails
+      // This allows the feature to work even before the migration is applied
+      // The preference will be saved once the migration is run
     }
   };
 

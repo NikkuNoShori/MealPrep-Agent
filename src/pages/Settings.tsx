@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -14,6 +14,8 @@ import {
   Unlink,
   Loader2,
   Ruler,
+  Save,
+  X,
 } from "lucide-react";
 import toast from 'react-hot-toast';
 
@@ -25,6 +27,27 @@ const Settings = () => {
     setSystem,
     isLoading: isLoadingMeasurement,
   } = useMeasurementSystem();
+
+  // Staged changes (not yet saved)
+  const [stagedTheme, setStagedTheme] = useState<typeof theme>(theme);
+  const [stagedColorScheme, setStagedColorScheme] = useState<string>(colorScheme.name);
+  const [stagedMeasurementSystem, setStagedMeasurementSystem] = useState<typeof system>(system);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = 
+    stagedTheme !== theme ||
+    stagedColorScheme !== colorScheme.name ||
+    stagedMeasurementSystem !== system;
+
+  // Reset staged values when theme/colorScheme/system changes externally
+  useEffect(() => {
+    setStagedTheme(theme);
+    setStagedColorScheme(colorScheme.name);
+    setStagedMeasurementSystem(system);
+  }, [theme, colorScheme.name, system]);
+
+  // Get the staged color scheme for preview
+  const previewColorScheme = availableColorSchemes[stagedColorScheme] || colorScheme;
 
   useEffect(() => {
     if (user) {
@@ -56,6 +79,32 @@ const Settings = () => {
     }
   };
 
+  const handleSave = () => {
+    // Apply staged theme
+    if (stagedTheme !== theme) {
+      setTheme(stagedTheme);
+    }
+
+    // Apply staged color scheme
+    if (stagedColorScheme !== colorScheme.name) {
+      setColorScheme(stagedColorScheme);
+    }
+
+    // Apply staged measurement system
+    if (stagedMeasurementSystem !== system) {
+      setSystem(stagedMeasurementSystem);
+    }
+
+    toast.success('Settings saved successfully');
+  };
+
+  const handleReset = () => {
+    setStagedTheme(theme);
+    setStagedColorScheme(colorScheme.name);
+    setStagedMeasurementSystem(system);
+    toast.info('Changes reset');
+  };
+
   const themeOptions = [
     { value: 'light', label: 'Light', icon: Sun },
     { value: 'dark', label: 'Dark', icon: Moon },
@@ -65,11 +114,30 @@ const Settings = () => {
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Settings</h1>
-          <p className="text-muted-foreground">
-            Customize your app appearance and preferences.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Settings</h1>
+            <p className="text-muted-foreground">
+              Customize your app appearance and preferences.
+            </p>
+          </div>
+          {hasUnsavedChanges && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReset}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                Reset
+              </Button>
+              <Button onClick={handleSave} size="sm" className="gap-2">
+                <Save className="h-4 w-4" />
+                Save Changes
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Theme Settings */}
@@ -81,7 +149,10 @@ const Settings = () => {
             {/* Theme Mode */}
             <div className="space-y-2">
               <Label htmlFor="theme">Theme</Label>
-              <Select value={theme} onValueChange={setTheme}>
+              <Select
+                value={stagedTheme}
+                onValueChange={(value) => setStagedTheme(value as typeof theme)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select theme" />
                 </SelectTrigger>
@@ -108,7 +179,10 @@ const Settings = () => {
             {/* Color Scheme */}
             <div className="space-y-2">
               <Label htmlFor="colorScheme">Color Scheme</Label>
-              <Select value={colorScheme.name} onValueChange={setColorScheme}>
+              <Select
+                value={stagedColorScheme}
+                onValueChange={setStagedColorScheme}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select color scheme" />
                 </SelectTrigger>
@@ -127,21 +201,29 @@ const Settings = () => {
 
             {/* Color Preview */}
             <div className="space-y-2">
-              <Label>Preview</Label>
+              <Label>
+                Preview{" "}
+                {hasUnsavedChanges &&
+                  stagedColorScheme !== colorScheme.name && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      (Unsaved)
+                    </span>
+                  )}
+              </Label>
               <div className="flex gap-2">
                 <div
                   className="w-8 h-8 rounded-full border"
-                  style={{ backgroundColor: colorScheme.primary[500] }}
+                  style={{ backgroundColor: previewColorScheme.primary[500] }}
                   title="Primary"
                 />
                 <div
                   className="w-8 h-8 rounded-full border"
-                  style={{ backgroundColor: colorScheme.secondary[500] }}
+                  style={{ backgroundColor: previewColorScheme.secondary[500] }}
                   title="Secondary"
                 />
                 <div
                   className="w-8 h-8 rounded-full border"
-                  style={{ backgroundColor: colorScheme.neutral[500] }}
+                  style={{ backgroundColor: previewColorScheme.neutral[500] }}
                   title="Neutral"
                 />
               </div>
@@ -185,9 +267,9 @@ const Settings = () => {
                 {/* Google Account */}
                 <div className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
                       <svg
-                        className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                        className="w-5 h-5 text-primary-600 dark:text-primary-400"
                         viewBox="0 0 24 24"
                       >
                         <path
@@ -264,9 +346,9 @@ const Settings = () => {
             <div>
               <Label htmlFor="measurement-system">Unit System</Label>
               <Select
-                value={system}
+                value={stagedMeasurementSystem}
                 onValueChange={(value: "metric" | "imperial") =>
-                  setSystem(value)
+                  setStagedMeasurementSystem(value)
                 }
                 disabled={isLoadingMeasurement}
               >

@@ -98,7 +98,7 @@
   }
   
   .hover-glow {
-    @apply transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/25;
+    @apply transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/25;
   }
   
   .glass-effect {
@@ -106,7 +106,7 @@
   }
   
   .gradient-text {
-    @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent;
   }
   
   .animate-on-scroll {

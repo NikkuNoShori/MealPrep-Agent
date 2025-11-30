@@ -155,7 +155,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
               onClick={handleSave}
               className="h-8 w-8"
             >
-              <Check className="h-4 w-4 text-green-600" />
+              <Check className="h-4 w-4 text-primary-600" />
             </Button>
             <Button
               type="button"
@@ -501,10 +501,10 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
       difficulty: "medium",
       tags: ["Italian", "Pasta", "Quick", "Comfort Food", "Dinner"],
       ingredients: [
-        { name: "Spaghetti", amount: 400, unit: "g" },
-        { name: "Pancetta", amount: 150, unit: "g" },
-        { name: "Large eggs", amount: 4, unit: "pieces" },
-        { name: "Parmesan cheese", amount: 100, unit: "g" },
+        { name: "Spaghetti", amount: 14, unit: "oz" },
+        { name: "Pancetta", amount: 5.3, unit: "oz" },
+        { name: "Large eggs", amount: 4, unit: "piece" },
+        { name: "Parmesan cheese", amount: 3.5, unit: "oz" },
         { name: "Black pepper", amount: 1, unit: "tsp" },
         { name: "Salt", amount: 1, unit: "tsp" },
         { name: "Olive oil", amount: 2, unit: "tbsp" },
@@ -518,8 +518,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
         "Remove from heat and quickly stir in egg mixture, adding pasta water as needed to create a creamy sauce.",
         "Serve immediately with extra Parmesan and black pepper.",
       ],
-      imageUrl:
-        "https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=800&h=600&fit=crop",
+      imageUrl: "none",
     });
   };
 

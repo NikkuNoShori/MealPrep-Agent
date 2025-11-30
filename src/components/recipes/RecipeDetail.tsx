@@ -221,7 +221,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
               const DifficultyIcon = getDifficultyIcon(recipe.difficulty);
               return (
                 <div className="text-center">
-                  <DifficultyIcon className={`h-8 w-8 mx-auto mb-2 ${getDifficultyColor(recipe.difficulty)}`} />
+                  <DifficultyIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">Difficulty</p>
                   <p className="font-semibold">{getDifficultyLabel(recipe.difficulty)}</p>
                 </div>
@@ -259,10 +259,14 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           <CardContent>
             <div className="space-y-2">
               {recipe.ingredients.map((ingredient, index) => {
+                // Ensure amount is a valid number
+                const amount = typeof ingredient.amount === 'number' ? ingredient.amount : parseFloat(ingredient.amount) || 0;
+                const unit = (ingredient.unit || 'piece') as Unit;
+                
                 // Convert ingredient to user's preferred measurement system
                 const converted = convertIngredient(
-                  ingredient.amount,
-                  ingredient.unit as Unit,
+                  amount,
+                  unit,
                   system
                 );
                 const optimized = optimizeUnit(converted.amount, converted.unit);

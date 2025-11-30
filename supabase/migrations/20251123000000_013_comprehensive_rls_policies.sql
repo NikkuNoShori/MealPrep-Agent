@@ -61,7 +61,9 @@ CREATE POLICY "Users can insert their own preferences" ON user_preferences
 
 DROP POLICY IF EXISTS "Users can update their own preferences" ON user_preferences;
 CREATE POLICY "Users can update their own preferences" ON user_preferences
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE 
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own preferences" ON user_preferences;
 CREATE POLICY "Users can delete their own preferences" ON user_preferences

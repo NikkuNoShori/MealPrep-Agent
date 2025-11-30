@@ -85,7 +85,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
             placeholder="Search recipes by name, ingredients, or tags..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-12 h-12 text-lg border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-blue-500 dark:focus:border-blue-400 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200"
+            className="pl-12 h-12 text-lg border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-primary-500 dark:focus:border-primary-400 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200"
           />
         </div>
         <Button
@@ -93,8 +93,8 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
           onClick={() => setShowFilters(!showFilters)}
           className={`h-12 px-6 rounded-xl transition-all duration-200 ${
             showFilters 
-              ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg' 
-              : 'border-2 border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'
+              ? 'bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-lg' 
+              : 'border-2 border-slate-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-400 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'
           }`}
         >
           <Filter className="h-5 w-5 mr-2" />
@@ -119,16 +119,16 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
       {hasActiveFilters && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-4 bg-gradient-to-b from-blue-600 to-purple-600 rounded-full"></div>
+            <div className="w-1 h-4 bg-gradient-to-b from-primary-600 to-secondary-600 rounded-full"></div>
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Active Filters:</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {filters.dietaryRestrictions.map(restriction => (
-              <Badge key={restriction} variant="secondary" className="gap-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-0 px-3 py-1.5 rounded-lg">
+              <Badge key={restriction} variant="secondary" className="gap-2 bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-200 border-0 px-3 py-1.5 rounded-lg">
                 {restriction}
                 <button
                   onClick={() => toggleDietaryRestriction(restriction)}
-                  className="ml-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 transition-colors duration-200"
+                  className="ml-1 hover:bg-primary-200 dark:hover:bg-primary-800 rounded-full p-0.5 transition-colors duration-200"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -146,11 +146,11 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               </Badge>
             )}
             {filters.difficulty && (
-              <Badge variant="secondary" className="gap-2 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-0 px-3 py-1.5 rounded-lg">
+              <Badge variant="secondary" className="gap-2 bg-secondary-100 dark:bg-secondary-900/30 text-secondary-800 dark:text-secondary-200 border-0 px-3 py-1.5 rounded-lg">
                 {filters.difficulty}
                 <button
                   onClick={() => updateFilter('difficulty', '')}
-                  className="ml-1 hover:bg-purple-200 dark:hover:bg-purple-800 rounded-full p-0.5 transition-colors duration-200"
+                  className="ml-1 hover:bg-secondary-200 dark:hover:bg-secondary-800 rounded-full p-0.5 transition-colors duration-200"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -179,8 +179,8 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               {/* Dietary Restrictions */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                    <span className="text-blue-600 dark:text-blue-400 text-sm">🥗</span>
+                  <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                    <span className="text-primary-600 dark:text-primary-400 text-sm">🥗</span>
                   </div>
                   <h4 className="text-lg font-semibold text-slate-900 dark:text-white">Dietary Restrictions</h4>
                 </div>
@@ -191,8 +191,8 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                       variant={filters.dietaryRestrictions.includes(restriction) ? 'default' : 'outline'}
                       className={`cursor-pointer px-4 py-2 rounded-lg transition-all duration-200 ${
                         filters.dietaryRestrictions.includes(restriction)
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
-                          : 'border-2 border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'
+                          ? 'bg-primary-600 hover:bg-primary-700 text-white shadow-lg'
+                          : 'border-2 border-slate-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-400 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'
                       }`}
                       onClick={() => toggleDietaryRestriction(restriction)}
                     >
@@ -231,8 +231,8 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               {/* Difficulty */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                    <span className="text-purple-600 dark:text-purple-400 text-sm">⚡</span>
+                  <div className="w-8 h-8 bg-secondary-100 dark:bg-secondary-900/30 rounded-lg flex items-center justify-center">
+                    <span className="text-secondary-600 dark:text-secondary-400 text-sm">⚡</span>
                   </div>
                   <h4 className="text-lg font-semibold text-slate-900 dark:text-white">Difficulty Level</h4>
                 </div>
@@ -243,8 +243,8 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                       variant={filters.difficulty === difficulty ? 'default' : 'outline'}
                       className={`cursor-pointer px-6 py-2 rounded-lg transition-all duration-200 capitalize ${
                         filters.difficulty === difficulty
-                          ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-lg'
-                          : 'border-2 border-slate-200 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-400 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'
+                          ? 'bg-secondary-600 hover:bg-secondary-700 text-white shadow-lg'
+                          : 'border-2 border-slate-200 dark:border-slate-700 hover:border-secondary-500 dark:hover:border-secondary-400 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'
                       }`}
                       onClick={() => updateFilter('difficulty', filters.difficulty === difficulty ? '' : difficulty)}
                     >

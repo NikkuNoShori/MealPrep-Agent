@@ -161,8 +161,8 @@ const Dashboard = () => {
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors truncate">
-                        {recipe.title}
+                      <h3 className="font-medium text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                        {recipe.title.length > 75 ? recipe.title.slice(0, 75) + '...' : recipe.title}
                       </h3>
                       <div className="flex items-center gap-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
                         {recipe.prepTime && (

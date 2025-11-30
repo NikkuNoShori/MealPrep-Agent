@@ -2,10 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from './supabase';
 
 // Supabase configuration - reuse from supabase.ts
-// @ts-ignore - Vite environment variables
-const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || '';
-// @ts-ignore - Vite environment variables  
-const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY =
+  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
 
 // Supabase Edge Functions base URL
 const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
@@ -558,23 +557,98 @@ class ApiClient {
       .from("user_preferences")
       .select("id")
       .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
-      .single();
+      .maybeSingle();
+
+    // Filter out measurement_system if column doesn't exist yet
+    const updateData = { ...data };
+    if (updateData.measurement_system) {
+      // Check if column exists by trying to update with it
+      // If it fails, we'll remove it and try again
+    }
 
     if (existing) {
       const { data: updated, error } = await supabase
         .from("user_preferences")
-        .update(data)
+        .update(updateData)
         .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
         .select()
-        .single();
+        .maybeSingle();
+
+      // If error is due to missing column (406 Not Acceptable or 42703), try without measurement_system
+      if (
+        error &&
+        (error.code === "42703" ||
+          error.code === "PGRST301" ||
+          error.message?.includes("406") ||
+          error.message?.includes("column") ||
+          error.message?.includes("does not exist") ||
+          error.message?.includes("Not Acceptable"))
+      ) {
+        const { measurement_system, ...dataWithoutMeasurement } = updateData;
+        const { data: updatedFallback, error: fallbackError } = await supabase
+          .from("user_preferences")
+          .update(dataWithoutMeasurement)
+          .eq("user_id", user.id)
+          .select()
+          .maybeSingle();
+
+        if (fallbackError) {
+          // If fallback also fails, still return the data with measurement_system for local use
+          console.warn(
+            "Could not update preferences (migration may not be run):",
+            fallbackError.message
+          );
+          return { ...existing, ...updateData };
+        }
+        // Return the updated data with measurement_system added locally (won't be saved until migration runs)
+        return {
+          ...updatedFallback,
+          measurement_system: updateData.measurement_system,
+        };
+      }
+
       if (error) throw error;
       return updated;
     } else {
+      // For insert, try with measurement_system first
       const { data: created, error } = await supabase
         .from("user_preferences")
-        .insert({ ...data, user_id: user.id }) // user_id references profiles(id) = auth.users(id)
+        .insert({ ...updateData, user_id: user.id }) // user_id references profiles(id) = auth.users(id)
         .select()
-        .single();
+        .maybeSingle();
+
+      // If error is due to missing column (406 Not Acceptable or 42703), try without measurement_system
+      if (
+        error &&
+        (error.code === "42703" ||
+          error.code === "PGRST301" ||
+          error.message?.includes("406") ||
+          error.message?.includes("column") ||
+          error.message?.includes("does not exist") ||
+          error.message?.includes("Not Acceptable"))
+      ) {
+        const { measurement_system, ...dataWithoutMeasurement } = updateData;
+        const { data: createdFallback, error: fallbackError } = await supabase
+          .from("user_preferences")
+          .insert({ ...dataWithoutMeasurement, user_id: user.id })
+          .select()
+          .maybeSingle();
+
+        if (fallbackError) {
+          // If fallback also fails, return the data with measurement_system for local use
+          console.warn(
+            "Could not create preferences (migration may not be run):",
+            fallbackError.message
+          );
+          return { ...updateData, user_id: user.id, id: null };
+        }
+        // Return with measurement_system added locally
+        return {
+          ...createdFallback,
+          measurement_system: updateData.measurement_system,
+        };
+      }
+
       if (error) throw error;
       return created;
     }

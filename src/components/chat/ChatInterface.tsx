@@ -459,77 +459,81 @@ export const ChatInterface: React.FC = () => {
   return (
     <div className="flex h-full min-h-0">
       {/* Sidebar - Conversation History */}
-      <div className="w-80 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col min-h-0">
+      <div className="w-80 bg-gradient-to-b from-primary-50/30 via-slate-50 to-secondary-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 border-r border-primary-200/50 dark:border-gray-700 flex flex-col min-h-0">
         {/* Header with New Chat and Multi-select */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-2">
-          <Button
-            onClick={createNewConversation}
-            className="w-full justify-start"
-            variant="outline"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Chat
-          </Button>
-
-          {conversations.length > 0 && (
-            <div className="flex gap-2">
-              {!isMultiSelectMode ? (
-                <Button
-                  onClick={() => setIsMultiSelectMode(true)}
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                >
-                  <CheckSquare className="h-4 w-4 mr-2" />
-                  Select
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    onClick={selectAllConversations}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    onClick={clearSelection}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
-
-          {isMultiSelectMode && selectedConversations.size > 0 && (
+        <div className="p-3 border-b border-primary-200/50 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+          <div className="flex gap-2">
             <Button
-              onClick={deleteSelectedConversations}
-              variant="destructive"
-              size="sm"
-              className="w-full"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Selected ({selectedConversations.size})
-            </Button>
-          )}
-
-          {conversations.some((conv) => conv.isTemporary) && (
-            <Button
-              onClick={cleanupTemporarySessions}
+              onClick={createNewConversation}
               variant="outline"
-              size="sm"
-              className="w-full"
+              size="icon"
+              title="New Chat"
+              className="flex-1"
             >
-              <X className="h-4 w-4 mr-2" />
-              Clean Up Unused Chats
+              <Plus className="h-4 w-4" />
             </Button>
-          )}
+
+            {conversations.length > 0 && (
+              <>
+                {!isMultiSelectMode ? (
+                  <Button
+                    onClick={() => setIsMultiSelectMode(true)}
+                    variant="outline"
+                    size="icon"
+                    className="flex-1"
+                    title="Select"
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={selectAllConversations}
+                      variant="outline"
+                      size="icon"
+                      className="flex-1"
+                      title="Select All"
+                    >
+                      <CheckSquare className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      onClick={clearSelection}
+                      variant="outline"
+                      size="icon"
+                      className="flex-1"
+                      title="Cancel"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+
+            {isMultiSelectMode && selectedConversations.size > 0 && (
+              <Button
+                onClick={deleteSelectedConversations}
+                variant="destructive"
+                size="icon"
+                className="flex-1"
+                title={`Delete Selected (${selectedConversations.size})`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+
+            {conversations.some((conv) => conv.isTemporary) && (
+              <Button
+                onClick={cleanupTemporarySessions}
+                variant="outline"
+                size="icon"
+                className="flex-1"
+                title="Clean Up Unused Chats"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Conversation List */}
@@ -537,9 +541,9 @@ export const ChatInterface: React.FC = () => {
           {conversations.map((conversation) => (
             <div
               key={conversation.id}
-              className={`p-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group ${
+              className={`p-3 border-b border-primary-100/50 dark:border-gray-700 cursor-pointer hover:bg-primary-100/50 dark:hover:bg-gray-700 transition-colors group ${
                 currentConversationId === conversation.id
-                  ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700"
+                  ? "bg-gradient-to-r from-primary-100/80 to-secondary-100/80 dark:from-primary-900/30 dark:to-secondary-900/30 border-primary-300 dark:border-primary-700 shadow-sm"
                   : ""
               } ${
                 selectedConversations.has(conversation.id)
@@ -579,11 +583,6 @@ export const ChatInterface: React.FC = () => {
                       <span className="font-medium text-sm truncate block">
                         {conversation.title}
                       </span>
-                      {conversation.isTemporary && (
-                        <span className="text-xs bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded">
-                          Temporary
-                        </span>
-                      )}
                     </div>
                     {conversation.lastMessage && (
                       <p className="text-xs text-gray-500 truncate mt-1">
@@ -616,8 +615,8 @@ export const ChatInterface: React.FC = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <Card className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-slate-50 via-white to-primary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
+        <Card className="flex-1 flex flex-col min-h-0 bg-transparent border-0 shadow-none">
           <CardContent className="flex-1 flex flex-col p-0 min-h-0">
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
@@ -633,9 +632,9 @@ export const ChatInterface: React.FC = () => {
                     tips.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-md mx-auto">
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <BookOpen className="h-5 w-5 mx-auto mb-2 text-blue-600" />
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                    <div className="p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                      <BookOpen className="h-5 w-5 mx-auto mb-2 text-primary-600" />
+                      <p className="text-xs text-primary-700 dark:text-primary-300">
                         "Add this recipe to my collection"
                       </p>
                     </div>

@@ -72,6 +72,11 @@ export function convertValue(
   fromUnit: Unit,
   toSystem: MeasurementSystem
 ): { value: number; unit: Unit } {
+  // Validate input
+  if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+    return { value: 0, unit: fromUnit };
+  }
+  
   // If unit is countable, no conversion needed
   if (isCountableUnit(fromUnit)) {
     return { value, unit: fromUnit };
@@ -132,6 +137,11 @@ function roundToReasonablePrecision(value: number): number {
  * Format a converted value for display
  */
 export function formatConvertedValue(value: number, unit: Unit): string {
+  // Validate input
+  if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+    return `0 ${unit}`;
+  }
+  
   const rounded = roundToReasonablePrecision(value);
   
   // Format based on value size
@@ -160,6 +170,11 @@ export function convertIngredient(
  * Sometimes we need to adjust units (e.g., 16 oz = 1 lb)
  */
 export function optimizeUnit(value: number, unit: Unit): { value: number; unit: Unit } {
+  // Validate input
+  if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+    return { value: 0, unit: unit };
+  }
+  
   // Convert large oz to lb
   if (unit === 'oz' && value >= 16) {
     return { value: value / 16, unit: 'lb' };

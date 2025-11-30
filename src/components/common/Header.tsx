@@ -55,7 +55,7 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-stone-200 dark:border-gray-700">
+    <header className="bg-gradient-to-r from-primary-50 via-white to-secondary-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 shadow-sm border-b border-primary-200/50 dark:border-gray-700">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -103,7 +103,7 @@ const Header = () => {
           <div className="flex items-center space-x-4">
             {/* User Menu */}
             {user && (
-              <div 
+              <div
                 className="relative"
                 ref={userMenuRef}
                 onMouseEnter={handleUserMenuMouseEnter}
@@ -111,8 +111,8 @@ const Header = () => {
               >
                 <button className="flex items-center space-x-2 p-2 rounded-lg hover:opacity-80 transition-opacity">
                   {user?.avatar_url ? (
-                    <img 
-                      src={user.avatar_url} 
+                    <img
+                      src={user.avatar_url}
                       alt={getFirstName()}
                       className="w-6 h-6 rounded-full object-cover"
                     />
@@ -123,20 +123,20 @@ const Header = () => {
                     Hey, {getFirstName()}
                   </span>
                 </button>
-                
+
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-stone-200 dark:border-gray-700 py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-lg border border-primary-200/50 dark:border-gray-700 py-1 z-50">
                     <Link
                       to="/settings"
                       onClick={() => setIsUserMenuOpen(false)}
-                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-stone-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-gray-700 flex items-center space-x-2 transition-colors"
                     >
                       <Settings className="w-4 h-4" />
                       <span>Settings</span>
                     </Link>
                     <button
                       onClick={signOut}
-                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-stone-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-gray-700 flex items-center space-x-2 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>
@@ -163,7 +163,7 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-stone-200 dark:border-gray-700">
+          <div className="md:hidden py-4 border-t border-primary-200/50 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
             <nav className="flex flex-col space-y-4">
               {navigation.map((item) =>
                 item.name === "Chat" ? (
