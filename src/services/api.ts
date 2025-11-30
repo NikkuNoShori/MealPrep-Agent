@@ -404,29 +404,6 @@ class ApiClient {
     return mealPlan;
   }
 
-  // Receipt endpoints - using Supabase client directly
-  // Note: user_id references profiles(id), which references auth.users(id)
-  async getReceipts(limit?: number) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    let query = supabase
-      .from("receipts")
-      .select("*")
-      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
-      .order("created_at", { ascending: false });
-
-    if (limit) {
-      query = query.limit(limit);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return { receipts: data || [] };
-  }
-
   async uploadImage(file: File, folder: string = "recipes"): Promise<string> {
     const {
       data: { user },
@@ -479,25 +456,6 @@ class ApiClient {
     return publicUrl;
   }
 
-  async uploadReceipt(data: { imageUrl: string; storeInfo: any }) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { data: receipt, error } = await supabase
-      .from("receipts")
-      .insert({
-        ...data,
-        user_id: user.id, // user_id references profiles(id) = auth.users(id)
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return receipt;
-  }
-
   // Preferences endpoints - using Supabase client directly
   // Note: user_id references profiles(id), which references auth.users(id)
   async getPreferences() {
@@ -523,9 +481,7 @@ class ApiClient {
       // Column doesn't exist yet - try selecting without it
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("user_preferences")
-        .select(
-          "id, user_id, global_restrictions, cuisine_preferences, cooking_skill_level, dietary_goals, spice_tolerance, meal_prep_preference, budget_range, time_constraints, created_at, updated_at"
-        )
+        .select("id, user_id, created_at, updated_at")
         .eq("user_id", user.id)
         .maybeSingle();
 

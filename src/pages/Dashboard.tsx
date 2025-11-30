@@ -3,10 +3,6 @@ import { Button } from '@/components/ui/button'
 import { useRecipes, useMealPlans } from '@/services/api'
 import { Link } from 'react-router-dom'
 import { 
-  BookOpen, 
-  Calendar, 
-  Users, 
-  ShoppingCart, 
   Plus, 
   ChefHat,
   Clock,
@@ -36,60 +32,60 @@ const Dashboard = () => {
       </div>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
         <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 text-center">
               Total Recipes
             </CardTitle>
-            <BookOpen className="h-4 w-4 text-primary-600 dark:text-primary-400" />
           </CardHeader>
           <CardContent>
             {recipesLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <div className="flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
             ) : (
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{recipes.length}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white text-center">{recipes.length}</p>
             )}
           </CardContent>
         </Card>
         
         <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 text-center">
               This Week's Meals
             </CardTitle>
-            <Calendar className="h-4 w-4 text-primary-600 dark:text-primary-400" />
           </CardHeader>
           <CardContent>
             {mealPlansLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <div className="flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
             ) : (
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{thisWeekMeals}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white text-center">{thisWeekMeals}</p>
             )}
           </CardContent>
         </Card>
         
         <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 text-center">
               Family Members
             </CardTitle>
-            <Users className="h-4 w-4 text-primary-600 dark:text-primary-400" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">0</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white text-center">0</p>
           </CardContent>
         </Card>
         
         <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 text-center">
               Grocery Items
             </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-primary-600 dark:text-primary-400" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">0</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white text-center">0</p>
           </CardContent>
         </Card>
       </div>

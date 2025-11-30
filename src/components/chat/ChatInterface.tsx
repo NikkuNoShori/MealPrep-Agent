@@ -1,10 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useChatHistory, useSendMessage } from '../../services/api'
-import {
-  ragService,
-  detectIntent,
-  formatRecipeContext,
-} from "../../services/ragService";
+import { useSendMessage } from "../../services/api";
+import { ragService, formatRecipeContext } from "../../services/ragService";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -19,10 +15,9 @@ import {
   CheckSquare,
   Square,
   X,
-  Search,
-  BookOpen,
 } from "lucide-react";
-import { ChatHistoryResponse, ChatMessageResponse } from "../../types";
+import { ChatMessageResponse } from "../../types";
+import { useAuthStore } from "../../stores/authStore";
 
 interface Message {
   id: string;
@@ -39,6 +34,7 @@ interface Conversation {
   timestamp: Date;
   sessionId: string; // Add sessionId for n8n context
   isTemporary: boolean; // Track if session is temporary (not yet persisted)
+  selectedIntent?: string | null; // Track manually selected intent (recipe_extraction or null for RAG queries)
 }
 
 export const ChatInterface: React.FC = () => {
@@ -57,10 +53,16 @@ export const ChatInterface: React.FC = () => {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: chatHistory } = useChatHistory(50) as {
-    data: ChatHistoryResponse | undefined;
-  };
   const sendMessageMutation = useSendMessage();
+  const { user } = useAuthStore();
+
+  // Get user's first name
+  const getFirstName = () => {
+    if (user?.first_name) return user.first_name;
+    if (user?.display_name) return user.display_name.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "there";
+  };
 
   // Load conversations from localStorage on component mount
   useEffect(() => {
@@ -95,6 +97,8 @@ export const ChatInterface: React.FC = () => {
             timestamp: new Date(msg.timestamp),
           })),
           isTemporary: conv.isTemporary || false, // Ensure isTemporary is set
+          selectedIntent: conv.selectedIntent || null, // Restore selected intent
+          sessionId: conv.sessionId || `session-${Date.now()}`, // Ensure sessionId is preserved
         }));
         setConversations(conversationsWithDates);
 
@@ -107,6 +111,14 @@ export const ChatInterface: React.FC = () => {
             (c: Conversation) => c.id === savedCurrentId
           )
         ) {
+          // Restore the saved conversation and log sessionId for debugging
+          const restoredConversation = conversationsWithDates.find(
+            (c: Conversation) => c.id === savedCurrentId
+          );
+          console.log(
+            "Restoring conversation with sessionId:",
+            restoredConversation?.sessionId
+          );
           setCurrentConversationId(savedCurrentId);
         } else if (conversationsWithDates.length > 0) {
           setCurrentConversationId(conversationsWithDates[0].id);
@@ -134,6 +146,7 @@ export const ChatInterface: React.FC = () => {
       timestamp: new Date(),
       sessionId: newSessionId,
       isTemporary: true, // Mark as temporary until first message
+      selectedIntent: null, // No intent selected yet
     };
     setConversations([defaultConversation]);
     setCurrentConversationId(defaultConversation.id);
@@ -156,6 +169,20 @@ export const ChatInterface: React.FC = () => {
       );
     }
   }, [conversations]);
+
+  // For conversations with messages but no selectedIntent (legacy conversations),
+  // infer intent from first message or default to RAG queries
+  useEffect(() => {
+    setConversations((prev) =>
+      prev.map((conv) => {
+        if (conv.messages.length > 0 && conv.selectedIntent === undefined) {
+          // Legacy conversation - default to RAG queries (null intent)
+          return { ...conv, selectedIntent: null };
+        }
+        return conv;
+      })
+    );
+  }, []);
 
   // Clean up temporary sessions on component unmount
   useEffect(() => {
@@ -197,10 +224,24 @@ export const ChatInterface: React.FC = () => {
       timestamp: new Date(),
       sessionId: newSessionId,
       isTemporary: true, // Mark as temporary until first message
+      selectedIntent: null, // No intent selected yet
     };
     setConversations((prev) => [newConversation, ...prev]);
     setCurrentConversationId(newConversation.id);
     setInputMessage("");
+  };
+
+  // Handle intent selection via button click
+  const handleIntentSelection = (intent: "recipe_extraction" | null) => {
+    if (!currentConversationId) return;
+
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === currentConversationId
+          ? { ...conv, selectedIntent: intent }
+          : conv
+      )
+    );
   };
 
   const deleteConversation = (conversationId: string) => {
@@ -266,11 +307,6 @@ export const ChatInterface: React.FC = () => {
     setIsMultiSelectMode(false);
   };
 
-  // Clean up temporary sessions that haven't been used
-  const cleanupTemporarySessions = () => {
-    setConversations((prev) => prev.filter((conv) => !conv.isTemporary));
-  };
-
   // Check if current conversation is temporary and unused
   const isCurrentConversationTemporary = () => {
     const current = getCurrentConversation();
@@ -293,9 +329,9 @@ export const ChatInterface: React.FC = () => {
     const currentConversation = getCurrentConversation();
     if (!currentConversation) return;
 
-    // Detect intent
-    const intent = detectIntent(inputMessage);
-    console.log("Detected intent:", intent);
+    // Use manually selected intent (or null for RAG queries)
+    const intent = currentConversation.selectedIntent || null;
+    console.log("Using selected intent:", intent);
 
     // Add message to history
     setMessageHistory((prev) => [
@@ -348,34 +384,29 @@ export const ChatInterface: React.FC = () => {
           },
         })) as ChatMessageResponse;
       } else {
-        // Handle RAG-based queries
+        // Handle RAG-based queries (all non-extraction intents)
         let recipeContext = "";
 
-        if (
-          intent === "recipe_search" ||
-          intent === "ingredient_search" ||
-          intent === "cooking_advice"
-        ) {
-          try {
-            const ragResults = await ragService.searchRecipes({
-              query: inputMessage,
-              userId: "test-user", // TODO: Get actual user ID
-              limit: 5,
-              searchType: "hybrid",
-            });
-            recipeContext = formatRecipeContext(ragResults.results);
-          } catch (ragError) {
-            console.warn(
-              "RAG search failed, proceeding without context:",
-              ragError
-            );
-          }
+        // Always perform RAG search for better context
+        try {
+          const ragResults = await ragService.searchRecipes({
+            query: inputMessage,
+            userId: user?.id || "test-user",
+            limit: 5,
+            searchType: "hybrid",
+          });
+          recipeContext = formatRecipeContext(ragResults.results);
+        } catch (ragError) {
+          console.warn(
+            "RAG search failed, proceeding without context:",
+            ragError
+          );
         }
 
         response = (await sendMessageMutation.mutateAsync({
           message: inputMessage,
           sessionId: currentConversation.sessionId,
-          intent: intent,
+          intent: undefined, // No specific intent for RAG queries
           context: {
             recentMessages: currentConversation.messages.slice(-5),
             recipeContext: recipeContext,
@@ -461,16 +492,16 @@ export const ChatInterface: React.FC = () => {
       {/* Sidebar - Conversation History */}
       <div className="w-80 bg-gradient-to-b from-primary-50/30 via-slate-50 to-secondary-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 border-r border-primary-200/50 dark:border-gray-700 flex flex-col min-h-0">
         {/* Header with New Chat and Multi-select */}
-        <div className="p-3 border-b border-primary-200/50 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+        <div className="p-3 border-b border-primary-200/50 dark:border-gray-700 bg-white/50 dark:bg-transparent backdrop-blur-sm">
           <div className="flex gap-2">
             <Button
               onClick={createNewConversation}
               variant="outline"
               size="icon"
               title="New Chat"
-              className="flex-1"
+              className="h-8 w-8 flex-1 bg-transparent dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
             </Button>
 
             {conversations.length > 0 && (
@@ -480,10 +511,10 @@ export const ChatInterface: React.FC = () => {
                     onClick={() => setIsMultiSelectMode(true)}
                     variant="outline"
                     size="icon"
-                    className="flex-1"
+                    className="h-8 w-8 flex-1 bg-transparent dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
                     title="Select"
                   >
-                    <CheckSquare className="h-4 w-4" />
+                    <CheckSquare className="h-3.5 w-3.5" />
                   </Button>
                 ) : (
                   <>
@@ -491,19 +522,19 @@ export const ChatInterface: React.FC = () => {
                       onClick={selectAllConversations}
                       variant="outline"
                       size="icon"
-                      className="flex-1"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
                       title="Select All"
                     >
-                      <CheckSquare className="h-4 w-4" />
+                      <CheckSquare className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       onClick={clearSelection}
                       variant="outline"
                       size="icon"
-                      className="flex-1"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
                       title="Cancel"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3.5 w-3.5" />
                     </Button>
                   </>
                 )}
@@ -515,22 +546,10 @@ export const ChatInterface: React.FC = () => {
                 onClick={deleteSelectedConversations}
                 variant="destructive"
                 size="icon"
-                className="flex-1"
+                className="h-8 w-8 flex-1"
                 title={`Delete Selected (${selectedConversations.size})`}
               >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-
-            {conversations.some((conv) => conv.isTemporary) && (
-              <Button
-                onClick={cleanupTemporarySessions}
-                variant="outline"
-                size="icon"
-                className="flex-1"
-                title="Clean Up Unused Chats"
-              >
-                <X className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
@@ -622,28 +641,25 @@ export const ChatInterface: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
               {!currentConversation ||
               currentConversation.messages.length === 0 ? (
-                <div className="text-center py-8">
-                  <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    Welcome to MealPrep Assistant!
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Ask me anything about recipes, meal planning, or cooking
-                    tips.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-md mx-auto">
-                    <div className="p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-                      <BookOpen className="h-5 w-5 mx-auto mb-2 text-primary-600" />
-                      <p className="text-xs text-primary-700 dark:text-primary-300">
-                        "Add this recipe to my collection"
-                      </p>
-                    </div>
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <Search className="h-5 w-5 mx-auto mb-2 text-green-600" />
-                      <p className="text-xs text-green-700 dark:text-green-300">
-                        "Find recipes with chicken"
-                      </p>
-                    </div>
+                <div className="flex flex-col items-center justify-center h-full py-8">
+                  <h2 className="text-xl font-medium text-gray-900 dark:text-gray-100 mb-6">
+                    Hey {getFirstName()}, where do you want to start?
+                  </h2>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => handleIntentSelection("recipe_extraction")}
+                      variant="outline"
+                      className="px-6 py-2"
+                    >
+                      Add new recipe
+                    </Button>
+                    <Button
+                      onClick={() => handleIntentSelection(null)}
+                      variant="outline"
+                      className="px-6 py-2"
+                    >
+                      Questions about an existing recipe
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -715,23 +731,42 @@ export const ChatInterface: React.FC = () => {
 
             {/* Input Area */}
             <div className="border-t p-4 flex-shrink-0">
-              <div className="flex gap-2">
-                <Input
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  disabled={isLoading}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || isLoading}
-                  size="icon"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+              {currentConversation &&
+              currentConversation.selectedIntent === null &&
+              currentConversation.messages.length === 0 ? (
+                <div className="text-center py-2">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Please select an option above to start chatting
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder={
+                      currentConversation?.selectedIntent ===
+                      "recipe_extraction"
+                        ? "Paste or type your recipe here..."
+                        : "Ask me about your recipes..."
+                    }
+                    disabled={isLoading || !currentConversation?.selectedIntent}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={
+                      !inputMessage.trim() ||
+                      isLoading ||
+                      !currentConversation?.selectedIntent
+                    }
+                    size="icon"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

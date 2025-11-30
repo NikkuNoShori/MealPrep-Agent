@@ -91,17 +91,60 @@ serve(async (req) => {
 // Handle sending a chat message
 async function handleSendMessage(req: Request, supabase: any, user: any) {
   try {
-    const { message, context } = await req.json()
+    const { message, context, sessionId, intent } = await req.json()
 
-    // Save user message first
+    // Get or create conversation
+    let conversationId: string
+    const session_id = sessionId || context?.sessionId || `session-${Date.now()}`
+    
+    // Try to find existing conversation by session_id
+    const { data: existingConv, error: findError } = await supabase
+      .from('chat_conversations')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('session_id', session_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (existingConv && !findError) {
+      conversationId = existingConv.id
+      
+      // Update conversation metadata if intent is provided
+      if (intent) {
+        await supabase
+          .from('chat_conversations')
+          .update({ selected_intent: intent })
+          .eq('id', conversationId)
+      }
+    } else {
+      // Create new conversation
+      const title = message.length > 50 ? message.substring(0, 50) + '...' : message
+      const { data: newConv, error: convError } = await supabase
+        .from('chat_conversations')
+        .insert({
+          user_id: user.id,
+          title: title,
+          session_id: session_id,
+          selected_intent: intent || null,
+          metadata: context?.metadata || {}
+        })
+        .select()
+        .single()
+
+      if (convError) throw convError
+      conversationId = newConv.id
+    }
+
+    // Save user message
     const { data: userMessage, error: userMsgError } = await supabase
       .from('chat_messages')
       .insert({
-        user_id: user.id,
+        conversation_id: conversationId,
         content: message,
         sender: 'user',
         message_type: 'text',
-        metadata: {}
+        metadata: context?.messageMetadata || {}
       })
       .select()
       .single()
@@ -126,7 +169,9 @@ async function handleSendMessage(req: Request, supabase: any, user: any) {
               id: userMessage.id,
               content: message,
               type: 'text',
-              context
+              context,
+              sessionId: session_id,
+              conversationId: conversationId
             },
             user: user
           }),
@@ -149,7 +194,7 @@ async function handleSendMessage(req: Request, supabase: any, user: any) {
     const { data: aiMessage, error: aiMsgError } = await supabase
       .from('chat_messages')
       .insert({
-        user_id: user.id,
+        conversation_id: conversationId,
         content: aiResponse,
         sender: 'ai',
         message_type: 'text',
@@ -168,7 +213,9 @@ async function handleSendMessage(req: Request, supabase: any, user: any) {
           content: aiResponse,
           sender: 'ai',
           timestamp: new Date().toISOString()
-        }
+        },
+        conversationId: conversationId,
+        sessionId: session_id
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -190,25 +237,84 @@ async function handleSendMessage(req: Request, supabase: any, user: any) {
 // Handle getting chat history
 async function handleGetHistory(req: Request, supabase: any, user: any, limit: number) {
   try {
-    const { data: messages, error } = await supabase
-      .from('chat_messages')
-      .select('*')
+    const url = new URL(req.url)
+    const conversationId = url.searchParams.get('conversationId')
+
+    // If conversationId provided, get messages for that conversation
+    if (conversationId) {
+      const { data: messages, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+
+      const formattedMessages = messages.map((msg: any) => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.sender,
+        type: msg.message_type,
+        timestamp: msg.created_at,
+        metadata: msg.metadata
+      }))
+
+      return new Response(
+        JSON.stringify({ messages: formattedMessages }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
+    }
+
+    // Otherwise, get list of conversations
+    const { data: conversations, error } = await supabase
+      .from('chat_conversations')
+      .select(`
+        id,
+        title,
+        session_id,
+        selected_intent,
+        created_at,
+        updated_at,
+        last_message_at
+      `)
       .eq('user_id', user.id)
+      .order('last_message_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(limit)
 
     if (error) throw error
 
-    const formattedMessages = messages.reverse().map((msg: any) => ({
-      id: msg.id,
-      content: msg.content,
-      sender: msg.sender,
-      type: msg.message_type,
-      timestamp: msg.created_at
+    // Get message counts for each conversation
+    const conversationIds = conversations.map((c: any) => c.id)
+    const { data: messageCounts, error: countError } = await supabase
+      .from('chat_messages')
+      .select('conversation_id')
+      .in('conversation_id', conversationIds)
+
+    if (countError) throw countError
+
+    // Count messages per conversation
+    const countsMap = new Map<string, number>()
+    messageCounts?.forEach((msg: any) => {
+      countsMap.set(msg.conversation_id, (countsMap.get(msg.conversation_id) || 0) + 1)
+    })
+
+    const formattedConversations = conversations.map((conv: any) => ({
+      id: conv.id,
+      title: conv.title,
+      sessionId: conv.session_id,
+      selectedIntent: conv.selected_intent,
+      createdAt: conv.created_at,
+      updatedAt: conv.updated_at,
+      lastMessageAt: conv.last_message_at,
+      messageCount: countsMap.get(conv.id) || 0
     }))
 
     return new Response(
-      JSON.stringify({ messages: formattedMessages }),
+      JSON.stringify({ conversations: formattedConversations }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -229,8 +335,31 @@ async function handleGetHistory(req: Request, supabase: any, user: any, limit: n
 // Handle clearing chat history
 async function handleClearHistory(req: Request, supabase: any, user: any) {
   try {
+    const url = new URL(req.url)
+    const conversationId = url.searchParams.get('conversationId')
+
+    // If conversationId provided, delete only that conversation (cascades to messages)
+    if (conversationId) {
+      const { error } = await supabase
+        .from('chat_conversations')
+        .delete()
+        .eq('id', conversationId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      return new Response(
+        JSON.stringify({ message: 'Conversation deleted successfully' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
+    }
+
+    // Otherwise, delete all conversations for user (cascades to all messages)
     const { error } = await supabase
-      .from('chat_messages')
+      .from('chat_conversations')
       .delete()
       .eq('user_id', user.id)
 

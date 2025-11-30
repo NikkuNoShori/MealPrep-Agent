@@ -12,12 +12,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const initializedRef = React.useRef(false)
 
   useEffect(() => {
-    if (!initializedRef.current && !user) {
+    // Always initialize on mount to ensure auth state is current
+    if (!initializedRef.current) {
       initializedRef.current = true
       initialize()
     }
-  }, [initialize, user])
+  }, [initialize])
 
+  // Show loading state while checking auth
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -26,6 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     )
   }
 
+  // Redirect to sign in if not authenticated
   if (!user) {
     return <Navigate to="/signin" state={{ from: location }} replace />
   }

@@ -1,5 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { useAuthStore } from '@/stores/authStore'
 import { 
   MessageSquare, 
   ChefHat, 
@@ -13,7 +15,40 @@ import {
 
 const LandingPage = () => {
   useDocumentTitle()
-  
+  const navigate = useNavigate()
+  const { user, isLoading, initialize } = useAuthStore()
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (!user && !isLoading) {
+        // Initialize auth if not already done
+        await initialize()
+      }
+    }
+    checkAuth()
+  }, [user, isLoading, initialize])
+
+  useEffect(() => {
+    if (user && !isLoading) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, isLoading, navigate])
+
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  // Don't render landing page if user is authenticated (will redirect)
+  if (user) {
+    return null
+  }
+
   const features = [
     {
       icon: MessageSquare,

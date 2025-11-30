@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import { useEffect } from "react";
 import { ThemeProvider } from "./providers/ThemeProvider";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Layout from "./components/common/Layout";
@@ -11,8 +12,15 @@ import Chat from "./pages/Chat";
 import Recipes from "./pages/Recipes";
 import MealPlanner from "./pages/MealPlanner";
 import Settings from "./pages/Settings";
+import { useAuthStore } from "./stores/authStore";
 
 function AppRoutes() {
+  const { initialize } = useAuthStore();
+
+  // Initialize auth on app mount
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />

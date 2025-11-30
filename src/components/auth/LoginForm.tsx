@@ -31,7 +31,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       email: string;
       password: string;
     }) => signIn(email, password),
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Small delay to ensure auth state is fully propagated
+      await new Promise((resolve) => setTimeout(resolve, 100));
       onSuccess?.();
       navigate("/dashboard");
       toast.success("Signed in successfully");

@@ -55,7 +55,7 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-gradient-to-r from-primary-50 via-white to-secondary-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 shadow-sm border-b border-primary-200/50 dark:border-gray-700">
+    <header className="bg-gradient-to-r from-primary-50 via-slate-50 to-secondary-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 shadow-sm border-b border-primary-200/50 dark:border-gray-700">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -125,18 +125,18 @@ const Header = () => {
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-lg border border-primary-200/50 dark:border-gray-700 py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 backdrop-blur-sm rounded-lg shadow-lg border border-primary-200/50 dark:border-gray-700 py-1 z-50">
                     <Link
                       to="/settings"
                       onClick={() => setIsUserMenuOpen(false)}
-                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-gray-700 flex items-center space-x-2 transition-colors"
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-gray-700 flex items-center space-x-2 transition-colors"
                     >
                       <Settings className="w-4 h-4" />
                       <span>Settings</span>
                     </Link>
                     <button
                       onClick={signOut}
-                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-gray-700 flex items-center space-x-2 transition-colors"
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-gray-700 flex items-center space-x-2 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>

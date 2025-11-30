@@ -248,7 +248,7 @@ BEGIN
         AND column_name = 'user_id'
         AND table_name IN (
             'user_preferences', 'recipes', 'recipe_ratings', 'meal_plans', 
-            'chat_messages', 'receipts', 'user_ingredients', 'shopping_lists'
+            'chat_messages', 'chat_conversations'
         )
     LOOP
         -- Find the foreign key constraint for user_id

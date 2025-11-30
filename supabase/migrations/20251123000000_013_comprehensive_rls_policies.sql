@@ -331,10 +331,8 @@ DROP POLICY IF EXISTS "Restrict role modifications" ON roles;
 -- ✅ recipes - Users can only access their own recipes (+ public recipes)
 -- ✅ user_preferences - Users can only access their own preferences
 -- ✅ meal_plans - Users can only access their own meal plans
--- ✅ chat_messages - Users can only access their own chat messages
--- ✅ receipts - Users can only access their own receipts
--- ✅ user_ingredients - Users can only access their own ingredients
--- ✅ shopping_lists - Users can only access their own shopping lists
+-- ✅ chat_conversations - Users can only access their own conversations
+-- ✅ chat_messages - Users can only access messages in their conversations
 -- ✅ family_members - Users can access family members in their family
 -- ✅ user_roles - Users can only view their own roles
 -- ✅ recipe_embeddings - Users can only access embeddings for their recipes

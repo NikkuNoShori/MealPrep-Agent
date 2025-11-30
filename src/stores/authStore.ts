@@ -61,12 +61,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   signIn: async (email: string, password: string) => {
     set({ isLoading: true, error: null })
     try {
-      await authService.signIn(email, password)
-      const currentUser = await authService.getUser()
-      set({ user: currentUser || null })
+      await authService.signIn(email, password);
+      // Wait a moment for session to be fully established
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const currentUser = await authService.getUser();
+      set({ user: currentUser || null });
       if (currentUser) {
-        const accounts = await authService.getLinkedAccounts()
-        set({ linkedAccounts: accounts })
+        const accounts = await authService.getLinkedAccounts();
+        set({ linkedAccounts: accounts });
       }
     } catch (err: any) {
       set({ error: err?.message || 'Sign in failed' })
