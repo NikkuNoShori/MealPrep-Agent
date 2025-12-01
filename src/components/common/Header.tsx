@@ -1,11 +1,10 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X, LogOut, User } from "lucide-react";
+import { Menu, X, LogOut, User, Settings } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
-import { ToastService } from "@/services/toast";
-import { Logger } from "@/services/logger";
 import { Button } from "../ui/button";
+import React from "react";
 
 const Header = () => {
   const { theme, setTheme, isDark } = useTheme();
@@ -14,20 +13,28 @@ const Header = () => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset avatar error when user changes
+  React.useEffect(() => {
+    setAvatarError(false);
+  }, [user?.id, user?.avatar_url]);
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard" },
     { name: "Chat", href: "/chat" },
     { name: "Recipes", href: "/recipes" },
     { name: "Meal Planner", href: "/meal-planner" },
-    { name: "Settings", href: "/settings" },
   ];
 
   // Get first name from user object
-  const getFirstName = (user: any) => {
-    return user?.firstName || user?.first_name || user?.displayName?.split(" ")[0] || user?.email?.split("@")[0] || 'User';
+  const getFirstName = () => {
+    if (user?.first_name) return user.first_name;
+    if (user?.display_name) return user.display_name.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "User";
   };
 
   // Handle user menu hover
@@ -55,7 +62,7 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-stone-200 dark:border-gray-700">
+    <header className="bg-gradient-to-r from-primary-50 via-slate-50 to-secondary-50 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 shadow-sm border-b border-primary-200/50 dark:border-slate-700/50">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -103,34 +110,52 @@ const Header = () => {
           <div className="flex items-center space-x-4">
             {/* User Menu */}
             {user && (
-              <div 
+              <div
                 className="relative"
                 ref={userMenuRef}
                 onMouseEnter={handleUserMenuMouseEnter}
                 onMouseLeave={handleUserMenuMouseLeave}
               >
-                <button className="flex items-center space-x-2 p-2 rounded-lg bg-stone-100 dark:bg-gray-700 hover:bg-stone-200 dark:hover:bg-gray-600 transition-colors">
-                  <User className="w-4 h-4 text-stone-600 dark:text-gray-300" />
+                <button className="flex items-center space-x-2 p-2 rounded-lg hover:opacity-80 transition-opacity">
+                  {user?.avatar_url && !avatarError ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={getFirstName()}
+                      className="w-8 h-8 rounded-full object-cover border border-stone-200 dark:border-slate-600"
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        // If image fails to load, show icon instead
+                        console.warn('Avatar image failed to load:', user.avatar_url);
+                        console.warn('Image error details:', e);
+                        setAvatarError(true);
+                      }}
+                      onLoad={() => {
+                        // Reset error state if image loads successfully
+                        setAvatarError(false);
+                      }}
+                    />
+                  ) : (
+                    <User className="w-5 h-5 text-stone-600 dark:text-gray-300" />
+                  )}
                   <span className="text-sm font-medium text-stone-700 dark:text-gray-300">
-                    {user.email}
+                    Hey, {getFirstName()}
                   </span>
                 </button>
-                
+
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-stone-200 dark:border-gray-700 py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-700 backdrop-blur-sm rounded-lg shadow-lg border border-primary-200/50 dark:border-slate-600/50 py-1 z-50">
+                    <Link
+                      to="/settings"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-slate-600 flex items-center space-x-2 transition-colors"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Settings</span>
+                    </Link>
                     <button
-                      onClick={async () => {
-                        try {
-                          Logger.info('🔵 Header: Sign out requested');
-                          await signOut();
-                          ToastService.success('Signed out successfully');
-                          navigate('/signin');
-                        } catch (error: any) {
-                          Logger.error('🔴 Header: Sign out error', error);
-                          ToastService.error('Failed to sign out. Please try again.');
-                        }
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-300 hover:bg-stone-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                      onClick={signOut}
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-slate-600 flex items-center space-x-2 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>
@@ -143,7 +168,7 @@ const Header = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg bg-stone-100 dark:bg-gray-700 hover:bg-stone-200 dark:hover:bg-gray-600 transition-colors"
+              className="md:hidden p-2 rounded-lg bg-stone-100 dark:bg-slate-700 hover:bg-stone-200 dark:hover:bg-slate-600 transition-colors"
               aria-label="Toggle mobile menu"
             >
               {isMobileMenuOpen ? (
@@ -157,7 +182,7 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-stone-200 dark:border-gray-700">
+          <div className="md:hidden py-4 border-t border-primary-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
             <nav className="flex flex-col space-y-4">
               {navigation.map((item) =>
                 item.name === "Chat" ? (

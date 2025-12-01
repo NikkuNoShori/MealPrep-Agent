@@ -7,14 +7,14 @@ export interface RecipeSearchResult {
   description?: string;
   ingredients: any[];
   instructions: any[];
-  prep_time?: string;
-  cook_time?: string;
+  prepTime?: string;
+  cookTime?: string;
   servings?: number;
   difficulty?: string;
   cuisine?: string;
-  dietary_tags?: string[];
-  similarity_score: number;
-  searchable_text: string;
+  dietaryTags?: string[];
+  similarityScore: number;
+  searchableText: string;
 }
 
 export interface RAGSearchRequest {
@@ -212,13 +212,13 @@ Recipe: ${recipe.title}
 Description: ${recipe.description || 'No description'}
 Ingredients: ${ingredients}
 Instructions: ${instructions}
-Prep Time: ${recipe.prep_time || 'Not specified'}
-Cook Time: ${recipe.cook_time || 'Not specified'}
+Prep Time: ${recipe.prepTime || 'Not specified'}
+Cook Time: ${recipe.cookTime || 'Not specified'}
 Servings: ${recipe.servings || 'Not specified'}
 Difficulty: ${recipe.difficulty || 'Not specified'}
 Cuisine: ${recipe.cuisine || 'Not specified'}
-Dietary Tags: ${recipe.dietary_tags?.join(', ') || 'None'}
-Similarity Score: ${recipe.similarity_score.toFixed(3)}
+Dietary Tags: ${recipe.dietaryTags?.join(', ') || 'None'}
+Similarity Score: ${recipe.similarityScore.toFixed(3)}
 ---`;
   }).join('\n');
 };

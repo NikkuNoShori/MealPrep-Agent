@@ -350,7 +350,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-primary-600">
                 {
                   getWeekDates().filter(
                     (date) => getMealCount(formatDate(date)) > 0
@@ -362,7 +362,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
+              <div className="text-2xl font-bold text-secondary-600">
                 {
                   mealPlans.filter((plan) => {
                     const planDate = new Date(plan.date);

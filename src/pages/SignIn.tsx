@@ -1,13 +1,38 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { BackButton } from '@/components/common/BackButton'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { useAuthStore } from '@/stores/authStore'
 
 const SignIn: React.FC = () => {
+  useDocumentTitle()
   const navigate = useNavigate()
+  const { user, isLoading } = useAuthStore()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user && !isLoading) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, isLoading, navigate])
 
   const handleAuthSuccess = () => {
     navigate('/dashboard')
+  }
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  // Don't render sign in if already authenticated (will redirect)
+  if (user) {
+    return null
   }
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">

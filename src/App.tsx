@@ -1,49 +1,33 @@
 import { Routes, Route } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect } from "react";
 import { ThemeProvider } from "./providers/ThemeProvider";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Layout from "./components/common/Layout";
 import LandingPage from "./pages/LandingPage";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import VerifyEmail from "./pages/VerifyEmail";
-import OAuthCallback from "./pages/OAuthCallback";
+import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import Recipes from "./pages/Recipes";
 import MealPlanner from "./pages/MealPlanner";
 import Settings from "./pages/Settings";
 import { useAuthStore } from "./stores/authStore";
-import { Logger } from "./services/logger";
 
 function AppRoutes() {
-  // Initialize auth when app starts - check for existing session/cookies
-  const { initialize, setupAuthListener } = useAuthStore()
-  
+  const { initialize } = useAuthStore();
+
+  // Initialize auth on app mount (only once)
   useEffect(() => {
-    // Initialize auth on app startup to check for existing session
-    // This will check Supabase Auth session and set user state if logged in
-    Logger.info('🚀 AppRoutes: Initializing auth on startup...')
-    initialize().then(() => {
-      // Set up listener for auth state changes after initialization
-      Logger.info('🚀 AppRoutes: Setting up auth state listener...')
-      setupAuthListener()
-    })
+    initialize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Only run once on mount
+  }, []); // Only run once on mount
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/signin" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/handler/password-reset" element={<ResetPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/handler/email-verification" element={<VerifyEmail />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/auth/callback" element={<OAuthCallback />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route
         path="/dashboard"
         element={
@@ -72,14 +56,6 @@ function AppRoutes() {
               <Recipes />
             </Layout>
           </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/recipes/:slug"
-        element={
-          <Layout>
-            <Recipes />
-          </Layout>
         }
       />
       <Route

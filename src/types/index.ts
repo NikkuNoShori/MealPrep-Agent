@@ -116,42 +116,6 @@ export interface GroceryItem {
   estimatedPrice?: number
 }
 
-// Receipt types
-export interface Receipt {
-  id: string
-  familyId: string
-  storeInfo: StoreInfo
-  rawOCRText: string
-  processedItems: ProcessedReceiptItem[]
-  totalAmount: number
-  date: Date
-  processingStatus: 'pending' | 'processed' | 'needs_review'
-  userCorrections: UserCorrection[]
-}
-
-export interface StoreInfo {
-  name: string
-  location?: string
-  receiptFormat: string
-}
-
-export interface ProcessedReceiptItem {
-  originalText: string
-  recognizedName: string
-  category: IngredientCategory
-  quantity: number
-  unit: string
-  price: number
-  confidence: 'high' | 'medium' | 'low'
-}
-
-export interface UserCorrection {
-  itemId: string
-  correctedName: string
-  correctedCategory: IngredientCategory
-  timestamp: Date
-}
-
 // API Response types
 export interface ApiResponse<T> {
   success: boolean
@@ -178,12 +142,26 @@ export interface ChatHistoryResponse {
   total: number
 }
 
+export interface StructuredRecipe {
+  title: string
+  description?: string
+  prepTime?: number
+  cookTime?: number
+  servings?: number
+  difficulty?: 'easy' | 'medium' | 'hard'
+  tags?: string[]
+  ingredients: Ingredient[]
+  instructions: string[]
+  imageUrl?: string
+}
+
 export interface ChatMessageResponse {
   response: {
     id: string
     content: string
     timestamp: string
   }
+  recipe?: StructuredRecipe // Optional structured recipe data
 }
 
 export interface RecipesResponse {

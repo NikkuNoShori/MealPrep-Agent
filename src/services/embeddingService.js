@@ -1,31 +1,33 @@
 import OpenAI from 'openai';
 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY;
+
+if (!OPENROUTER_API_KEY) {
+  console.warn('⚠️  OPENROUTER_API_KEY not configured. Embedding generation will fail.');
+  console.warn('⚠️  Required: OPENROUTER_API_KEY or VITE_OPENROUTER_API_KEY environment variable');
+}
+
+const openai = new OpenAI({
+  apiKey: OPENROUTER_API_KEY || '',
+  baseURL: 'https://openrouter.ai/api/v1',
+  defaultHeaders: {
+    'HTTP-Referer': process.env.FRONTEND_URL || 'http://localhost:5173',
+    'X-Title': 'MealPrep Agent',
+  },
+});
+
 export class EmbeddingService {
   constructor() {
-    this._openai = null;
-  }
-
-  get openai() {
-    if (!this._openai) {
-      const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
-      if (!apiKey) {
-        throw new Error(
-          'OpenAI API key not configured. Please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file.'
-        );
-      }
-      this._openai = new OpenAI({
-        apiKey: apiKey,
-        baseURL: process.env.OPENROUTER_API_KEY 
-          ? 'https://openrouter.ai/api/v1'
-          : undefined, // Use default OpenAI endpoint if using OPENAI_API_KEY
-      });
-    }
-    return this._openai;
+    this.openai = openai;
   }
 
   async generateEmbedding(text) {
     try {
       console.log('🔄 Generating embedding for text:', text.substring(0, 100) + '...');
+      
+      if (!OPENROUTER_API_KEY) {
+        throw new Error('OPENROUTER_API_KEY is not configured');
+      }
       
       const response = await this.openai.embeddings.create({
         model: 'text-embedding-ada-002',
@@ -38,6 +40,10 @@ export class EmbeddingService {
       return embedding;
     } catch (error) {
       console.error('❌ Error generating embedding:', error);
+      if (error.status === 401) {
+        console.error('❌ Authentication failed. Check if OPENROUTER_API_KEY is valid.');
+        console.error('❌ API Key present:', OPENROUTER_API_KEY ? `Yes (length: ${OPENROUTER_API_KEY.length})` : 'No');
+      }
       throw new Error(`Failed to generate embedding: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

@@ -54,7 +54,7 @@ const Recipes = () => {
 
   const handleEditRecipe = (recipe: any) => {
     setEditingRecipe(recipe);
-    setShowAddForm(false);
+    setShowAddForm(true);
     setSelectedRecipe(null);
   };
 
@@ -69,10 +69,10 @@ const Recipes = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {showAddForm && (
+        {(showAddForm || editingRecipe) && (
           <div className="animate-fade-in">
             <RecipeForm
               recipe={editingRecipe}
@@ -85,17 +85,15 @@ const Recipes = () => {
           </div>
         )}
 
-        {selectedRecipe && (
-          <div className="animate-fade-in">
-            <RecipeDetail
-              recipe={selectedRecipe}
-              onEdit={() => handleEditRecipe(selectedRecipe)}
-              onClose={handleCloseDetail}
-            />
-          </div>
+        {selectedRecipe && !showAddForm && !editingRecipe && (
+          <RecipeDetail
+            recipe={selectedRecipe}
+            onEdit={() => handleEditRecipe(selectedRecipe)}
+            onClose={handleCloseDetail}
+          />
         )}
 
-        {!showAddForm && !selectedRecipe && (
+        {!showAddForm && !selectedRecipe && !editingRecipe && (
           <div className="animate-fade-in">
             <RecipeList
               onRecipeSelect={handleRecipeSelect}

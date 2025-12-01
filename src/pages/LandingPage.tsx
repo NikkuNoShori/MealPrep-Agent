@@ -1,5 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { useAuthStore } from '@/stores/authStore'
 import { 
   MessageSquare, 
   ChefHat, 
@@ -10,18 +12,23 @@ import {
   Play,
   Star
 } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
-import { Logger } from '@/services/logger'
 
 const LandingPage = () => {
-  // Refresh auth state when landing page loads to check for existing session
-  const { refreshUser } = useAuthStore()
-  
+  useDocumentTitle()
+  const navigate = useNavigate()
+  const { user, isLoading } = useAuthStore()
+
+  // Redirect authenticated users to dashboard
+  // Don't block page rendering - show content immediately
   useEffect(() => {
-    Logger.info('🔵 LandingPage: Refreshing auth state on mount')
-    refreshUser()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (user && !isLoading) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, isLoading, navigate])
+
+  // Don't block rendering - show landing page content immediately
+  // If user is authenticated, they'll be redirected via useEffect above
+
   const features = [
     {
       icon: MessageSquare,

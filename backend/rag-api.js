@@ -1,11 +1,21 @@
 // RAG API endpoints for recipe search and retrieval
-import pkg from 'pg';
-const { Pool } = pkg;
+import { createClient } from '@supabase/supabase-js';
 
-// Initialize PostgreSQL connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://username:password@localhost:5432/mealprep',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+// Initialize Supabase client
+// Check both VITE_ prefixed and non-prefixed environment variables
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('⚠️  Supabase credentials not configured. RAG features may not work.');
+  console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or SUPABASE_URL and SUPABASE_ANON_KEY) environment variables');
+}
+
+// Create client with fallback empty strings to prevent errors
+const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
+  auth: {
+    persistSession: false
+  }
 });
 
 // OpenAI API for embeddings

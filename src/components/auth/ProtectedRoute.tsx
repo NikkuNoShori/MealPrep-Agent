@@ -1,48 +1,58 @@
 import React, { useEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { Logger } from '@/services/logger'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  // ALL HOOKS MUST BE CALLED FIRST - before any conditional returns
   const location = useLocation()
-  const { user, isLoading, refreshUser } = useAuthStore()
+  const { user, isLoading } = useAuthStore()
+  const [waitingForAuth, setWaitingForAuth] = React.useState(false)
   
-  // Only refresh auth state if user is not already loaded and not currently loading
-  // This prevents unnecessary calls when navigating between protected routes
-  useEffect(() => {
-    if (!isLoading && !user) {
-      Logger.debug('🔵 ProtectedRoute: User not loaded, refreshing auth state')
-      refreshUser()
-    } else {
-      Logger.debug('🔵 ProtectedRoute: User already loaded or loading, skipping refresh', { 
-        hasUser: !!user, 
-        isLoading 
-      })
+  // Auth is initialized in App.tsx - no need to initialize here
+  
+  React.useEffect(() => {
+    // If no user but we might be coming from OAuth, wait a moment
+    if (!user && !isLoading && !waitingForAuth) {
+      const isOAuthCallback = document.referrer.includes('/auth/callback') ||
+                              sessionStorage.getItem('oauth_redirecting') === 'true'
+      
+      if (isOAuthCallback) {
+        console.log('🟡 ProtectedRoute: Detected OAuth callback, waiting for auth state...')
+        setWaitingForAuth(true)
+        sessionStorage.removeItem('oauth_redirecting')
+        
+        // Wait up to 2 seconds for auth state to update
+        const timer = setTimeout(() => {
+          setWaitingForAuth(false)
+        }, 2000)
+        
+        return () => clearTimeout(timer)
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [user, isLoading, waitingForAuth])
 
+  // NOW we can do conditional returns after all hooks are called
   // Show loading state while checking auth
-  if (isLoading) {
+  // Give it a moment after OAuth callback to update state
+  if (isLoading || (!user && waitingForAuth)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
   }
-
-  // Redirect to sign in if not authenticated
+  
   if (!user) {
-    Logger.debug('🔵 ProtectedRoute: No user found, redirecting to signin')
+    console.log('🔴 ProtectedRoute: No user found, redirecting to signin')
     return <Navigate to="/signin" state={{ from: location }} replace />
   }
+  
+  console.log('✅ ProtectedRoute: User authenticated, rendering children')
 
-  // User is authenticated, render children
-  Logger.debug('🔵 ProtectedRoute: User authenticated, rendering children', { userId: user.id })
   return <>{children}</>
 }
 

@@ -7,66 +7,38 @@ import { BackButton } from '@/components/common/BackButton'
 import { useAuthStore } from '@/stores/authStore'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { ToastService } from '@/services/toast'
-import { Logger } from '@/services/logger'
-import { Loader2, UserPlus } from 'lucide-react'
-import { authService } from '@/services/authService'
+import toast from 'react-hot-toast'
+import { Loader2, UserPlus, Eye, EyeOff } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
 
 interface SignupFormProps {
   onSuccess?: () => void
 }
 
 export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { signUp } = useAuthStore()
+  const { signUp, signInWithGoogle } = useAuthStore()
   
   const signupMutation = useMutation({
-    mutationFn: async ({ firstName, lastName, email, password }: { firstName: string; lastName: string; email: string; password: string }) => {
-      Logger.info('🔵 SignupForm: Calling signUp...')
-      
-      // signUp now returns the user directly with retry logic built-in
-      const user = await signUp(firstName, lastName, email, password)
-      
-      if (!user || !user.id) {
-        throw new Error('Sign up successful but user not found. Please try signing in.')
-      }
-      
-      Logger.info('🔵 SignupForm: SignUp successful', { userId: user.id })
-      return user
-    },
-    onSuccess: (user) => {
-      Logger.info('🔵 SignupForm: onSuccess called with user', { userId: user.id })
-      ToastService.success('Account created successfully!')
-      
-      // Navigate immediately - user is confirmed
+    mutationFn: async ({ email, password }: { email: string; password: string }) => signUp(email, password),
+    onSuccess: () => {
       onSuccess?.()
-      navigate('/dashboard', { replace: true })
+      navigate('/dashboard')
+      toast.success('Account created')
     },
     onError: (error: any) => {
       const raw = error?.message || ''
-      Logger.error('🔴 SignupForm: SignUp error', error)
-      
-      // Handle different error types
-      let friendly = raw || 'Sign up failed'
-      
-      if (/exists|taken|already/i.test(raw)) {
-        friendly = 'An account already exists with this email. Please sign in instead.'
-      } else if (/not\s*found|user/i.test(raw)) {
-        friendly = 'User not found after sign up. Please try signing in.'
-      } else if (/password/i.test(raw)) {
-        friendly = 'Password requirements not met. Please check your password.'
-      } else if (/email/i.test(raw) && /invalid/i.test(raw)) {
-        friendly = 'Invalid email address. Please check your email.'
-      }
-      
+      const friendly = /exists|taken|already/i.test(raw)
+        ? 'An account already exists with this email.'
+        : (raw || 'Signup failed')
       setError(friendly)
-      ToastService.error(friendly)
+      toast.error(friendly)
     }
   })
 
@@ -74,18 +46,8 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
     e.preventDefault()
     setError('')
     
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
-      setError('Please fill in all required fields')
-      return
-    }
-
-    if (!firstName.trim()) {
-      setError('First name is required')
-      return
-    }
-
-    if (!lastName.trim()) {
-      setError('Last name is required')
+    if (!email || !password || !confirmPassword) {
+      setError('Please fill in all fields')
       return
     }
 
@@ -99,7 +61,18 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
       return
     }
 
-    signupMutation.mutate({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password })
+    signupMutation.mutate({ email, password })
+  }
+
+  const handleGoogleSignUp = async () => {
+    setError('')
+    try {
+      await signInWithGoogle(`${window.location.origin}/auth/callback`)
+    } catch (err: any) {
+      const friendly = err?.message || 'Google sign up failed'
+      setError(friendly)
+      toast.error(friendly)
+    }
   }
 
   return (
@@ -110,34 +83,6 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Enter your first name"
-                autoComplete="given-name"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Enter your last name"
-                autoComplete="family-name"
-                required
-              />
-            </div>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -146,35 +91,65 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
-              autoComplete="username"
+              autoComplete="email"
               required
             />
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create a password"
-              autoComplete="new-password"
-              required
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Create a password"
+                className="pr-10"
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your password"
-              autoComplete="new-password"
-              required
-            />
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm your password"
+                className="pr-10"
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -183,14 +158,30 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
             </div>
           )}
 
-          <div className="relative">
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={signupMutation.isPending}
+          >
+            {signupMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              <>
+                <UserPlus className="w-4 h-4 mr-2" />
+                Sign Up
+              </>
+            )}
+          </Button>
+
+          <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+              <Separator />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
+              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
             </div>
           </div>
 
@@ -198,14 +189,8 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
             type="button"
             variant="outline"
             className="w-full"
-            onClick={async () => {
-              try {
-                await authService.signInWithGoogle();
-              } catch (error: any) {
-                setError(error.message || 'Failed to sign in with Google');
-                ToastService.error(error.message || 'Failed to sign in with Google');
-              }
-            }}
+            onClick={handleGoogleSignUp}
+            disabled={signupMutation.isPending}
           >
             <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
               <path
@@ -225,25 +210,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Continue with Google
-          </Button>
-
-          <Button 
-            type="submit" 
-            className="w-full" 
-            disabled={signupMutation.isPending}
-          >
-            {signupMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating account...
-              </>
-            ) : (
-              <>
-                <UserPlus className="w-4 h-4 mr-2" />
-                Sign Up
-              </>
-            )}
+            Sign up with Google
           </Button>
         </form>
       </CardContent>

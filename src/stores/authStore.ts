@@ -1,16 +1,9 @@
 import { create } from 'zustand'
-import { authService } from '@/services/authService'
-import { Logger } from '@/services/logger'
-import { supabase } from '@/lib/supabase'
+import { authService } from '@/services/supabase'
 
 export interface AuthUser {
   id: string
   email?: string
-  firstName?: string
-  first_name?: string
-  lastName?: string
-  last_name?: string
-  displayName?: string
   [key: string]: any
 }
 
@@ -18,215 +11,204 @@ interface AuthState {
   user: AuthUser | null
   isLoading: boolean
   error: string | null
+  linkedAccounts: Array<{ provider: string; id: string; created_at: string }>
   initialize: () => Promise<void>
   refreshUser: () => Promise<void>
-  signIn: (email: string, password: string) => Promise<AuthUser>
-  signUp: (firstName: string, lastName: string, email: string, password: string) => Promise<AuthUser>
-  signOut: () => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string) => Promise<void>
+  signInWithGoogle: (redirectTo?: string) => Promise<void>
+  linkGoogleAccount: (redirectTo?: string) => Promise<void>
+  unlinkGoogleAccount: () => Promise<void>
+  loadLinkedAccounts: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<void>
-  setupAuthListener: () => void
+  signOut: () => Promise<void>
 }
+
+// Track if initialization has been started
+let initializationStarted = false
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: true,
   error: null,
+  linkedAccounts: [],
 
   initialize: async () => {
-    Logger.info('🔵 AuthStore: Initializing auth, checking Supabase session...')
+    // Prevent multiple simultaneous initializations
+    if (initializationStarted) {
+      return // Already initializing
+    }
+    
+    initializationStarted = true
     set({ isLoading: true, error: null })
     try {
-      // Check for existing user session from Supabase
-      // Supabase automatically handles session persistence
-      const currentUser = await authService.getUser()
-      Logger.info('🔵 AuthStore: User found during initialization', { 
-        found: currentUser ? 'Yes' : 'No',
-        userId: currentUser?.id,
-        source: 'Supabase Auth'
-      })
-      set({ user: currentUser || null, isLoading: false })
+      // Add timeout to prevent hanging
+      const getUserPromise = authService.getUser()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth initialization timeout')), 5000)
+      )
+      
+      const currentUser = await Promise.race([getUserPromise, timeoutPromise]) as any
+      set({ user: currentUser || null })
+      if (currentUser) {
+        try {
+          const accounts = await authService.getLinkedAccounts()
+          set({ linkedAccounts: accounts })
+        } catch (err) {
+          // Don't fail initialization if linked accounts fail
+          console.warn('Failed to load linked accounts:', err)
+        }
+      }
     } catch (err: any) {
-      Logger.error('🔴 AuthStore: Initialization error', err)
-      set({ user: null, error: err?.message || 'Failed to initialize auth', isLoading: false })
+      // Clear user and continue - don't block app loading
+      console.warn('Auth initialization warning:', err?.message)
+      set({ user: null, error: null }) // Don't set error on timeout - just continue unauthenticated
+    } finally {
+      set({ isLoading: false })
+      initializationStarted = false // Reset flag when done
     }
   },
 
   refreshUser: async () => {
     try {
+      console.log('🟡 AuthStore: Refreshing user...')
       const currentUser = await authService.getUser()
-      set({ user: currentUser || null })
+      console.log('🟡 AuthStore: Got user:', currentUser ? currentUser.id : 'null')
+      set({ user: currentUser || null, isLoading: false })
+      if (currentUser) {
+        try {
+          const accounts = await authService.getLinkedAccounts()
+          set({ linkedAccounts: accounts })
+        } catch (err) {
+          console.warn('Failed to load linked accounts:', err)
+        }
+      }
+      console.log('✅ AuthStore: User refreshed successfully')
     } catch (err: any) {
-      set({ user: null, error: err?.message || 'Failed to refresh user' })
+      console.error('🔴 AuthStore: Refresh user error:', err)
+      set({ user: null, error: err?.message || 'Failed to refresh user', isLoading: false })
     }
   },
 
   signIn: async (email: string, password: string) => {
     set({ isLoading: true, error: null })
     try {
-      Logger.info('🔵 AuthStore: Starting signIn...')
-      
-      // signIn now returns the user directly, with retry logic built-in
-      const user = await authService.signIn(email, password)
-      
-      if (!user) {
-        throw new Error('Sign in successful but user not found. Please try again.')
+      await authService.signIn(email, password);
+      // Wait a moment for session to be fully established
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const currentUser = await authService.getUser();
+      set({ user: currentUser || null });
+      if (currentUser) {
+        const accounts = await authService.getLinkedAccounts();
+        set({ linkedAccounts: accounts });
       }
-      
-      Logger.info('🔵 AuthStore: SignIn successful', { userId: user.id })
-      Logger.auth('signin', user.id, email)
-      
-      // Stop any existing polling since we now have a user
-      const existingInterval = (useAuthStore as any).pollInterval
-      if (existingInterval) {
-        Logger.debug('🔍 AuthStore: Stopping polling after signin')
-        clearInterval(existingInterval)
-        ;(useAuthStore as any).pollInterval = null
-      }
-      
-      // Clear any existing chat state and set flag to create a new chat on next visit
-      localStorage.removeItem("chat-current-conversation-id");
-      localStorage.setItem("chat-create-temporary-session", "true");
-      Logger.info('🔵 AuthStore: Set flag to create new chat on next visit')
-      
-      // Update state with user
-      set({ user, isLoading: false })
-      
-      return user;
     } catch (err: any) {
-      Logger.error('🔴 AuthStore: SignIn error', err)
-      set({ error: err?.message || 'Sign in failed', isLoading: false })
+      set({ error: err?.message || 'Sign in failed' })
+      throw err
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  signUp: async (email: string, password: string) => {
+    set({ isLoading: true, error: null })
+    try {
+      const signUpResult = await authService.signUp(email, password)
+      
+      // If signup succeeded but no session (email confirmation required), 
+      // automatically sign in the user
+      if (signUpResult.user && !signUpResult.session) {
+        await authService.signIn(email, password)
+      }
+      
+      const currentUser = await authService.getUser()
+      set({ user: currentUser || null })
+      if (currentUser) {
+        const accounts = await authService.getLinkedAccounts()
+        set({ linkedAccounts: accounts })
+      }
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Sign up failed'
+      set({ error: errorMessage })
+      throw err
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  signInWithGoogle: async (redirectTo?: string) => {
+    set({ isLoading: true, error: null })
+    try {
+      const { url } = await authService.signInWithGoogle(redirectTo)
+      if (url) {
+        window.location.href = url
+      }
+    } catch (err: any) {
+      set({ error: err?.message || 'Google sign in failed' })
+      set({ isLoading: false })
       throw err
     }
   },
 
-  signUp: async (firstName: string, lastName: string, email: string, password: string) => {
-    Logger.info('🔵 AuthStore: Starting signUp', { email, firstName, lastName })
+  linkGoogleAccount: async (redirectTo?: string) => {
     set({ isLoading: true, error: null })
     try {
-      Logger.info('🔵 AuthStore: Calling authService.signUp...')
-      
-      // signUp now returns the user directly, with retry logic built-in
-      const user = await authService.signUp(firstName, lastName, email, password)
-      
-      if (!user) {
-        throw new Error('Sign up successful but user not found. Please try signing in.')
+      const { url } = await authService.linkGoogleAccount(redirectTo)
+      if (url) {
+        window.location.href = url
       }
-      
-      Logger.info('🔵 AuthStore: SignUp successful', { userId: user.id })
-      Logger.auth('signup', user.id, email)
-      
-      // Stop any existing polling since we now have a user
-      const existingInterval = (useAuthStore as any).pollInterval
-      if (existingInterval) {
-        Logger.debug('🔍 AuthStore: Stopping polling after signup')
-        clearInterval(existingInterval)
-        ;(useAuthStore as any).pollInterval = null
-      }
-      
-      // Clear any existing chat state and set flag to create a new chat on next visit
-      localStorage.removeItem("chat-current-conversation-id");
-      localStorage.setItem("chat-create-temporary-session", "true");
-      Logger.info('🔵 AuthStore: Set flag to create new chat on next visit')
-      
-      // Update state with user
-      set({ user, isLoading: false })
-      
-      return user;
     } catch (err: any) {
-      Logger.error('🔴 AuthStore: SignUp error', err)
-      set({ error: err?.message || 'Sign up failed', isLoading: false })
+      set({ error: err?.message || 'Failed to link Google account' })
+      set({ isLoading: false })
       throw err
     }
   },
 
-  signOut: async () => {
-    const userId = useAuthStore.getState().user?.id
+  unlinkGoogleAccount: async () => {
     set({ isLoading: true, error: null })
     try {
-      await authService.signOut()
-      
-      // Clear user state
-      set({ user: null, isLoading: false })
-      
-      // Restart polling to detect when user logs in again
-      const existingInterval = (useAuthStore as any).pollInterval
-      if (!existingInterval) {
-        Logger.debug('🔍 AuthStore: Restarting polling after signout')
-        // Polling will be restarted by setupAuthListener if needed
-        // But we need to check if listener is already set up
-        if ((useAuthStore as any).listenerSetup) {
-          // Re-setup listener to restart polling
-          ;(useAuthStore as any).listenerSetup = false
-          useAuthStore.getState().setupAuthListener()
-        }
-      }
-      
-      Logger.auth('signout', userId)
-      Logger.info('🔵 AuthStore: Sign out successful')
+      await authService.unlinkGoogleAccount()
+      const accounts = await authService.getLinkedAccounts()
+      set({ linkedAccounts: accounts })
     } catch (err: any) {
-      Logger.error('🔴 AuthStore: SignOut error', err)
-      // Even if signOut fails, clear local state
-      set({ user: null, error: err?.message || 'Sign out failed', isLoading: false })
+      set({ error: err?.message || 'Failed to unlink Google account' })
+      throw err
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  loadLinkedAccounts: async () => {
+    try {
+      const accounts = await authService.getLinkedAccounts()
+      set({ linkedAccounts: accounts })
+    } catch (err: any) {
+      console.error('Failed to load linked accounts:', err)
     }
   },
 
   requestPasswordReset: async (email: string) => {
-    Logger.info('🔵 AuthStore: Requesting password reset', { email })
-    set({ error: null })
+    set({ isLoading: true, error: null })
     try {
       await authService.requestPasswordReset(email)
-      Logger.auth('password-reset', undefined, email)
-      Logger.info('🔵 AuthStore: Password reset request sent successfully')
     } catch (err: any) {
-      Logger.error('🔴 AuthStore: Password reset request failed', err)
       set({ error: err?.message || 'Failed to send password reset email' })
       throw err
+    } finally {
+      set({ isLoading: false })
     }
   },
 
-  setupAuthListener: () => {
-    // Prevent duplicate listener setup
-    if ((useAuthStore as any).listenerSetup) {
-      Logger.debug('🔍 AuthStore: Listener already setup, skipping')
-      return
-    }
-    
-    ;(useAuthStore as any).listenerSetup = true
-
+  signOut: async () => {
+    set({ isLoading: true, error: null })
     try {
-      // Set up Supabase auth state change listener
-      Logger.info('🔵 AuthStore: Setting up Supabase auth state listener')
-      
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        Logger.info('🔵 AuthStore: Auth state changed', { event, hasSession: !!session })
-        
-        if (session?.user) {
-          // Transform Supabase user to match expected format
-          const user: AuthUser = {
-            id: session.user.id,
-            email: session.user.email,
-            emailVerified: session.user.email_confirmed_at ? true : false,
-            firstName: session.user.user_metadata?.first_name,
-            first_name: session.user.user_metadata?.first_name,
-            lastName: session.user.user_metadata?.last_name,
-            last_name: session.user.user_metadata?.last_name,
-            displayName: session.user.user_metadata?.full_name || session.user.email,
-            ...session.user
-          }
-          set({ user, isLoading: false })
-        } else {
-          // User signed out
-          set({ user: null, isLoading: false })
-        }
-      })
-      
-      // Store subscription for cleanup if needed
-      ;(useAuthStore as any).authSubscription = subscription
-      
-      Logger.info('✅ AuthStore: Supabase auth listener setup successfully')
+      await authService.signOut()
+      set({ user: null, linkedAccounts: [] })
     } catch (err: any) {
-      Logger.error('🔴 AuthStore: Error setting up auth listener', err)
-      ;(useAuthStore as any).listenerSetup = false // Reset on error
+      set({ error: err?.message || 'Sign out failed' })
+      throw err
+    } finally {
+      set({ isLoading: false })
     }
   }
 }))

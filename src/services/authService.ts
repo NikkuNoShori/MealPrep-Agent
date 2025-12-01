@@ -30,10 +30,9 @@ export const authService = {
       // Transform Supabase user to match expected format
       if (user) {
         return {
-          id: user.id,
+          ...user,
           email: user.email,
           emailVerified: user.email_confirmed_at ? true : false,
-          ...user
         }
       }
       
@@ -86,10 +85,9 @@ export const authService = {
       
       // Transform Supabase user to match expected format
       return {
-        id: data.user.id,
+        ...data.user,
         email: data.user.email,
         emailVerified: data.user.email_confirmed_at ? true : false,
-        ...data.user
       }
     } catch (error: any) {
       Logger.error('🔴 AuthService: SignUp error', error)
@@ -104,30 +102,8 @@ export const authService = {
    * @param lastName User's last name
    * @param email User's email address
    */
-  async createProfile(userId: string, firstName: string, lastName: string, email: string) {
-    try {
-      Logger.info('🟡 AuthService: Creating profile in database', { userId, firstName, lastName, email })
-      
-      // Create profile in database via API client (uses correct backend URL)
-      await apiClient.createProfile({
-        userId,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim(),
-      })
-      
-      Logger.info('✅ AuthService: Profile created successfully', { userId })
-    } catch (error: any) {
-      // If profile already exists, that's okay (idempotent)
-      if (error?.status === 409 || error?.message?.includes('already exists')) {
-        Logger.info('✅ AuthService: Profile already exists', { userId })
-        return
-      }
-      Logger.error('🔴 AuthService: Failed to create profile', error)
-      // Don't throw - profile creation failure shouldn't block signup
-      // The profile can be created later or manually
-    }
-  },
+  // Profile creation is handled automatically by database trigger
+  // No need for manual profile creation - trigger handles it when user is created in auth.users
 
   /**
    * Sign in existing user
@@ -154,10 +130,9 @@ export const authService = {
       
       // Transform Supabase user to match expected format
       return {
-        id: data.user.id,
+        ...data.user,
         email: data.user.email,
         emailVerified: data.user.email_confirmed_at ? true : false,
-        ...data.user
       }
     } catch (error: any) {
       Logger.error('🔴 AuthService: SignIn error', error)
@@ -230,13 +205,25 @@ export const authService = {
    * @param code Verification code from email link
    * @returns Promise with verification result
    */
-  async verifyEmail(code: string) {
+  async verifyEmail(code: string, email?: string) {
     Logger.info('🟡 AuthService: Verifying email with code', { code: code.substring(0, 10) + '...' })
     
     try {
+      // Get user email if not provided
+      let userEmail = email
+      if (!userEmail) {
+        const { data: { user } } = await supabase.auth.getUser()
+        userEmail = user?.email
+      }
+      
+      if (!userEmail) {
+        throw new Error('Email is required for verification')
+      }
+      
       const { data, error } = await supabase.auth.verifyOtp({
         token: code,
         type: 'email',
+        email: userEmail,
       })
       
       if (error) {

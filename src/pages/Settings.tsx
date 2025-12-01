@@ -1,60 +1,109 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import React, { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { Input } from '../components/ui/input';
-import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
+import { Button } from '../components/ui/button';
 import { useTheme } from '../providers/ThemeProvider';
 import { useAuthStore } from '../stores/authStore';
-import { authService } from '../services/authService';
-import { apiClient } from '../services/api';
-import { ToastService } from '../services/toast';
-import { Logger } from '../services/logger';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Moon, Sun, Monitor, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { useMeasurementSystem } from "../contexts/MeasurementSystemContext";
+import {
+  Moon,
+  Sun,
+  Monitor,
+  Link as LinkIcon,
+  Unlink,
+  Loader2,
+  Ruler,
+  Save,
+  X,
+} from "lucide-react";
+import toast from 'react-hot-toast';
 
 const Settings = () => {
   const { theme, setTheme, colorScheme, availableColorSchemes, setColorScheme } = useTheme();
-  const { user } = useAuthStore();
-  const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('account');
-  
-  // Fetch profile from database
-  const { data: profileData, isLoading: isLoadingProfile, error: profileError } = useQuery({
-    queryKey: ['profile'],
-    queryFn: async () => {
-      const response = await apiClient.getProfile();
-      return response.profile;
-    },
-    enabled: !!user, // Only fetch if user is authenticated
-    retry: 1,
-  });
-  
-  // Account settings state
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [isEmailVerified, setIsEmailVerified] = useState(false);
-  const [isUpdatingName, setIsUpdatingName] = useState(false);
-  const [isResendingVerification, setIsResendingVerification] = useState(false);
-  
-  // Password change state
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const { user, linkedAccounts, linkGoogleAccount, unlinkGoogleAccount, loadLinkedAccounts } = useAuthStore();
+  const {
+    system,
+    setSystem,
+    isLoading: isLoadingMeasurement,
+  } = useMeasurementSystem();
 
-  // Update form fields when profile data loads
+  // Staged changes (not yet saved)
+  const [stagedTheme, setStagedTheme] = useState<typeof theme>(theme);
+  const [stagedColorScheme, setStagedColorScheme] = useState<string>(colorScheme.name);
+  const [stagedMeasurementSystem, setStagedMeasurementSystem] = useState<typeof system>(system);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = 
+    stagedTheme !== theme ||
+    stagedColorScheme !== colorScheme.name ||
+    stagedMeasurementSystem !== system;
+
+  // Reset staged values when theme/colorScheme/system changes externally
   useEffect(() => {
-    if (profileData) {
-      setFirstName(profileData.firstName || '');
-      setLastName(profileData.lastName || '');
-      setEmail(profileData.email || '');
-      // Email verification status comes from Supabase Auth user, not database
-      setIsEmailVerified(user?.emailVerified || user?.primaryEmailVerified || false);
+    setStagedTheme(theme);
+    setStagedColorScheme(colorScheme.name);
+    setStagedMeasurementSystem(system);
+  }, [theme, colorScheme.name, system]);
+
+  // Get the staged color scheme for preview
+  const previewColorScheme = availableColorSchemes[stagedColorScheme] || colorScheme;
+
+  useEffect(() => {
+    if (user) {
+      loadLinkedAccounts();
     }
-  }, [profileData, user]);
+  }, [user, loadLinkedAccounts]);
+
+  const hasGoogleLinked = linkedAccounts.some(account => account.provider === 'google');
+  const hasEmailPassword = linkedAccounts.some(account => account.provider === 'email');
+
+  const handleLinkGoogle = async () => {
+    try {
+      await linkGoogleAccount(`${window.location.origin}/auth/callback`);
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to link Google account');
+    }
+  };
+
+  const handleUnlinkGoogle = async () => {
+    if (!confirm('Are you sure you want to unlink your Google account? You will need to use email/password to sign in.')) {
+      return;
+    }
+    
+    try {
+      await unlinkGoogleAccount();
+      toast.success('Google account unlinked successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to unlink Google account');
+    }
+  };
+
+  const handleSave = () => {
+    // Apply staged theme
+    if (stagedTheme !== theme) {
+      setTheme(stagedTheme);
+    }
+
+    // Apply staged color scheme
+    if (stagedColorScheme !== colorScheme.name) {
+      setColorScheme(stagedColorScheme);
+    }
+
+    // Apply staged measurement system
+    if (stagedMeasurementSystem !== system) {
+      setSystem(stagedMeasurementSystem);
+    }
+
+    toast.success('Settings saved successfully');
+  };
+
+  const handleReset = () => {
+    setStagedTheme(theme);
+    setStagedColorScheme(colorScheme.name);
+    setStagedMeasurementSystem(system);
+    toast('Changes reset');
+  };
 
   const themeOptions = [
     { value: 'light', label: 'Light', icon: Sun },
@@ -62,403 +111,266 @@ const Settings = () => {
     { value: 'system', label: 'System', icon: Monitor },
   ];
 
-  // Update profile mutation
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: { firstName: string; lastName?: string }) => {
-      return await apiClient.updateProfile(data);
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      ToastService.success('Name updated successfully');
-      Logger.info('✅ Settings: Profile updated successfully', data);
-    },
-    onError: (error: any) => {
-      Logger.error('🔴 Settings: Failed to update profile', error);
-      ToastService.error(error?.message || 'Failed to update name');
-    },
-  });
-
-  const handleUpdateName = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!firstName.trim()) {
-      ToastService.error('First name cannot be empty');
-      return;
-    }
-
-    if (firstName === profileData?.firstName && 
-        lastName === profileData?.lastName) {
-      ToastService.info('Name unchanged');
-      return;
-    }
-
-    setIsUpdatingName(true);
-    try {
-      await updateProfileMutation.mutateAsync({ firstName, lastName });
-    } finally {
-      setIsUpdatingName(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    setIsResendingVerification(true);
-    try {
-      await authService.resendVerificationEmail();
-      ToastService.success('Verification email sent! Please check your inbox.');
-    } catch (error: any) {
-      Logger.error('🔴 Settings: Failed to resend verification email', error);
-      ToastService.error(error?.message || 'Failed to resend verification email');
-    } finally {
-      setIsResendingVerification(false);
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      ToastService.error('Please fill in all password fields');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      ToastService.error('New passwords do not match');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      ToastService.error('Password must be at least 8 characters long');
-      return;
-    }
-
-    setIsChangingPassword(true);
-    try {
-      await authService.changePassword(currentPassword, newPassword);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      ToastService.success('Password changed successfully');
-    } catch (error: any) {
-      Logger.error('🔴 Settings: Failed to change password', error);
-      ToastService.error(error?.message || 'Failed to change password');
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
-
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your account settings and preferences.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Settings</h1>
+            <p className="text-muted-foreground">
+              Customize your app appearance and preferences.
+            </p>
+          </div>
+          {hasUnsavedChanges && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReset}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                Reset
+              </Button>
+              <Button onClick={handleSave} size="sm" className="gap-2">
+                <Save className="h-4 w-4" />
+                Save Changes
+              </Button>
+            </div>
+          )}
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="account" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Account
-            </TabsTrigger>
-            <TabsTrigger value="appearance" className="flex items-center gap-2">
-              <Sun className="h-4 w-4" />
-              Appearance
-            </TabsTrigger>
-            <TabsTrigger value="preferences" className="flex items-center gap-2">
-              <Monitor className="h-4 w-4" />
-              Preferences
-            </TabsTrigger>
-          </TabsList>
+        {/* Theme Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Theme Mode */}
+            <div className="space-y-2">
+              <Label htmlFor="theme">Theme</Label>
+              <Select
+                value={stagedTheme}
+                onValueChange={(value) => setStagedTheme(value as typeof theme)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select theme" />
+                </SelectTrigger>
+                <SelectContent>
+                  {themeOptions.map((option) => {
+                    const Icon = option.icon;
+                    return (
+                      <SelectItem key={option.value} value={option.value}>
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {option.label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Choose your preferred theme. System will automatically match
+                your device settings.
+              </p>
+            </div>
 
-          {/* Account Settings Tab */}
-          <TabsContent value="account" className="space-y-6 mt-6">
-            {/* Profile Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>
-                  Update your name and email address. This information is stored in the database.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {isLoadingProfile ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <span className="ml-2 text-muted-foreground">Loading profile...</span>
-                  </div>
-                ) : profileError ? (
-                  <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">
-                    <p className="font-medium">Failed to load profile</p>
-                    <p className="mt-1">{(profileError as any)?.message || 'Unable to load profile information. Please try refreshing the page.'}</p>
-                  </div>
-                ) : (
-                  <>
-                {/* Name */}
-                <form onSubmit={handleUpdateName} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                      id="firstName"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="Enter your first name"
-                      disabled={isUpdatingName || isLoadingProfile}
-                      required
-                    />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Enter your last name"
-                      disabled={isUpdatingName || isLoadingProfile}
-                    />
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    This is how your name will appear in the app.
-                  </p>
-                  <Button 
-                    type="submit" 
-                    disabled={isUpdatingName || isLoadingProfile || !firstName.trim() || 
-                      (firstName === profileData?.firstName && 
-                       lastName === profileData?.lastName)}
-                  >
-                    {isUpdatingName ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      'Update Name'
-                    )}
-                  </Button>
-                </form>
+            {/* Color Scheme */}
+            <div className="space-y-2">
+              <Label htmlFor="colorScheme">Color Scheme</Label>
+              <Select
+                value={stagedColorScheme}
+                onValueChange={setStagedColorScheme}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select color scheme" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(availableColorSchemes).map((schemeName) => (
+                    <SelectItem key={schemeName} value={schemeName}>
+                      {schemeName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Choose your preferred color palette for the app.
+              </p>
+            </div>
 
-                {/* Email Address */}
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="email"
-                      value={email}
-                      disabled
-                      className="flex-1"
-                      placeholder={isLoadingProfile ? "Loading..." : "Email address"}
-                    />
-                    {isEmailVerified ? (
-                      <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                        <CheckCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Verified</span>
+            {/* Color Preview */}
+            <div className="space-y-2">
+              <Label>
+                Preview{" "}
+                {hasUnsavedChanges &&
+                  stagedColorScheme !== colorScheme.name && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      (Unsaved)
+                    </span>
+                  )}
+              </Label>
+              <div className="flex gap-2">
+                <div
+                  className="w-8 h-8 rounded-full border"
+                  style={{ backgroundColor: previewColorScheme.primary[500] }}
+                  title="Primary"
+                />
+                <div
+                  className="w-8 h-8 rounded-full border"
+                  style={{ backgroundColor: previewColorScheme.secondary[500] }}
+                  title="Secondary"
+                />
+                <div
+                  className="w-8 h-8 rounded-full border"
+                  style={{ backgroundColor: previewColorScheme.neutral[500] }}
+                  title="Neutral"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Account Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Account</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <p className="text-sm text-muted-foreground">
+                {user?.email || "Not available"}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <Label>Connected Accounts</Label>
+              <div className="space-y-3">
+                {/* Email/Password Account */}
+                {hasEmailPassword && (
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-primary font-semibold">@</span>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                        <XCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Unverified</span>
+                      <div>
+                        <p className="font-medium">Email & Password</p>
+                        <p className="text-sm text-muted-foreground">
+                          Always available
+                        </p>
                       </div>
-                    )}
+                    </div>
                   </div>
-                  {!isEmailVerified && (
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Your email address is not verified. Please check your inbox for a verification email.
-                      </p>
-                      <Button
-                        variant="outline"
-                        onClick={handleResendVerification}
-                        disabled={isResendingVerification}
-                        className="w-full sm:w-auto"
+                )}
+
+                {/* Google Account */}
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+                      <svg
+                        className="w-5 h-5 text-primary-600 dark:text-primary-400"
+                        viewBox="0 0 24 24"
                       >
-                        {isResendingVerification ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Resend Verification Email
-                          </>
-                        )}
-                      </Button>
+                        <path
+                          fill="currentColor"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="currentColor"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="currentColor"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        />
+                        <path
+                          fill="currentColor"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        />
+                      </svg>
                     </div>
+                    <div>
+                      <p className="font-medium">Google</p>
+                      <p className="text-sm text-muted-foreground">
+                        {hasGoogleLinked ? "Connected" : "Not connected"}
+                      </p>
+                    </div>
+                  </div>
+                  {hasGoogleLinked ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUnlinkGoogle}
+                      disabled={!hasEmailPassword}
+                      title={
+                        !hasEmailPassword
+                          ? "Cannot unlink: Email/password account required"
+                          : ""
+                      }
+                    >
+                      <Unlink className="w-4 h-4 mr-2" />
+                      Unlink
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleLinkGoogle}
+                    >
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      Link
+                    </Button>
                   )}
                 </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Password Change */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Change Password</CardTitle>
-                <CardDescription>
-                  Update your password to keep your account secure.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Current Password</Label>
-                    <Input
-                      id="currentPassword"
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="Enter your current password"
-                      disabled={isChangingPassword}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter your new password"
-                      disabled={isChangingPassword}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Password must be at least 8 characters long.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm your new password"
-                      disabled={isChangingPassword}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
-                  >
-                    {isChangingPassword ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Changing...
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="h-4 w-4 mr-2" />
-                        Change Password
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Appearance Settings Tab */}
-          <TabsContent value="appearance" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-                <CardDescription>
-                  Customize your app appearance and theme preferences.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Theme Mode */}
-                <div className="space-y-2">
-                  <Label htmlFor="theme">Theme</Label>
-                  <Select value={theme} onValueChange={setTheme}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select theme" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {themeOptions.map((option) => {
-                        const Icon = option.icon;
-                        return (
-                          <SelectItem key={option.value} value={option.value}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4" />
-                              {option.label}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    Choose your preferred theme. System will automatically match your device settings.
-                  </p>
-                </div>
-
-                {/* Color Scheme */}
-                <div className="space-y-2">
-                  <Label htmlFor="colorScheme">Color Scheme</Label>
-                  <Select value={colorScheme.name} onValueChange={setColorScheme}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select color scheme" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(availableColorSchemes).map((schemeName) => (
-                        <SelectItem key={schemeName} value={schemeName}>
-                          {schemeName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    Choose your preferred color palette for the app.
-                  </p>
-                </div>
-
-                {/* Color Preview */}
-                <div className="space-y-2">
-                  <Label>Preview</Label>
-                  <div className="flex gap-2">
-                    <div 
-                      className="w-8 h-8 rounded-full border"
-                      style={{ backgroundColor: colorScheme.primary[500] }}
-                      title="Primary"
-                    />
-                    <div 
-                      className="w-8 h-8 rounded-full border"
-                      style={{ backgroundColor: colorScheme.secondary[500] }}
-                      title="Secondary"
-                    />
-                    <div 
-                      className="w-8 h-8 rounded-full border"
-                      style={{ backgroundColor: colorScheme.neutral[500] }}
-                      title="Neutral"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Preferences Tab */}
-          <TabsContent value="preferences" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Preferences</CardTitle>
-                <CardDescription>
-                  Additional settings and preferences.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  More preferences will be available here in the future.
+              </div>
+              {!hasEmailPassword && hasGoogleLinked && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  ⚠️ You must have an email/password account to unlink Google.
+                  Please set a password first.
                 </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Measurement System */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Ruler className="h-5 w-5" />
+              Measurement System
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="measurement-system">Unit System</Label>
+              <Select
+                value={stagedMeasurementSystem}
+                onValueChange={(value: "metric" | "imperial") =>
+                  setStagedMeasurementSystem(value)
+                }
+                disabled={isLoadingMeasurement}
+              >
+                <SelectTrigger id="measurement-system">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="metric">
+                    Metric (g, kg, ml, l, °C)
+                  </SelectItem>
+                  <SelectItem value="imperial">
+                    Imperial (oz, lb, fl oz, cup, °F)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground mt-2">
+                Recipe measurements will be automatically converted to your
+                preferred system.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
