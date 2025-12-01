@@ -16,38 +16,18 @@ import {
 const LandingPage = () => {
   useDocumentTitle()
   const navigate = useNavigate()
-  const { user, isLoading, initialize } = useAuthStore()
+  const { user, isLoading } = useAuthStore()
 
   // Redirect authenticated users to dashboard
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (!user && !isLoading) {
-        // Initialize auth if not already done
-        await initialize()
-      }
-    }
-    checkAuth()
-  }, [user, isLoading, initialize])
-
+  // Don't block page rendering - show content immediately
   useEffect(() => {
     if (user && !isLoading) {
       navigate('/dashboard', { replace: true })
     }
   }, [user, isLoading, navigate])
 
-  // Show loading state while checking auth
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
-  // Don't render landing page if user is authenticated (will redirect)
-  if (user) {
-    return null
-  }
+  // Don't block rendering - show landing page content immediately
+  // If user is authenticated, they'll be redirected via useEffect above
 
   const features = [
     {

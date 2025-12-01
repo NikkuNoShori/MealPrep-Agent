@@ -7,31 +7,51 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  // ALL HOOKS MUST BE CALLED FIRST - before any conditional returns
   const location = useLocation()
-  const { user, isLoading, initialize } = useAuthStore()
-  const initializedRef = React.useRef(false)
-
-  useEffect(() => {
-    // Always initialize on mount to ensure auth state is current
-    if (!initializedRef.current) {
-      initializedRef.current = true
-      initialize()
+  const { user, isLoading } = useAuthStore()
+  const [waitingForAuth, setWaitingForAuth] = React.useState(false)
+  
+  // Auth is initialized in App.tsx - no need to initialize here
+  
+  React.useEffect(() => {
+    // If no user but we might be coming from OAuth, wait a moment
+    if (!user && !isLoading && !waitingForAuth) {
+      const isOAuthCallback = document.referrer.includes('/auth/callback') ||
+                              sessionStorage.getItem('oauth_redirecting') === 'true'
+      
+      if (isOAuthCallback) {
+        console.log('🟡 ProtectedRoute: Detected OAuth callback, waiting for auth state...')
+        setWaitingForAuth(true)
+        sessionStorage.removeItem('oauth_redirecting')
+        
+        // Wait up to 2 seconds for auth state to update
+        const timer = setTimeout(() => {
+          setWaitingForAuth(false)
+        }, 2000)
+        
+        return () => clearTimeout(timer)
+      }
     }
-  }, [initialize])
+  }, [user, isLoading, waitingForAuth])
 
+  // NOW we can do conditional returns after all hooks are called
   // Show loading state while checking auth
-  if (isLoading) {
+  // Give it a moment after OAuth callback to update state
+  if (isLoading || (!user && waitingForAuth)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
   }
-
-  // Redirect to sign in if not authenticated
+  
   if (!user) {
+    console.log('🔴 ProtectedRoute: No user found, redirecting to signin')
     return <Navigate to="/signin" state={{ from: location }} replace />
   }
+  
+  console.log('✅ ProtectedRoute: User authenticated, rendering children')
 
   return <>{children}</>
 }

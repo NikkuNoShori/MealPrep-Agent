@@ -102,7 +102,7 @@ const Settings = () => {
     setStagedTheme(theme);
     setStagedColorScheme(colorScheme.name);
     setStagedMeasurementSystem(system);
-    toast.info('Changes reset');
+    toast('Changes reset');
   };
 
   const themeOptions = [

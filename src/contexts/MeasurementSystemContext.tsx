@@ -17,8 +17,9 @@ export const MeasurementSystemProvider: React.FC<{ children: ReactNode }> = ({ c
 
   // Load preference from database
   useEffect(() => {
-    if (preferences?.measurement_system) {
-      setSystemState(preferences.measurement_system);
+    const prefs = preferences as any; // Type assertion for preferences
+    if (prefs?.measurement_system) {
+      setSystemState(prefs.measurement_system);
     } else {
       // Preferences don't exist yet or column doesn't exist, use default (metric)
       setSystemState('metric');

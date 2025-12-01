@@ -1,21 +1,52 @@
 // Database service using Supabase client
+// IMPORTANT: This file is server-side only (used in server.js)
+// If bundled in frontend, it will try to use the shared client to avoid duplicate instances
+
 import { createClient } from '@supabase/supabase-js';
 
-// Create Supabase client for Node.js backend (uses process.env instead of import.meta.env)
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+// In browser: try to use shared client (prevents "Multiple GoTrueClient instances" warning)
+// Server-side: create own client with process.env
+let supabase = null;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('⚠️  Supabase credentials not configured. Database operations may fail.');
-  console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or SUPABASE_URL and SUPABASE_ANON_KEY) environment variables');
-}
-
-const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+// Try to use shared client if in browser (frontend bundle)
+if (typeof window !== 'undefined') {
+  try {
+    // Dynamic import to avoid circular deps - use shared client
+    const supabaseModule = await import('./supabase.js');
+    supabase = supabaseModule.supabase;
+    console.log('✅ Database service using shared Supabase client (browser)');
+  } catch (err) {
+    console.warn('⚠️  Could not import shared Supabase client, creating new one:', err.message);
+    // Fallback: create client (shouldn't normally happen)
+    const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+    }
   }
-});
+} else {
+  // Server-side: Create client with process.env
+  const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.warn('⚠️  Supabase credentials not configured. Database operations may fail.');
+    console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or SUPABASE_URL and SUPABASE_ANON_KEY) environment variables');
+  } else {
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+    console.log('✅ Database service using server-side Supabase client');
+  }
+}
 
 export class DatabaseService {
   constructor() {

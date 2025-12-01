@@ -17,10 +17,11 @@ import { useAuthStore } from "./stores/authStore";
 function AppRoutes() {
   const { initialize } = useAuthStore();
 
-  // Initialize auth on app mount
+  // Initialize auth on app mount (only once)
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />

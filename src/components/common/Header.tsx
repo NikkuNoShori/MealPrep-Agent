@@ -1,9 +1,10 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Menu, X, LogOut, User, Settings } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "../ui/button";
+import React from "react";
 
 const Header = () => {
   const { theme, setTheme, isDark } = useTheme();
@@ -12,8 +13,14 @@ const Header = () => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset avatar error when user changes
+  React.useEffect(() => {
+    setAvatarError(false);
+  }, [user?.id, user?.avatar_url]);
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard" },
@@ -110,14 +117,26 @@ const Header = () => {
                 onMouseLeave={handleUserMenuMouseLeave}
               >
                 <button className="flex items-center space-x-2 p-2 rounded-lg hover:opacity-80 transition-opacity">
-                  {user?.avatar_url ? (
+                  {user?.avatar_url && !avatarError ? (
                     <img
                       src={user.avatar_url}
                       alt={getFirstName()}
-                      className="w-6 h-6 rounded-full object-cover"
+                      className="w-8 h-8 rounded-full object-cover border border-stone-200 dark:border-slate-600"
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        // If image fails to load, show icon instead
+                        console.warn('Avatar image failed to load:', user.avatar_url);
+                        console.warn('Image error details:', e);
+                        setAvatarError(true);
+                      }}
+                      onLoad={() => {
+                        // Reset error state if image loads successfully
+                        setAvatarError(false);
+                      }}
                     />
                   ) : (
-                    <User className="w-4 h-4 text-stone-600 dark:text-gray-300" />
+                    <User className="w-5 h-5 text-stone-600 dark:text-gray-300" />
                   )}
                   <span className="text-sm font-medium text-stone-700 dark:text-gray-300">
                     Hey, {getFirstName()}

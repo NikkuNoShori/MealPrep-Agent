@@ -162,7 +162,8 @@ export function convertIngredient(
   unit: Unit,
   targetSystem: MeasurementSystem
 ): { amount: number; unit: Unit } {
-  return convertValue(amount, unit, targetSystem);
+  const result = convertValue(amount, unit, targetSystem);
+  return { amount: result.value, unit: result.unit };
 }
 
 /**

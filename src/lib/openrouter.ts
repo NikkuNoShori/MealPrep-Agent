@@ -3,8 +3,8 @@
  * Handles all interactions with OpenRouter AI models
  */
 
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
-const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+const OPENROUTER_API_KEY = (import.meta as any).env?.VITE_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
+const FRONTEND_URL = (import.meta as any).env?.VITE_FRONTEND_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
 
 if (!OPENROUTER_API_KEY) {
   console.warn('⚠️ OPENROUTER_API_KEY not configured');

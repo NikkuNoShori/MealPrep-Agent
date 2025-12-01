@@ -23,6 +23,9 @@ interface AuthState {
   signOut: () => Promise<void>
 }
 
+// Track if initialization has been started
+let initializationStarted = false
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: true,
@@ -30,31 +33,59 @@ export const useAuthStore = create<AuthState>((set) => ({
   linkedAccounts: [],
 
   initialize: async () => {
+    // Prevent multiple simultaneous initializations
+    if (initializationStarted) {
+      return // Already initializing
+    }
+    
+    initializationStarted = true
     set({ isLoading: true, error: null })
     try {
-      const currentUser = await authService.getUser()
+      // Add timeout to prevent hanging
+      const getUserPromise = authService.getUser()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth initialization timeout')), 5000)
+      )
+      
+      const currentUser = await Promise.race([getUserPromise, timeoutPromise]) as any
       set({ user: currentUser || null })
       if (currentUser) {
-        const accounts = await authService.getLinkedAccounts()
-        set({ linkedAccounts: accounts })
+        try {
+          const accounts = await authService.getLinkedAccounts()
+          set({ linkedAccounts: accounts })
+        } catch (err) {
+          // Don't fail initialization if linked accounts fail
+          console.warn('Failed to load linked accounts:', err)
+        }
       }
     } catch (err: any) {
-      set({ user: null, error: err?.message || 'Failed to initialize auth' })
+      // Clear user and continue - don't block app loading
+      console.warn('Auth initialization warning:', err?.message)
+      set({ user: null, error: null }) // Don't set error on timeout - just continue unauthenticated
     } finally {
       set({ isLoading: false })
+      initializationStarted = false // Reset flag when done
     }
   },
 
   refreshUser: async () => {
     try {
+      console.log('🟡 AuthStore: Refreshing user...')
       const currentUser = await authService.getUser()
-      set({ user: currentUser || null })
+      console.log('🟡 AuthStore: Got user:', currentUser ? currentUser.id : 'null')
+      set({ user: currentUser || null, isLoading: false })
       if (currentUser) {
-        const accounts = await authService.getLinkedAccounts()
-        set({ linkedAccounts: accounts })
+        try {
+          const accounts = await authService.getLinkedAccounts()
+          set({ linkedAccounts: accounts })
+        } catch (err) {
+          console.warn('Failed to load linked accounts:', err)
+        }
       }
+      console.log('✅ AuthStore: User refreshed successfully')
     } catch (err: any) {
-      set({ user: null, error: err?.message || 'Failed to refresh user' })
+      console.error('🔴 AuthStore: Refresh user error:', err)
+      set({ user: null, error: err?.message || 'Failed to refresh user', isLoading: false })
     }
   },
 

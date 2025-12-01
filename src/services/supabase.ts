@@ -1,21 +1,59 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Supabase client for authentication
-const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL
-const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || ''
+// Use singleton pattern to prevent multiple instances
+let supabaseInstance: ReturnType<typeof createClient> | null = null;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('⚠️  Supabase credentials not configured. Authentication may not work.');
-  console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables');
+function getSupabaseClient() {
+  if (supabaseInstance) {
+    return supabaseInstance;
+  }
+
+  const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL
+  const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || ''
+
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.warn('⚠️  Supabase credentials not configured. Authentication may not work.');
+    console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables');
+  }
+
+  supabaseInstance = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    }
+  });
+
+  return supabaseInstance;
 }
 
-const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-})
+// Export singleton instance
+const supabase = getSupabaseClient();
+
+// Handle invalid refresh token errors gracefully
+if (typeof window !== 'undefined') {
+  // Listen for auth errors and clear invalid sessions
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+      // Session is valid
+      return;
+    }
+  });
+
+  // Catch and handle refresh token errors on initial load
+  supabase.auth.getSession().catch((error) => {
+    if (error?.message?.includes('Invalid Refresh Token') || 
+        error?.message?.includes('Refresh Token Not Found')) {
+      // Clear invalid session from storage
+      console.warn('⚠️ Invalid refresh token detected, clearing session');
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {
+        // Ignore sign out errors
+      });
+    }
+  });
+}
 
 // Recipe service - using API endpoints (not direct database access)
 export const recipeService = {
@@ -56,27 +94,138 @@ export const authService = {
   // Get current user with profile data
   async getUser() {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser()
-      if (error || !user) {
+      console.log('🟡 authService.getUser: Starting...')
+      
+      // First check if we have a session - this is more reliable than getUser() immediately after OAuth
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
+      console.log('🟡 authService.getUser: Session check:', {
+        hasSession: !!currentSession,
+        hasUser: !!currentSession?.user,
+        error: sessionError?.message
+      })
+      
+      // If we have a session with a user, use that directly
+      if (currentSession?.user) {
+        console.log('✅ authService.getUser: Using user from session:', currentSession.user.id)
+        const user = currentSession.user
+        
+        // Fetch profile data (don't fail if profile doesn't exist)
+        let profile: any = null
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('display_name, first_name, last_name, avatar_url')
+            .eq('id', user.id)
+            .single()
+          if (!error) {
+            profile = data
+          }
+        } catch (err) {
+          // Ignore profile fetch errors
+          profile = null
+        }
+
+        // Extract avatar URL - Google OAuth provides 'picture' in user_metadata
+        const avatarUrl = profile?.avatar_url || 
+                         user.user_metadata?.avatar_url || 
+                         user.user_metadata?.picture ||
+                         user.user_metadata?.avatar_url
+        
+        console.log('🟡 authService.getUser: Avatar URL sources:', {
+          profile_avatar_url: profile?.avatar_url,
+          user_metadata_avatar_url: user.user_metadata?.avatar_url,
+          user_metadata_picture: user.user_metadata?.picture,
+          user_metadata_full: user.user_metadata,
+          final_avatar_url: avatarUrl
+        })
+
+        return {
+          ...user,
+          email: user.email,
+          display_name: profile?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+          first_name: profile?.first_name || user.user_metadata?.first_name || user.user_metadata?.given_name || profile?.display_name?.split(' ')[0] || user.email?.split('@')[0] || 'User',
+          avatar_url: avatarUrl,
+        }
+      }
+      
+      // Fallback: Try getUser() if no session (for cases where session isn't available yet)
+      console.log('🟡 authService.getUser: No session found, trying getUser()...')
+      const getUserPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('getUser timeout')), 3000)
+      )
+      
+      let result: any
+      try {
+        result = await Promise.race([getUserPromise, timeoutPromise])
+      } catch (timeoutError) {
+        // Timeout occurred - clear invalid session
+        console.warn('getUser timeout - clearing invalid session')
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+        return null
+      }
+      
+      const { data: { user }, error } = result || { data: { user: null }, error: null }
+      
+      console.log('🟡 authService.getUser: getUser() result:', {
+        hasUser: !!user,
+        error: error?.message
+      })
+      
+      // Handle invalid refresh token errors
+      if (error) {
+        if (error.message?.includes('Invalid Refresh Token') || 
+            error.message?.includes('Refresh Token Not Found') ||
+            error.message?.includes('JWT')) {
+          // Clear invalid session
+          console.warn('Invalid token detected, clearing session')
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+          return null
+        }
+        console.warn('authService.getUser: Error from getUser():', error.message)
+        return null
+      }
+      
+      if (!user) {
+        console.warn('authService.getUser: No user returned from getUser()')
         return null
       }
 
-      // Fetch profile data
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name, first_name, last_name, avatar_url')
-        .eq('id', user.id)
-        .single()
+      // Fetch profile data (don't fail if profile doesn't exist)
+      let profile: any = null
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('display_name, first_name, last_name, avatar_url')
+          .eq('id', user.id)
+          .single()
+        if (!error) {
+          profile = data
+        }
+      } catch (err) {
+        // Ignore profile fetch errors
+        profile = null
+      }
+
+      // Extract avatar URL - Google OAuth provides 'picture' in user_metadata
+      const avatarUrl = profile?.avatar_url || 
+                       user.user_metadata?.avatar_url || 
+                       user.user_metadata?.picture ||
+                       user.user_metadata?.avatar_url
 
       return {
-        id: user.id,
+        ...user,
         email: user.email,
         display_name: profile?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
         first_name: profile?.first_name || user.user_metadata?.first_name || user.user_metadata?.given_name || profile?.display_name?.split(' ')[0] || user.email?.split('@')[0] || 'User',
-        avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture,
-        ...user
+        avatar_url: avatarUrl,
       }
-    } catch (err) {
+    } catch (err: any) {
+      // Handle any other errors gracefully
+      if (err?.message?.includes('timeout')) {
+        console.warn('Auth getUser timeout - clearing invalid session')
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+      }
       return null
     }
   },
@@ -97,8 +246,8 @@ export const authService = {
       // After auth user is created, create/update profile in profiles table
       // Note: The trigger should handle this automatically, but we do it here as backup
       if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
+        const { error: profileError } = await (supabase
+          .from('profiles') as any)
           .upsert({
             id: data.user.id, // Use auth.users.id as the primary key
             email: data.user.email,
@@ -117,9 +266,8 @@ export const authService = {
       
       return {
         user: data.user ? {
-          id: data.user.id,
+          ...data.user,
           email: data.user.email,
-          ...data.user
         } : null,
         session: data.session
       }
@@ -160,8 +308,8 @@ export const authService = {
       // After successful sign in, ensure profile exists in profiles table
       // Note: The trigger should handle this automatically, but we do it here as backup
       if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
+        const { error: profileError } = await (supabase
+          .from('profiles') as any)
           .upsert({
             id: data.user.id,
             email: data.user.email,
@@ -178,9 +326,8 @@ export const authService = {
       
       return {
         user: data.user ? {
-          id: data.user.id,
+          ...data.user,
           email: data.user.email,
-          ...data.user
         } : null,
         session: data.session
       }
@@ -285,7 +432,7 @@ export const authService = {
       const { error } = await supabase.auth.unlinkIdentity({
         provider: 'google',
         identityId: googleIdentity.id,
-      })
+      } as any)
 
       if (error) {
         throw new Error(error.message)
@@ -345,8 +492,8 @@ export const authService = {
         try {
           // Ensure profile exists
           if (session?.user) {
-            const { error: profileError } = await supabase
-              .from("profiles")
+            const { error: profileError } = await (supabase
+              .from("profiles") as any)
               .upsert(
                 {
                   id: session.user.id,

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from './supabase';
+import { useAuthStore } from '@/stores/authStore';
 
 // Supabase configuration - reuse from supabase.ts
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
@@ -264,8 +265,8 @@ class ApiClient {
     // Transform camelCase to snake_case for database
     const dbData = camelToSnake(data);
 
-    const { data: recipe, error } = await supabase
-      .from("recipes")
+    const { data: recipe, error } = await (supabase
+      .from("recipes") as any)
       .update(dbData)
       .eq("id", id)
       .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
@@ -410,8 +411,8 @@ class ApiClient {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data: mealPlan, error } = await supabase
-      .from("meal_plans")
+    const { data: mealPlan, error } = await (supabase
+      .from("meal_plans") as any)
       .insert({
         ...data,
         user_id: user.id, // user_id references profiles(id) = auth.users(id)
@@ -478,17 +479,24 @@ class ApiClient {
   // Preferences endpoints - using Supabase client directly
   // Note: user_id references profiles(id), which references auth.users(id)
   async getPreferences() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      
+      // If no user or auth error, return null instead of throwing
+      // This allows the app to work for unauthenticated users
+      if (authError || !user) {
+        return null;
+      }
 
-    // Try to get preferences - handle case where measurement_system column might not exist yet
-    let { data, error } = await supabase
-      .from("user_preferences")
-      .select("*")
-      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
-      .maybeSingle();
+      // Try to get preferences - handle case where measurement_system column might not exist yet
+      let { data, error } = await supabase
+        .from("user_preferences")
+        .select("*")
+        .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
+        .maybeSingle();
 
     // If error is due to missing column (measurement_system), try without it
     if (
@@ -519,6 +527,11 @@ class ApiClient {
       return null;
     }
     return data;
+    } catch (error: any) {
+      // Handle any unexpected errors (like network issues) gracefully
+      console.warn("Error in getPreferences:", error.message);
+      return null;
+    }
   }
 
   async updatePreferences(data: any) {
@@ -542,8 +555,8 @@ class ApiClient {
     }
 
     if (existing) {
-      const { data: updated, error } = await supabase
-        .from("user_preferences")
+      const { data: updated, error } = await (supabase
+        .from("user_preferences") as any)
         .update(updateData)
         .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
         .select()
@@ -560,8 +573,8 @@ class ApiClient {
           error.message?.includes("Not Acceptable"))
       ) {
         const { measurement_system, ...dataWithoutMeasurement } = updateData;
-        const { data: updatedFallback, error: fallbackError } = await supabase
-          .from("user_preferences")
+        const { data: updatedFallback, error: fallbackError } = await (supabase
+          .from("user_preferences") as any)
           .update(dataWithoutMeasurement)
           .eq("user_id", user.id)
           .select()
@@ -573,12 +586,12 @@ class ApiClient {
             "Could not update preferences (migration may not be run):",
             fallbackError.message
           );
-          return { ...existing, ...updateData };
+          return { ...(existing as any), ...updateData };
         }
         // Return the updated data with measurement_system added locally (won't be saved until migration runs)
-        return {
-          ...updatedFallback,
-          measurement_system: updateData.measurement_system,
+          return {
+            ...(updatedFallback as any),
+            measurement_system: updateData.measurement_system,
         };
       }
 
@@ -618,10 +631,10 @@ class ApiClient {
           return { ...updateData, user_id: user.id, id: null };
         }
         // Return with measurement_system added locally
-        return {
-          ...createdFallback,
-          measurement_system: updateData.measurement_system,
-        };
+          return {
+            ...(createdFallback as any),
+            measurement_system: updateData.measurement_system,
+          };
       }
 
       if (error) throw error;
@@ -798,9 +811,14 @@ export const useCreateMealPlan = () => {
 };
 
 export const usePreferences = () => {
+  // Check if user is authenticated before running the query
+  const { user, isLoading: authLoading } = useAuthStore();
+  
   return useQuery({
     queryKey: ["preferences"],
     queryFn: () => apiClient.getPreferences(),
+    enabled: !authLoading && !!user, // Only run when auth is loaded and user exists
+    retry: false, // Don't retry on auth errors
   });
 };
 
