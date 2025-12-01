@@ -20,6 +20,7 @@ interface AuthState {
   linkGoogleAccount: (redirectTo?: string) => Promise<void>
   unlinkGoogleAccount: () => Promise<void>
   loadLinkedAccounts: () => Promise<void>
+  requestPasswordReset: (email: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -183,6 +184,18 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ linkedAccounts: accounts })
     } catch (err: any) {
       console.error('Failed to load linked accounts:', err)
+    }
+  },
+
+  requestPasswordReset: async (email: string) => {
+    set({ isLoading: true, error: null })
+    try {
+      await authService.requestPasswordReset(email)
+    } catch (err: any) {
+      set({ error: err?.message || 'Failed to send password reset email' })
+      throw err
+    } finally {
+      set({ isLoading: false })
     }
   },
 

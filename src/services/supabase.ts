@@ -463,6 +463,23 @@ export const authService = {
     }
   },
 
+  // Request password reset
+  async requestPasswordReset(email: string) {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      
+      return { success: true }
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to send password reset email')
+    }
+  },
+
   // Handle OAuth callback - wait for session to be available
   async handleOAuthCallback(): Promise<{ user: any; session: any }> {
     return new Promise((resolve, reject) => {
