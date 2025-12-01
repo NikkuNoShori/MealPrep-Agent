@@ -212,8 +212,8 @@ http://localhost:5173/**
 ```
 
 **Google Provider:**
-- Client ID: `72754375853-0lruj2dk166qhj5nf708rhgpf1kdhb40.apps.googleusercontent.com`
-- Client Secret: `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`
+- Client ID: `[your-google-client-id].apps.googleusercontent.com`
+- Client Secret: `[your-google-client-secret]`
 
 ## References
 
