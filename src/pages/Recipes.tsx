@@ -21,15 +21,21 @@ const Recipes = () => {
         .then(recipe => {
           if (recipe) {
             setSelectedRecipe(recipe);
+            setShowAddForm(false);
+            setEditingRecipe(null);
           } else {
             // Recipe not found, redirect to recipes list
-            navigate('/recipes');
+            navigate('/recipes', { replace: true });
           }
         })
-        .catch(error => {
-          console.error('Error loading recipe:', error);
-          navigate('/recipes');
+        .catch(() => {
+          navigate('/recipes', { replace: true });
         });
+    } else {
+      // No slug in URL - clear selected recipe
+      setSelectedRecipe(null);
+      setShowAddForm(false);
+      setEditingRecipe(null);
     }
   }, [slug, navigate]);
 

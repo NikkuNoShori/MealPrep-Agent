@@ -124,12 +124,10 @@ const Header = () => {
                       className="w-8 h-8 rounded-full object-cover border border-stone-200 dark:border-slate-600"
                       crossOrigin="anonymous"
                       referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        // If image fails to load, show icon instead
-                        console.warn('Avatar image failed to load:', user.avatar_url);
-                        console.warn('Image error details:', e);
-                        setAvatarError(true);
-                      }}
+                          onError={() => {
+                            // If image fails to load, show icon instead
+                            setAvatarError(true);
+                          }}
                       onLoad={() => {
                         // Reset error state if image loads successfully
                         setAvatarError(false);

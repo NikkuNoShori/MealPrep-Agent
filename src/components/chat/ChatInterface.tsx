@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useSendMessage, useChatHistory } from "../../services/api";
 import { apiClient } from "../../services/api";
 import { detectIntent } from "../../services/ragService";
+import { Logger } from "../../services/logger";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -36,7 +37,7 @@ interface Conversation {
   messages: Message[];
   lastMessage: string;
   timestamp: Date;
-  sessionId: string; // Add sessionId for n8n context
+  sessionId: string; // Session ID for conversation tracking
   isTemporary: boolean; // Track if session is temporary (not yet persisted)
   selectedIntent?: string | null; // Track manually selected intent (recipe_extraction or null for RAG queries)
 }
@@ -117,10 +118,9 @@ export const ChatInterface: React.FC = () => {
                   }));
                 }
               } catch (error) {
-                console.error(
-                  `Error loading messages for conversation ${dbConv.id}:`,
-                  error
-                );
+                Logger.chat.error('loadMessages', error as Error, {
+                  conversationId: dbConv.id,
+                });
               }
 
               return {
@@ -148,7 +148,9 @@ export const ChatInterface: React.FC = () => {
 
           // Set the most recent conversation as current
           if (conversationsWithMessages.length > 0) {
-            setCurrentConversationId(conversationsWithMessages[0].id);
+            const firstConv = conversationsWithMessages[0];
+            setCurrentConversationId(firstConv.id);
+            Logger.chat.conversationLoaded(firstConv.id, firstConv.messages.length);
           } else {
             createDefaultConversation();
           }
@@ -157,7 +159,7 @@ export const ChatInterface: React.FC = () => {
           createDefaultConversation();
         }
       } catch (error) {
-        console.error("Error loading conversations from database:", error);
+        Logger.chat.error('loadConversations', error as Error);
         createDefaultConversation();
       }
     };
@@ -179,6 +181,7 @@ export const ChatInterface: React.FC = () => {
     };
     setConversations([defaultConversation]);
     setCurrentConversationId(defaultConversation.id);
+    Logger.chat.conversationCreated(defaultConversation.id, newSessionId, "New Chat", true);
   };
 
   // Refetch conversations when messages are sent (handled by mutation invalidation)
@@ -235,11 +238,18 @@ export const ChatInterface: React.FC = () => {
     setConversations((prev) => [newConversation, ...prev]);
     setCurrentConversationId(newConversation.id);
     setInputMessage("");
+    Logger.chat.conversationCreated(newConversation.id, newSessionId, "New Chat", true);
+    Logger.chat.stateChange('conversation_switched', { conversationId: newConversation.id });
   };
 
   // Handle intent selection via button click
   const handleIntentSelection = (intent: "recipe_extraction" | null) => {
     if (!currentConversationId) return;
+
+    Logger.chat.stateChange('intent_selected', {
+      conversationId: currentConversationId,
+      intent,
+    });
 
     setConversations((prev) =>
       prev.map((conv) =>
@@ -276,6 +286,7 @@ export const ChatInterface: React.FC = () => {
     // If it's in the database (has messages), delete it via API
     try {
       await apiClient.deleteConversation(conversationId);
+      Logger.chat.conversationDeleted(conversationId);
 
       // Remove from state after successful API call
       setConversations((prev) =>
@@ -287,6 +298,7 @@ export const ChatInterface: React.FC = () => {
         );
         if (remainingConversations.length > 0) {
           setCurrentConversationId(remainingConversations[0].id);
+          Logger.chat.stateChange('conversation_switched', { conversationId: remainingConversations[0].id });
         } else {
           createNewConversation();
         }
@@ -294,7 +306,7 @@ export const ChatInterface: React.FC = () => {
       // Refetch to sync with database
       refetchHistory();
     } catch (error) {
-      console.error("Error deleting conversation:", error);
+      Logger.chat.error('deleteConversation', error as Error, { conversationId });
       // Revert state change on error
       refetchHistory();
     }
@@ -511,11 +523,19 @@ export const ChatInterface: React.FC = () => {
       return;
 
     const currentConversation = getCurrentConversation();
-    if (!currentConversation) return;
+    if (!currentConversation) {
+      Logger.chat.error('sendMessage', new Error('No current conversation'), { currentConversationId });
+      return;
+    }
 
     // Use manually selected intent (or null for RAG queries)
     const intent = currentConversation.selectedIntent || null;
-    console.log("Using selected intent:", intent);
+    Logger.chat.stateChange('message_sending', {
+      conversationId: currentConversationId,
+      intent,
+      hasImages: pendingImages.length > 0,
+      messageLength: inputMessage.length,
+    });
 
     // Add message to history
     setMessageHistory((prev) => [
@@ -580,6 +600,10 @@ export const ChatInterface: React.FC = () => {
 
       if (intent === "recipe_extraction") {
         // Handle recipe extraction
+        Logger.chat.stateChange('recipe_extraction_started', {
+          conversationId: currentConversationId,
+          hasImages: imageDataUrls.length > 0,
+        });
         const messageData: {
           message: string;
           sessionId: string;
@@ -592,6 +616,7 @@ export const ChatInterface: React.FC = () => {
           intent: "recipe_extraction",
           context: {
             recentMessages: currentConversation.messages.slice(-5),
+            conversationId: currentConversationId,
           },
         };
         if (imageDataUrls.length > 0) {
@@ -606,6 +631,10 @@ export const ChatInterface: React.FC = () => {
 
         // Update conversation ID if this is a new conversation (from database)
         if (sendResponse.conversationId && currentConversation.isTemporary) {
+          Logger.chat.stateChange('conversation_persisted', {
+            oldId: currentConversationId,
+            newId: sendResponse.conversationId,
+          });
           setConversations((prev) =>
             prev.map((conv) =>
               conv.id === currentConversationId
@@ -625,6 +654,11 @@ export const ChatInterface: React.FC = () => {
           sendResponse.sessionId &&
           sendResponse.sessionId !== currentConversation.sessionId
         ) {
+          Logger.chat.stateChange('sessionId_updated', {
+            conversationId: sendResponse.conversationId || currentConversationId,
+            oldSessionId: currentConversation.sessionId,
+            newSessionId: sendResponse.sessionId,
+          });
           setConversations((prev) =>
             prev.map((conv) =>
               conv.id === (sendResponse.conversationId || currentConversationId)
@@ -636,16 +670,18 @@ export const ChatInterface: React.FC = () => {
 
         response = sendResponse;
       } else {
-        // Handle RAG-based queries - let n8n intent router decide
-        // Detect intent and send it to n8n, which will handle RAG search if needed
+        // Handle general chat and RAG queries
+        // Server performs AI-powered intent detection, but we can provide a client-side hint
         const detectedIntent = detectIntent(inputMessage);
+        Logger.chat.intentDetected(detectedIntent, 0.8, 'Client-side hint (server will make final decision)', inputMessage);
 
-        // Only send specific intent if it's recipe-related, otherwise send undefined
-        // n8n's intent router: if intent === "recipe_extraction" → extraction path, else → RAG path
+        // Only send explicit intent if client-side detection strongly suggests recipe_extraction
+        // Otherwise, let server's AI-powered detection decide (it handles images, context, etc.)
+        // Server intents: 'recipe_extraction' | 'rag_search' | 'general_chat'
         const intentToSend =
           detectedIntent === "recipe_extraction"
-            ? "recipe_extraction"
-            : undefined; // Let n8n handle RAG search in its RAG Query path
+            ? "recipe_extraction" // Explicitly request recipe extraction
+            : undefined; // Let server's AI detection decide (handles RAG search, general chat, etc.)
 
         const messageData: {
           message: string;
@@ -656,10 +692,11 @@ export const ChatInterface: React.FC = () => {
         } = {
           message: inputMessage,
           sessionId: currentConversation.sessionId,
-          intent: intentToSend,
+          intent: intentToSend, // Only set if recipe_extraction, otherwise undefined for server to detect
           context: {
             recentMessages: currentConversation.messages.slice(-5),
-            detectedIntent: detectedIntent, // Pass detected intent in context for n8n to use
+            conversationId: currentConversationId,
+            clientDetectedIntent: detectedIntent, // Pass as hint for logging/debugging
           },
         };
         if (imageDataUrls.length > 0) {
@@ -674,6 +711,10 @@ export const ChatInterface: React.FC = () => {
 
         // Update conversation ID if this is a new conversation (from database)
         if (sendResponse.conversationId && currentConversation.isTemporary) {
+          Logger.chat.stateChange('conversation_persisted', {
+            oldId: currentConversationId,
+            newId: sendResponse.conversationId,
+          });
           setConversations((prev) =>
             prev.map((conv) =>
               conv.id === currentConversationId
@@ -693,6 +734,11 @@ export const ChatInterface: React.FC = () => {
           sendResponse.sessionId &&
           sendResponse.sessionId !== currentConversation.sessionId
         ) {
+          Logger.chat.stateChange('sessionId_updated', {
+            conversationId: sendResponse.conversationId || currentConversationId,
+            oldSessionId: currentConversation.sessionId,
+            newSessionId: sendResponse.sessionId,
+          });
           setConversations((prev) =>
             prev.map((conv) =>
               conv.id === (sendResponse.conversationId || currentConversationId)
@@ -713,6 +759,15 @@ export const ChatInterface: React.FC = () => {
         recipe: response.recipe, // Include structured recipe if present
       };
 
+      // Log successful response
+      if (response.recipe) {
+        Logger.chat.recipeExtracted(
+          currentConversationId,
+          response.recipe.title || 'Unknown',
+          true
+        );
+      }
+
       // Update conversation with AI response
       setConversations((prev) =>
         prev.map((conv) =>
@@ -725,8 +780,18 @@ export const ChatInterface: React.FC = () => {
             : conv
         )
       );
+
+      Logger.chat.stateChange('message_received', {
+        conversationId: currentConversationId,
+        hasRecipe: !!response.recipe,
+      });
     } catch (error) {
-      console.error("Failed to send message:", error);
+      Logger.chat.error('sendMessage', error as Error, {
+        conversationId: currentConversationId,
+        sessionId: currentConversation?.sessionId,
+        messageLength: inputMessage.length,
+        imageCount: pendingImages.length,
+      });
       const errorMessage: Message = {
         id: Date.now().toString(),
         content: "Sorry, I encountered an error. Please try again.",
@@ -969,9 +1034,12 @@ export const ChatInterface: React.FC = () => {
         >
           {!currentConversation || currentConversation.messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-8">
-              <h2 className="text-xl font-medium text-gray-900 dark:text-gray-100 mb-6">
-                Hey {getFirstName()}, where do you want to start?
+              <h2 className="text-xl font-medium text-gray-900 dark:text-gray-100 mb-2">
+                Hey {getFirstName()}, what can I help you with?
               </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                You can start typing, or use the buttons below for quick actions
+              </p>
               <div className="flex gap-3">
                 <Button
                   onClick={() => handleIntentSelection("recipe_extraction")}
@@ -985,7 +1053,7 @@ export const ChatInterface: React.FC = () => {
                   variant="outline"
                   className="px-6 py-2"
                 >
-                  Questions about an existing recipe
+                  Questions about recipes
                 </Button>
               </div>
             </div>
@@ -1014,8 +1082,8 @@ export const ChatInterface: React.FC = () => {
                     )}
                     <StructuredRecipeDisplay
                       recipe={message.recipe}
-                      onSave={(recipe) => {
-                        console.log("Recipe saved:", recipe);
+                      onSave={() => {
+                        // Recipe saved
                       }}
                     />
                   </div>
@@ -1091,16 +1159,7 @@ export const ChatInterface: React.FC = () => {
 
         {/* Input Area */}
         <div className="border-t p-4 flex-shrink-0">
-          {currentConversation &&
-          currentConversation.selectedIntent === undefined &&
-          currentConversation.messages.length === 0 ? (
-            <div className="text-center py-2">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Please select an option above to start chatting
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
+          <div className="space-y-2">
               {/* Image Previews */}
               {pendingImages.length > 0 && (
                 <div className="flex gap-2 flex-wrap">
@@ -1141,7 +1200,6 @@ export const ChatInterface: React.FC = () => {
                   className="hidden"
                   disabled={
                     isLoading ||
-                    currentConversation?.selectedIntent === undefined ||
                     pendingImages.length >= 4
                   }
                 />
@@ -1151,7 +1209,6 @@ export const ChatInterface: React.FC = () => {
                   size="icon"
                   disabled={
                     isLoading ||
-                    currentConversation?.selectedIntent === undefined ||
                     pendingImages.length >= 4
                   }
                   title={
@@ -1169,29 +1226,26 @@ export const ChatInterface: React.FC = () => {
                   onPaste={handlePaste}
                   placeholder={
                     currentConversation?.selectedIntent === "recipe_extraction"
-                      ? "Paste or type your recipe here..."
-                      : "Ask me about your recipes..."
+                      ? "Paste or type your recipe here, or upload images..."
+                      : currentConversation?.selectedIntent === null
+                      ? "Ask me about your recipes..."
+                      : "Type your message or question..."
                   }
-                  disabled={
-                    isLoading ||
-                    currentConversation?.selectedIntent === undefined
-                  }
+                  disabled={isLoading}
                   className="flex-1"
                 />
                 <Button
                   onClick={handleSendMessage}
                   disabled={
                     (!inputMessage.trim() && pendingImages.length === 0) ||
-                    isLoading ||
-                    currentConversation?.selectedIntent === undefined
+                    isLoading
                   }
                   size="icon"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

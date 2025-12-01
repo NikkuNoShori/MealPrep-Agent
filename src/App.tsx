@@ -49,7 +49,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/recipes"
+        path="/recipes/:slug?"
         element={
           <ProtectedRoute>
             <Layout>

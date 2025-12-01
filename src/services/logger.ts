@@ -224,6 +224,162 @@ export class AppLogger {
       ...data,
     });
   }
+
+  /**
+   * Chat-specific logging methods
+   */
+  static chat = {
+    /**
+     * Log chat message sent
+     */
+    messageSent: (conversationId: string, sessionId: string, message: string, intent?: string, imageCount?: number) => {
+      log('info', '💬 Chat: Message Sent', {
+        type: 'chat',
+        action: 'message_sent',
+        conversationId,
+        sessionId,
+        messageLength: message.length,
+        messagePreview: message.substring(0, 100),
+        intent,
+        imageCount: imageCount || 0,
+      });
+    },
+
+    /**
+     * Log chat message received
+     */
+    messageReceived: (conversationId: string, response: string, hasRecipe?: boolean, intent?: string) => {
+      log('info', '💬 Chat: Message Received', {
+        type: 'chat',
+        action: 'message_received',
+        conversationId,
+        responseLength: response.length,
+        responsePreview: response.substring(0, 100),
+        hasRecipe: !!hasRecipe,
+        intent,
+      });
+    },
+
+    /**
+     * Log intent detection
+     */
+    intentDetected: (intent: string, confidence: number, reason: string, message?: string) => {
+      log('debug', '🎯 Chat: Intent Detected', {
+        type: 'chat',
+        action: 'intent_detection',
+        intent,
+        confidence,
+        reason,
+        messagePreview: message?.substring(0, 100),
+      });
+    },
+
+    /**
+     * Log recipe extraction
+     */
+    recipeExtracted: (conversationId: string, recipeTitle: string, success: boolean, error?: string) => {
+      const level = success ? 'info' : 'error';
+      log(level, success ? '📝 Chat: Recipe Extracted' : '📝 Chat: Recipe Extraction Failed', {
+        type: 'chat',
+        action: 'recipe_extraction',
+        conversationId,
+        recipeTitle,
+        success,
+        error,
+      });
+    },
+
+    /**
+     * Log conversation created
+     */
+    conversationCreated: (conversationId: string, sessionId: string, title: string, isTemporary: boolean) => {
+      log('info', '💬 Chat: Conversation Created', {
+        type: 'chat',
+        action: 'conversation_created',
+        conversationId,
+        sessionId,
+        title,
+        isTemporary,
+      });
+    },
+
+    /**
+     * Log conversation loaded
+     */
+    conversationLoaded: (conversationId: string, messageCount: number) => {
+      log('debug', '💬 Chat: Conversation Loaded', {
+        type: 'chat',
+        action: 'conversation_loaded',
+        conversationId,
+        messageCount,
+      });
+    },
+
+    /**
+     * Log conversation deleted
+     */
+    conversationDeleted: (conversationId: string) => {
+      log('info', '💬 Chat: Conversation Deleted', {
+        type: 'chat',
+        action: 'conversation_deleted',
+        conversationId,
+      });
+    },
+
+    /**
+     * Log API call to chat endpoint
+     */
+    apiCall: (endpoint: string, method: string, statusCode?: number, duration?: number, error?: string) => {
+      const level = error || (statusCode && statusCode >= 400) ? 'error' : 'http';
+      log(level, `💬 Chat API: ${method} ${endpoint}`, {
+        type: 'chat',
+        action: 'api_call',
+        endpoint,
+        method,
+        statusCode,
+        duration: duration ? `${duration.toFixed(2)}ms` : undefined,
+        error,
+      });
+    },
+
+    /**
+     * Log chat error
+     */
+    error: (action: string, error: Error | string, context?: any) => {
+      log('error', `💬 Chat Error: ${action}`, {
+        type: 'chat',
+        action,
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+        ...context,
+      });
+    },
+
+    /**
+     * Log chat state change
+     */
+    stateChange: (state: string, data?: any) => {
+      log('debug', `💬 Chat: State Change - ${state}`, {
+        type: 'chat',
+        action: 'state_change',
+        state,
+        ...data,
+      });
+    },
+
+    /**
+     * Log RAG search
+     */
+    ragSearch: (query: string, resultCount: number, duration?: number) => {
+      log('info', '🔍 Chat: RAG Search', {
+        type: 'chat',
+        action: 'rag_search',
+        query: query.substring(0, 100),
+        resultCount,
+        duration: duration ? `${duration.toFixed(2)}ms` : undefined,
+      });
+    },
+  };
 }
 
 // Export Logger as alias for convenience

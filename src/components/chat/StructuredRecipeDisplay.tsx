@@ -80,7 +80,7 @@ export const StructuredRecipeDisplay: React.FC<StructuredRecipeDisplayProps> = (
         onSave(recipe);
       }
     } catch (error: any) {
-      console.error("Failed to save recipe:", error);
+      // Error logging handled by API client
       setSaveError(error?.message || "Failed to save recipe. Please try again.");
     } finally {
       setIsSaving(false);

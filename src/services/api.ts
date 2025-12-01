@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from './supabase';
 import { useAuthStore } from '@/stores/authStore';
+import { Logger } from './logger';
 
 // Supabase configuration - reuse from supabase.ts
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
@@ -315,7 +316,8 @@ class ApiClient {
     });
   }
 
-  // Chat endpoints - using Supabase edge function
+  // Chat endpoints - using Supabase Edge Function (secure, API key protected)
+  // The Edge Function handles OpenRouter calls server-side, keeping the API key secure
   async sendMessage(data: {
     message: string;
     context?: any;
@@ -324,11 +326,72 @@ class ApiClient {
     intent?: string;
     images?: string[]; // Array of base64 data URLs
   }) {
-    // Supabase edge function path: /functions/v1/chat-api/message
-    return this.request(`${SUPABASE_FUNCTIONS_URL}/chat-api/message`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+    const startTime = Date.now();
+    const endpoint = `${SUPABASE_FUNCTIONS_URL}/chat-api/message`;
+    
+    Logger.chat.apiCall(endpoint, 'POST', undefined, undefined);
+    Logger.chat.messageSent(
+      data.context?.conversationId || 'new',
+      data.sessionId || 'unknown',
+      data.message,
+      data.intent,
+      data.images?.length
+    );
+
+    try {
+      const response = await this.request(endpoint, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      const duration = Date.now() - startTime;
+      Logger.chat.apiCall(endpoint, 'POST', 200, duration);
+      
+      // Log response details
+      if (response) {
+        const responseData = response as any;
+        // ChatMessageResponse has nested structure: { response: { content, id, timestamp }, recipe? }
+        const responseContent = responseData.response?.content || responseData.content || '';
+        const conversationId = data.context?.conversationId || responseData.conversationId || 'unknown';
+        
+        Logger.chat.messageReceived(
+          conversationId,
+          responseContent,
+          !!responseData.recipe,
+          responseData.intent || data.intent
+        );
+
+        if (responseData.recipe) {
+          Logger.chat.recipeExtracted(
+            conversationId,
+            responseData.recipe.title || 'Unknown',
+            true
+          );
+        }
+
+        // Log full response structure for debugging
+        Logger.debug('Chat API Response', {
+          hasResponse: !!responseData.response,
+          hasContent: !!responseContent,
+          contentLength: responseContent.length,
+          hasRecipe: !!responseData.recipe,
+          conversationId: responseData.conversationId,
+          sessionId: responseData.sessionId,
+        });
+      }
+
+      return response;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      const statusCode = error?.status || error?.response?.status || 500;
+      Logger.chat.apiCall(endpoint, 'POST', statusCode, duration, error?.message);
+      Logger.chat.error('sendMessage', error, {
+        sessionId: data.sessionId,
+        intent: data.intent,
+        messageLength: data.message.length,
+      });
+      throw error;
+    }
   }
 
   async addRecipeViaChat(data: { recipeText: string }) {

@@ -71,21 +71,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   refreshUser: async () => {
     try {
-      console.log('🟡 AuthStore: Refreshing user...')
       const currentUser = await authService.getUser()
-      console.log('🟡 AuthStore: Got user:', currentUser ? currentUser.id : 'null')
       set({ user: currentUser || null, isLoading: false })
       if (currentUser) {
         try {
           const accounts = await authService.getLinkedAccounts()
           set({ linkedAccounts: accounts })
         } catch (err) {
-          console.warn('Failed to load linked accounts:', err)
+          // Ignore linked accounts errors
         }
       }
-      console.log('✅ AuthStore: User refreshed successfully')
     } catch (err: any) {
-      console.error('🔴 AuthStore: Refresh user error:', err)
+      console.error('AuthStore: Refresh user error:', err)
       set({ user: null, error: err?.message || 'Failed to refresh user', isLoading: false })
     }
   },

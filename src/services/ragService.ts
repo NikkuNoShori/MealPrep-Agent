@@ -146,51 +146,49 @@ export const useIngredientSearch = () => {
   };
 };
 
-// Intent detection utility
-export const detectIntent = (message: string): string => {
-  const lowerMessage = message.toLowerCase();
+/**
+ * Client-side intent detection utility
+ * 
+ * NOTE: This is a lightweight client-side hint for logging/debugging only.
+ * The server performs AI-powered intent detection which is authoritative.
+ * 
+ * Server-side intents: 'recipe_extraction' | 'rag_search' | 'general_chat'
+ * 
+ * This function provides a quick client-side hint but should not be used
+ * for routing decisions - the server's AI detection is the source of truth.
+ */
+export const detectIntent = (message: string): 'recipe_extraction' | 'rag_search' | 'general_chat' => {
+  const lowerMessage = message.toLowerCase().trim();
   
-  // Recipe extraction keywords
-  const recipeKeywords = [
-    'recipe', 'ingredients', 'instructions', 'cook', 'bake', 'prepare',
+  // Recipe extraction keywords - user wants to ADD/SAVE a recipe
+  const recipeExtractionKeywords = [
     'add recipe', 'save recipe', 'extract recipe', 'recipe from',
-    'save it', 'save this', 'can you save', 'save that', 'save the recipe'
+    'save it', 'save this', 'can you save', 'save that', 'save the recipe',
+    'add this recipe', 'add a recipe', 'new recipe', 'recipe:',
+    // Common patterns when pasting recipe content
+    'ingredients:', 'instructions:', 'directions:', 'prep time', 'cook time'
   ];
   
-  // Recipe search keywords
-  const searchKeywords = [
+  // RAG search keywords - user wants to FIND/SEARCH existing recipes
+  const ragSearchKeywords = [
     'find recipe', 'search recipe', 'recipe with', 'recipes containing',
-    'show me recipes', 'what recipes', 'recommend recipe', 'suggest recipe'
+    'show me recipes', 'what recipes', 'recommend recipe', 'suggest recipe',
+    'recipes i have', 'my recipes', 'saved recipes', 'recipe collection',
+    'what can i make with', 'recipes using', 'recipes that have'
   ];
   
-  // Ingredient search keywords
-  const ingredientKeywords = [
-    'recipes with', 'what can i make with', 'ingredients i have',
-    'using these ingredients', 'cook with'
-  ];
-  
-  // General cooking questions
-  const cookingKeywords = [
-    'how to cook', 'cooking tips', 'cooking advice', 'meal planning',
-    'what should i cook', 'dinner ideas', 'lunch ideas'
-  ];
-  
-  if (recipeKeywords.some(keyword => lowerMessage.includes(keyword))) {
+  // Check for explicit recipe extraction intent (highest priority)
+  if (recipeExtractionKeywords.some(keyword => lowerMessage.includes(keyword))) {
     return 'recipe_extraction';
   }
   
-  if (searchKeywords.some(keyword => lowerMessage.includes(keyword))) {
-    return 'recipe_search';
+  // Check for recipe search intent
+  if (ragSearchKeywords.some(keyword => lowerMessage.includes(keyword))) {
+    return 'rag_search';
   }
   
-  if (ingredientKeywords.some(keyword => lowerMessage.includes(keyword))) {
-    return 'ingredient_search';
-  }
-  
-  if (cookingKeywords.some(keyword => lowerMessage.includes(keyword))) {
-    return 'cooking_advice';
-  }
-  
+  // Default to general chat
+  // Note: Server-side AI detection will make the final decision
   return 'general_chat';
 };
 

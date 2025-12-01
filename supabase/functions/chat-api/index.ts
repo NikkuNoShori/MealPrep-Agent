@@ -105,22 +105,31 @@ class OpenRouterClient {
 
   // Get the appropriate API key based on model type
   private getApiKeyForModel(model: string): string {
-    // Vision Language models (VL)
-    if (model.includes("vl") || model.includes("vision")) {
-      return this.vlApiKey || this.defaultApiKey;
+    const apiKey = (() => {
+      // Vision Language models (VL)
+      if (model.includes("vl") || model.includes("vision")) {
+        return this.vlApiKey || this.defaultApiKey;
+      }
+      // Instruction models
+      if (model.includes("instruct") || model.includes("qwen")) {
+        return this.instructApiKey || this.defaultApiKey;
+      }
+      // Default fallback
+      return this.defaultApiKey;
+    })();
+
+    // Validate the API key is not empty
+    if (!apiKey || apiKey.trim() === "") {
+      throw new Error("OpenRouter API key is empty or invalid. Please configure OPENROUTER_API_KEY in Supabase Edge Function secrets.");
     }
-    // Instruction models
-    if (model.includes("instruct") || model.includes("qwen")) {
-      return this.instructApiKey || this.defaultApiKey;
-    }
-    // Default fallback
-    return this.defaultApiKey;
+
+    return apiKey;
   }
 
   async chat(
     systemPrompt: string,
     userMessage: string,
-    model: string = "qwen/qwen3-8b",
+    model: string = "qwen/qwen-2.5-7b-instruct",
     options?: {
       temperature?: number;
       max_tokens?: number;
@@ -149,9 +158,24 @@ class OpenRouterClient {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error("OpenRouter error:", response.status, error);
-      throw new Error(`OpenRouter API failed: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `OpenRouter API failed: ${response.status}`;
+      
+      // Provide specific error messages for common issues
+      if (response.status === 401) {
+        errorMessage = "OpenRouter API key is invalid or missing. Please check your OPENROUTER_API_KEY configuration in Supabase Edge Function secrets.";
+        console.error("❌ OpenRouter authentication failed:", {
+          status: response.status,
+          error: errorText,
+          apiKeyLength: apiKey.length,
+          apiKeyPrefix: apiKey.substring(0, 10) + "...",
+        });
+      } else {
+        console.error("OpenRouter error:", response.status, errorText);
+        errorMessage = `OpenRouter API failed: ${response.status} - ${errorText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -162,7 +186,7 @@ class OpenRouterClient {
     systemPrompt: string,
     conversationHistory: any[],
     userMessage: string,
-    model: string = "qwen/qwen3-8b",
+    model: string = "qwen/qwen-2.5-7b-instruct",
     options?: { temperature?: number; max_tokens?: number }
   ): Promise<string> {
     const messages = [
@@ -189,13 +213,24 @@ class OpenRouterClient {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error(
-        "OpenRouter chatWithHistory error:",
-        response.status,
-        error
-      );
-      throw new Error(`OpenRouter API failed: ${response.status} - ${error}`);
+      const errorText = await response.text();
+      let errorMessage = `OpenRouter API failed: ${response.status}`;
+      
+      // Provide specific error messages for common issues
+      if (response.status === 401) {
+        errorMessage = "OpenRouter API key is invalid or missing. Please check your OPENROUTER_API_KEY configuration in Supabase Edge Function secrets.";
+        console.error("❌ OpenRouter authentication failed:", {
+          status: response.status,
+          error: errorText,
+          apiKeyLength: apiKey.length,
+          apiKeyPrefix: apiKey.substring(0, 10) + "...",
+        });
+      } else {
+        console.error("OpenRouter chatWithHistory error:", response.status, errorText);
+        errorMessage = `OpenRouter API failed: ${response.status} - ${errorText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -247,7 +282,24 @@ class OpenRouterClient {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenRouter API failed: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `OpenRouter API failed: ${response.status}`;
+      
+      // Provide specific error messages for common issues
+      if (response.status === 401) {
+        errorMessage = "OpenRouter API key is invalid or missing. Please check your OPENROUTER_API_KEY configuration in Supabase Edge Function secrets.";
+        console.error("❌ OpenRouter authentication failed (chatWithImages):", {
+          status: response.status,
+          error: errorText,
+          apiKeyLength: apiKey.length,
+          apiKeyPrefix: apiKey.substring(0, 10) + "...",
+        });
+      } else {
+        console.error("OpenRouter chatWithImages error:", response.status, errorText);
+        errorMessage = `OpenRouter API failed: ${response.status} - ${errorText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -309,7 +361,8 @@ async function detectIntent(
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// RECIPE EXTRACTION (Direct - No n8n!)
+// RECIPE EXTRACTION
+// Direct extraction using OpenRouter vision/text models
 // ═══════════════════════════════════════════════════════════════════
 
 async function extractRecipe(
@@ -376,7 +429,8 @@ async function extractRecipe(
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// GENERAL CHAT (Direct - No n8n!)
+// GENERAL CHAT
+// Direct chat using OpenRouter models
 // ═══════════════════════════════════════════════════════════════════
 
 async function handleGeneralChat(
@@ -387,12 +441,17 @@ async function handleGeneralChat(
 ): Promise<string> {
   try {
     // Get recent conversation history
-    const { data: recentMessages } = await supabase
+    const { data: recentMessages, error: historyError } = await supabase
       .from("chat_messages")
       .select("content, sender, created_at")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(10);
+
+    if (historyError) {
+      console.error("❌ Error fetching conversation history:", historyError);
+      // Continue without history rather than failing
+    }
 
     const conversationHistory = (recentMessages || [])
       .reverse()
@@ -401,25 +460,73 @@ async function handleGeneralChat(
         content: msg.content,
       }));
 
-    const response = await openRouter.chatWithHistory(
-      GENERAL_CHAT_PROMPT,
-      conversationHistory,
-      message,
-      "qwen/qwen3-8b",
-      { temperature: 0.7, max_tokens: 500 }
-    );
+    // Use the same model as intent detection for consistency
+    // qwen-2.5-7b-instruct is more reliable than qwen3-8b
+    const model = "qwen/qwen-2.5-7b-instruct";
+    console.log(`💬 Generating general chat response with model: ${model}, history length: ${conversationHistory.length}`);
 
-    console.log("✅ General chat response generated");
-    return response;
-  } catch (error) {
+    // Try chatWithHistory first (with context)
+    try {
+      const response = await openRouter.chatWithHistory(
+        GENERAL_CHAT_PROMPT,
+        conversationHistory,
+        message,
+        model,
+        { temperature: 0.7, max_tokens: 500 }
+      );
+
+      console.log("✅ General chat response generated");
+      return response;
+    } catch (historyError: any) {
+      console.warn("⚠️ chatWithHistory failed, trying simple chat:", historyError?.message);
+      
+      // Fallback: Use simple chat without history if chatWithHistory fails
+      // This handles cases where the model doesn't support history or there's an API issue
+      const fallbackResponse = await openRouter.chat(
+        GENERAL_CHAT_PROMPT,
+        message,
+        model,
+        { temperature: 0.7, max_tokens: 500 }
+      );
+
+      console.log("✅ General chat response generated (fallback mode)");
+      return fallbackResponse;
+    }
+  } catch (error: any) {
     console.error("❌ General chat error:", error);
-    console.error("Error details:", error.message, error.stack);
+    console.error("Error message:", error?.message);
+    console.error("Error stack:", error?.stack);
+    
+    // Try to extract more details from the error
+    let errorDetails = error?.message || String(error);
+    if (error?.response) {
+      try {
+        const errorText = await error.response.text();
+        errorDetails += ` - Response: ${errorText}`;
+      } catch (e) {
+        // Ignore
+      }
+    }
+    console.error("Full error details:", errorDetails);
+    
+    // Provide more specific error message if possible
+    if (error?.message?.includes("model") || error?.message?.includes("404") || error?.message?.includes("not found")) {
+      return "I'm having trouble with the AI model right now. Please try again in a moment.";
+    }
+    if (error?.message?.includes("API") || error?.message?.includes("401") || error?.message?.includes("403")) {
+      return "I'm having trouble connecting to the AI service. Please check your API configuration.";
+    }
+    if (error?.message?.includes("timeout") || error?.message?.includes("network")) {
+      return "The AI service is taking too long to respond. Please try again in a moment.";
+    }
+    
     return "I apologize, but I'm having trouble processing your message right now. Please try again.";
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// RAG SEARCH (Still uses n8n)
+// RAG SEARCH
+// Searches user's recipe collection using semantic search
 // ═══════════════════════════════════════════════════════════════════
 
 async function callRAGWorkflow(
@@ -542,12 +649,18 @@ serve(async (req) => {
     const defaultKey =
       openRouterKeyDefault || openRouterKeyInstruct || openRouterKeyVL;
 
-    // Validate OpenRouter API key
-    if (!defaultKey) {
+    // Validate OpenRouter API key (check for presence and non-empty)
+    if (!defaultKey || defaultKey.trim() === "") {
       console.error("❌ OPENROUTER_API_KEY not configured");
+      console.error("   Available env vars:", {
+        hasDefault: !!openRouterKeyDefault,
+        hasVL: !!openRouterKeyVL,
+        hasInstruct: !!openRouterKeyInstruct,
+      });
       return new Response(
         JSON.stringify({
-          error: "OpenRouter API key not configured. Please contact support.",
+          error: "OpenRouter API key not configured. Please set OPENROUTER_API_KEY in Supabase Edge Function secrets.",
+          details: "To fix: Run 'supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-key-here'",
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -555,6 +668,14 @@ serve(async (req) => {
         }
       );
     }
+
+    // Log key status (without exposing the actual key)
+    console.log("✅ OpenRouter API key configured", {
+      hasDefault: !!openRouterKeyDefault,
+      hasVL: !!openRouterKeyVL,
+      hasInstruct: !!openRouterKeyInstruct,
+      defaultKeyLength: defaultKey.length,
+    });
 
     // Create OpenRouter client with model-specific keys
     const openRouter = new OpenRouterClient(
@@ -781,7 +902,7 @@ async function handleSendMessage(
         aiResponse = `I had trouble extracting the recipe: ${extractionResult.error}`;
       }
     } else if (routingIntent === "rag_search") {
-      console.log("🔍 Routing to RAG Search (n8n)...");
+      console.log("🔍 Routing to RAG Search...");
       aiResponse = await callRAGWorkflow(
         message || "",
         session_id,

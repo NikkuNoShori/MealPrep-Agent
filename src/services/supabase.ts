@@ -47,7 +47,6 @@ if (typeof window !== 'undefined') {
     if (error?.message?.includes('Invalid Refresh Token') || 
         error?.message?.includes('Refresh Token Not Found')) {
       // Clear invalid session from storage
-      console.warn('⚠️ Invalid refresh token detected, clearing session');
       supabase.auth.signOut({ scope: 'local' }).catch(() => {
         // Ignore sign out errors
       });
@@ -94,19 +93,11 @@ export const authService = {
   // Get current user with profile data
   async getUser() {
     try {
-      console.log('🟡 authService.getUser: Starting...')
-      
       // First check if we have a session - this is more reliable than getUser() immediately after OAuth
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
-      console.log('🟡 authService.getUser: Session check:', {
-        hasSession: !!currentSession,
-        hasUser: !!currentSession?.user,
-        error: sessionError?.message
-      })
       
       // If we have a session with a user, use that directly
       if (currentSession?.user) {
-        console.log('✅ authService.getUser: Using user from session:', currentSession.user.id)
         const user = currentSession.user
         
         // Fetch profile data (don't fail if profile doesn't exist)
@@ -130,14 +121,6 @@ export const authService = {
                          user.user_metadata?.avatar_url || 
                          user.user_metadata?.picture ||
                          user.user_metadata?.avatar_url
-        
-        console.log('🟡 authService.getUser: Avatar URL sources:', {
-          profile_avatar_url: profile?.avatar_url,
-          user_metadata_avatar_url: user.user_metadata?.avatar_url,
-          user_metadata_picture: user.user_metadata?.picture,
-          user_metadata_full: user.user_metadata,
-          final_avatar_url: avatarUrl
-        })
 
         return {
           ...user,
@@ -149,7 +132,6 @@ export const authService = {
       }
       
       // Fallback: Try getUser() if no session (for cases where session isn't available yet)
-      console.log('🟡 authService.getUser: No session found, trying getUser()...')
       const getUserPromise = supabase.auth.getUser()
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('getUser timeout')), 3000)
@@ -160,17 +142,11 @@ export const authService = {
         result = await Promise.race([getUserPromise, timeoutPromise])
       } catch (timeoutError) {
         // Timeout occurred - clear invalid session
-        console.warn('getUser timeout - clearing invalid session')
         await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
         return null
       }
       
       const { data: { user }, error } = result || { data: { user: null }, error: null }
-      
-      console.log('🟡 authService.getUser: getUser() result:', {
-        hasUser: !!user,
-        error: error?.message
-      })
       
       // Handle invalid refresh token errors
       if (error) {
@@ -178,16 +154,13 @@ export const authService = {
             error.message?.includes('Refresh Token Not Found') ||
             error.message?.includes('JWT')) {
           // Clear invalid session
-          console.warn('Invalid token detected, clearing session')
           await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
           return null
         }
-        console.warn('authService.getUser: Error from getUser():', error.message)
         return null
       }
       
       if (!user) {
-        console.warn('authService.getUser: No user returned from getUser()')
         return null
       }
 
@@ -223,7 +196,6 @@ export const authService = {
     } catch (err: any) {
       // Handle any other errors gracefully
       if (err?.message?.includes('timeout')) {
-        console.warn('Auth getUser timeout - clearing invalid session')
         await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
       }
       return null

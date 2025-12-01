@@ -21,7 +21,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
                               sessionStorage.getItem('oauth_redirecting') === 'true'
       
       if (isOAuthCallback) {
-        console.log('🟡 ProtectedRoute: Detected OAuth callback, waiting for auth state...')
         setWaitingForAuth(true)
         sessionStorage.removeItem('oauth_redirecting')
         
@@ -47,11 +46,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
   
   if (!user) {
-    console.log('🔴 ProtectedRoute: No user found, redirecting to signin')
     return <Navigate to="/signin" state={{ from: location }} replace />
   }
-  
-  console.log('✅ ProtectedRoute: User authenticated, rendering children')
 
   return <>{children}</>
 }
