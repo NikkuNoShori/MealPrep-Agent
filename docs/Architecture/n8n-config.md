@@ -57,7 +57,7 @@
       "credentials": {
         "postgres": {
           "id": "d7mgmIS2U1INL1Tn",
-          "name": "Neon Postgres DB"
+          "name": "Supabase Postgres DB"
         }
       }
     },

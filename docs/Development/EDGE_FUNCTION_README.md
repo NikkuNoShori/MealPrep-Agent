@@ -7,7 +7,7 @@ This document explains how to set up and deploy the chat edge function for the M
 The chat edge function provides a high-performance, serverless solution for handling chat operations:
 
 - **Edge Runtime**: Runs on Vercel's edge network for global low-latency
-- **Direct Database Access**: Connects directly to NeonDB for fast data operations
+- **Direct Database Access**: Connects directly to Supabase for fast data operations
 - **AI Integration**: Integrates with Vertex AI for intelligent responses
 - **Real-time Processing**: Handles message processing and storage efficiently
 
@@ -30,7 +30,7 @@ backend/
 ### 1. Prerequisites
 
 - Vercel CLI installed: `npm install -g vercel`
-- NeonDB database with the chat_messages table
+- Supabase database with the chat_messages table
 - Vertex AI project configured
 - Environment variables set up
 
@@ -220,7 +220,7 @@ export const chatApi = {
 - **Global Edge Network**: Low latency worldwide
 - **Serverless**: No server management required
 - **Auto-scaling**: Handles traffic spikes automatically
-- **Direct Database**: Minimal network hops to NeonDB
+- **Direct Database**: Minimal network hops to Supabase
 - **Cold Start Optimization**: Fast function initialization
 
 ## 🔍 Monitoring

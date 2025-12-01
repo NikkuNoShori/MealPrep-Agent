@@ -207,4 +207,3 @@ After configuring Google OAuth in Supabase:
 For issues or questions:
 - Check Supabase documentation: https://supabase.com/docs/guides/auth/social-login/auth-google
 - Check Google OAuth documentation: https://developers.google.com/identity/protocols/oauth2
-
