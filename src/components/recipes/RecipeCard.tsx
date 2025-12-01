@@ -35,8 +35,11 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 }) => {
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
 
-  // Truncate title to 75 characters
-  const truncateTitle = (title: string, maxLength: number = 75): string => {
+  // Truncate title to fit on single line
+  // Grid view: ~40-45 characters at text-base (16px) in ~280-320px card width
+  // List view: ~50-60 characters at text-xl (20px) with more available width
+  // Using 50 as safe limit for both views
+  const truncateTitle = (title: string, maxLength: number = 50): string => {
     if (title.length <= maxLength) return title;
     return title.slice(0, maxLength) + "...";
   };
@@ -165,7 +168,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-xl text-slate-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200">
+                    <h3 className="font-bold text-xl text-slate-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200" title={recipe.title}>
                       {displayTitle}
                     </h3>
                     {recipe.description && (
@@ -365,7 +368,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           {/* Enhanced Title with Actions */}
           <div className="mb-2">
             <div className="flex items-start justify-between gap-2 mb-1.5">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white line-clamp-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200 leading-tight flex-1">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200 leading-tight flex-1 min-w-0" title={recipe.title}>
                 {displayTitle}
               </h3>
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">

@@ -18,7 +18,8 @@ import {
   X,
   TrendingUp,
   TrendingDown,
-  MinusCircle
+  MinusCircle,
+  Flame
 } from 'lucide-react'
 
 interface RecipeDetailProps {
@@ -195,7 +196,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           <CardTitle>Recipe Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {totalTime > 0 && (
               <div className="text-center">
                 <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
@@ -208,6 +209,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                 <ChefHat className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">Prep Time</p>
                 <p className="font-semibold">{recipe.prepTime} min</p>
+              </div>
+            )}
+            {recipe.cookTime && (
+              <div className="text-center">
+                <Flame className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Cook Time</p>
+                <p className="font-semibold">{recipe.cookTime} min</p>
               </div>
             )}
             {recipe.servings && (

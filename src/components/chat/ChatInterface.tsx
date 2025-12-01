@@ -56,6 +56,7 @@ export const ChatInterface: React.FC = () => {
   >(new Set());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [pendingImages, setPendingImages] = useState<File[]>([]); // Images to be sent with next message
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]); // Object URLs for image previews
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     // Load saved width from localStorage or default to 320px (w-80)
     const saved = localStorage.getItem("chat-sidebar-width");
@@ -428,24 +429,32 @@ export const ChatInterface: React.FC = () => {
 
   // Remove image from pending list
   const removeImage = (index: number) => {
-    setPendingImages((prev) => {
-      const newImages = prev.filter((_, i) => i !== index);
-      // Clean up object URL for removed image
-      if (prev[index]) {
-        URL.revokeObjectURL(URL.createObjectURL(prev[index]));
-      }
-      return newImages;
-    });
+    // Revoke object URL for removed image
+    if (imagePreviewUrls[index]) {
+      URL.revokeObjectURL(imagePreviewUrls[index]);
+      setImagePreviewUrls((prevUrls) => prevUrls.filter((_, i) => i !== index));
+    }
+    setPendingImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Cleanup object URLs on unmount
+  // Create object URLs when pendingImages change
   useEffect(() => {
+    // Revoke old URLs
+    imagePreviewUrls.forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
+    
+    // Create new URLs for current images
+    const newUrls = pendingImages.map((file) => URL.createObjectURL(file));
+    setImagePreviewUrls(newUrls);
+    
+    // Cleanup function to revoke URLs on unmount or when images change
     return () => {
-      pendingImages.forEach((file) => {
-        URL.revokeObjectURL(URL.createObjectURL(file));
+      newUrls.forEach((url) => {
+        URL.revokeObjectURL(url);
       });
     };
-  }, []);
+  }, [pendingImages]); // Only recreate when pendingImages changes
 
   // Save sidebar width to localStorage
   useEffect(() => {
@@ -540,7 +549,16 @@ export const ChatInterface: React.FC = () => {
               timestamp: new Date(),
               title:
                 conv.messages.length === 0
-                  ? inputMessage.slice(0, 30) + "..."
+                  ? (() => {
+                      const trimmedMessage = inputMessage.trim();
+                      if (trimmedMessage) {
+                        return trimmedMessage.slice(0, 30) + (trimmedMessage.length > 30 ? "..." : "");
+                      } else if (pendingImages.length > 0) {
+                        return `${pendingImages.length} image${pendingImages.length > 1 ? 's' : ''}`;
+                      } else {
+                        return "New conversation";
+                      }
+                    })()
                   : conv.title,
               isTemporary: false, // Persist the session when first message is sent
             }
@@ -549,6 +567,11 @@ export const ChatInterface: React.FC = () => {
     );
 
     setInputMessage("");
+    // Revoke all image preview URLs before clearing
+    imagePreviewUrls.forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
+    setImagePreviewUrls([]);
     setPendingImages([]); // Clear images after adding to message
     setIsLoading(true);
 
@@ -1082,7 +1105,8 @@ export const ChatInterface: React.FC = () => {
               {pendingImages.length > 0 && (
                 <div className="flex gap-2 flex-wrap">
                   {pendingImages.map((file, index) => {
-                    const imageUrl = URL.createObjectURL(file);
+                    const imageUrl = imagePreviewUrls[index] || '';
+                    if (!imageUrl) return null; // Don't render if URL not ready yet
                     return (
                       <div
                         key={index}

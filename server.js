@@ -298,38 +298,7 @@ app.post('/api/recipes', async (req, res) => {
   }
 });
 
-// Get similar recipes
-app.get('/api/rag/similar/:recipeId', async (req, res) => {
-  try {
-    const { userId } = req.query;
-    
-    // Require userId from query (should come from authenticated user)
-    if (!userId) {
-      return res.status(401).json({ 
-        error: 'Authentication required. userId query parameter must be provided.' 
-      });
-    }
-    
-    const user = { id: userId };
-    const limit = parseInt(req.query.limit) || 50;
-    const offset = parseInt(req.query.offset) || 0;
-
-    // Get recipes from database
-    const recipes = await db.getRecipes(user.id, limit, offset);
-
-    res.json({
-      recipes,
-      total: recipes.length
-    });
-
-  } catch (error) {
-    console.error('Recipe retrieval error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
-  }
-});
+// Removed duplicate handler - see /api/rag/similar/:recipeId below (line 443)
 
 // RAG Search endpoint
 app.post('/api/rag/search', async (req, res) => {
@@ -442,8 +411,35 @@ app.post('/api/rag/search', async (req, res) => {
 // RAG Similar recipes endpoint
 app.get('/api/rag/similar/:recipeId', async (req, res) => {
   try {
+    // Verify JWT authentication
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: 'Authentication required. Please sign in.' 
+      });
+    }
+
+    // Get Supabase client for auth verification
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    const tempSupabase = createClient(supabaseUrl || '', supabaseKey || '');
+    
+    // Verify JWT token and extract user ID from token (don't trust userId from query params)
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await tempSupabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: 'Invalid or expired token. Please sign in again.' 
+      });
+    }
+
+    // Use authenticated user's ID from token (don't trust userId from query params)
+    const userId = user.id;
     const { recipeId } = req.params;
-    const { userId, limit = 5 } = req.query;
+    const { limit = 5 } = req.query;
     
     console.log('RAG Similar request:', { recipeId, userId, limit });
     

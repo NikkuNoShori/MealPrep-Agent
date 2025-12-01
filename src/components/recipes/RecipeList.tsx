@@ -161,8 +161,8 @@ export const RecipeList: React.FC<RecipeListProps> = ({
         </div>
       </div>
 
-      {/* Enhanced Search and Filters */}
-      <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl border border-slate-200/50 dark:border-slate-700/50 p-6 shadow-sm">
+      {/* Compact Search and Filters */}
+      <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-lg border border-slate-200/50 dark:border-slate-700/50 p-3 shadow-sm">
         <RecipeSearch
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
