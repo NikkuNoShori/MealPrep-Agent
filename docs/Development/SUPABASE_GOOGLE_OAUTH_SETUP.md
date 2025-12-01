@@ -30,8 +30,8 @@ This guide explains how to configure Google OAuth in Supabase for the MealPrep A
 
 ### 1.2 Get Client ID and Secret
 
-1. Copy the **Client ID** (e.g., `72754375853-0lruj2dk166qhj5nf708rhgpf1kdhb40.apps.googleusercontent.com`)
-2. Copy the **Client Secret** (e.g., `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`)
+1. Copy the **Client ID** (e.g., `[your-client-id].apps.googleusercontent.com`)
+2. Copy the **Client Secret** (e.g., `[your-client-secret]`)
 3. Save these for Step 2
 
 ### 1.3 Configure OAuth Consent Screen
