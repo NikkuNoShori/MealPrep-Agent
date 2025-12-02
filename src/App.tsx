@@ -12,6 +12,7 @@ import Chat from "./pages/Chat";
 import Recipes from "./pages/Recipes";
 import MealPlanner from "./pages/MealPlanner";
 import Settings from "./pages/Settings";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { useAuthStore } from "./stores/authStore";
 
 function AppRoutes() {
@@ -28,6 +29,7 @@ function AppRoutes() {
       <Route path="/signin" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route
         path="/dashboard"
         element={

@@ -84,6 +84,11 @@ export default {
           800: '#292524',
           900: '#1c1917',
         },
+        // Header colors
+        header: {
+          light: '#B0C4DE', // Light steel blue
+          dark: '#1E201E',  // Dark charcoal
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

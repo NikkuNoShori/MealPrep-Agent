@@ -845,7 +845,7 @@ export const ChatInterface: React.FC = () => {
   const currentConversation = getCurrentConversation();
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 overflow-hidden">
       {/* Sidebar - Conversation History */}
       <div
         ref={sidebarRef}
@@ -863,7 +863,7 @@ export const ChatInterface: React.FC = () => {
           <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-transparent group-hover:bg-primary-500/30 dark:group-hover:bg-primary-400/30" />
         </div>
         {/* Header with New Chat and Multi-select */}
-        <div className="p-3 border-b border-primary-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-900/30 backdrop-blur-sm">
+        <div className="p-3 border-b border-primary-200/50 dark:border-slate-700/50 bg-gray-50/50 dark:bg-slate-900/30 backdrop-blur-sm">
           <div className="flex gap-2">
             <Button
               onClick={createNewConversation}
@@ -1026,11 +1026,7 @@ export const ChatInterface: React.FC = () => {
       <div className="flex-1 flex flex-col min-h-0 bg-background p-2.5">
         {/* Messages Area */}
         <div
-          className={`flex-1 p-4 space-y-4 min-h-0 ${
-            currentConversation && currentConversation.messages.length > 0
-              ? "overflow-y-auto"
-              : "overflow-hidden"
-          }`}
+          className={`flex-1 p-4 space-y-4 min-h-0 overflow-y-auto chat-container`}
         >
           {!currentConversation || currentConversation.messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-8">

@@ -1,7 +1,20 @@
 // Supabase Edge Function for Chat API
 // Updated with intelligent intent routing and direct OpenRouter integration
 
+// Note: TypeScript linter errors for Deno imports and globals are expected.
+// These files run in Deno runtime, not Node.js, so TypeScript can't resolve them.
+// The code will work correctly when deployed to Supabase Edge Functions.
+
+// @ts-ignore - Deno runtime global (available in Deno runtime)
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
+
+// @ts-ignore - Deno remote import (resolved at runtime)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-ignore - Deno remote import (resolved at runtime)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -65,23 +78,225 @@ Rules:
 
 const GENERAL_CHAT_PROMPT = `# Cooking & Meal Planning Assistant
 
-You are a helpful cooking assistant.
+You are a helpful cooking assistant with access to the user's recipe collection.
 
 Capabilities:
 - Answer general cooking questions
 - Provide cooking tips and techniques
 - Suggest meal ideas
 - Discuss ingredients and substitutions
+- Answer questions about the user's recipe collection (when context is provided)
 
 Limitations:
-- You CANNOT search user's recipe collection (tell them to use search)
 - You CANNOT add recipes (tell them to use "Add Recipe" button)
+- Only use recipe information that is explicitly provided in the context
+- If asked about recipes but no context is provided, say you don't have access to their recipes right now
 
 Response Style:
 - Conversational and friendly
 - Concise (2-3 paragraphs max)
 - Practical and actionable
-- Stay on topic (cooking, food, meal planning)`
+- Stay on topic (cooking, food, meal planning)
+- When recipe context is provided, reference specific recipes by name when relevant`
+
+// ═══════════════════════════════════════════════════════════════════
+// VALIDATION UTILITIES
+// ═══════════════════════════════════════════════════════════════════
+
+// Supported image formats
+const SUPPORTED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_IMAGES_PER_MESSAGE = 4;
+const MAX_CONTEXT_TOKENS = 8000; // Conservative limit for most models
+const ESTIMATED_CHARS_PER_TOKEN = 4; // Rough estimate
+
+interface ValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+/**
+ * Validate image format and size from base64 data URL
+ */
+function validateImage(imageUrl: string): ValidationResult {
+  try {
+    // Check if it's a data URL
+    if (!imageUrl.startsWith('data:')) {
+      return { valid: false, error: 'Image must be a valid data URL (base64 encoded)' };
+    }
+
+    // Extract MIME type
+    const mimeMatch = imageUrl.match(/^data:([^;]+);base64,/);
+    if (!mimeMatch) {
+      return { valid: false, error: 'Invalid image format. Image must be base64 encoded with a valid MIME type.' };
+    }
+
+    const mimeType = mimeMatch[1].toLowerCase();
+    
+    // Check format
+    if (!SUPPORTED_IMAGE_FORMATS.includes(mimeType)) {
+      const supported = SUPPORTED_IMAGE_FORMATS.map(f => f.split('/')[1].toUpperCase()).join(', ');
+      return { 
+        valid: false, 
+        error: `Unsupported image format. Supported formats: ${supported}. Your image is ${mimeType}.` 
+      };
+    }
+
+    // Extract base64 data and estimate size
+    const base64Data = imageUrl.split(',')[1];
+    if (!base64Data) {
+      return { valid: false, error: 'Invalid image data. Base64 data is missing.' };
+    }
+
+    // Estimate size (base64 is ~33% larger than binary)
+    const estimatedSize = (base64Data.length * 3) / 4;
+    
+    if (estimatedSize > MAX_IMAGE_SIZE) {
+      const sizeMB = (estimatedSize / (1024 * 1024)).toFixed(2);
+      const maxMB = (MAX_IMAGE_SIZE / (1024 * 1024)).toFixed(0);
+      return { 
+        valid: false, 
+        error: `Image file is too large (${sizeMB}MB). Maximum size is ${maxMB}MB. Please compress or resize your image.` 
+      };
+    }
+
+    return { valid: true };
+  } catch (error: any) {
+    return { valid: false, error: `Error validating image: ${error?.message || String(error)}` };
+  }
+}
+
+/**
+ * Estimate token count for a message (rough approximation)
+ */
+function estimateTokenCount(text: string): number {
+  if (!text) return 0;
+  // Rough estimate: 1 token ≈ 4 characters
+  return Math.ceil(text.length / ESTIMATED_CHARS_PER_TOKEN);
+}
+
+/**
+ * Validate context length before sending to API
+ */
+function validateContextLength(
+  systemPrompt: string,
+  conversationHistory: any[],
+  userMessage: string,
+  maxTokens: number = MAX_CONTEXT_TOKENS
+): ValidationResult {
+  try {
+    let totalTokens = estimateTokenCount(systemPrompt);
+    totalTokens += estimateTokenCount(userMessage);
+    
+    // Add history tokens
+    for (const msg of conversationHistory) {
+      if (typeof msg.content === 'string') {
+        totalTokens += estimateTokenCount(msg.content);
+      } else if (Array.isArray(msg.content)) {
+        // For images, estimate higher token cost
+        for (const item of msg.content) {
+          if (item.type === 'text') {
+            totalTokens += estimateTokenCount(item.text || '');
+          } else if (item.type === 'image_url') {
+            totalTokens += 100; // Rough estimate for image tokens
+          }
+        }
+      }
+    }
+
+    if (totalTokens > maxTokens) {
+      return {
+        valid: false,
+        error: `Message context is too long (estimated ${totalTokens} tokens, maximum ${maxTokens} tokens). Please shorten your message or start a new conversation.`
+      };
+    }
+
+    return { valid: true };
+  } catch (error: any) {
+    return { valid: false, error: `Error validating context length: ${error?.message || String(error)}` };
+  }
+}
+
+/**
+ * Parse OpenRouter error response for specific error types
+ */
+function parseOpenRouterError(status: number, errorText: string): { type: string; message: string } {
+  let parsedError;
+  try {
+    parsedError = JSON.parse(errorText || '{}');
+  } catch {
+    parsedError = { error: { message: errorText } };
+  }
+
+  const openRouterMessage = parsedError?.error?.message || errorText || '';
+  const lowerMessage = openRouterMessage.toLowerCase();
+
+  // Check for specific error types
+  if (status === 401) {
+    if (lowerMessage.includes('user not found') || lowerMessage.includes('invalid api key')) {
+      return {
+        type: 'invalid_api_key',
+        message: "OpenRouter API key is invalid or the account doesn't exist. Please verify your API key at https://openrouter.ai/keys"
+      };
+    }
+    return {
+      type: 'authentication_failed',
+      message: "OpenRouter API key authentication failed. Please check your OPENROUTER_API_KEY configuration."
+    };
+  }
+
+  if (status === 402 || lowerMessage.includes('insufficient credits') || lowerMessage.includes('payment required')) {
+    return {
+      type: 'insufficient_credits',
+      message: "OpenRouter account has insufficient credits. Please add credits at https://openrouter.ai/credits to continue using the AI service."
+    };
+  }
+
+  if (status === 429 || lowerMessage.includes('rate limit') || lowerMessage.includes('too many requests')) {
+    return {
+      type: 'rate_limit_exceeded',
+      message: "Rate limit exceeded. Please wait a moment and try again. If this persists, consider upgrading your OpenRouter plan."
+    };
+  }
+
+  if (status === 400) {
+    if (lowerMessage.includes('context length') || lowerMessage.includes('token') || lowerMessage.includes('too long')) {
+      return {
+        type: 'context_too_long',
+        message: "Message is too long for the AI model. Please shorten your message or start a new conversation."
+      };
+    }
+    if (lowerMessage.includes('image') || lowerMessage.includes('format') || lowerMessage.includes('invalid')) {
+      return {
+        type: 'invalid_image',
+        message: "One or more images are invalid or in an unsupported format. Please check your images and try again."
+      };
+    }
+    return {
+      type: 'bad_request',
+      message: `Invalid request: ${openRouterMessage || 'Please check your message format and try again.'}`
+    };
+  }
+
+  if (status === 503 || lowerMessage.includes('service unavailable') || lowerMessage.includes('overloaded')) {
+    return {
+      type: 'service_unavailable',
+      message: "AI service is temporarily unavailable. Please try again in a few moments."
+    };
+  }
+
+  if (status === 500 || status === 502 || status === 504) {
+    return {
+      type: 'server_error',
+      message: "AI service encountered an error. Please try again in a moment."
+    };
+  }
+
+  return {
+    type: 'unknown_error',
+    message: `AI service error (${status}): ${openRouterMessage || 'Please try again later.'}`
+  };
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // OPENROUTER CLIENT
@@ -159,23 +374,17 @@ class OpenRouterClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMessage = `OpenRouter API failed: ${response.status}`;
+      const parsedError = parseOpenRouterError(response.status, errorText);
       
-      // Provide specific error messages for common issues
-      if (response.status === 401) {
-        errorMessage = "OpenRouter API key is invalid or missing. Please check your OPENROUTER_API_KEY configuration in Supabase Edge Function secrets.";
-        console.error("❌ OpenRouter authentication failed:", {
-          status: response.status,
-          error: errorText,
-          apiKeyLength: apiKey.length,
-          apiKeyPrefix: apiKey.substring(0, 10) + "...",
-        });
-      } else {
-        console.error("OpenRouter error:", response.status, errorText);
-        errorMessage = `OpenRouter API failed: ${response.status} - ${errorText}`;
-      }
+      console.error(`❌ OpenRouter error (${parsedError.type}):`, {
+        status: response.status,
+        error: parsedError.message,
+        rawError: errorText,
+        apiKeyLength: apiKey.length,
+        apiKeyPrefix: apiKey.substring(0, 15) + "...",
+      });
       
-      throw new Error(errorMessage);
+      throw new Error(parsedError.message);
     }
 
     const data = await response.json();
@@ -214,23 +423,17 @@ class OpenRouterClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMessage = `OpenRouter API failed: ${response.status}`;
+      const parsedError = parseOpenRouterError(response.status, errorText);
       
-      // Provide specific error messages for common issues
-      if (response.status === 401) {
-        errorMessage = "OpenRouter API key is invalid or missing. Please check your OPENROUTER_API_KEY configuration in Supabase Edge Function secrets.";
-        console.error("❌ OpenRouter authentication failed:", {
-          status: response.status,
-          error: errorText,
-          apiKeyLength: apiKey.length,
-          apiKeyPrefix: apiKey.substring(0, 10) + "...",
-        });
-      } else {
-        console.error("OpenRouter chatWithHistory error:", response.status, errorText);
-        errorMessage = `OpenRouter API failed: ${response.status} - ${errorText}`;
-      }
+      console.error(`❌ OpenRouter error (${parsedError.type}) in chatWithHistory:`, {
+        status: response.status,
+        error: parsedError.message,
+        rawError: errorText,
+        apiKeyLength: apiKey.length,
+        apiKeyPrefix: apiKey.substring(0, 15) + "...",
+      });
       
-      throw new Error(errorMessage);
+      throw new Error(parsedError.message);
     }
 
     const data = await response.json();
@@ -283,23 +486,18 @@ class OpenRouterClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMessage = `OpenRouter API failed: ${response.status}`;
+      const parsedError = parseOpenRouterError(response.status, errorText);
       
-      // Provide specific error messages for common issues
-      if (response.status === 401) {
-        errorMessage = "OpenRouter API key is invalid or missing. Please check your OPENROUTER_API_KEY configuration in Supabase Edge Function secrets.";
-        console.error("❌ OpenRouter authentication failed (chatWithImages):", {
-          status: response.status,
-          error: errorText,
-          apiKeyLength: apiKey.length,
-          apiKeyPrefix: apiKey.substring(0, 10) + "...",
-        });
-      } else {
-        console.error("OpenRouter chatWithImages error:", response.status, errorText);
-        errorMessage = `OpenRouter API failed: ${response.status} - ${errorText}`;
-      }
+      console.error(`❌ OpenRouter error (${parsedError.type}) in chatWithImages:`, {
+        status: response.status,
+        error: parsedError.message,
+        rawError: errorText,
+        apiKeyLength: apiKey.length,
+        apiKeyPrefix: apiKey.substring(0, 15) + "...",
+        imageCount: images.length,
+      });
       
-      throw new Error(errorMessage);
+      throw new Error(parsedError.message);
     }
 
     const data = await response.json();
@@ -350,11 +548,25 @@ async function detectIntent(
 
     console.log("✅ Intent detected:", result);
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ Intent detection error:", error);
+    console.error("Error message:", error?.message);
+    console.error("Error stack:", error?.stack);
+    
+    // If intent detection fails due to API key issues, we should still try to route
+    // but log the error clearly
+    const errorMessage = error?.message || String(error);
+    if (errorMessage.includes("OpenRouter API key") || 
+        errorMessage.includes("401") || 
+        errorMessage.includes("User not found") ||
+        errorMessage.includes("credits") ||
+        errorMessage.includes("rate limit")) {
+      console.error("⚠️ Intent detection failed due to API issue - defaulting to general_chat");
+    }
+    
     return {
       intent: "general_chat",
-      reason: `Error: ${error.message}`,
+      reason: `Error: ${errorMessage}`,
       confidence: 0.5,
     };
   }
@@ -433,11 +645,194 @@ async function extractRecipe(
 // Direct chat using OpenRouter models
 // ═══════════════════════════════════════════════════════════════════
 
+/**
+ * Detect if a message is asking about the user's recipes
+ */
+async function isRecipeRelatedQuestion(message: string, openRouter: OpenRouterClient): Promise<boolean> {
+  const lowerMessage = message.toLowerCase();
+  
+  // Quick keyword check first (faster)
+  const recipeKeywords = [
+    'recipe', 'recipes', 'my recipe', 'my recipes', 'recipe collection',
+    'how many recipe', 'what recipe', 'which recipe', 'recipe with',
+    'ingredient', 'ingredients', 'cook time', 'prep time', 'servings',
+    'favorite recipe', 'most common', 'recipe count', 'recipe stats'
+  ];
+  
+  if (recipeKeywords.some(keyword => lowerMessage.includes(keyword))) {
+    return true;
+  }
+  
+  // Use AI for ambiguous cases (only if no clear keyword match)
+  try {
+    const detectionPrompt = `Determine if this question is about the user's personal recipe collection (not general cooking advice).
+
+Question: "${message}"
+
+Is this asking about:
+- The user's saved recipes?
+- Statistics about their recipe collection?
+- Specific recipes they have?
+- Ingredients in their recipes?
+
+Respond with ONLY: {"isRecipeRelated": true/false, "reason": "brief explanation"}`;
+
+    const response = await openRouter.chat(
+      detectionPrompt,
+      message,
+      "qwen/qwen-2.5-7b-instruct",
+      { temperature: 0.1, max_tokens: 100, response_format: { type: "json_object" } }
+    );
+    
+    const result = JSON.parse(response);
+    return result.isRecipeRelated === true;
+  } catch (error) {
+    console.warn("⚠️ Recipe detection failed, defaulting to false:", error);
+    return false;
+  }
+}
+
+/**
+ * Get recipe statistics for the user
+ */
+async function getRecipeStats(userId: string, supabase: any): Promise<any> {
+  try {
+    const { data: recipes, error } = await supabase
+      .from("recipes")
+      .select("id, title, ingredients, tags, difficulty, prep_time, cook_time, servings")
+      .eq("user_id", userId);
+    
+    if (error) {
+      console.error("Error fetching recipes for stats:", error);
+      return null;
+    }
+    
+    if (!recipes || recipes.length === 0) {
+      return { total: 0, message: "You don't have any recipes yet." };
+    }
+    
+    // Calculate statistics
+    const total = recipes.length;
+    const difficulties = recipes.filter(r => r.difficulty).map(r => r.difficulty);
+    const difficultyCounts = difficulties.reduce((acc: any, d: string) => {
+      acc[d] = (acc[d] || 0) + 1;
+      return acc;
+    }, {});
+    
+    // Extract all ingredients
+    const allIngredients: string[] = [];
+    recipes.forEach(recipe => {
+      if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+        recipe.ingredients.forEach((ing: any) => {
+          if (ing.name) allIngredients.push(ing.name.toLowerCase());
+        });
+      }
+    });
+    
+    const ingredientCounts = allIngredients.reduce((acc: any, ing: string) => {
+      acc[ing] = (acc[ing] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const mostCommonIngredients = Object.entries(ingredientCounts)
+      .sort(([, a]: any, [, b]: any) => b - a)
+      .slice(0, 5)
+      .map(([name, count]: any) => ({ name, count }));
+    
+    // Extract all tags
+    const allTags: string[] = [];
+    recipes.forEach(recipe => {
+      if (recipe.tags && Array.isArray(recipe.tags)) {
+        allTags.push(...recipe.tags);
+      }
+    });
+    
+    const tagCounts = allTags.reduce((acc: any, tag: string) => {
+      acc[tag] = (acc[tag] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const mostCommonTags = Object.entries(tagCounts)
+      .sort(([, a]: any, [, b]: any) => b - a)
+      .slice(0, 5)
+      .map(([name, count]: any) => ({ name, count }));
+    
+    return {
+      total,
+      difficultyCounts,
+      mostCommonIngredients,
+      mostCommonTags,
+      recipes: recipes.map(r => ({ id: r.id, title: r.title }))
+    };
+  } catch (error) {
+    console.error("Error calculating recipe stats:", error);
+    return null;
+  }
+}
+
+/**
+ * Search recipes using RAG (for content-based questions)
+ */
+async function searchRecipesForContext(
+  query: string,
+  userId: string,
+  supabase: any,
+  openRouter: OpenRouterClient
+): Promise<any[]> {
+  try {
+    // Try to use RAG workflow if available
+    const n8nUrl = Deno.env.get("N8N_RAG_WEBHOOK_URL");
+    if (n8nUrl) {
+      try {
+        const response = await fetch(n8nUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: query,
+            userId,
+            limit: 5, // Limit to top 5 for context
+          }),
+          signal: AbortSignal.timeout(10000), // 10s timeout
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const results = data.results || data.recipes || [];
+          if (results.length > 0) {
+            return results.slice(0, 5); // Return top 5
+          }
+        }
+      } catch (ragError) {
+        console.warn("⚠️ RAG search failed, falling back to direct query:", ragError);
+      }
+    }
+    
+    // Fallback: Direct text search in Supabase
+    const { data: recipes, error } = await supabase
+      .from("recipes")
+      .select("id, title, description, ingredients, instructions, tags")
+      .eq("user_id", userId)
+      .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+      .limit(5);
+    
+    if (error) {
+      console.error("Error in fallback recipe search:", error);
+      return [];
+    }
+    
+    return recipes || [];
+  } catch (error) {
+    console.error("Error searching recipes for context:", error);
+    return [];
+  }
+}
+
 async function handleGeneralChat(
   message: string,
   conversationId: string,
   supabase: any,
-  openRouter: OpenRouterClient
+  openRouter: OpenRouterClient,
+  userId?: string
 ): Promise<string> {
   try {
     // Get recent conversation history
@@ -460,15 +855,82 @@ async function handleGeneralChat(
         content: msg.content,
       }));
 
+    // Check if this is a recipe-related question and fetch context
+    let recipeContext = "";
+    if (userId) {
+      const isRecipeRelated = await isRecipeRelatedQuestion(message, openRouter);
+      
+      if (isRecipeRelated) {
+        console.log("📚 Detected recipe-related question, fetching context...");
+        
+        // Check if it's a stats question (count, most common, etc.)
+        const lowerMessage = message.toLowerCase();
+        const isStatsQuestion = lowerMessage.includes("how many") || 
+                                lowerMessage.includes("count") || 
+                                lowerMessage.includes("most common") ||
+                                lowerMessage.includes("statistics") ||
+                                lowerMessage.includes("stats");
+        
+        if (isStatsQuestion) {
+          const stats = await getRecipeStats(userId, supabase);
+          if (stats) {
+            recipeContext = `\n\n## User's Recipe Collection Statistics:\n` +
+              `- Total recipes: ${stats.total}\n` +
+              (stats.difficultyCounts && Object.keys(stats.difficultyCounts).length > 0
+                ? `- Difficulty breakdown: ${JSON.stringify(stats.difficultyCounts)}\n`
+                : '') +
+              (stats.mostCommonIngredients && stats.mostCommonIngredients.length > 0
+                ? `- Most common ingredients: ${stats.mostCommonIngredients.map((i: any) => `${i.name} (${i.count}x)`).join(', ')}\n`
+                : '') +
+              (stats.mostCommonTags && stats.mostCommonTags.length > 0
+                ? `- Most common tags: ${stats.mostCommonTags.map((t: any) => `${t.name} (${t.count}x)`).join(', ')}\n`
+                : '');
+          }
+        } else {
+          // Content-based question - use RAG search
+          const recipes = await searchRecipesForContext(message, userId, supabase, openRouter);
+          if (recipes && recipes.length > 0) {
+            recipeContext = `\n\n## Relevant Recipes from User's Collection:\n` +
+              recipes.map((recipe: any, idx: number) => {
+                const ingredients = recipe.ingredients 
+                  ? (Array.isArray(recipe.ingredients) 
+                      ? recipe.ingredients.map((i: any) => i.name || i).join(', ')
+                      : JSON.stringify(recipe.ingredients))
+                  : 'N/A';
+                return `${idx + 1}. **${recipe.title}**\n` +
+                  (recipe.description ? `   Description: ${recipe.description}\n` : '') +
+                  `   Ingredients: ${ingredients}\n` +
+                  (recipe.tags && recipe.tags.length > 0 ? `   Tags: ${recipe.tags.join(', ')}\n` : '');
+              }).join('\n');
+          }
+        }
+      }
+    }
+
+    // Build enhanced prompt with recipe context
+    const enhancedPrompt = GENERAL_CHAT_PROMPT + (recipeContext ? recipeContext : "");
+
     // Use the same model as intent detection for consistency
     // qwen-2.5-7b-instruct is more reliable than qwen3-8b
     const model = "qwen/qwen-2.5-7b-instruct";
-    console.log(`💬 Generating general chat response with model: ${model}, history length: ${conversationHistory.length}`);
+    console.log(`💬 Generating general chat response with model: ${model}, history length: ${conversationHistory.length}, hasRecipeContext: ${!!recipeContext}`);
+
+    // Validate context length before making API call (use enhanced prompt for accurate validation)
+    const contextValidation = validateContextLength(
+      enhancedPrompt,
+      conversationHistory,
+      message,
+      MAX_CONTEXT_TOKENS
+    );
+    
+    if (!contextValidation.valid) {
+      throw new Error(contextValidation.error || "Context length validation failed");
+    }
 
     // Try chatWithHistory first (with context)
     try {
       const response = await openRouter.chatWithHistory(
-        GENERAL_CHAT_PROMPT,
+        enhancedPrompt,
         conversationHistory,
         message,
         model,
@@ -478,12 +940,17 @@ async function handleGeneralChat(
       console.log("✅ General chat response generated");
       return response;
     } catch (historyError: any) {
+      // If context length error, don't fallback - return the error
+      if (historyError?.message?.includes("context") || historyError?.message?.includes("too long")) {
+        throw historyError;
+      }
+      
       console.warn("⚠️ chatWithHistory failed, trying simple chat:", historyError?.message);
       
       // Fallback: Use simple chat without history if chatWithHistory fails
       // This handles cases where the model doesn't support history or there's an API issue
       const fallbackResponse = await openRouter.chat(
-        GENERAL_CHAT_PROMPT,
+        enhancedPrompt,
         message,
         model,
         { temperature: 0.7, max_tokens: 500 }
@@ -497,29 +964,21 @@ async function handleGeneralChat(
     console.error("Error message:", error?.message);
     console.error("Error stack:", error?.stack);
     
-    // Try to extract more details from the error
-    let errorDetails = error?.message || String(error);
-    if (error?.response) {
-      try {
-        const errorText = await error.response.text();
-        errorDetails += ` - Response: ${errorText}`;
-      } catch (e) {
-        // Ignore
-      }
-    }
-    console.error("Full error details:", errorDetails);
+    // The error message from OpenRouter should already be user-friendly
+    // Just return it directly - it's been processed by parseOpenRouterError
+    const errorMessage = error?.message || String(error);
     
-    // Provide more specific error message if possible
-    if (error?.message?.includes("model") || error?.message?.includes("404") || error?.message?.includes("not found")) {
-      return "I'm having trouble with the AI model right now. Please try again in a moment.";
-    }
-    if (error?.message?.includes("API") || error?.message?.includes("401") || error?.message?.includes("403")) {
-      return "I'm having trouble connecting to the AI service. Please check your API configuration.";
-    }
-    if (error?.message?.includes("timeout") || error?.message?.includes("network")) {
-      return "The AI service is taking too long to respond. Please try again in a moment.";
+    // If it's already a formatted error message (from parseOpenRouterError), return it
+    if (errorMessage.includes("OpenRouter") || 
+        errorMessage.includes("credits") || 
+        errorMessage.includes("rate limit") ||
+        errorMessage.includes("context") ||
+        errorMessage.includes("API key")) {
+      return errorMessage;
     }
     
+    // Fallback for unexpected errors
+    console.error("Full error details:", errorMessage);
     return "I apologize, but I'm having trouble processing your message right now. Please try again.";
   }
 }
@@ -646,11 +1105,13 @@ serve(async (req) => {
     );
 
     // Use default key or fallback to one of the model-specific keys
-    const defaultKey =
-      openRouterKeyDefault || openRouterKeyInstruct || openRouterKeyVL;
+    // Trim whitespace to avoid issues
+    const defaultKey = (
+      openRouterKeyDefault || openRouterKeyInstruct || openRouterKeyVL
+    )?.trim();
 
     // Validate OpenRouter API key (check for presence and non-empty)
-    if (!defaultKey || defaultKey.trim() === "") {
+    if (!defaultKey || defaultKey === "") {
       console.error("❌ OPENROUTER_API_KEY not configured");
       console.error("   Available env vars:", {
         hasDefault: !!openRouterKeyDefault,
@@ -669,19 +1130,36 @@ serve(async (req) => {
       );
     }
 
+    // Validate API key format (should start with sk-or-v1-)
+    if (!defaultKey.startsWith("sk-or-v1-")) {
+      console.error("❌ OPENROUTER_API_KEY has invalid format");
+      console.error("   Expected format: sk-or-v1-...");
+      console.error("   Actual prefix:", defaultKey.substring(0, 15) + "...");
+      return new Response(
+        JSON.stringify({
+          error: "OpenRouter API key has invalid format. Expected format: sk-or-v1-...",
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
+    }
+
     // Log key status (without exposing the actual key)
     console.log("✅ OpenRouter API key configured", {
       hasDefault: !!openRouterKeyDefault,
       hasVL: !!openRouterKeyVL,
       hasInstruct: !!openRouterKeyInstruct,
       defaultKeyLength: defaultKey.length,
+      keyPrefix: defaultKey.substring(0, 15) + "...",
     });
 
-    // Create OpenRouter client with model-specific keys
+    // Create OpenRouter client with model-specific keys (trimmed)
     const openRouter = new OpenRouterClient(
       defaultKey,
-      openRouterKeyVL, // For vision language models
-      openRouterKeyInstruct // For instruction models
+      openRouterKeyVL?.trim(), // For vision language models
+      openRouterKeyInstruct?.trim() // For instruction models
     );
 
     const url = new URL(req.url);
@@ -797,6 +1275,35 @@ async function handleSendMessage(
           status: 400,
         }
       );
+    }
+
+    // Validate image count
+    if (images.length > MAX_IMAGES_PER_MESSAGE) {
+      return new Response(
+        JSON.stringify({ 
+          error: `Too many images. Maximum ${MAX_IMAGES_PER_MESSAGE} images per message. You provided ${images.length}.` 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+
+    // Validate each image
+    for (let i = 0; i < images.length; i++) {
+      const validation = validateImage(images[i]);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Image ${i + 1} validation failed: ${validation.error}` 
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          }
+        );
+      }
     }
 
     // Get or create conversation
@@ -915,7 +1422,8 @@ async function handleSendMessage(
         message || "",
         conversationId,
         supabase,
-        openRouter
+        openRouter,
+        user.id
       );
     }
 

@@ -150,8 +150,12 @@ const Settings = () => {
             <div className="space-y-2">
               <Label htmlFor="theme">Theme</Label>
               <Select
-                value={stagedTheme}
-                onValueChange={(value) => setStagedTheme(value as typeof theme)}
+                value={theme}
+                onValueChange={(value) => {
+                  setTheme(value as typeof theme);
+                  // Also update staged theme for consistency
+                  setStagedTheme(value as typeof theme);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select theme" />

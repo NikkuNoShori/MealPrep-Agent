@@ -1,5 +1,6 @@
 import { ReactNode } from 'react'
 import Header from './Header'
+import Footer from './Footer'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 interface LayoutProps {
@@ -10,9 +11,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   useDocumentTitle()
   
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 overflow-hidden">
       <Header />
-      <main className="flex-1 min-h-0">{children}</main>
+      <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
+      <Footer />
     </div>
   );
 }

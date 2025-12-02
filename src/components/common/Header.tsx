@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X, LogOut, User, Settings } from "lucide-react";
+import { Menu, X, LogOut, User, Settings, Moon, Sun } from "lucide-react";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
@@ -61,9 +61,20 @@ const Header = () => {
     navigate("/chat");
   };
 
+  const handleThemeToggle = () => {
+    const newTheme = isDark ? 'light' : 'dark';
+    setTheme(newTheme);
+  };
+
   return (
-    <header className="bg-gradient-to-r from-primary-50 via-slate-50 to-secondary-50 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 shadow-sm border-b border-primary-200/50 dark:border-slate-700/50">
-      <div className="container mx-auto px-4">
+    <header className="bg-gradient-to-br from-header-light via-slate-300/90 to-header-light dark:from-header-dark dark:via-slate-700/90 dark:to-header-dark shadow-lg border-b border-slate-400/70 dark:border-slate-600/70 backdrop-blur-sm relative">
+      {/* Subtle shine effect */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-white/5 to-transparent dark:from-white/10 dark:via-white/2 pointer-events-none"></div>
+      {/* Subtle texture pattern */}
+      <div className="absolute inset-0 opacity-30 dark:opacity-20 bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.05)_1px,transparent_0)] dark:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)] [background-size:16px_16px] pointer-events-none"></div>
+      {/* Subtle inner shadow for depth */}
+      <div className="absolute inset-0 shadow-inner pointer-events-none"></div>
+      <div className="container mx-auto px-4 relative z-10">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
@@ -111,7 +122,7 @@ const Header = () => {
             {/* User Menu */}
             {user && (
               <div
-                className="relative"
+                className="relative z-20"
                 ref={userMenuRef}
                 onMouseEnter={handleUserMenuMouseEnter}
                 onMouseLeave={handleUserMenuMouseLeave}
@@ -142,7 +153,31 @@ const Header = () => {
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-700 backdrop-blur-sm rounded-lg shadow-lg border border-primary-200/50 dark:border-slate-600/50 py-1 z-50">
+                  <div 
+                    className="absolute right-0 mt-2 w-48 bg-gray-50 dark:bg-slate-700 backdrop-blur-sm rounded-lg shadow-lg border border-primary-200/50 dark:border-slate-600/50 py-1 z-50"
+                    onMouseEnter={handleUserMenuMouseEnter}
+                    onMouseLeave={handleUserMenuMouseLeave}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleThemeToggle();
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-stone-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-slate-600 flex items-center space-x-2 transition-colors"
+                    >
+                      {isDark ? (
+                        <>
+                          <Sun className="w-4 h-4" />
+                          <span>Light Mode</span>
+                        </>
+                      ) : (
+                        <>
+                          <Moon className="w-4 h-4" />
+                          <span>Dark Mode</span>
+                        </>
+                      )}
+                    </button>
                     <Link
                       to="/settings"
                       onClick={() => setIsUserMenuOpen(false)}
@@ -180,7 +215,7 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-primary-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
+          <div className="md:hidden py-4 border-t border-primary-200/50 dark:border-slate-700/50 bg-gray-50/50 dark:bg-slate-800/50 backdrop-blur-sm">
             <nav className="flex flex-col space-y-4">
               {navigation.map((item) =>
                 item.name === "Chat" ? (

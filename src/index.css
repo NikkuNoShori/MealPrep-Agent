@@ -4,48 +4,50 @@
 
 @layer base {
   :root {
-    --background: 60 9% 98%;
-    --foreground: 20 14% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 20 14% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 20 14% 4%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 60 4% 95%;
-    --secondary-foreground: 20 14% 4%;
-    --muted: 60 4% 95%;
-    --muted-foreground: 25 5% 45%;
-    --accent: 60 4% 95%;
-    --accent-foreground: 20 14% 4%;
+    /* Light mode: Soft grey-tinted backgrounds (no harsh whites) */
+    --background: 0 0% 96%;        /* Soft off-white (#f5f5f5) */
+    --foreground: 210 10% 15%;     /* Dark grey-blue text */
+    --card: 0 0% 98%;              /* Very soft white (#fafafa) */
+    --card-foreground: 210 10% 15%;
+    --popover: 0 0% 98%;
+    --popover-foreground: 210 10% 15%;
+    --primary: 210 50% 50%;        /* Steel blue */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 91%;         /* Soft grey (#e8e8e8) */
+    --secondary-foreground: 210 10% 15%;
+    --muted: 0 0% 91%;
+    --muted-foreground: 210 5% 40%;
+    --accent: 0 0% 91%;
+    --accent-foreground: 210 10% 15%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 20 6% 90%;
-    --input: 20 6% 90%;
-    --ring: 221.2 83.2% 53.3%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 85%;            /* Soft grey border */
+    --input: 0 0% 85%;
+    --ring: 210 50% 50%;           /* Steel blue ring */
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Dark mode: Navy and grey */
+    --background: 220 25% 10%;     /* Dark navy background */
+    --foreground: 210 20% 90%;     /* Light grey text */
+    --card: 220 25% 12%;           /* Slightly lighter navy */
+    --card-foreground: 210 20% 90%;
+    --popover: 220 25% 12%;
+    --popover-foreground: 210 20% 90%;
+    --primary: 220 40% 35%;        /* Navy blue */
+    --primary-foreground: 210 20% 90%;
+    --secondary: 220 15% 25%;      /* Dark grey */
+    --secondary-foreground: 210 20% 90%;
+    --muted: 220 15% 25%;
+    --muted-foreground: 210 10% 65%;
+    --accent: 220 15% 25%;
+    --accent-foreground: 210 20% 90%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --destructive-foreground: 210 20% 90%;
+    --border: 220 15% 25%;
+    --input: 220 15% 25%;
+    --ring: 220 40% 35%;
   }
 
   html {
@@ -53,7 +55,7 @@
   }
   
   body {
-    @apply bg-stone-50 text-stone-900 dark:bg-gray-900 dark:text-gray-100;
+    @apply bg-gray-50 text-gray-900 dark:bg-slate-900 dark:text-gray-100;
     scroll-behavior: smooth;
   }
   
@@ -98,11 +100,11 @@
   }
   
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6;
+    @apply bg-gray-50 dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6;
   }
   
   .input-field {
-    @apply w-full px-3 py-2 border border-stone-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-stone-900 dark:text-gray-100;
+    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100;
   }
   
   /* Enhanced interaction classes */
@@ -115,7 +117,7 @@
   }
   
   .glass-effect {
-    @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-white/20 dark:border-slate-700/50;
+    @apply bg-gray-50/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200/20 dark:border-slate-700/50;
   }
   
   .gradient-text {

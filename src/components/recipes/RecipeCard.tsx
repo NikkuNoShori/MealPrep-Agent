@@ -126,7 +126,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   if (viewMode === "list") {
     return (
       <div onClick={onClick} className="group">
-        <Card className="cursor-pointer hover:shadow-xl transition-all duration-300 border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800 group-hover:scale-[1.02] p-0">
+        <Card className="cursor-pointer hover:shadow-xl transition-all duration-300 border-0 bg-gray-50/80 dark:bg-slate-800/80 backdrop-blur-sm hover:bg-gray-50 dark:hover:bg-slate-800 group-hover:scale-[1.02] p-0">
           <CardContent className="p-[10px]">
             <div className="flex items-center gap-6">
               {/* Enhanced Recipe Image */}
@@ -325,7 +325,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   // Grid view
   return (
     <div onClick={onClick} className="group h-full">
-      <Card className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800 h-full group-hover:scale-[1.03] group-hover:-translate-y-1 overflow-hidden p-0">
+      <Card className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-gray-50/80 dark:bg-slate-800/80 backdrop-blur-sm hover:bg-gray-50 dark:hover:bg-slate-800 h-full group-hover:scale-[1.03] group-hover:-translate-y-1 overflow-hidden p-0">
         {/* Enhanced Recipe Image - Edge to Edge */}
         <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
           {recipe.imageUrl ? (
