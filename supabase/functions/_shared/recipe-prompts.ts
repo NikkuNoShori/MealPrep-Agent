@@ -23,11 +23,18 @@ You MUST return ONLY valid JSON in this exact structure:
     "description": "Brief description of the dish",
     "ingredients": [
       {
-        "name": "ingredient name",
-        "amount": 2.5,
-        "unit": "cups",
+        "name": "extra-virgin olive oil",
+        "amount": 2,
+        "unit": "tbsp",
         "category": "pantry",
-        "notes": "optional preparation notes"
+        "notes": ""
+      },
+      {
+        "name": "boneless skinless chicken breasts",
+        "amount": 4,
+        "unit": "",
+        "category": "protein",
+        "notes": "pounded thin"
       }
     ],
     "instructions": [
@@ -54,7 +61,7 @@ You MUST return ONLY valid JSON in this exact structure:
 
 ## Critical Rules
 1. **Never hallucinate** - If information is missing, omit the field or use null
-2. **Convert measurements** - Always use numeric amounts (2.5 not "2 1/2")
+2. **Parse ingredient quantities** - Extract the numeric amount and unit from ingredient text. "2 tablespoons olive oil" → amount: 2, unit: "tbsp", name: "olive oil". "1/2 cup flour" → amount: 0.5, unit: "cups". Always convert fractions to decimals.
 3. **Standard units** - cups, tbsp, tsp, oz, lb, g, kg, ml, L
 4. **Preserve techniques** - Keep cooking methods and tips
 5. **Extract all metadata** - Times, servings, difficulty, dietary info
@@ -84,7 +91,13 @@ You MUST return ONLY valid JSON in this exact structure:
 ## Difficulty Classification
 - easy: < 30 min prep, simple techniques, few ingredients
 - medium: 30-60 min, some skill required, moderate complexity
-- hard: > 60 min, advanced techniques, complex preparation`;
+- hard: > 60 min, advanced techniques, complex preparation
+
+## CRITICAL REMINDER
+Your response MUST be a single JSON object with a "recipe" key at the top level.
+The "recipe" object MUST contain: "title" (string), "ingredients" (array of objects), and "instructions" (array of strings).
+Do NOT wrap in markdown. Do NOT add any text before or after the JSON.
+Example minimal valid response: {"recipe":{"title":"My Recipe","ingredients":[{"name":"salt","amount":1,"unit":"tsp","category":"pantry","notes":""}],"instructions":["Step 1"]}}`;
 
 export const INTENT_DETECTION_PROMPT = `# Intent Classification System
 
@@ -95,7 +108,9 @@ You are an intent classifier for a meal planning application.
 1. **recipe_extraction** - User wants to ADD/SAVE a new recipe
    - Has recipe text to parse
    - Uploaded recipe images/screenshots
+   - Pasted a URL to a recipe page (e.g., allrecipes.com, food network, delish.com, any food blog)
    - Says "add recipe", "save this recipe", "extract recipe"
+   - Message contains a URL that looks like a recipe link
 
 2. **rag_search** - User wants to FIND/SEARCH existing recipes
    - "Find recipes with [ingredient]"

@@ -62,10 +62,14 @@ export class OpenRouterClient {
     if (!response.ok) {
       const error = await response.text();
       console.error("OpenRouter error:", response.status, error);
-      throw new Error(`OpenRouter API failed: ${response.status}`);
+      throw new Error(`OpenRouter API failed: ${response.status} - ${error}`);
     }
 
     const data = await response.json();
+    if (!data.choices?.[0]?.message) {
+      console.error("Unexpected OpenRouter response:", JSON.stringify(data).substring(0, 500));
+      throw new Error(`OpenRouter returned no choices: ${data.error?.message || JSON.stringify(data).substring(0, 200)}`);
+    }
     return data.choices[0].message.content;
   }
 
@@ -154,10 +158,16 @@ export class OpenRouterClient {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenRouter API failed: ${response.status}`);
+      const error = await response.text();
+      console.error("OpenRouter chatWithImages error:", response.status, error);
+      throw new Error(`OpenRouter API failed: ${response.status} - ${error}`);
     }
 
     const data = await response.json();
+    if (!data.choices?.[0]?.message) {
+      console.error("Unexpected OpenRouter response (images):", JSON.stringify(data).substring(0, 500));
+      throw new Error(`OpenRouter returned no choices: ${data.error?.message || JSON.stringify(data).substring(0, 200)}`);
+    }
     return data.choices[0].message.content;
   }
 

@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { useEffect } from "react";
+import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from "./providers/ThemeProvider";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Layout from "./components/common/Layout";
@@ -86,6 +87,29 @@ function App() {
   return (
     <ThemeProvider>
       <AppRoutes />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'hsl(var(--card))',
+            color: 'hsl(var(--card-foreground))',
+            border: '1px solid hsl(var(--border))',
+          },
+          success: {
+            iconTheme: {
+              primary: 'hsl(var(--primary))',
+              secondary: 'hsl(var(--primary-foreground))',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: 'hsl(var(--destructive, 0 84% 60%))',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
     </ThemeProvider>
   )
 }
