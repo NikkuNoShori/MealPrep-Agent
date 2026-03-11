@@ -2,7 +2,7 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-03-10
+**Last reviewed:** 2026-03-11
 **Last updated:** 2026-03-10 (documentation system overhaul)
 
 ---

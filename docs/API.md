@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-03-10
-**Last updated:** 2026-03-10 (initial canonical doc creation)
+**Last reviewed:** 2026-03-11
+**Last updated:** 2026-03-11 (getRecipe slug support)
 
 ---
 
@@ -167,7 +167,7 @@ get_recipe_recommendations(
 | Method | Description |
 |--------|-------------|
 | `getRecipes()` | List all user recipes |
-| `getRecipe(id)` | Get single recipe by ID |
+| `getRecipe(idOrSlug)` | Get single recipe by UUID or URL slug |
 | `createRecipe(data)` | Create new recipe |
 | `updateRecipe(id, data)` | Update existing recipe |
 | `deleteRecipe(id)` | Delete recipe |

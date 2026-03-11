@@ -2,10 +2,22 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-03-10
-**Last updated:** 2026-03-10 (initial canonical doc creation)
+**Last reviewed:** 2026-03-11
+**Last updated:** 2026-03-11 (UI overhaul and layout fix entries)
 
 ---
+
+## 2026-03-11 (UI overhaul and layout fixes) `feature/next-improvements`
+
+- Implemented glassmorphism design system: semi-transparent backgrounds, backdrop blur, ambient glow orbs, grid overlay
+- Restyled Header and ChatInterface sidebar to match new design language
+- Fixed layout whitespace/overflow bug: sealed CSS height chain from `html`/`body`/`#root` through Layout `<main>`
+- Chat page now uses `absolute inset-0` positioning to opt out of main scroll container
+- Removed unnecessary scroll wrapper divs from all page components
+- Switched Recipes page from legacy `recipeService` (localhost:3000) to `apiClient` (Supabase direct)
+- Added slug-based recipe lookup to `apiClient.getRecipe(idOrSlug)`
+- Updated Button and Card UI components
+- Restyled Dashboard and MealPlanner pages
 
 ## 2026-03-10 (Documentation system overhaul) `feature/next-improvements`
 

@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-03-10
-**Last updated:** 2026-03-10 (initial canonical doc creation)
+**Last reviewed:** 2026-03-11
+**Last updated:** 2026-03-11 (layout architecture, glassmorphism design system, recipe service migration)
 
 ---
 
@@ -16,7 +16,7 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS (dark theme) |
+| Styling | Tailwind CSS (glassmorphism design system, dark/light theme) |
 | State | Zustand (auth, theme) + React Query (server state) |
 | Routing | React Router v6 |
 | Database | PostgreSQL via Supabase |
@@ -154,6 +154,33 @@ System prompts are defined in `src/prompts/`:
 - **React Query** (`src/services/api.ts`): Server state for recipes, chat, meal plans, preferences — cached, auto-refetched
 - **React Context** (`src/contexts/`): MeasurementSystemContext (metric/imperial preference)
 
+### Layout Architecture
+
+The app uses a sealed CSS height chain to fill the viewport without overflow:
+
+```
+html, body, #root  →  height: 100%; overflow: hidden
+  └─ Layout         →  h-screen flex flex-col
+       ├─ Header
+       └─ <main>    →  flex-1 min-h-0 overflow-y-auto (handles scroll for all pages)
+            └─ Page content renders directly (no wrapper divs)
+```
+
+**Key patterns:**
+- `html`, `body`, `#root` all have `height: 100%; overflow: hidden` (set in `src/index.css`)
+- Layout's `<main>` is the single scroll container for all pages
+- Pages render content directly without scroll wrapper divs
+- **Chat page exception:** Uses `absolute inset-0 overflow-hidden` to opt out of `<main>`'s scroll flow, since ChatInterface manages its own scroll internally
+
+### Design System
+
+The UI uses a glassmorphism design language with:
+- Semi-transparent backgrounds (`bg-white/[0.03]`, `backdrop-blur-sm`)
+- Subtle borders (`border-white/[0.06]`)
+- Ambient glow orbs (CSS `glow-orb` class in Layout)
+- Grid overlay for dark mode
+- Custom color scale: `primary-*` and `secondary-*` tokens
+
 ### Component Structure
 ```
 src/components/
@@ -172,6 +199,7 @@ src/components/
 - Automatic camelCase ↔ snake_case field mapping
 - React Query hooks for all CRUD operations
 - Methods for: recipes, chat, meal plans, preferences, images, RAG search
+- Recipe lookup by UUID or URL slug (`getRecipe(idOrSlug)`)
 
 ---
 
@@ -254,3 +282,11 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 - **n8n Integration**: Webhook URL configured but not fully active — intended for advanced RAG orchestration
 - **Receipt OCR**: Tables exist (`receipts`) but processing pipeline not implemented
 - **Real-time Chat**: Express server infrastructure exists for WebSocket support
+
+---
+
+## Known Anti-patterns (Avoid)
+
+- **Double scroll wrappers**: Do not add `h-full overflow-y-auto` wrapper divs around page content — this breaks the sealed height chain and causes whitespace/overflow issues. Let `<main>` in Layout handle scroll.
+- **`min-h-screen` on page roots**: This creates content taller than the viewport, causing double scrollbars.
+- **`recipeService.ts`**: Legacy service that hits `localhost:3000` (non-existent API server). Use `apiClient` from `src/services/api.ts` instead — it queries Supabase directly.

@@ -67,6 +67,7 @@ export const ChatInterface: React.FC = () => {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const sendMessageMutation = useSendMessage();
   const { user } = useAuthStore();
@@ -211,7 +212,11 @@ export const ChatInterface: React.FC = () => {
   }, [conversations, currentConversationId]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Use scrollTop on the messages container directly instead of scrollIntoView
+    // to prevent scroll propagation to parent containers (which clips the header)
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   const getCurrentConversation = () => {
@@ -1026,6 +1031,7 @@ export const ChatInterface: React.FC = () => {
       <div className="flex-1 flex flex-col min-h-0 bg-background p-2.5">
         {/* Messages Area */}
         <div
+          ref={messagesContainerRef}
           className={`flex-1 p-4 space-y-4 min-h-0 ${
             currentConversation && currentConversation.messages.length > 0
               ? "overflow-y-auto"

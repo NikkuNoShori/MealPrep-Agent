@@ -229,3 +229,4 @@ Append to the update log at the bottom of this document:
 | Date | Requester | Branches covered | Docs modified |
 |------|-----------|------------------|---------------|
 | 2026-03-10 | Nick Neal | (initial creation — retroactive audit of all branches through feature/next-improvements) | ARCHITECTURE, DATA_MODEL, API, RUNBOOK, CHANGELOG, docs/README |
+| 2026-03-11 | Nick Neal | feature/next-improvements (UI overhaul, layout fixes, recipe service migration) | ARCHITECTURE, API, RUNBOOK, CHANGELOG |
