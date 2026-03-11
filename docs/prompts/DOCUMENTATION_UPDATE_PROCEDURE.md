@@ -67,6 +67,14 @@ These are the documents that must be checked and potentially updated. Each has a
 | **CHANGELOG.md** | `docs/CHANGELOG.md` | User-visible changes by date | Every merge to main (always) |
 | **Docs README** | `docs/README.md` | Doc index + navigation | New canonical docs added, structural changes |
 
+### MOP Registry (always review):
+
+| Document | Path | Update when... |
+|----------|------|----------------|
+| **MOP Registry** | `docs/MOPs/REGISTRY.md` | Any code change completes or advances a MOP phase |
+
+Review all `planned` MOPs in the registry. If the merged code completes any phase or acceptance criterion, update that MOP's status, `Date Updated`, and check off the relevant criteria. If a MOP is fully complete, set status to `completed` and fill in `Date Completed`.
+
 ### Secondary documents (update if directly impacted):
 
 | Document | Path | Update when... |
@@ -215,6 +223,7 @@ Append to the update log at the bottom of this document:
 - [ ] Updated API.md (if applicable)
 - [ ] Updated RUNBOOK.md (if applicable)
 - [ ] Updated CHANGELOG.md (always)
+- [ ] Reviewed MOP Registry — updated any MOPs advanced by this change
 - [ ] Updated secondary docs (if applicable)
 - [ ] Verified cross-references and file paths
 - [ ] Provided summary to user

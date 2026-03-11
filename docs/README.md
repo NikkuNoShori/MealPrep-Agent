@@ -63,6 +63,16 @@ Feature-specific implementation documentation.
 
 ---
 
+## MOPs (Methods of Procedure)
+
+Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md](MOPs/REGISTRY.md) for the full index.
+
+| MOP | Title | Status |
+|-----|-------|--------|
+| [MOP-0001](MOPs/MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | planned |
+
+---
+
 ## Procedures
 
 | Document | Description |
