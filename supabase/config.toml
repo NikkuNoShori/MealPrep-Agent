@@ -275,6 +275,14 @@ enabled = false
 # Obtain from https://clerk.com/setup/supabase
 # domain = "example.clerk.accounts.dev"
 
+[functions.chat-api]
+# Gateway JWT disabled — function handles its own auth via getUserFromToken()
+# Required for CORS: browsers send OPTIONS preflight without Authorization header
+verify_jwt = false
+
+[functions.recipe-pipeline]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Configure one of the supported request policies: `oneshot`, `per_worker`.

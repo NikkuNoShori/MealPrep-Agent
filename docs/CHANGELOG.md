@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-03-11 (Remove n8n dependency, direct RAG search) `feature/next-improvements`
+
+- Removed n8n webhook dependency from chat pipeline — RAG search now runs directly in `chat-api` edge function
+- Replaced `callRAGWorkflow()` (n8n webhook) with `handleRAGSearch()` (hybrid Supabase RPCs + OpenRouter)
+- RAG search uses parallel semantic (embedding) + text (tsvector) search, deduplicates, and generates contextual AI response
+- Fixed `handleGeneralChat` bug: `historyError` variable was referenced but never declared
+- Removed `N8N_RAG_WEBHOOK_URL` from all env files (`.env`, `.env.local`, `chat-api/.env.local`)
+- Removed n8n health check from `chat-api` `/health` endpoint
+- Updated ARCHITECTURE.md, API.md with new RAG search flow documentation
+
 ## 2026-03-11 (UI overhaul and layout fixes) `feature/next-improvements`
 
 - Implemented glassmorphism design system: semi-transparent backgrounds, backdrop blur, ambient glow orbs, grid overlay

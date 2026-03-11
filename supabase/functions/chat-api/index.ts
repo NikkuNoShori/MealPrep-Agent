@@ -109,7 +109,7 @@ async function handleGeneralChat(
   openRouter: OpenRouterClient
 ): Promise<string> {
   try {
-    const { data: recentMessages } = await supabase
+    const { data: recentMessages, error: historyError } = await supabase
       .from("chat_messages")
       .select("content, sender, created_at")
       .eq("conversation_id", conversationId)
@@ -117,8 +117,7 @@ async function handleGeneralChat(
       .limit(10);
 
     if (historyError) {
-      console.error("❌ Error fetching conversation history:", historyError);
-      // Continue without history rather than failing
+      console.error("Error fetching conversation history:", historyError);
     }
 
     const conversationHistory = (recentMessages || [])
@@ -128,20 +127,15 @@ async function handleGeneralChat(
         content: msg.content,
       }));
 
-    // Use the same model as intent detection for consistency
-    // qwen-2.5-7b-instruct is more reliable than qwen3-8b
     const model = "qwen/qwen-2.5-7b-instruct";
-    console.log(`💬 Generating general chat response with model: ${model}, history length: ${conversationHistory.length}`);
 
-    // Try chatWithHistory first (with context)
-    try {
-      const response = await openRouter.chatWithHistory(
-        GENERAL_CHAT_PROMPT,
-        conversationHistory,
-        message,
-        model,
-        { temperature: 0.7, max_tokens: 500 }
-      );
+    const response = await openRouter.chatWithHistory(
+      GENERAL_CHAT_PROMPT,
+      conversationHistory,
+      message,
+      model,
+      { temperature: 0.7, max_tokens: 500 }
+    );
 
     return response;
   } catch (error) {
@@ -152,56 +146,126 @@ async function handleGeneralChat(
 
 // ═══════════════════════════════════════════════════════════════════
 // RAG SEARCH
-// Searches user's recipe collection using semantic search
+// Hybrid semantic + text search against user's recipe collection
 // ═══════════════════════════════════════════════════════════════════
 
-async function callRAGWorkflow(
+const RAG_RESPONSE_PROMPT = `You are a helpful cooking assistant answering questions about the user's recipe collection.
+
+You have been given search results from the user's saved recipes. Use ONLY these results to answer.
+
+Rules:
+- Reference specific recipe names when relevant
+- If no results match, say so honestly — don't make up recipes
+- Be concise (2-3 paragraphs max)
+- If the user asks for a recipe you found, include key details (ingredients, cook time)
+- Stay conversational and helpful`;
+
+async function handleRAGSearch(
   message: string,
-  sessionId: string,
   conversationId: string,
-  userId: string
+  userId: string,
+  supabase: any,
+  openRouter: OpenRouterClient
 ): Promise<string> {
-  const n8nUrl = Deno.env.get("N8N_RAG_WEBHOOK_URL");
-
-  if (!n8nUrl) {
-    return "Recipe search is temporarily unavailable. The n8n webhook URL is not configured.";
-  }
-
-  if (n8nUrl.includes("localhost") || n8nUrl.includes("127.0.0.1")) {
-    console.warn("N8N_RAG_WEBHOOK_URL uses localhost — only works locally");
-  }
-
   try {
-    const response = await fetch(n8nUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, sessionId, conversationId, userId }),
-      signal: AbortSignal.timeout(30000),
-    });
+    // Run hybrid search (semantic + text) in parallel
+    let semanticResults: any[] = [];
+    let textResults: any[] = [];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`n8n webhook failed: ${response.status} - ${errorText}`);
-    }
-
-    const text = await response.text();
+    // Generate embedding for semantic search
     try {
-      const data = JSON.parse(text);
-      return data.content || data.message || data.output || data.response || text;
-    } catch {
-      return text;
+      const embedding = await openRouter.generateEmbedding(message);
+      const { data, error } = await supabase.rpc("search_recipes_semantic", {
+        query_embedding: JSON.stringify(embedding),
+        user_id: userId,
+        match_threshold: 0.5,
+        match_count: 5,
+      });
+      if (!error && data) semanticResults = data;
+    } catch (e) {
+      console.warn("Semantic search failed (non-fatal):", e.message);
     }
+
+    // Text search
+    try {
+      const { data, error } = await supabase.rpc("search_recipes_text", {
+        search_query: message,
+        user_uuid: userId,
+        max_results: 5,
+      });
+      if (!error && data) textResults = data;
+    } catch (e) {
+      console.warn("Text search failed (non-fatal):", e.message);
+    }
+
+    // Combine and deduplicate (semantic results first — higher relevance)
+    const seenIds = new Set<string>();
+    const combinedResults: any[] = [];
+    for (const r of [...semanticResults, ...textResults]) {
+      if (!seenIds.has(r.id)) {
+        seenIds.add(r.id);
+        combinedResults.push(r);
+      }
+    }
+
+    console.log(`RAG search: ${semanticResults.length} semantic + ${textResults.length} text → ${combinedResults.length} combined`);
+
+    // Format results as context
+    let recipeContext: string;
+    if (combinedResults.length === 0) {
+      recipeContext = "No matching recipes found in the user's collection.";
+    } else {
+      recipeContext = combinedResults.map((r: any) => {
+        const parts = [`Recipe: ${r.title}`];
+        if (r.description) parts.push(`Description: ${r.description}`);
+        if (r.cuisine) parts.push(`Cuisine: ${r.cuisine}`);
+        if (r.difficulty) parts.push(`Difficulty: ${r.difficulty}`);
+        if (r.prep_time) parts.push(`Prep Time: ${r.prep_time}`);
+        if (r.cook_time) parts.push(`Cook Time: ${r.cook_time}`);
+        if (r.servings) parts.push(`Servings: ${r.servings}`);
+        if (r.tags?.length) parts.push(`Tags: ${r.tags.join(", ")}`);
+        if (r.ingredients) {
+          const ingList = Array.isArray(r.ingredients)
+            ? r.ingredients.map((i: any) =>
+                typeof i === "string" ? i : `${i.amount || ""} ${i.unit || ""} ${i.name}`.trim()
+              ).join(", ")
+            : "";
+          if (ingList) parts.push(`Ingredients: ${ingList}`);
+        }
+        return parts.join("\n");
+      }).join("\n---\n");
+    }
+
+    // Get conversation history for context
+    const { data: recentMessages } = await supabase
+      .from("chat_messages")
+      .select("content, sender")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .limit(6);
+
+    const conversationHistory = (recentMessages || [])
+      .reverse()
+      .map((msg: any) => ({
+        role: msg.sender === "user" ? "user" : "assistant",
+        content: msg.content,
+      }));
+
+    // Generate response with recipe context
+    const augmentedMessage = `User question: ${message}\n\n--- Search Results (${combinedResults.length} recipes found) ---\n${recipeContext}`;
+
+    const response = await openRouter.chatWithHistory(
+      RAG_RESPONSE_PROMPT,
+      conversationHistory,
+      augmentedMessage,
+      "qwen/qwen-2.5-7b-instruct",
+      { temperature: 0.5, max_tokens: 800 }
+    );
+
+    return response;
   } catch (error) {
-    console.error("RAG workflow error:", error);
-
-    if (error.name === "AbortError" || error.message.includes("timeout")) {
-      return "Recipe search timed out. Please try again.";
-    }
-    if (error.message.includes("Failed to fetch") || error.message.includes("ECONNREFUSED")) {
-      return "Recipe search is unavailable. Cannot connect to n8n instance.";
-    }
-
-    return "I had trouble searching your recipes. Please try again later.";
+    console.error("RAG search error:", error);
+    return "I had trouble searching your recipes. Please try again.";
   }
 }
 
@@ -231,7 +295,6 @@ serve(async (req) => {
         status: "OK",
         timestamp: new Date().toISOString(),
         openRouterConfigured: openRouterOk,
-        n8nConfigured: !!Deno.env.get("N8N_RAG_WEBHOOK_URL"),
       });
     }
 
@@ -376,7 +439,7 @@ async function handleSendMessage(
         aiResponse = `I had trouble extracting the recipe: ${extractionResult.error}`;
       }
     } else if (routingIntent === "rag_search") {
-      aiResponse = await callRAGWorkflow(message || "", session_id, conversationId, user.id);
+      aiResponse = await handleRAGSearch(message || "", conversationId, user.id, supabase, openRouter);
     } else {
       aiResponse = await handleGeneralChat(message || "", conversationId, supabase, openRouter);
     }

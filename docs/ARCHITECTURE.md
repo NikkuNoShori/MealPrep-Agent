@@ -3,7 +3,7 @@
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
 **Last reviewed:** 2026-03-11
-**Last updated:** 2026-03-11 (layout architecture, glassmorphism design system, recipe service migration)
+**Last updated:** 2026-03-11 (removed n8n dependency, added direct RAG search, layout architecture)
 
 ---
 
@@ -99,16 +99,17 @@ When a user sends a message, the system classifies intent into one of three cate
 | `rag_search` | User is searching their recipe collection | `qwen/qwen-3-8b` |
 | `general_chat` | General cooking questions, conversation | `qwen/qwen-3-8b` |
 
-Intent detection runs via OpenRouter with a classification prompt defined in `src/prompts/intentRouter.ts`.
+Intent detection runs via OpenRouter with a classification prompt defined in `_shared/recipe-prompts.ts` (server) and `src/prompts/intentRouter.ts` (client hint).
 
 ### RAG Search Pipeline
-1. User query → `EmbeddingService.generateEmbedding()` (ada-002, 1536-dim)
-2. Hybrid search executes in parallel:
-   - **Vector search**: cosine similarity against `recipes.embedding_vector` (weight: 0.7, threshold: 0.5)
-   - **Text search**: PostgreSQL full-text search against `recipes.searchable_text` (weight: 0.3)
-3. Results deduplicated by recipe ID, combined scores ranked
-4. Top K results returned as context for AI response generation
-5. AI generates contextual response using recipe context
+Handled directly in the `chat-api` edge function (`handleRAGSearch`):
+1. User query → `openRouter.generateEmbedding()` (ada-002, 1536-dim)
+2. Hybrid search via Supabase RPCs (in parallel):
+   - **Semantic**: `search_recipes_semantic` — cosine similarity against `recipes.embedding_vector` (threshold: 0.5, top 5)
+   - **Text**: `search_recipes_text` — PostgreSQL full-text search against `recipes.searchable_text` (top 5)
+3. Results deduplicated by recipe ID, semantic results prioritized
+4. Recipe details formatted as context and sent to OpenRouter
+5. AI generates contextual response referencing the user's actual recipes
 
 ### Recipe Extraction Pipeline
 1. User sends text/images (up to 4 images supported)
@@ -119,17 +120,18 @@ Intent detection runs via OpenRouter with a classification prompt defined in `sr
 6. Full-text index updated automatically via trigger
 
 ### Prompts
-System prompts are defined in `src/prompts/`:
-- `intentRouter.ts` — intent classification prompt
-- `recipeExtraction.ts` — recipe extraction prompt
-- `generalChat.ts` — Chef Marcus conversational prompt
+**Server-side** (edge functions, authoritative): `supabase/functions/_shared/recipe-prompts.ts`
+- `INTENT_DETECTION_PROMPT` — intent classification
+- `RECIPE_EXTRACTION_PROMPT` — structured recipe extraction
+- `GENERAL_CHAT_PROMPT` — cooking assistant responses
+- `RAG_RESPONSE_PROMPT` — recipe search contextual responses (inline in chat-api)
 
-### OpenRouter Client
-`src/lib/openrouter.ts` provides:
-- `chat()` — simple text completion
-- `chatWithHistory()` — stateful multi-turn chat
-- `chatWithImages()` — multi-modal (vision) completion
-- `chatJSON()` — structured JSON output
+**Client-side** (UI hints, non-authoritative): `src/prompts/`
+- `intentRouter.ts`, `recipeExtraction.ts`, `generalChat.ts`
+
+### OpenRouter Clients
+**Frontend** (`src/lib/openrouter.ts`): `chat()`, `chatWithHistory()`, `chatWithImages()`, `chatJSON()`
+**Edge Functions** (`_shared/openrouter-client.ts`): `chat()`, `chatWithHistory()`, `chatWithImages()`, `generateEmbedding()`
 
 ---
 
@@ -214,10 +216,13 @@ Component → api.ts (React Query) → Supabase Client → PostgreSQL
 
 ### Chat Message Flow
 ```
-ChatInterface → OpenRouter (intent detection)
-             → OpenRouter (chat/vision/RAG based on intent)
-             → Supabase (save conversation + messages)
-             → If recipe_extraction: save recipe → generate embedding
+ChatInterface → api.ts → Supabase Edge Function (chat-api)
+  → Intent detection (OpenRouter)
+  → Route by intent:
+    • recipe_extraction → recipe-pipeline edge function → OpenRouter vision → structured recipe
+    • rag_search → embedding + Supabase RPCs (semantic + text) → OpenRouter (contextual response)
+    • general_chat → OpenRouter (with conversation history)
+  → Save messages to chat_conversations + chat_messages
 ```
 
 ### Measurement Conversion
@@ -261,9 +266,9 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 ### Optional
 | Variable | Context | Purpose |
 |----------|---------|---------|
-| `N8N_RAG_WEBHOOK_URL` | Backend | n8n webhook for RAG workflow integration |
 | `VITE_FRONTEND_URL` | Frontend | Frontend URL for OAuth redirects |
-| `LOCAL_API_URL` | Development | Local API server URL |
+| `OPENROUTER_API_KEY_QWEN2.5_VL_8b` | Edge Functions | Per-model API key for vision model |
+| `OPENROUTER_API_KEY_QWEN2.5_instruct_8b` | Edge Functions | Per-model API key for instruct model |
 
 ---
 
@@ -279,9 +284,8 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 
 ## Future / Planned
 
-- **n8n Integration**: Webhook URL configured but not fully active — intended for advanced RAG orchestration
 - **Receipt OCR**: Tables exist (`receipts`) but processing pipeline not implemented
-- **Real-time Chat**: Express server infrastructure exists for WebSocket support
+- **URL/Video Recipe Import UI**: Backend pipeline exists (`recipe-pipeline` edge function with URL and video adapters) but no frontend UI yet
 
 ---
 
