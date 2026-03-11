@@ -23,110 +23,242 @@
     --border: 20 6% 90%;
     --input: 20 6% 90%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 220 20% 6%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 220 18% 9%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 220 18% 9%;
     --popover-foreground: 210 40% 98%;
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 84% 4.9%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 220 16% 14%;
     --muted-foreground: 215 20.2% 65.1%;
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 220 16% 16%;
+    --input: 220 16% 16%;
     --ring: 224.3 76.3% 94.1%;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
   }
 
   html {
     font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  
+
   body {
-    @apply bg-stone-50 text-stone-900 dark:bg-gray-900 dark:text-gray-100;
-    scroll-behavior: smooth;
+    @apply bg-stone-50 text-stone-900 dark:bg-[#0a0e1a] dark:text-gray-100;
   }
-  
-  /* Custom scrollbar - thin and modern */
+
+  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  
+
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
-  
+
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+    @apply bg-slate-300 dark:bg-white/10 rounded-full;
     border: 1px solid transparent;
     background-clip: padding-box;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-500;
+    @apply bg-slate-400 dark:bg-white/20;
   }
 
-  /* Hide horizontal scrollbar for chat containers */
   .chat-container {
     overflow-x: hidden;
     overflow-y: auto;
   }
-  
+
   .chat-container::-webkit-scrollbar {
     width: 4px;
+  }
+
+  ::selection {
+    background-color: rgba(14, 165, 233, 0.3);
   }
 }
 
 @layer components {
+  /* ── Buttons ── */
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    @apply relative bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 hover:-translate-y-0.5 active:translate-y-0;
+    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25);
   }
-  
+
+  .btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(14, 165, 233, 0.35);
+  }
+
   .btn-secondary {
-    @apply bg-stone-200 hover:bg-stone-300 text-stone-900 font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-stone-500 focus:ring-offset-2 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100;
+    @apply font-medium py-2.5 px-5 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 text-stone-700 border border-stone-200 hover:border-stone-300;
+    background: rgba(255, 255, 255, 0.8);
   }
-  
+
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 1);
+  }
+
+  .dark .btn-secondary {
+    @apply text-gray-200;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  /* ── Cards ── */
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6;
+    @apply bg-white dark:bg-white/[0.04] rounded-2xl border border-stone-200/80 dark:border-white/[0.06] p-6 transition-all duration-300 shadow-sm dark:shadow-none;
   }
-  
+
+  .card-interactive {
+    @apply card hover:shadow-lg hover:-translate-y-0.5 cursor-pointer;
+  }
+
+  .card-interactive:hover {
+    border-color: rgba(14, 165, 233, 0.3);
+  }
+
+  .dark .card-interactive:hover {
+    border-color: rgba(14, 165, 233, 0.15);
+  }
+
+  .card-glass {
+    @apply bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/40 dark:border-white/[0.06] p-6 transition-all duration-300;
+  }
+
+  /* ── Inputs ── */
   .input-field {
-    @apply w-full px-3 py-2 border border-stone-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-stone-900 dark:text-gray-100;
+    @apply w-full px-4 py-2.5 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-stone-900 placeholder:text-stone-400 transition-all duration-200;
   }
-  
-  /* Enhanced interaction classes */
+
+  .dark .input-field {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    @apply text-gray-100 placeholder:text-gray-500;
+  }
+
+  /* ── Interaction Effects ── */
   .hover-lift {
-    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
   }
-  
+
   .hover-glow {
-    @apply transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/25;
+    @apply transition-all duration-300 hover:shadow-xl;
   }
-  
+
+  .hover-scale {
+    @apply transition-transform duration-300 hover:scale-[1.02] active:scale-[0.98];
+  }
+
   .glass-effect {
-    @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-white/20 dark:border-slate-700/50;
+    @apply bg-white/70 dark:bg-white/[0.04] backdrop-blur-xl border border-white/30 dark:border-white/[0.08];
   }
-  
+
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent;
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, var(--primary-400, #38bdf8), var(--secondary-400, #e879f9));
   }
-  
-  .animate-on-scroll {
-    @apply opacity-0 translate-y-4 transition-all duration-500 ease-out;
+
+  /* ── Stat Card ── */
+  .stat-card {
+    @apply relative overflow-hidden rounded-2xl p-5 transition-all duration-300 hover:-translate-y-0.5 bg-white dark:bg-white/[0.03] border border-stone-200/80 dark:border-white/[0.06];
   }
-  
-  .animate-on-scroll.visible {
-    @apply opacity-100 translate-y-0;
+
+  /* ── Subtle Grid Background ── */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Glow Orbs ── */
+  .glow-orb {
+    @apply absolute rounded-full blur-3xl pointer-events-none;
+  }
+
+  /* ── Gradient Border on Hover ── */
+  .gradient-border {
+    position: relative;
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, var(--primary-500, #0ea5e9), var(--secondary-500, #d946ef), var(--primary-500, #0ea5e9));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .gradient-border:hover::before {
+    opacity: 1;
+  }
+
+  /* ── Shimmer ── */
+  .shimmer {
+    @apply relative overflow-hidden;
+  }
+
+  .shimmer::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+    animation: shimmer 2.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  /* ── Stagger Animation ── */
+  .stagger-in > * {
+    @apply opacity-0 translate-y-3;
+    animation: staggerFadeIn 0.5s ease-out forwards;
+  }
+
+  .stagger-in > *:nth-child(1) { animation-delay: 0.05s; }
+  .stagger-in > *:nth-child(2) { animation-delay: 0.1s; }
+  .stagger-in > *:nth-child(3) { animation-delay: 0.15s; }
+  .stagger-in > *:nth-child(4) { animation-delay: 0.2s; }
+  .stagger-in > *:nth-child(5) { animation-delay: 0.25s; }
+  .stagger-in > *:nth-child(6) { animation-delay: 0.3s; }
+
+  @keyframes staggerFadeIn {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

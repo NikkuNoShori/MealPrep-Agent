@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"n8n\\\\|N8N\" /c/dev/MealPrep-Agent/docs/Architecture/*.md /c/dev/MealPrep-Agent/docs/*.md)",
+      "Bash(grep -rn N8N_RAG_WEBHOOK_URL /c/dev/MealPrep-Agent --include=*.ts --include=*.tsx --include=*.js --include=*.json)",
+      "Bash(git rm:*)",
+      "Bash(find c:devMealPrep-Agent/supabase -type f -name *.ts)",
+      "WebFetch(domain:supabase.com)"
+    ]
+  }
+}

@@ -67,6 +67,7 @@ export const ChatInterface: React.FC = () => {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const sendMessageMutation = useSendMessage();
   const { user } = useAuthStore();
@@ -211,7 +212,11 @@ export const ChatInterface: React.FC = () => {
   }, [conversations, currentConversationId]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Use scrollTop on the messages container directly instead of scrollIntoView
+    // to prevent scroll propagation to parent containers (which clips the header)
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   const getCurrentConversation = () => {
@@ -849,28 +854,28 @@ export const ChatInterface: React.FC = () => {
       {/* Sidebar - Conversation History */}
       <div
         ref={sidebarRef}
-        className="bg-gray-600 dark:bg-slate-800 border-r border-primary-200/50 dark:border-slate-700/50 flex flex-col min-h-0 relative"
+        className="bg-stone-100 dark:bg-white/[0.03] border-r border-stone-200/60 dark:border-white/[0.06] flex flex-col min-h-0 relative"
         style={{ width: `${sidebarWidth}px` }}
       >
         {/* Resize Handle */}
         <div
-          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary-500/50 dark:hover:bg-primary-400/50 transition-colors z-10 group"
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/50 dark:hover:bg-blue-400/50 transition-colors z-10 group"
           onMouseDown={(e) => {
             e.preventDefault();
             setIsResizing(true);
           }}
         >
-          <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-transparent group-hover:bg-primary-500/30 dark:group-hover:bg-primary-400/30" />
+          <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-transparent group-hover:bg-blue-500/30 dark:group-hover:bg-blue-400/30" />
         </div>
         {/* Header with New Chat and Multi-select */}
-        <div className="p-3 border-b border-primary-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-900/30 backdrop-blur-sm">
+        <div className="p-3 border-b border-stone-200/60 dark:border-white/[0.06] bg-white/50 dark:bg-white/[0.02] backdrop-blur-sm">
           <div className="flex gap-2">
             <Button
               onClick={createNewConversation}
               variant="outline"
               size="icon"
               title="New Chat"
-              className="h-8 w-8 flex-1 bg-transparent dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600"
+              className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] hover:bg-stone-200 dark:hover:bg-white/[0.08] border-stone-200 dark:border-white/[0.08]"
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -882,7 +887,7 @@ export const ChatInterface: React.FC = () => {
                     onClick={() => setIsMultiSelectMode(true)}
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8 flex-1 bg-transparent dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600"
+                    className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] hover:bg-stone-200 dark:hover:bg-white/[0.08] border-stone-200 dark:border-white/[0.08]"
                     title="Select"
                   >
                     <CheckSquare className="h-3.5 w-3.5" />
@@ -893,7 +898,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={selectAllConversations}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] hover:bg-stone-200 dark:hover:bg-white/[0.08] border-stone-200 dark:border-white/[0.08]"
                       title="Select All"
                     >
                       <CheckSquare className="h-3.5 w-3.5" />
@@ -902,7 +907,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={clearSelection}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] hover:bg-stone-200 dark:hover:bg-white/[0.08] border-stone-200 dark:border-white/[0.08]"
                       title="Cancel"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -933,9 +938,9 @@ export const ChatInterface: React.FC = () => {
             .map((conversation) => (
               <div
                 key={conversation.id}
-                className={`p-3 border-b border-primary-100/50 dark:border-slate-700/50 cursor-pointer hover:bg-primary-100/50 dark:hover:bg-slate-700/60 transition-colors group ${
+                className={`p-3 border-b border-stone-200/40 dark:border-white/[0.04] cursor-pointer hover:bg-stone-200/50 dark:hover:bg-white/[0.04] transition-colors group ${
                   currentConversationId === conversation.id
-                    ? "bg-gradient-to-r from-primary-100/80 to-secondary-100/80 dark:bg-slate-700/70 dark:border-slate-600/50 shadow-sm"
+                    ? "bg-white dark:bg-white/[0.06] shadow-sm"
                     : ""
                 } ${
                   selectedConversations.has(conversation.id)
@@ -1026,6 +1031,7 @@ export const ChatInterface: React.FC = () => {
       <div className="flex-1 flex flex-col min-h-0 bg-background p-2.5">
         {/* Messages Area */}
         <div
+          ref={messagesContainerRef}
           className={`flex-1 p-4 space-y-4 min-h-0 ${
             currentConversation && currentConversation.messages.length > 0
               ? "overflow-y-auto"

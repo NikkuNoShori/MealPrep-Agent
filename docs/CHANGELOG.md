@@ -2,10 +2,32 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-03-10
-**Last updated:** 2026-03-10 (initial canonical doc creation)
+**Last reviewed:** 2026-03-11
+**Last updated:** 2026-03-11 (UI overhaul and layout fix entries)
 
 ---
+
+## 2026-03-11 (Remove n8n dependency, direct RAG search) `feature/next-improvements`
+
+- Removed n8n webhook dependency from chat pipeline — RAG search now runs directly in `chat-api` edge function
+- Replaced `callRAGWorkflow()` (n8n webhook) with `handleRAGSearch()` (hybrid Supabase RPCs + OpenRouter)
+- RAG search uses parallel semantic (embedding) + text (tsvector) search, deduplicates, and generates contextual AI response
+- Fixed `handleGeneralChat` bug: `historyError` variable was referenced but never declared
+- Removed `N8N_RAG_WEBHOOK_URL` from all env files (`.env`, `.env.local`, `chat-api/.env.local`)
+- Removed n8n health check from `chat-api` `/health` endpoint
+- Updated ARCHITECTURE.md, API.md with new RAG search flow documentation
+
+## 2026-03-11 (UI overhaul and layout fixes) `feature/next-improvements`
+
+- Implemented glassmorphism design system: semi-transparent backgrounds, backdrop blur, ambient glow orbs, grid overlay
+- Restyled Header and ChatInterface sidebar to match new design language
+- Fixed layout whitespace/overflow bug: sealed CSS height chain from `html`/`body`/`#root` through Layout `<main>`
+- Chat page now uses `absolute inset-0` positioning to opt out of main scroll container
+- Removed unnecessary scroll wrapper divs from all page components
+- Switched Recipes page from legacy `recipeService` (localhost:3000) to `apiClient` (Supabase direct)
+- Added slug-based recipe lookup to `apiClient.getRecipe(idOrSlug)`
+- Updated Button and Card UI components
+- Restyled Dashboard and MealPlanner pages
 
 ## 2026-03-10 (Documentation system overhaul) `feature/next-improvements`
 

@@ -3,8 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { RecipeList } from "@/components/recipes/RecipeList";
 import { RecipeDetail } from "@/components/recipes/RecipeDetail";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
-import { useRecipe } from "@/services/api";
-import { recipeService } from "@/services/recipeService";
+import { apiClient } from "@/services/api";
 
 const Recipes = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -17,7 +16,7 @@ const Recipes = () => {
   useEffect(() => {
     if (slug) {
       // Try to load recipe by slug (or ID if slug is a UUID)
-      recipeService.getRecipe(slug)
+      apiClient.getRecipe(slug)
         .then(recipe => {
           if (recipe) {
             setSelectedRecipe(recipe);
@@ -37,7 +36,8 @@ const Recipes = () => {
       setShowAddForm(false);
       setEditingRecipe(null);
     }
-  }, [slug, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
 
   const handleRecipeSelect = (recipe: any) => {
     // Navigate to recipe URL using slug if available, otherwise use ID
@@ -75,7 +75,7 @@ const Recipes = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
+    <div className="bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {(showAddForm || editingRecipe) && (

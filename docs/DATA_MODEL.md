@@ -2,7 +2,7 @@
 
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
-**Last reviewed:** 2026-03-10
+**Last reviewed:** 2026-03-11
 **Last updated:** 2026-03-10 (initial canonical doc creation)
 
 ---

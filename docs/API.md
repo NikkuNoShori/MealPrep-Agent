@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-03-10
-**Last updated:** 2026-03-10 (initial canonical doc creation)
+**Last reviewed:** 2026-03-11
+**Last updated:** 2026-03-11 (removed n8n, direct RAG search, getRecipe slug support)
 
 ---
 
@@ -55,9 +55,9 @@ Content-Type: application/json
 **Intent routing:**
 | Intent | Model | Behavior |
 |--------|-------|----------|
-| `recipe_extraction` | `qwen/qwen-2.5-vl-7b-instruct` | Extracts structured recipe JSON from text/images |
-| `rag_search` | `qwen/qwen-3-8b` | Searches user recipes via hybrid search, returns contextual response |
-| `general_chat` | `qwen/qwen-3-8b` | General cooking conversation |
+| `recipe_extraction` | `qwen/qwen-2.5-vl-7b-instruct` | Delegates to `recipe-pipeline/extract-only` for structured recipe extraction |
+| `rag_search` | `qwen/qwen-2.5-7b-instruct` | Hybrid search (semantic + text) via Supabase RPCs, then contextual AI response |
+| `general_chat` | `qwen/qwen-2.5-7b-instruct` | Direct OpenRouter chat with conversation history |
 
 **Error responses:**
 - `401` — Missing or invalid JWT
@@ -167,7 +167,7 @@ get_recipe_recommendations(
 | Method | Description |
 |--------|-------------|
 | `getRecipes()` | List all user recipes |
-| `getRecipe(id)` | Get single recipe by ID |
+| `getRecipe(idOrSlug)` | Get single recipe by UUID or URL slug |
 | `createRecipe(data)` | Create new recipe |
 | `updateRecipe(id, data)` | Update existing recipe |
 | `deleteRecipe(id)` | Delete recipe |

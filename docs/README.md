@@ -2,8 +2,8 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-03-10
-**Last updated:** 2026-03-10 (documentation system overhaul)
+**Last reviewed:** 2026-03-11
+**Last updated:** 2026-03-11 (removed n8n references, archived n8n docs)
 
 ---
 
@@ -34,7 +34,6 @@ Detailed design documents for major subsystems.
 | [RAG_SYSTEM_SUMMARY.md](Architecture/RAG_SYSTEM_SUMMARY.md) | RAG system summary and benefits |
 | [CHAT_WORKFLOW_ANALYSIS.md](Architecture/CHAT_WORKFLOW_ANALYSIS.md) | Chat flow analysis and intent routing |
 | [CHAT_DATABASE_SCHEMA.md](Architecture/CHAT_DATABASE_SCHEMA.md) | Chat tables schema documentation |
-| [n8n-config.md](Architecture/n8n-config.md) | n8n workflow configuration |
 
 ---
 
@@ -47,9 +46,6 @@ Setup guides, tooling, and operational procedures.
 | [LOCAL_DEVELOPMENT.md](Development/LOCAL_DEVELOPMENT.md) | Local development setup guide |
 | [EDGE_FUNCTION_README.md](Development/EDGE_FUNCTION_README.md) | Edge function documentation |
 | [VECTOR_VS_TEXT_SEARCH.md](Development/VECTOR_VS_TEXT_SEARCH.md) | Vector vs text search comparison |
-| [DEPLOY_TO_N8N_SERVER.md](Development/DEPLOY_TO_N8N_SERVER.md) | n8n server deployment guide |
-| [N8N_URL_OPTIONS.md](Development/N8N_URL_OPTIONS.md) | n8n URL configuration options |
-| [N8N_SUPABASE_INTEGRATION.md](Development/N8N_SUPABASE_INTEGRATION.md) | n8n + Supabase integration guide |
 | [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md) | Google OAuth configuration |
 
 ---
@@ -87,6 +83,10 @@ Outdated documentation from earlier phases. Kept for historical reference.
 | [FRONTEND_CHECKLIST.md](Archived/FRONTEND_CHECKLIST.md) | Outdated frontend checklist |
 | [PRIORITY_ASSESSMENT.md](Archived/PRIORITY_ASSESSMENT.md) | Outdated priority assessment |
 | [DEPLOYMENT_GUIDE.md](Archived/DEPLOYMENT_GUIDE.md) | Outdated deployment guide |
+| [n8n-config.md](Architecture/n8n-config.md) | n8n workflow configuration (removed) |
+| [DEPLOY_TO_N8N_SERVER.md](Development/DEPLOY_TO_N8N_SERVER.md) | n8n server deployment (removed) |
+| [N8N_URL_OPTIONS.md](Development/N8N_URL_OPTIONS.md) | n8n URL options (removed) |
+| [N8N_SUPABASE_INTEGRATION.md](Development/N8N_SUPABASE_INTEGRATION.md) | n8n + Supabase integration (removed) |
 
 ---
 

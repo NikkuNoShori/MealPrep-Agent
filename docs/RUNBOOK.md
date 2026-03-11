@@ -2,8 +2,8 @@
 
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
-**Last reviewed:** 2026-03-10
-**Last updated:** 2026-03-10 (initial canonical doc creation)
+**Last reviewed:** 2026-03-11
+**Last updated:** 2026-03-11 (added layout whitespace and recipe service entries)
 
 ---
 
@@ -339,6 +339,70 @@ supabase functions serve chat-api --env-file .env.local
 3. Check Supabase dashboard for project status
 
 **Added:** 2026-03-10
+
+---
+
+## Layout: Whitespace or overflow on pages
+
+### Symptom
+- Whitespace at the bottom or sides of pages
+- Double scrollbars
+- Content overflows instead of fitting the viewport
+- Chat page has dead space below the input
+
+### Likely causes
+- CSS height chain broken: `html`, `body`, or `#root` missing `height: 100%`
+- Page component uses `min-h-screen` (creates content taller than viewport)
+- Page content wrapped in unnecessary `h-full overflow-y-auto` div (double scroll container)
+- Chat page not using `absolute inset-0` (resolves height against scroll content instead of viewport)
+
+### Verification steps
+```bash
+# Check index.css for height chain
+grep -A3 'html, body, #root' src/index.css
+
+# Check Layout.tsx main element
+grep 'overflow-y-auto' src/components/common/Layout.tsx
+
+# Check for min-h-screen on page roots
+grep -rn 'min-h-screen' src/pages/
+```
+
+### Fix steps
+1. Ensure `src/index.css` has: `html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }`
+2. Ensure Layout's `<main>` has `flex-1 min-h-0 overflow-y-auto`
+3. Remove any `h-full overflow-y-auto` wrapper divs from page components — pages should render content directly
+4. Remove `min-h-screen` from page root elements
+5. Chat.tsx must use `absolute inset-0 overflow-hidden` to opt out of main's scroll
+
+**Added:** 2026-03-11
+
+---
+
+## Recipes: Connection refused (localhost:3000)
+
+### Symptom
+- Recipes page fails to load with `net::ERR_CONNECTION_REFUSED` to `localhost:3000`
+- Console shows `GET http://localhost:3000/api/recipes/...` errors
+
+### Likely causes
+- Code is using `recipeService.ts` which hits a non-existent local API server instead of Supabase directly
+
+### Verification steps
+```bash
+# Check which service the component imports
+grep -n 'recipeService\|apiClient' src/pages/Recipes.tsx
+
+# Verify recipeService targets localhost
+grep -n 'localhost:3000\|LOCAL_API' src/services/recipeService.ts
+```
+
+### Fix steps
+1. Replace `recipeService` imports with `apiClient` from `src/services/api.ts`
+2. `apiClient` queries Supabase directly via the JS SDK — no local server needed
+3. `apiClient.getRecipe(idOrSlug)` supports both UUID and slug-based lookups
+
+**Added:** 2026-03-11
 
 ---
 

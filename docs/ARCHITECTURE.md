@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-03-10
-**Last updated:** 2026-03-10 (initial canonical doc creation)
+**Last reviewed:** 2026-03-11
+**Last updated:** 2026-03-11 (removed n8n dependency, added direct RAG search, layout architecture)
 
 ---
 
@@ -16,7 +16,7 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS (dark theme) |
+| Styling | Tailwind CSS (glassmorphism design system, dark/light theme) |
 | State | Zustand (auth, theme) + React Query (server state) |
 | Routing | React Router v6 |
 | Database | PostgreSQL via Supabase |
@@ -99,16 +99,17 @@ When a user sends a message, the system classifies intent into one of three cate
 | `rag_search` | User is searching their recipe collection | `qwen/qwen-3-8b` |
 | `general_chat` | General cooking questions, conversation | `qwen/qwen-3-8b` |
 
-Intent detection runs via OpenRouter with a classification prompt defined in `src/prompts/intentRouter.ts`.
+Intent detection runs via OpenRouter with a classification prompt defined in `_shared/recipe-prompts.ts` (server) and `src/prompts/intentRouter.ts` (client hint).
 
 ### RAG Search Pipeline
-1. User query → `EmbeddingService.generateEmbedding()` (ada-002, 1536-dim)
-2. Hybrid search executes in parallel:
-   - **Vector search**: cosine similarity against `recipes.embedding_vector` (weight: 0.7, threshold: 0.5)
-   - **Text search**: PostgreSQL full-text search against `recipes.searchable_text` (weight: 0.3)
-3. Results deduplicated by recipe ID, combined scores ranked
-4. Top K results returned as context for AI response generation
-5. AI generates contextual response using recipe context
+Handled directly in the `chat-api` edge function (`handleRAGSearch`):
+1. User query → `openRouter.generateEmbedding()` (ada-002, 1536-dim)
+2. Hybrid search via Supabase RPCs (in parallel):
+   - **Semantic**: `search_recipes_semantic` — cosine similarity against `recipes.embedding_vector` (threshold: 0.5, top 5)
+   - **Text**: `search_recipes_text` — PostgreSQL full-text search against `recipes.searchable_text` (top 5)
+3. Results deduplicated by recipe ID, semantic results prioritized
+4. Recipe details formatted as context and sent to OpenRouter
+5. AI generates contextual response referencing the user's actual recipes
 
 ### Recipe Extraction Pipeline
 1. User sends text/images (up to 4 images supported)
@@ -119,17 +120,18 @@ Intent detection runs via OpenRouter with a classification prompt defined in `sr
 6. Full-text index updated automatically via trigger
 
 ### Prompts
-System prompts are defined in `src/prompts/`:
-- `intentRouter.ts` — intent classification prompt
-- `recipeExtraction.ts` — recipe extraction prompt
-- `generalChat.ts` — Chef Marcus conversational prompt
+**Server-side** (edge functions, authoritative): `supabase/functions/_shared/recipe-prompts.ts`
+- `INTENT_DETECTION_PROMPT` — intent classification
+- `RECIPE_EXTRACTION_PROMPT` — structured recipe extraction
+- `GENERAL_CHAT_PROMPT` — cooking assistant responses
+- `RAG_RESPONSE_PROMPT` — recipe search contextual responses (inline in chat-api)
 
-### OpenRouter Client
-`src/lib/openrouter.ts` provides:
-- `chat()` — simple text completion
-- `chatWithHistory()` — stateful multi-turn chat
-- `chatWithImages()` — multi-modal (vision) completion
-- `chatJSON()` — structured JSON output
+**Client-side** (UI hints, non-authoritative): `src/prompts/`
+- `intentRouter.ts`, `recipeExtraction.ts`, `generalChat.ts`
+
+### OpenRouter Clients
+**Frontend** (`src/lib/openrouter.ts`): `chat()`, `chatWithHistory()`, `chatWithImages()`, `chatJSON()`
+**Edge Functions** (`_shared/openrouter-client.ts`): `chat()`, `chatWithHistory()`, `chatWithImages()`, `generateEmbedding()`
 
 ---
 
@@ -154,6 +156,33 @@ System prompts are defined in `src/prompts/`:
 - **React Query** (`src/services/api.ts`): Server state for recipes, chat, meal plans, preferences — cached, auto-refetched
 - **React Context** (`src/contexts/`): MeasurementSystemContext (metric/imperial preference)
 
+### Layout Architecture
+
+The app uses a sealed CSS height chain to fill the viewport without overflow:
+
+```
+html, body, #root  →  height: 100%; overflow: hidden
+  └─ Layout         →  h-screen flex flex-col
+       ├─ Header
+       └─ <main>    →  flex-1 min-h-0 overflow-y-auto (handles scroll for all pages)
+            └─ Page content renders directly (no wrapper divs)
+```
+
+**Key patterns:**
+- `html`, `body`, `#root` all have `height: 100%; overflow: hidden` (set in `src/index.css`)
+- Layout's `<main>` is the single scroll container for all pages
+- Pages render content directly without scroll wrapper divs
+- **Chat page exception:** Uses `absolute inset-0 overflow-hidden` to opt out of `<main>`'s scroll flow, since ChatInterface manages its own scroll internally
+
+### Design System
+
+The UI uses a glassmorphism design language with:
+- Semi-transparent backgrounds (`bg-white/[0.03]`, `backdrop-blur-sm`)
+- Subtle borders (`border-white/[0.06]`)
+- Ambient glow orbs (CSS `glow-orb` class in Layout)
+- Grid overlay for dark mode
+- Custom color scale: `primary-*` and `secondary-*` tokens
+
 ### Component Structure
 ```
 src/components/
@@ -172,6 +201,7 @@ src/components/
 - Automatic camelCase ↔ snake_case field mapping
 - React Query hooks for all CRUD operations
 - Methods for: recipes, chat, meal plans, preferences, images, RAG search
+- Recipe lookup by UUID or URL slug (`getRecipe(idOrSlug)`)
 
 ---
 
@@ -186,10 +216,13 @@ Component → api.ts (React Query) → Supabase Client → PostgreSQL
 
 ### Chat Message Flow
 ```
-ChatInterface → OpenRouter (intent detection)
-             → OpenRouter (chat/vision/RAG based on intent)
-             → Supabase (save conversation + messages)
-             → If recipe_extraction: save recipe → generate embedding
+ChatInterface → api.ts → Supabase Edge Function (chat-api)
+  → Intent detection (OpenRouter)
+  → Route by intent:
+    • recipe_extraction → recipe-pipeline edge function → OpenRouter vision → structured recipe
+    • rag_search → embedding + Supabase RPCs (semantic + text) → OpenRouter (contextual response)
+    • general_chat → OpenRouter (with conversation history)
+  → Save messages to chat_conversations + chat_messages
 ```
 
 ### Measurement Conversion
@@ -233,9 +266,9 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 ### Optional
 | Variable | Context | Purpose |
 |----------|---------|---------|
-| `N8N_RAG_WEBHOOK_URL` | Backend | n8n webhook for RAG workflow integration |
 | `VITE_FRONTEND_URL` | Frontend | Frontend URL for OAuth redirects |
-| `LOCAL_API_URL` | Development | Local API server URL |
+| `OPENROUTER_API_KEY_QWEN2.5_VL_8b` | Edge Functions | Per-model API key for vision model |
+| `OPENROUTER_API_KEY_QWEN2.5_instruct_8b` | Edge Functions | Per-model API key for instruct model |
 
 ---
 
@@ -251,6 +284,13 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 
 ## Future / Planned
 
-- **n8n Integration**: Webhook URL configured but not fully active — intended for advanced RAG orchestration
 - **Receipt OCR**: Tables exist (`receipts`) but processing pipeline not implemented
-- **Real-time Chat**: Express server infrastructure exists for WebSocket support
+- **URL/Video Recipe Import UI**: Backend pipeline exists (`recipe-pipeline` edge function with URL and video adapters) but no frontend UI yet
+
+---
+
+## Known Anti-patterns (Avoid)
+
+- **Double scroll wrappers**: Do not add `h-full overflow-y-auto` wrapper divs around page content — this breaks the sealed height chain and causes whitespace/overflow issues. Let `<main>` in Layout handle scroll.
+- **`min-h-screen` on page roots**: This creates content taller than the viewport, causing double scrollbars.
+- **`recipeService.ts`**: Legacy service that hits `localhost:3000` (non-existent API server). Use `apiClient` from `src/services/api.ts` instead — it queries Supabase directly.
