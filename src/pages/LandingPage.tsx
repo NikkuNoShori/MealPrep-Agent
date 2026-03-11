@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { useAuthStore } from '@/stores/authStore'
-import { 
+import {
   MessageSquare, 
   ChefHat, 
   ShoppingCart, 
@@ -19,7 +19,6 @@ const LandingPage = () => {
   const { user, isLoading } = useAuthStore()
 
   // Redirect authenticated users to dashboard
-  // Don't block page rendering - show content immediately
   useEffect(() => {
     if (user && !isLoading) {
       navigate('/dashboard', { replace: true })
