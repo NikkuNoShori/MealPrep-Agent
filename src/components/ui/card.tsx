@@ -1,13 +1,18 @@
 import { ReactNode } from 'react'
+import { cn } from '../../utils/cn'
 
 interface CardProps {
   children: ReactNode
   className?: string
+  variant?: 'default' | 'interactive' | 'glass'
 }
 
-export const Card: React.FC<CardProps> = ({ children, className = '' }) => {
+export const Card: React.FC<CardProps> = ({ children, className = '', variant = 'default' }) => {
   return (
-    <div className={`card ${className}`}>
+    <div className={cn(
+      variant === 'glass' ? 'card-glass' : variant === 'interactive' ? 'card-interactive' : 'card',
+      className
+    )}>
       {children}
     </div>
   )
@@ -20,7 +25,7 @@ interface CardHeaderProps {
 
 export const CardHeader: React.FC<CardHeaderProps> = ({ children, className = '' }) => {
   return (
-    <div className={`pb-4 ${className}`}>
+    <div className={cn('pb-4', className)}>
       {children}
     </div>
   )
@@ -33,7 +38,7 @@ interface CardTitleProps {
 
 export const CardTitle: React.FC<CardTitleProps> = ({ children, className = '' }) => {
   return (
-    <h3 className={`text-lg font-semibold text-gray-900 dark:text-white ${className}`}>
+    <h3 className={cn('text-lg font-semibold text-gray-900 dark:text-white', className)}>
       {children}
     </h3>
   )
@@ -46,7 +51,7 @@ interface CardDescriptionProps {
 
 export const CardDescription: React.FC<CardDescriptionProps> = ({ children, className = '' }) => {
   return (
-    <p className={`text-sm text-muted-foreground ${className}`}>
+    <p className={cn('text-sm text-muted-foreground', className)}>
       {children}
     </p>
   )

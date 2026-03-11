@@ -158,18 +158,27 @@ class ApiClient {
     return { recipes: camelRecipes, total: camelRecipes.length };
   }
 
-  async getRecipe(id: string) {
+  async getRecipe(idOrSlug: string) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data, error } = await supabase
+    // Determine if the input is a UUID or a slug
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+
+    let query = supabase
       .from("recipes")
       .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
-      .single();
+      .eq("user_id", user.id);
+
+    if (isUuid) {
+      query = query.eq("id", idOrSlug);
+    } else {
+      query = query.eq("slug", idOrSlug);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) {
       if (error.code === "PGRST116") return null;
