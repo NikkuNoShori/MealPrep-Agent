@@ -5,7 +5,10 @@
       "Bash(grep -rn N8N_RAG_WEBHOOK_URL /c/dev/MealPrep-Agent --include=*.ts --include=*.tsx --include=*.js --include=*.json)",
       "Bash(git rm:*)",
       "Bash(find c:devMealPrep-Agent/supabase -type f -name *.ts)",
-      "WebFetch(domain:supabase.com)"
+      "WebFetch(domain:supabase.com)",
+      "Bash(find /c/dev/MealPrep-Agent -name *.md -type f)",
+      "Bash(find /c/dev/MealPrep-Agent/docs -type f -name *.md)",
+      "Bash(node -e \"require\\(''fs''\\).readFileSync\\(''c:/dev/MealPrep-Agent/supabase/functions/_shared/recipe-prompts.ts'', ''utf8''\\); console.log\\(''Parses OK''\\)\")"
     ]
   }
 }

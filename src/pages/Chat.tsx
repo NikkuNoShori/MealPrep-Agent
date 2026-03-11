@@ -2,7 +2,7 @@ import { ChatInterface } from "../components/chat/ChatInterface";
 
 const Chat = () => {
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    <div className="h-full overflow-hidden">
       <ChatInterface />
     </div>
   );

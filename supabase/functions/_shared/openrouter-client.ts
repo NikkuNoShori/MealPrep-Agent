@@ -67,8 +67,10 @@ export class OpenRouterClient {
 
     const data = await response.json();
     if (!data.choices?.[0]?.message) {
-      console.error("Unexpected OpenRouter response:", JSON.stringify(data).substring(0, 500));
-      throw new Error(`OpenRouter returned no choices: ${data.error?.message || JSON.stringify(data).substring(0, 200)}`);
+      const bodyStr = JSON.stringify(data).substring(0, 500);
+      console.error("Unexpected OpenRouter response:", bodyStr);
+      const errorDetail = data.error?.message ? `error: ${data.error.message}` : `body: ${bodyStr.substring(0, 200)}`;
+      throw new Error(`OpenRouter returned no choices (${errorDetail})`);
     }
     return data.choices[0].message.content;
   }
@@ -165,8 +167,10 @@ export class OpenRouterClient {
 
     const data = await response.json();
     if (!data.choices?.[0]?.message) {
-      console.error("Unexpected OpenRouter response (images):", JSON.stringify(data).substring(0, 500));
-      throw new Error(`OpenRouter returned no choices: ${data.error?.message || JSON.stringify(data).substring(0, 200)}`);
+      const bodyStr = JSON.stringify(data).substring(0, 500);
+      console.error("Unexpected OpenRouter response (images):", bodyStr);
+      const errorDetail = data.error?.message ? `error: ${data.error.message}` : `body: ${bodyStr.substring(0, 200)}`;
+      throw new Error(`OpenRouter returned no choices (${errorDetail})`);
     }
     return data.choices[0].message.content;
   }

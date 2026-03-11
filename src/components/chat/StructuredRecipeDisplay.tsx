@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useImperativeHandle, forwardRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Save, Clock, Users, ChefHat, Loader2, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
-import { useCreateRecipe } from "@/services/api";
+import { Save, Clock, Users, ChefHat, Loader2, CheckCircle2, ChevronDown, ChevronRight, AlertTriangle, Copy, X, RefreshCw } from "lucide-react";
+import { useCreateRecipe, useUpdateRecipe, apiClient } from "@/services/api";
 
 interface Ingredient {
   name: string;
@@ -35,26 +35,80 @@ interface StructuredRecipe {
   source_name?: string | null;
 }
 
+interface SimilarRecipeMatch {
+  id: string;
+  title: string;
+  similarity: number;
+}
+
+type SavePhase =
+  | "idle"
+  | "checking_title"       // Phase 1: checking for duplicate title
+  | "duplicate_found"      // Phase 1 result: duplicate title exists
+  | "confirm_overwrite"    // Phase 1b: user clicked Overwrite, confirm before proceeding
+  | "uploading_image"      // Uploading user image
+  | "checking_similarity"  // Phase 2: checking for similar recipes via embedding
+  | "similar_found"        // Phase 2 result: similar recipes found
+  | "saving"               // Final save in progress
+  | "saved";               // Done
+
+export interface StructuredRecipeDisplayHandle {
+  /** Programmatically trigger save (used by "Save All" button). */
+  triggerSave: () => void;
+  /** Whether this card has already been saved. */
+  isSaved: () => boolean;
+}
+
 interface StructuredRecipeDisplayProps {
   recipe: StructuredRecipe;
+  /** Base64 data URL of user-uploaded image to save as recipe image */
+  userImageDataUrl?: string;
   onSave?: (result: { success: boolean; error?: string }) => void;
 }
 
-export const StructuredRecipeDisplay: React.FC<StructuredRecipeDisplayProps> = ({
+/**
+ * Convert a base64 data URL to a File object for upload.
+ */
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const [header, base64] = dataUrl.split(",");
+  const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new File([bytes], filename, { type: mime });
+}
+
+export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle, StructuredRecipeDisplayProps>(({
   recipe,
+  userImageDataUrl,
   onSave,
-}) => {
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+}, ref) => {
+  const [savePhase, setSavePhase] = useState<SavePhase>("idle");
+  const [similarRecipes, setSimilarRecipes] = useState<SimilarRecipeMatch[]>([]);
+  const [duplicateId, setDuplicateId] = useState<string | null>(null);
+  const [saveTitle, setSaveTitle] = useState(recipe.title);
   const [showIngredients, setShowIngredients] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const createRecipeMutation = useCreateRecipe();
+  const updateRecipeMutation = useUpdateRecipe();
 
   // Normalize snake_case/camelCase fields from pipeline
   const prepTime = recipe.prepTime ?? recipe.prep_time ?? null;
   const cookTime = recipe.cookTime ?? recipe.cook_time ?? null;
   const totalTime = recipe.totalTime ?? recipe.total_time ?? (prepTime || cookTime ? (prepTime || 0) + (cookTime || 0) : null);
   const imageUrl = recipe.imageUrl ?? recipe.image_url ?? null;
+
+  const isBusy = savePhase === "checking_title" || savePhase === "uploading_image" || savePhase === "checking_similarity" || savePhase === "saving";
+  const isPrompting = savePhase === "duplicate_found" || savePhase === "confirm_overwrite" || savePhase === "similar_found";
+  const isSaved = savePhase === "saved";
+
+  // Expose imperative handle for "Save All" button
+  useImperativeHandle(ref, () => ({
+    triggerSave: () => { if (!isSaved && !isBusy) handleSave(); },
+    isSaved: () => isSaved,
+  }));
 
   const getDifficultyColor = (difficulty?: string) => {
     switch (difficulty) {
@@ -76,37 +130,154 @@ export const StructuredRecipeDisplay: React.FC<StructuredRecipeDisplayProps> = (
     return parts.join(" ") || "";
   };
 
+  /** Upload user image if available. Returns the image URL or empty string. */
+  const uploadImage = async (): Promise<string> => {
+    let finalImageUrl = imageUrl || "";
+    if (!finalImageUrl && userImageDataUrl) {
+      try {
+        setSavePhase("uploading_image");
+        const slug = saveTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
+        const imageFile = dataUrlToFile(userImageDataUrl, `${slug}.jpg`);
+        finalImageUrl = await apiClient.uploadImage(imageFile, "recipes");
+        console.log("Uploaded recipe image:", finalImageUrl);
+      } catch (uploadErr: any) {
+        console.warn("Image upload failed (non-fatal):", uploadErr.message);
+      }
+    }
+    return finalImageUrl;
+  };
+
+  /** Build the recipe data object for save. */
+  const buildRecipeData = (title: string, finalImageUrl: string) => ({
+    title,
+    description: recipe.description || "",
+    prepTime: prepTime || 0,
+    cookTime: cookTime || 0,
+    servings: recipe.servings || 4,
+    difficulty: recipe.difficulty || "medium",
+    tags: recipe.tags || [],
+    ingredients: recipe.ingredients,
+    instructions: recipe.instructions,
+    imageUrl: finalImageUrl,
+  });
+
+  /** Final save — skips the duplicate check in createRecipe since we already checked. */
+  const doSave = async (title: string, skipSimilarityCheck = false) => {
+    setSavePhase("saving");
+    try {
+      const finalImageUrl = await uploadImage();
+      const recipeData = buildRecipeData(title, finalImageUrl);
+
+      // Phase 2: similarity check (unless skipped)
+      if (!skipSimilarityCheck) {
+        setSavePhase("checking_similarity");
+        try {
+          const { similar } = await apiClient.checkSimilarRecipes({
+            title: recipeData.title,
+            description: recipeData.description,
+            ingredients: recipeData.ingredients,
+            instructions: recipeData.instructions,
+            tags: recipeData.tags,
+            cuisine: recipe.cuisine || undefined,
+            difficulty: recipeData.difficulty,
+          });
+
+          if (similar && similar.length > 0) {
+            setSimilarRecipes(similar);
+            setSavePhase("similar_found");
+            return; // Pause — user must confirm
+          }
+        } catch (err) {
+          // Similarity check failed (non-fatal) — proceed with save
+          console.warn("Similarity check failed (non-fatal):", err);
+        }
+      }
+
+      // Proceed with actual save
+      setSavePhase("saving");
+      await createRecipeMutation.mutateAsync({ data: recipeData, options: { skipDuplicateCheck: true } });
+      setSavePhase("saved");
+      onSave?.({ success: true });
+    } catch (error: any) {
+      setSavePhase("idle");
+      onSave?.({ success: false, error: error?.message || "Failed to save recipe. Please try again." });
+    }
+  };
+
+  /** Phase 1: title duplicate check, then proceed to Phase 2 + save. */
   const handleSave = async () => {
-    if (isSaved) return;
+    if (isSaved || isBusy) return;
 
     if (!recipe.title || !recipe.ingredients?.length || !recipe.instructions?.length) {
       onSave?.({ success: false, error: "Recipe is missing required fields (title, ingredients, or instructions)" });
       return;
     }
 
-    setIsSaving(true);
-
+    setSavePhase("checking_title");
     try {
-      const recipeData = {
-        title: recipe.title,
-        description: recipe.description || "",
-        prepTime: prepTime || 0,
-        cookTime: cookTime || 0,
-        servings: recipe.servings || 4,
-        difficulty: recipe.difficulty || "medium",
-        tags: recipe.tags || [],
-        ingredients: recipe.ingredients,
-        instructions: recipe.instructions,
-        imageUrl: imageUrl || "",
-      };
+      const { isDuplicate, existingId } = await apiClient.checkDuplicateTitle(saveTitle);
+      if (isDuplicate) {
+        setDuplicateId(existingId || null);
+        setSavePhase("duplicate_found");
+        return; // Pause — user must choose
+      }
+    } catch (err) {
+      // Title check failed (non-fatal) — proceed anyway
+      console.warn("Title check failed (non-fatal):", err);
+    }
 
-      await createRecipeMutation.mutateAsync(recipeData);
-      setIsSaved(true);
+    // No duplicate — proceed to Phase 2 (similarity) + save
+    await doSave(saveTitle);
+  };
+
+  /** User chose "Overwrite" from Phase 1 duplicate prompt — ask for confirmation. */
+  const handleOverwriteRequest = () => {
+    setSavePhase("confirm_overwrite");
+  };
+
+  /** User confirmed overwrite — update the existing recipe. */
+  const handleOverwriteConfirm = async () => {
+    if (!duplicateId) return;
+    setSavePhase("saving");
+    try {
+      const finalImageUrl = await uploadImage();
+      const recipeData = buildRecipeData(saveTitle, finalImageUrl);
+      await updateRecipeMutation.mutateAsync({ id: duplicateId, data: recipeData });
+      setSavePhase("saved");
       onSave?.({ success: true });
     } catch (error: any) {
-      onSave?.({ success: false, error: error?.message || "Failed to save recipe. Please try again." });
-    } finally {
-      setIsSaving(false);
+      setSavePhase("idle");
+      onSave?.({ success: false, error: error?.message || "Failed to overwrite recipe." });
+    }
+  };
+
+  /** User chose "Save as Copy" from Phase 1 duplicate prompt. */
+  const handleSaveAsCopy = async () => {
+    const copyTitle = `${recipe.title} (Copy)`;
+    setSaveTitle(copyTitle);
+    await doSave(copyTitle);
+  };
+
+  /** User chose "Save Anyway" from Phase 2 similarity prompt. */
+  const handleSaveDespiteSimilar = async () => {
+    setSimilarRecipes([]);
+    await doSave(saveTitle, true); // skip similarity re-check
+  };
+
+  /** User cancelled from any prompt. */
+  const handleCancel = () => {
+    setSavePhase("idle");
+    setSimilarRecipes([]);
+    setDuplicateId(null);
+  };
+
+  const getPhaseStatusText = () => {
+    switch (savePhase) {
+      case "checking_title": return "Checking for duplicates...";
+      case "uploading_image": return "Uploading image...";
+      case "checking_similarity": return "Checking for similar recipes...";
+      case "saving": return "Saving...";
+      default: return "Saving...";
     }
   };
 
@@ -250,32 +421,129 @@ export const StructuredRecipeDisplay: React.FC<StructuredRecipeDisplayProps> = (
           </div>
         )}
 
+        {/* ── Phase 1 Prompt: Duplicate title found ── */}
+        {savePhase === "duplicate_found" && (
+          <div className="border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium text-yellow-800 dark:text-yellow-200">
+                  Duplicate recipe name
+                </p>
+                <p className="text-yellow-700 dark:text-yellow-300 mt-0.5">
+                  A recipe named "{saveTitle}" already exists in your collection.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 ml-6">
+              <Button size="sm" variant="outline" onClick={handleSaveAsCopy} className="gap-1">
+                <Copy className="h-3 w-3" />
+                Save as Copy
+              </Button>
+              <Button size="sm" variant="destructive" onClick={handleOverwriteRequest} className="gap-1">
+                <RefreshCw className="h-3 w-3" />
+                Overwrite
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancel} className="gap-1">
+                <X className="h-3 w-3" />
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Phase 1b: Confirm overwrite ── */}
+        {savePhase === "confirm_overwrite" && (
+          <div className="border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 rounded-lg p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium text-red-800 dark:text-red-200">
+                  Confirm overwrite
+                </p>
+                <p className="text-red-700 dark:text-red-300 mt-0.5">
+                  This will replace your existing "{saveTitle}" recipe. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 ml-6">
+              <Button size="sm" variant="destructive" onClick={handleOverwriteConfirm}>
+                Yes, Overwrite
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancel} className="gap-1">
+                <X className="h-3 w-3" />
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Phase 2 Prompt: Similar recipes found ── */}
+        {savePhase === "similar_found" && similarRecipes.length > 0 && (
+          <div className="border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium text-blue-800 dark:text-blue-200">
+                  Similar recipes detected
+                </p>
+                <p className="text-blue-700 dark:text-blue-300 mt-0.5">
+                  We found recipes in your collection that look similar:
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {similarRecipes.map((match) => (
+                    <li key={match.id} className="text-blue-700 dark:text-blue-300">
+                      <span className="font-medium">{match.title}</span>
+                      <span className="text-blue-500 dark:text-blue-400 ml-1.5">
+                        ({Math.round(match.similarity * 100)}% similar)
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="flex gap-2 ml-6">
+              <Button size="sm" variant="default" onClick={handleSaveDespiteSimilar}>
+                Save Anyway
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancel} className="gap-1">
+                <X className="h-3 w-3" />
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Save button at the bottom of the card */}
-        <Button
-          onClick={handleSave}
-          disabled={isSaving || isSaved}
-          size="sm"
-          variant={isSaved ? "outline" : "default"}
-          className="w-full mt-3"
-        >
-          {isSaved ? (
-            <>
-              <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
-              Saved
-            </>
-          ) : isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Save Recipe
-            </>
-          )}
-        </Button>
+        {!isPrompting && (
+          <Button
+            onClick={handleSave}
+            disabled={isBusy || isSaved}
+            size="sm"
+            variant={isSaved ? "outline" : "default"}
+            className="w-full mt-3"
+          >
+            {isSaved ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                Saved
+              </>
+            ) : isBusy ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {getPhaseStatusText()}
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Recipe
+              </>
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
-};
+});
+
+StructuredRecipeDisplay.displayName = "StructuredRecipeDisplay";

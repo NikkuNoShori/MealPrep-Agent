@@ -68,7 +68,7 @@ async function extractRecipe(
   message: string,
   images: string[],
   userToken: string
-): Promise<{ success: boolean; recipe?: any; error?: string; source_url?: string }> {
+): Promise<{ success: boolean; recipe?: any; recipes?: any[]; error?: string; source_url?: string }> {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -108,8 +108,17 @@ async function extractRecipe(
 
     const result = await response.json();
 
-    if (result.success && result.recipe) {
-      console.log("Recipe extracted via pipeline:", result.recipe.title);
+    if (result.success && (result.recipe || result.recipes)) {
+      if (result.recipes && result.recipes.length > 1) {
+        console.log(`Multi-recipe extracted via pipeline: ${result.recipes.length} recipes`);
+        return {
+          success: true,
+          recipe: result.recipes[0],
+          recipes: result.recipes,
+          source_url: detectedUrl || undefined,
+        };
+      }
+      console.log("Recipe extracted via pipeline:", result.recipe?.title);
       return { success: true, recipe: result.recipe, source_url: detectedUrl || undefined };
     }
 
@@ -455,14 +464,22 @@ async function handleSendMessage(
     // ── Route to service ──
     let aiResponse: string;
     let recipe: any = null;
+    let recipes: any[] | null = null;
 
     if (routingIntent === "recipe_extraction") {
       const extractionResult = await extractRecipe(message || "", images, userToken);
       if (extractionResult.success) {
         recipe = extractionResult.recipe;
-        aiResponse = extractionResult.source_url
-          ? `I've fetched and extracted the recipe from that URL! Here's what I found:`
-          : "I've extracted the recipe! Here's what I found:";
+        recipes = extractionResult.recipes || null;
+        if (recipes && recipes.length > 1) {
+          aiResponse = extractionResult.source_url
+            ? `I've fetched and extracted ${recipes.length} recipes from that URL! Here's what I found:`
+            : `I've extracted ${recipes.length} recipes! Here's what I found:`;
+        } else {
+          aiResponse = extractionResult.source_url
+            ? `I've fetched and extracted the recipe from that URL! Here's what I found:`
+            : "I've extracted the recipe! Here's what I found:";
+        }
       } else {
         aiResponse = `I had trouble extracting the recipe: ${extractionResult.error}`;
       }
@@ -482,7 +499,7 @@ async function handleSendMessage(
         content: aiResponse,
         sender: "ai",
         message_type: recipe ? "recipe" : "text",
-        metadata: { ...intentMetadata, recipe, routingDuration },
+        metadata: { ...intentMetadata, recipe, recipes, routingDuration },
       })
       .select()
       .single();
@@ -518,6 +535,7 @@ async function handleSendMessage(
         timestamp: new Date().toISOString(),
       },
       recipe,
+      recipes: recipes && recipes.length > 1 ? recipes : undefined,
       conversationId,
       sessionId: session_id,
       intentMetadata,

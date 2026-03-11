@@ -390,7 +390,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
           data: recipeData,
         });
       } else {
-        await createRecipeMutation.mutateAsync(recipeData);
+        await createRecipeMutation.mutateAsync({ data: recipeData });
       }
       onSave();
     } catch (error: any) {

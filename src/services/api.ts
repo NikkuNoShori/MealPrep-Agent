@@ -218,18 +218,20 @@ class ApiClient {
     return !!data; // Returns true if duplicate exists
   }
 
-  async createRecipe(data: any) {
+  async createRecipe(data: any, options?: { skipDuplicateCheck?: boolean }) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    // Check for duplicate recipe name
-    const isDuplicate = await this.checkDuplicateRecipe(data.title);
-    if (isDuplicate) {
-      throw new Error(
-        `A recipe with the name "${data.title}" already exists. Please choose a different name.`
-      );
+    // Check for duplicate recipe name (skip if caller already checked)
+    if (!options?.skipDuplicateCheck) {
+      const isDuplicate = await this.checkDuplicateRecipe(data.title);
+      if (isDuplicate) {
+        throw new Error(
+          `A recipe with the name "${data.title}" already exists. Please choose a different name.`
+        );
+      }
     }
 
     // Transform camelCase to snake_case for database
@@ -769,6 +771,55 @@ class ApiClient {
     });
   }
 
+  // ── Duplicate & Similarity checks ──
+
+  /**
+   * Check if a recipe with the same title already exists (Phase 1 — pre-save).
+   * Returns the existing recipe's id and title if found.
+   */
+  async checkDuplicateTitle(title: string): Promise<{ isDuplicate: boolean; existingId?: string; existingTitle?: string }> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("id, title")
+      .eq("user_id", user.id)
+      .ilike("title", title.trim().toLowerCase())
+      .maybeSingle();
+
+    if (error && error.code !== "PGRST116") throw error;
+
+    const record = data as { id: string; title: string } | null;
+    return {
+      isDuplicate: !!record,
+      existingId: record?.id,
+      existingTitle: record?.title,
+    };
+  }
+
+  /**
+   * Check for semantically similar recipes (Phase 2 — post-embedding).
+   * Sends recipe data to backend which generates an embedding and searches.
+   * Returns similar recipes above the similarity threshold.
+   */
+  async checkSimilarRecipes(recipeData: {
+    title: string;
+    description?: string;
+    ingredients?: any[];
+    instructions?: string[];
+    tags?: string[];
+    cuisine?: string;
+    difficulty?: string;
+  }): Promise<{ similar: Array<{ id: string; title: string; similarity: number }> }> {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/check-similar`, {
+      method: "POST",
+      body: JSON.stringify(recipeData),
+    });
+  }
+
   // ── Recipe Pipeline endpoints ──
 
   async ingestRecipeFromUrl(url: string, autoSave = true) {
@@ -832,7 +883,8 @@ export const useCreateRecipe = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: any) => apiClient.createRecipe(data),
+    mutationFn: ({ data, options }: { data: any; options?: { skipDuplicateCheck?: boolean } }) =>
+      apiClient.createRecipe(data, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
     },

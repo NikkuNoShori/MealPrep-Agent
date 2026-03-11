@@ -8,6 +8,8 @@ import type {
   PipelineResult,
   PipelineError,
   IntermediateContent,
+  ExtractedRecipe,
+  ValidatedRecipe,
 } from "../_shared/recipe-schema.ts";
 import { textAdapter } from "./adapters/text-adapter.ts";
 import { urlAdapter } from "./adapters/url-adapter.ts";
@@ -37,12 +39,21 @@ export async function runPipeline(
   let extracted;
   try {
     extracted = await extract(content, openRouter);
-    console.log(`Extract completed: "${extracted.title}"`);
+    if (Array.isArray(extracted)) {
+      console.log(`Extract completed: ${extracted.length} recipes found`);
+    } else {
+      console.log(`Extract completed: "${extracted.title}"`);
+    }
   } catch (error) {
     return errorResult("extract", error);
   }
 
-  // ── 3. Transform ──
+  // ── Multi-recipe path ──
+  if (Array.isArray(extracted)) {
+    return handleMultipleRecipes(extracted, content, autoSave, userId, supabase, openRouter);
+  }
+
+  // ── 3. Transform (single recipe) ──
   let validated;
   try {
     validated = transform(extracted, content.source_metadata);
@@ -72,6 +83,78 @@ export async function runPipeline(
   } catch (error) {
     return errorResult("load", error);
   }
+}
+
+/**
+ * Handle transform + load for multiple extracted recipes.
+ * Each recipe is processed independently; per-recipe errors don't fail the batch.
+ */
+async function handleMultipleRecipes(
+  extractedRecipes: ExtractedRecipe[],
+  content: IntermediateContent,
+  autoSave: boolean,
+  userId: string,
+  supabase: SupabaseClient,
+  openRouter: OpenRouterClient
+): Promise<PipelineResult> {
+  const validatedRecipes: ValidatedRecipe[] = [];
+  const recipeIds: string[] = [];
+  const errors: PipelineError[] = [];
+
+  for (const extracted of extractedRecipes) {
+    try {
+      const validated = transform(extracted, content.source_metadata);
+      console.log(`Transform completed: "${validated.title}"`);
+
+      if (autoSave) {
+        try {
+          const { recipe_id } = await load(validated, userId, supabase, openRouter);
+          console.log(`Load completed: ${recipe_id}`);
+          recipeIds.push(recipe_id);
+        } catch (loadError: any) {
+          console.warn(`Load failed for "${validated.title}": ${loadError.message}`);
+          errors.push({
+            stage: "load",
+            code: "LOAD_FAILED",
+            message: `Failed to save "${validated.title}": ${loadError.message}`,
+          });
+        }
+      }
+
+      validatedRecipes.push(validated);
+    } catch (transformError: any) {
+      console.warn(`Transform failed for "${extracted.title}": ${transformError.message}`);
+      errors.push({
+        stage: "transform",
+        code: "TRANSFORM_FAILED",
+        message: `Failed to validate "${extracted.title}": ${transformError.message}`,
+      });
+    }
+  }
+
+  if (validatedRecipes.length === 0) {
+    return {
+      success: false,
+      errors: errors.length > 0 ? errors : [{
+        stage: "transform",
+        code: "ALL_RECIPES_FAILED",
+        message: "All recipes failed validation",
+      }],
+      stage_failed: "transform",
+    };
+  }
+
+  return {
+    success: true,
+    // Backwards-compatible: first recipe in singular fields
+    recipe_id: recipeIds[0],
+    recipe: validatedRecipes[0],
+    // Multi-recipe fields
+    recipe_ids: recipeIds.length > 0 ? recipeIds : undefined,
+    recipes: validatedRecipes,
+    source_metadata: content.source_metadata,
+    errors: errors.length > 0 ? errors : undefined,
+  };
 }
 
 async function runAdapter(

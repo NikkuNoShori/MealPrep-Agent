@@ -161,7 +161,8 @@ export interface ChatMessageResponse {
     content: string
     timestamp: string
   }
-  recipe?: StructuredRecipe // Optional structured recipe data
+  recipe?: StructuredRecipe // Optional structured recipe data (single)
+  recipes?: StructuredRecipe[] // Optional multiple recipes
 }
 
 export interface RecipesResponse {

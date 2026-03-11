@@ -86,6 +86,9 @@ export interface PipelineResult {
   success: boolean;
   recipe_id?: string;
   recipe?: ValidatedRecipe | ExtractedRecipe;
+  /** Multi-recipe support: IDs and recipes when multiple are extracted */
+  recipe_ids?: string[];
+  recipes?: (ValidatedRecipe | ExtractedRecipe)[];
   source_metadata?: SourceMetadata;
   errors?: PipelineError[];
   stage_failed?: PipelineError["stage"];
