@@ -56,16 +56,44 @@ async function detectIntent(
 // RECIPE EXTRACTION — delegates to recipe-pipeline/extract-only
 // ═══════════════════════════════════════════════════════════════════
 
+/**
+ * Detect a URL in the message text.
+ */
+function extractUrl(text: string): string | null {
+  const match = text.match(/https?:\/\/[^\s<>"{}|\\^`\[\]]+/i);
+  return match ? match[0] : null;
+}
+
 async function extractRecipe(
   message: string,
   images: string[],
   userToken: string
-): Promise<{ success: boolean; recipe?: any; error?: string }> {
+): Promise<{ success: boolean; recipe?: any; error?: string; source_url?: string }> {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     const pipelineUrl = `${supabaseUrl}/functions/v1/recipe-pipeline/extract-only`;
+
+    // Detect URL in message — route to url adapter
+    const detectedUrl = extractUrl(message || "");
+    let pipelineBody: Record<string, unknown>;
+
+    if (detectedUrl) {
+      console.log("URL detected, using url adapter:", detectedUrl);
+      pipelineBody = {
+        source_type: "url",
+        url: detectedUrl,
+        auto_save: false,
+      };
+    } else {
+      pipelineBody = {
+        source_type: "text",
+        text: message || "",
+        images: images,
+        auto_save: false,
+      };
+    }
 
     const response = await fetch(pipelineUrl, {
       method: "POST",
@@ -74,20 +102,15 @@ async function extractRecipe(
         Authorization: `Bearer ${userToken}`,
         apikey: supabaseKey,
       },
-      body: JSON.stringify({
-        source_type: "text",
-        text: message || "",
-        images: images,
-        auto_save: false,
-      }),
-      signal: AbortSignal.timeout(25000),
+      body: JSON.stringify(pipelineBody),
+      signal: AbortSignal.timeout(50000),
     });
 
     const result = await response.json();
 
     if (result.success && result.recipe) {
       console.log("Recipe extracted via pipeline:", result.recipe.title);
-      return { success: true, recipe: result.recipe };
+      return { success: true, recipe: result.recipe, source_url: detectedUrl || undefined };
     }
 
     const errorMsg = result.errors?.[0]?.message || "Recipe extraction failed";
@@ -378,7 +401,8 @@ async function handleSendMessage(
           .eq("id", conversationId);
       }
     } else {
-      const title =
+      // Placeholder title — will be replaced by AI-generated title after first response
+      const placeholderTitle =
         message?.length > 50
           ? message.substring(0, 50) + "..."
           : message || "New conversation";
@@ -386,7 +410,7 @@ async function handleSendMessage(
         .from("chat_conversations")
         .insert({
           user_id: user.id,
-          title,
+          title: placeholderTitle,
           session_id,
           selected_intent: manualIntent || null,
           metadata: context?.metadata || {},
@@ -397,6 +421,8 @@ async function handleSendMessage(
       if (convError) throw convError;
       conversationId = newConv.id;
     }
+
+    const isFirstMessage = !existingConv || !!findError;
 
     // Save user message
     await supabase.from("chat_messages").insert({
@@ -434,7 +460,9 @@ async function handleSendMessage(
       const extractionResult = await extractRecipe(message || "", images, userToken);
       if (extractionResult.success) {
         recipe = extractionResult.recipe;
-        aiResponse = "I've extracted the recipe! Here's what I found:";
+        aiResponse = extractionResult.source_url
+          ? `I've fetched and extracted the recipe from that URL! Here's what I found:`
+          : "I've extracted the recipe! Here's what I found:";
       } else {
         aiResponse = `I had trouble extracting the recipe: ${extractionResult.error}`;
       }
@@ -459,6 +487,28 @@ async function handleSendMessage(
       .select()
       .single();
 
+    // Generate a smart title for new conversations (non-blocking on failure)
+    let generatedTitle: string | undefined;
+    if (isFirstMessage) {
+      try {
+        const titleResponse = await openRouter.chat(
+          "Generate a very short title (4-6 words max) for this conversation. Return ONLY the title text, nothing else.",
+          `User: ${(message || "").substring(0, 200)}\nAssistant: ${aiResponse.substring(0, 200)}`,
+          "qwen/qwen-2.5-7b-instruct",
+          { temperature: 0.3, max_tokens: 20 }
+        );
+        generatedTitle = titleResponse.trim().replace(/^["']|["']$/g, "");
+        if (generatedTitle) {
+          await supabase
+            .from("chat_conversations")
+            .update({ title: generatedTitle })
+            .eq("id", conversationId);
+        }
+      } catch (e) {
+        console.warn("Title generation failed (non-fatal):", e.message);
+      }
+    }
+
     return corsResponse({
       message: "Message processed successfully",
       response: {
@@ -471,6 +521,7 @@ async function handleSendMessage(
       conversationId,
       sessionId: session_id,
       intentMetadata,
+      title: generatedTitle,
     });
   } catch (error) {
     console.error("handleSendMessage error:", error);

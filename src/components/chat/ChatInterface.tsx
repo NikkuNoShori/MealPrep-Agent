@@ -4,7 +4,6 @@ import { apiClient } from "../../services/api";
 import { detectIntent } from "../../services/ragService";
 import { Logger } from "../../services/logger";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import {
   Send,
   Loader2,
@@ -17,7 +16,12 @@ import {
   Square,
   X,
   Image as ImageIcon,
+  Copy,
+  Check,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { ChatMessageResponse, StructuredRecipe } from "../../types";
 import { useAuthStore } from "../../stores/authStore";
 import { StructuredRecipeDisplay } from "./StructuredRecipeDisplay";
@@ -64,10 +68,13 @@ export const ChatInterface: React.FC = () => {
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const sendMessageMutation = useSendMessage();
   const { user } = useAuthStore();
@@ -116,6 +123,7 @@ export const ChatInterface: React.FC = () => {
                     content: msg.content,
                     sender: msg.sender as "user" | "ai",
                     timestamp: new Date(msg.timestamp),
+                    recipe: msg.metadata?.recipe || undefined,
                   }));
                 }
               } catch (error) {
@@ -243,6 +251,7 @@ export const ChatInterface: React.FC = () => {
     setConversations((prev) => [newConversation, ...prev]);
     setCurrentConversationId(newConversation.id);
     setInputMessage("");
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     Logger.chat.conversationCreated(newConversation.id, newSessionId, "New Chat", true);
     Logger.chat.stateChange('conversation_switched', { conversationId: newConversation.id });
   };
@@ -592,6 +601,7 @@ export const ChatInterface: React.FC = () => {
     );
 
     setInputMessage("");
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     // Revoke all image preview URLs before clearing
     imagePreviewUrls.forEach((url) => {
       URL.revokeObjectURL(url);
@@ -773,7 +783,8 @@ export const ChatInterface: React.FC = () => {
         );
       }
 
-      // Update conversation with AI response
+      // Update conversation with AI response and title if returned
+      const serverTitle = (response as any).title;
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === currentConversationId
@@ -781,6 +792,7 @@ export const ChatInterface: React.FC = () => {
                 ...conv,
                 messages: [...conv.messages, aiMessage],
                 lastMessage: response.response.content,
+                ...(serverTitle ? { title: serverTitle } : {}),
               }
             : conv
         )
@@ -847,6 +859,24 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  const copyMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(messageId);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = content;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedMessageId(messageId);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    }
+  };
+
   const currentConversation = getCurrentConversation();
 
   return (
@@ -854,19 +884,21 @@ export const ChatInterface: React.FC = () => {
       {/* Sidebar - Conversation History */}
       <div
         ref={sidebarRef}
-        className="bg-stone-100 dark:bg-white/[0.03] border-r border-stone-200/60 dark:border-white/[0.06] flex flex-col min-h-0 relative"
-        style={{ width: `${sidebarWidth}px` }}
+        className={`bg-stone-100 dark:bg-white/[0.03] border-r border-stone-200/60 dark:border-white/[0.06] flex flex-col min-h-0 relative transition-[width] duration-200 ${isSidebarCollapsed ? 'overflow-hidden' : ''}`}
+        style={{ width: isSidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
       >
         {/* Resize Handle */}
-        <div
-          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/50 dark:hover:bg-blue-400/50 transition-colors z-10 group"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setIsResizing(true);
-          }}
-        >
-          <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-transparent group-hover:bg-blue-500/30 dark:group-hover:bg-blue-400/30" />
-        </div>
+        {!isSidebarCollapsed && (
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/50 dark:hover:bg-blue-400/50 transition-colors z-10 group"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsResizing(true);
+            }}
+          >
+            <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-transparent group-hover:bg-blue-500/30 dark:group-hover:bg-blue-400/30" />
+          </div>
+        )}
         {/* Header with New Chat and Multi-select */}
         <div className="p-3 border-b border-stone-200/60 dark:border-white/[0.06] bg-white/50 dark:bg-white/[0.02] backdrop-blur-sm">
           <div className="flex gap-2">
@@ -1028,7 +1060,23 @@ export const ChatInterface: React.FC = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-h-0 bg-background p-2.5">
+      <div className="flex-1 flex flex-col min-h-0 bg-background">
+        {/* Sidebar toggle */}
+        <div className="flex items-center px-2.5 pt-2.5 pb-0">
+          <Button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title={isSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+          >
+            {isSidebarCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
         {/* Messages Area */}
         <div
           ref={messagesContainerRef}
@@ -1067,7 +1115,7 @@ export const ChatInterface: React.FC = () => {
             currentConversation.messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex gap-3 ${
+                className={`group/msg flex gap-3 ${
                   message.sender === "user" ? "justify-end" : "justify-start"
                 } ${message.recipe && message.sender === "ai" ? "w-full" : ""}`}
               >
@@ -1080,61 +1128,125 @@ export const ChatInterface: React.FC = () => {
                   // Full-width recipe display
                   <div className="flex-1">
                     {message.content && (
-                      <div className="mb-3 max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
+                      <div className="relative mb-3 max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
                         <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">
                           {message.content}
                         </p>
+                        <button
+                          onClick={() => copyMessage(message.id, message.content)}
+                          className="absolute -bottom-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                          title="Copy message"
+                        >
+                          {copiedMessageId === message.id ? (
+                            <Check className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <Copy className="h-3 w-3 text-gray-500 dark:text-gray-400" />
+                          )}
+                        </button>
                       </div>
                     )}
                     <StructuredRecipeDisplay
                       recipe={message.recipe}
-                      onSave={() => {
-                        // Recipe saved
+                      onSave={(result) => {
+                        if (!currentConversationId) return;
+                        const now = new Date();
+
+                        // Inject a "Save Recipe" user message
+                        const saveRequestMsg: Message = {
+                          id: `save-req-${Date.now()}`,
+                          content: "Save Recipe",
+                          sender: "user",
+                          timestamp: now,
+                        };
+
+                        // Inject success/fail AI response
+                        const saveResponseMsg: Message = {
+                          id: `save-res-${Date.now()}`,
+                          content: result.success
+                            ? `"${message.recipe!.title}" has been saved to your recipe collection!`
+                            : `Failed to save recipe: ${result.error || "Unknown error"}`,
+                          sender: "ai",
+                          timestamp: new Date(now.getTime() + 1),
+                        };
+
+                        setConversations((prev) =>
+                          prev.map((conv) =>
+                            conv.id === currentConversationId
+                              ? {
+                                  ...conv,
+                                  messages: [...conv.messages, saveRequestMsg, saveResponseMsg],
+                                  lastMessage: saveResponseMsg.content,
+                                  timestamp: now,
+                                }
+                              : conv
+                          )
+                        );
+
+                        if (result.success) {
+                          toast.success(`"${message.recipe!.title}" saved!`);
+                        } else {
+                          toast.error(result.error || "Failed to save recipe");
+                        }
                       }}
                     />
                   </div>
                 ) : (
                   // Regular message display
-                  <div
-                    className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                      message.sender === "user"
-                        ? "bg-primary text-white"
-                        : "bg-gray-100 dark:bg-gray-800"
-                    }`}
-                  >
-                    {/* Display images if present */}
-                    {message.images && message.images.length > 0 && (
-                      <div className="mb-2 grid grid-cols-2 gap-2">
-                        {message.images.map((imageUrl, idx) => (
-                          <img
-                            key={idx}
-                            src={imageUrl}
-                            alt={`Uploaded image ${idx + 1}`}
-                            className="rounded-lg max-w-full h-auto object-cover"
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {message.content && (
-                      <p
-                        className={`text-sm whitespace-pre-wrap ${
-                          message.sender === "user"
-                            ? "text-white"
-                            : "text-gray-900 dark:text-gray-100"
-                        }`}
-                      >
-                        {message.content}
-                      </p>
-                    )}
-                    <p
-                      className={`text-xs opacity-70 mt-1 ${
+                  <div className="relative group/bubble">
+                    <div
+                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
                         message.sender === "user"
-                          ? "text-white"
-                          : "text-gray-600 dark:text-gray-400"
+                          ? "bg-primary text-white"
+                          : "bg-gray-100 dark:bg-gray-800"
                       }`}
                     >
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
+                      {/* Display images if present */}
+                      {message.images && message.images.length > 0 && (
+                        <div className="mb-2 grid grid-cols-2 gap-2">
+                          {message.images.map((imageUrl, idx) => (
+                            <img
+                              key={idx}
+                              src={imageUrl}
+                              alt={`Uploaded image ${idx + 1}`}
+                              className="rounded-lg max-w-full h-auto object-cover"
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {message.content && (
+                        <p
+                          className={`text-sm whitespace-pre-wrap ${
+                            message.sender === "user"
+                              ? "text-white"
+                              : "text-gray-900 dark:text-gray-100"
+                          }`}
+                        >
+                          {message.content}
+                        </p>
+                      )}
+                      <p
+                        className={`text-xs opacity-70 mt-1 ${
+                          message.sender === "user"
+                            ? "text-white"
+                            : "text-gray-600 dark:text-gray-400"
+                        }`}
+                      >
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => copyMessage(message.id, message.content)}
+                      className={`absolute -bottom-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 ${
+                        message.sender === "user" ? "left-1" : "right-1"
+                      }`}
+                      title="Copy message"
+                    >
+                      {copiedMessageId === message.id ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3 text-gray-500 dark:text-gray-400" />
+                      )}
+                    </button>
                   </div>
                 )}
                 {message.sender === "user" && (
@@ -1225,9 +1337,15 @@ export const ChatInterface: React.FC = () => {
                 >
                   <ImageIcon className="h-4 w-4" />
                 </Button>
-                <Input
+                <textarea
+                  ref={textareaRef}
                   value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
+                  onChange={(e) => {
+                    setInputMessage(e.target.value);
+                    // Auto-resize textarea
+                    e.target.style.height = 'auto';
+                    e.target.style.height = Math.min(e.target.scrollHeight, 300) + 'px';
+                  }}
                   onKeyDown={handleKeyPress}
                   onPaste={handlePaste}
                   placeholder={
@@ -1235,10 +1353,12 @@ export const ChatInterface: React.FC = () => {
                       ? "Paste or type your recipe here, or upload images..."
                       : currentConversation?.selectedIntent === null
                       ? "Ask me about your recipes..."
-                      : "Type your message or question..."
+                      : "Type your message... (Shift+Enter for new line)"
                   }
                   disabled={isLoading}
-                  className="flex-1"
+                  rows={2}
+                  className="flex-1 resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ minHeight: '60px', maxHeight: '300px' }}
                 />
                 <Button
                   onClick={handleSendMessage}
