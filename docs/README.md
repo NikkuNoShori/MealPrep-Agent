@@ -70,6 +70,7 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 | MOP | Title | Status |
 |-----|-------|--------|
 | [MOP-0001](MOPs/MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | planned |
+| [MOP-0002](MOPs/MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | draft |
 
 ---
 
