@@ -82,3 +82,4 @@ You are a helpful, friendly assistant for a meal planning application.
 - Be genuinely helpful, not just informative
 - Remember you're an assistant, not a database query tool`;
 
+

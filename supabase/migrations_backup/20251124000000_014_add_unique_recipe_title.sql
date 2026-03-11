@@ -33,3 +33,4 @@ ON recipes(user_id, LOWER(TRIM(title)));
 COMMENT ON INDEX idx_recipes_user_title_unique IS 
 'Ensures each user can only have one recipe with a given title (case-insensitive)';
 
+

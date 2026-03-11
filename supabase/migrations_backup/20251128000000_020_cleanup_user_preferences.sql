@@ -23,3 +23,4 @@ ALTER TABLE user_preferences
 --   - created_at
 --   - updated_at
 
+

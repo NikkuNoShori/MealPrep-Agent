@@ -22,3 +22,4 @@ DROP TABLE IF EXISTS receipts CASCADE;
 -- Note: RLS policies, triggers, and indexes are automatically dropped with CASCADE
 -- No need to explicitly drop them
 
+

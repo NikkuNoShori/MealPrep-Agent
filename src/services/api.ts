@@ -759,6 +759,42 @@ class ApiClient {
       body: JSON.stringify({ userId, preferences, limit }),
     });
   }
+
+  // ── Recipe Pipeline endpoints ──
+
+  async ingestRecipeFromUrl(url: string, autoSave = true) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/ingest`, {
+      method: "POST",
+      body: JSON.stringify({ source_type: "url", url, auto_save: autoSave }),
+    });
+  }
+
+  async ingestRecipeFromText(text: string, images?: string[], autoSave = true) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/ingest`, {
+      method: "POST",
+      body: JSON.stringify({ source_type: "text", text, images, auto_save: autoSave }),
+    });
+  }
+
+  async ingestRecipeFromVideo(
+    data: { video_url?: string; frame_urls?: string[]; transcript?: string },
+    autoSave = true
+  ) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/ingest`, {
+      method: "POST",
+      body: JSON.stringify({ source_type: "video", ...data, auto_save: autoSave }),
+    });
+  }
+
+  async extractRecipeOnly(
+    sourceType: "url" | "text" | "video",
+    data: Record<string, any>
+  ) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/extract-only`, {
+      method: "POST",
+      body: JSON.stringify({ source_type: sourceType, ...data }),
+    });
+  }
 }
 
 // Create singleton instance
