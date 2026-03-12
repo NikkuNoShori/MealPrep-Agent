@@ -63,8 +63,10 @@ BEGIN
   EXECUTE format('ALTER TABLE %I ALTER COLUMN last_name SET DEFAULT ''''', table_name_var);
 
   -- Step 5: Rename table from users to profiles (if it's still called users)
+  -- Must use EXECUTE so Postgres doesn't parse the static reference to 'users'
+  -- when the table has already been renamed to 'profiles'
   IF table_name_var = 'users' THEN
-    ALTER TABLE users RENAME TO profiles;
+    EXECUTE 'ALTER TABLE users RENAME TO profiles';
   END IF;
 END $$;
 

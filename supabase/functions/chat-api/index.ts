@@ -433,13 +433,53 @@ async function handleSendMessage(
 
     const isFirstMessage = !existingConv || !!findError;
 
-    // Save user message
+    // Upload chat images to Supabase Storage and collect public URLs
+    const imageUrls: string[] = [];
+    if (images.length > 0) {
+      for (let i = 0; i < images.length; i++) {
+        try {
+          const base64Data = images[i];
+          // Extract mime type and raw base64
+          const mimeMatch = base64Data.match(/^data:(image\/\w+);base64,/);
+          if (!mimeMatch) continue;
+          const mimeType = mimeMatch[1];
+          const ext = mimeType.split("/")[1] || "jpg";
+          const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
+          const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+
+          const filePath = `chat/${user.id}/${conversationId}/${Date.now()}-${i}.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("chat-images")
+            .upload(filePath, bytes, { contentType: mimeType, upsert: false });
+
+          if (uploadError) {
+            console.warn(`Chat image upload failed: ${uploadError.message}`);
+            continue;
+          }
+
+          const { data: urlData } = supabase.storage
+            .from("chat-images")
+            .getPublicUrl(filePath);
+          if (urlData?.publicUrl) {
+            imageUrls.push(urlData.publicUrl);
+          }
+        } catch (e) {
+          console.warn(`Failed to upload chat image ${i}:`, e.message);
+        }
+      }
+    }
+
+    // Save user message with image URLs in metadata
     await supabase.from("chat_messages").insert({
       conversation_id: conversationId,
       content: message || "[Images only]",
       sender: "user",
       message_type: "text",
-      metadata: { images: images.length, hasImages: images.length > 0 },
+      metadata: {
+        imagesCount: images.length,
+        hasImages: images.length > 0,
+        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      },
     });
 
     // ── Intent routing ──

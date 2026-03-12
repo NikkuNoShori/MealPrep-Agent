@@ -13,7 +13,7 @@ const MAX_RECIPES_PER_REQUEST = 5;
 /** Vision models to try in order — fallback if first returns 500 */
 const VISION_MODELS = [
   "qwen/qwen-2.5-vl-7b-instruct",
-  "google/gemini-flash-1.5-8b",
+  "google/gemini-2.0-flash-001",
 ];
 
 export async function extract(

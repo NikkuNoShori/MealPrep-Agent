@@ -205,7 +205,9 @@ export const ChatInterface: React.FC = () => {
                     content: msg.content,
                     sender: msg.sender as "user" | "ai",
                     timestamp: new Date(msg.timestamp),
+                    images: msg.metadata?.imageUrls || undefined,
                     recipe: msg.metadata?.recipe || undefined,
+                    recipes: msg.metadata?.recipes || undefined,
                   }));
                 }
               } catch (error) {
