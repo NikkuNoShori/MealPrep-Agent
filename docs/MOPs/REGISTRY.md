@@ -23,7 +23,9 @@
 | MOP | Title | Status | Submitted | Updated | Completed | Submitted By |
 |-----|-------|--------|-----------|---------|-----------|--------------|
 | [MOP-0001](MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | planned | 2026-03-11 | 2026-03-11 | — | Nick Neal |
-| [MOP-0002](MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | draft | 2026-03-11 | 2026-03-11 | — | Nick Neal |
+| [MOP-0002](MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | draft | 2026-03-11 | 2026-03-12 | — | Nick Neal |
+| [MOP-0003](MOP-0003.md) | Dietary Profiles & Allergen Detection | draft | 2026-03-12 | 2026-03-12 | — | Nick Neal |
+| [MOP-0004](MOP-0004.md) | Meal Planner & Grocery Cart | draft | 2026-03-12 | 2026-03-12 | — | Nick Neal |
 
 ---
 
