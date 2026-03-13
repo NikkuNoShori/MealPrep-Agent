@@ -2,8 +2,8 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-03-11
-**Last updated:** 2026-03-11 (removed n8n references, archived n8n docs)
+**Last reviewed:** 2026-03-12
+**Last updated:** 2026-03-12 (MOP-0002 status updated to in-progress)
 
 ---
 
@@ -69,8 +69,10 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 
 | MOP | Title | Status |
 |-----|-------|--------|
-| [MOP-0001](MOPs/MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | planned |
-| [MOP-0002](MOPs/MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | draft |
+| [MOP-0001](MOPs/MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | complete |
+| [MOP-0002](MOPs/MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | in-progress |
+| [MOP-0003](MOPs/MOP-0003.md) | Dietary Profiles & Allergen Detection | draft |
+| [MOP-0004](MOPs/MOP-0004.md) | Meal Planner & Grocery Cart | draft |
 
 ---
 

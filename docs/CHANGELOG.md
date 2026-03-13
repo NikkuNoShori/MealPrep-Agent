@@ -2,10 +2,37 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-03-11
-**Last updated:** 2026-03-11 (UI overhaul and layout fix entries)
+**Last reviewed:** 2026-03-12
+**Last updated:** 2026-03-12 (MOP-0002 P1/P2 collections, invite UI, recipe page redesign)
 
 ---
+
+## 2026-03-12 (Recipe collections, invite UI, recipe page modernization — MOP-0002 P1/P2) `enhancement/chat`
+
+- Added `recipe_collections` and `collection_recipes` tables (migration 011) for organizing recipes into shareable folders
+- Default collections (Favorites, My Recipes) auto-created on signup via updated `handle_new_user()` trigger
+- Added collection-level sharing inheritance: recipes in household/public collections are visible to appropriate users (migration 012)
+- Added collections CRUD API methods and React Query hooks (`getMyCollections`, `createCollection`, `updateCollection`, `deleteCollection`, `addRecipeToCollection`, `removeRecipeFromCollection`)
+- Added `CollectionsSidebar` component on Recipes page with create/delete and collection-filtered recipe list
+- Added Household section to Settings page: household name editing, members list with roles, invite-by-email form
+- Added pending invite banners on Settings page with Accept/Decline actions
+- Redesigned `RecipeDetail` page: hero image with gradient overlay, colorful stat pills, glassmorphism cards, two-column layout (ingredients + nutrition / instructions), progress bar macros
+- Added "Show more" ingredient truncation (10 item limit with expand/collapse)
+- Redesigned `VisibilityPicker` as custom dropdown with icon pills, descriptions, and animations
+
+## 2026-03-12 (Household model and recipe visibility — MOP-0002 P0) `enhancement/chat`
+
+- Added `households`, `household_members`, and `household_invites` tables with full RLS (migration 009)
+- Added `recipes.visibility` column (private/household/public) replacing the `is_public` boolean, with sync trigger for backward compatibility
+- Updated `handle_new_user()` trigger to create household + membership on signup
+- Added `household_id` and `managed_by` columns to `family_members` for linking dependents to households
+- Backfill migration creates households for all existing users and links their family members
+- Added SECURITY DEFINER helper functions (`is_household_member`, `get_household_role`) to prevent RLS infinite recursion
+- Added `VisibilityPicker` component (segmented control: Only Me / My Household / Public)
+- Added visibility picker to `StructuredRecipeDisplay` (recipe save from chat) and `RecipeDetail` (recipe view/edit)
+- Added household CRUD methods and React Query hooks to `api.ts`: `getMyHousehold`, `updateHousehold`, `createHouseholdInvite`, `getMyPendingInvites`, `respondToInvite`, `updateRecipeVisibility`
+- Updated `authStore` to load household membership (id, name, role) on auth initialization
+- Updated `FamilyMembers` component to pass `householdId` and `managedBy` when creating dependents
 
 ## 2026-03-11 (Remove n8n dependency, direct RAG search) `feature/next-improvements`
 

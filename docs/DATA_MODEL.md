@@ -2,8 +2,8 @@
 
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
-**Last reviewed:** 2026-03-11
-**Last updated:** 2026-03-10 (initial canonical doc creation)
+**Last reviewed:** 2026-03-12
+**Last updated:** 2026-03-12 (recipe_collections, collection_recipes tables; collection sharing inheritance RLS; updated handle_new_user trigger)
 
 ---
 
@@ -68,7 +68,8 @@ User recipe collection with vector embeddings for semantic search.
 | `nutrition_info` | JSONB | | `{calories, protein, carbs, fat}` |
 | `source_url` | TEXT | | |
 | `source_name` | VARCHAR | | |
-| `is_public` | BOOLEAN | DEFAULT false | |
+| `visibility` | TEXT | NOT NULL DEFAULT 'private', CHECK ('private','household','public') | Three-tier sharing (migration 009) |
+| `is_public` | BOOLEAN | DEFAULT false | Legacy — synced from `visibility` via trigger |
 | `is_favorite` | BOOLEAN | DEFAULT false | |
 | `embedding_vector` | VECTOR(1536) | | OpenAI ada-002 embeddings |
 | `searchable_text` | TEXT | | Auto-generated for full-text search |
@@ -83,14 +84,15 @@ User recipe collection with vector embeddings for semantic search.
 - `embedding_vector` (IVFFlat, cosine, lists=100)
 - `embedding_vector` (IVFFlat, L2, lists=100)
 
-**RLS:** Users can view/edit/delete own recipes + read public recipes (`is_public = true`)
+**RLS:** Unified SELECT policy: owner can view own recipes, household members can view `visibility = 'household'` recipes, all users can view `visibility = 'public'` recipes, plus recipes in shared/public collections are visible via collection-level sharing inheritance (migration 012). INSERT/UPDATE/DELETE: owner only.
 
 **Triggers:**
 - `update_recipes_updated_at` — auto-update `updated_at`
 - `update_recipe_searchable_text_trigger` — concatenates title + description + difficulty + tags + ingredients + instructions into `searchable_text`
 - `trigger_update_recipe_embedding` — clears `embedding_vector` when recipe content changes (must be regenerated separately)
+- `sync_recipe_visibility_trigger` — syncs `is_public` from `visibility` on INSERT/UPDATE (keeps legacy column in sync)
 
-**Migration history:** 007 (create), 008 (RLS), 009 (search functions), 014 (unique title per user)
+**Migration history:** 007 (create), 008 (RLS), 009 (search functions + household visibility), 014 (unique title per user)
 
 ---
 
@@ -219,6 +221,8 @@ Family member profiles with dietary information.
 |--------|------|-------------|-------|
 | `id` | UUID | PK | |
 | `family_id` | UUID | | References `profiles.family_id` (validated via trigger) |
+| `household_id` | UUID | FK → `households(id)` ON DELETE CASCADE | Links dependent to household (migration 009) |
+| `managed_by` | UUID | FK → `profiles(id)` | Authenticated user who manages this dependent |
 | `name` | VARCHAR(255) | NOT NULL | |
 | `relationship` | VARCHAR(100) | | |
 | `age` | INT | | |
@@ -229,13 +233,112 @@ Family member profiles with dietary information.
 | `created_at` | TIMESTAMPTZ | DEFAULT now() | |
 | `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
 
-**Indexes:** family_id
-**RLS:** Users can access family members in their family group
+**Indexes:** family_id, household_id
+**RLS:** Users can access family members in their household (via `is_household_member()` helper) OR via legacy `family_id` path
 **Triggers:**
 - `update_family_members_updated_at`
 - `validate_family_member_family_id` — ensures `family_id` exists in `profiles`
 
-**Note:** `family_id` is not a true FK constraint. Validation is enforced via trigger because `family_id` is not unique in `profiles` (multiple users can share a family).
+**Note:** `family_id` is not a true FK constraint. Validation is enforced via trigger because `family_id` is not unique in `profiles` (multiple users can share a family). The `household_id` column is a real FK and is the preferred path going forward.
+
+---
+
+### households
+
+Core sharing unit. Each user belongs to at least one household. Created automatically on signup via `handle_new_user()` trigger.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `name` | TEXT | NOT NULL, DEFAULT 'My Household' | |
+| `created_by` | UUID | NOT NULL, FK → `profiles(id)` | |
+| `created_at` | TIMESTAMPTZ | DEFAULT now() | |
+| `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
+
+**Indexes:** created_by
+**RLS:** Members can view (via `is_household_member()`), owners can update/delete
+**Triggers:** `update_households_updated_at`
+**Migration:** 009
+
+---
+
+### household_members
+
+Links authenticated users to households with roles (owner/admin/member).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `household_id` | UUID | NOT NULL, FK → `households(id)` ON DELETE CASCADE | |
+| `user_id` | UUID | NOT NULL, FK → `profiles(id)` ON DELETE CASCADE | |
+| `role` | TEXT | NOT NULL, DEFAULT 'member', CHECK ('owner','admin','member') | |
+| `joined_at` | TIMESTAMPTZ | DEFAULT now() | |
+
+**Constraints:** UNIQUE (household_id, user_id)
+**Indexes:** user_id, household_id
+**RLS:** Uses `SECURITY DEFINER` helper functions (`is_household_member()`, `get_household_role()`) to avoid infinite recursion. Members can view same-household rows; owners/admins can insert; owners can update/delete.
+**Migration:** 009
+
+**Note:** Two role systems exist independently: `user_roles` (app-level RBAC: admin/user/family_member) and `household_members.role` (household-level: owner/admin/member). App roles control feature access; household roles control sharing permissions.
+
+---
+
+### household_invites
+
+Pending invitations for authenticated users to join households.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `household_id` | UUID | NOT NULL, FK → `households(id)` ON DELETE CASCADE | |
+| `invited_by` | UUID | NOT NULL, FK → `profiles(id)` | |
+| `invited_email` | TEXT | NOT NULL | |
+| `status` | TEXT | NOT NULL, DEFAULT 'pending', CHECK ('pending','accepted','declined','expired') | |
+| `created_at` | TIMESTAMPTZ | DEFAULT now() | |
+| `expires_at` | TIMESTAMPTZ | DEFAULT now() + 7 days | |
+
+**Indexes:** household_id, invited_email
+**RLS:** Household members + invitee can view; owners/admins can create; owners/admins + invitee can update
+**Migration:** 009
+
+---
+
+### recipe_collections
+
+Folders for organizing recipes. Collections carry their own visibility independent of individual recipe visibility.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `user_id` | UUID | NOT NULL, FK → `profiles(id)` ON DELETE CASCADE | |
+| `name` | TEXT | NOT NULL, UNIQUE per user | |
+| `description` | TEXT | | |
+| `visibility` | TEXT | NOT NULL, DEFAULT 'private', CHECK ('private','household','public') | |
+| `icon` | TEXT | | Emoji or icon name for UI |
+| `sort_order` | INT | DEFAULT 0 | |
+| `created_at` | TIMESTAMPTZ | DEFAULT now() | |
+| `updated_at` | TIMESTAMPTZ | DEFAULT now() | Auto-updated via trigger |
+
+**Indexes:** user_id
+**RLS:** Owner + household members (if household visibility) + everyone (if public) can view; owner-only INSERT/UPDATE/DELETE
+**Triggers:** `update_recipe_collections_updated_at`
+**Migration:** 011
+
+### collection_recipes
+
+Many-to-many join between collections and recipes.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `collection_id` | UUID | NOT NULL, FK → `recipe_collections(id)` ON DELETE CASCADE | |
+| `recipe_id` | UUID | NOT NULL, FK → `recipes(id)` ON DELETE CASCADE | |
+| `added_at` | TIMESTAMPTZ | DEFAULT now() | |
+| `sort_order` | INT | DEFAULT 0 | |
+
+**PK:** (collection_id, recipe_id)
+**Indexes:** recipe_id
+**RLS:** Viewable if parent collection passes SELECT policy; collection owner can INSERT/DELETE
+**Migration:** 011
 
 ---
 
@@ -291,7 +394,10 @@ System roles (`admin`, `user`, `family_member`) with JSONB permissions. Default 
 
 | Function | Type | Description |
 |----------|------|-------------|
-| `handle_new_user()` | Trigger on `auth.users` INSERT | Creates profile + assigns default role |
+| `handle_new_user()` | Trigger on `auth.users` INSERT | Creates profile + assigns default role + creates household + membership + default collections (Favorites, My Recipes) |
+| `sync_recipe_visibility()` | Trigger on recipes INSERT/UPDATE | Syncs `is_public` from `visibility` column |
+| `is_household_member()` | SECURITY DEFINER helper | Checks household membership without RLS recursion |
+| `get_household_role()` | SECURITY DEFINER helper | Returns user's role in a household without RLS recursion |
 | `update_recipe_searchable_text()` | Trigger on recipes INSERT/UPDATE | Builds `searchable_text` from recipe fields |
 | `update_recipe_embedding()` | Trigger on recipes UPDATE | Clears `embedding_vector` when content changes |
 | `validate_family_id()` | Trigger on family_members INSERT/UPDATE | Validates `family_id` exists in profiles |
@@ -323,3 +429,7 @@ System roles (`admin`, `user`, `family_member`) with JSONB permissions. Default 
 | `20251126000000_018_create_chat_messages_table.sql` | 018 | chat_conversations + chat_messages (current schema) |
 | `20251127000000_019_drop_unused_tables.sql` | 019 | Drop deprecated tables |
 | `20251128000000_020_cleanup_user_preferences.sql` | 020 | Cleanup user_preferences |
+| `20260312000000_009_household_and_visibility.sql` | 009b | Households, household_members, household_invites, recipe visibility, updated handle_new_user() trigger |
+| `20260312000001_010_fix_household_rls_recursion.sql` | 010 | Fix RLS infinite recursion: SECURITY DEFINER helpers (`is_household_member`, `get_household_role`), updated all household-related policies |
+| `20260312000002_011_recipe_collections.sql` | 011 | recipe_collections + collection_recipes tables, RLS, indexes, updated handle_new_user() with default collections |
+| `20260312000003_012_collection_sharing_inheritance.sql` | 012 | Updated recipes SELECT policy with collection-level sharing inheritance |

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Save, Clock, Users, ChefHat, Loader2, CheckCircle2, ChevronDown, ChevronRight, AlertTriangle, Copy, X, RefreshCw } from "lucide-react";
 import { useCreateRecipe, useUpdateRecipe, apiClient } from "@/services/api";
+import { VisibilityPicker, type RecipeVisibility } from "@/components/recipes/VisibilityPicker";
 
 interface Ingredient {
   name: string;
@@ -91,6 +92,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
   const [saveTitle, setSaveTitle] = useState(recipe.title);
   const [showIngredients, setShowIngredients] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [visibility, setVisibility] = useState<RecipeVisibility>("private");
   const createRecipeMutation = useCreateRecipe();
   const updateRecipeMutation = useUpdateRecipe();
 
@@ -159,6 +161,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
     ingredients: recipe.ingredients,
     instructions: recipe.instructions,
     imageUrl: finalImageUrl,
+    visibility,
   });
 
   /** Final save — skips the duplicate check in createRecipe since we already checked. */
@@ -514,14 +517,20 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           </div>
         )}
 
-        {/* Save button at the bottom of the card */}
+        {/* Visibility picker + Save button at the bottom of the card */}
+        {!isPrompting && !isSaved && !isBusy && (
+          <div className="flex items-center justify-between mt-3 mb-1">
+            <span className="text-xs text-muted-foreground mr-2">Visibility:</span>
+            <VisibilityPicker value={visibility} onChange={setVisibility} size="sm" />
+          </div>
+        )}
         {!isPrompting && (
           <Button
             onClick={handleSave}
             disabled={isBusy || isSaved}
             size="sm"
             variant={isSaved ? "outline" : "default"}
-            className="w-full mt-3"
+            className="w-full mt-1"
           >
             {isSaved ? (
               <>

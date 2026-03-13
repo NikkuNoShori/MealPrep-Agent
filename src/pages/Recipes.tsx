@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { RecipeList } from "@/components/recipes/RecipeList";
 import { RecipeDetail } from "@/components/recipes/RecipeDetail";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
+import { CollectionsSidebar } from "@/components/recipes/CollectionsSidebar";
 import { apiClient } from "@/services/api";
 
 const Recipes = () => {
@@ -11,11 +12,11 @@ const Recipes = () => {
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<any>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
   // Load recipe from URL slug if present
   useEffect(() => {
     if (slug) {
-      // Try to load recipe by slug (or ID if slug is a UUID)
       apiClient.getRecipe(slug)
         .then(recipe => {
           if (recipe) {
@@ -23,7 +24,6 @@ const Recipes = () => {
             setShowAddForm(false);
             setEditingRecipe(null);
           } else {
-            // Recipe not found, redirect to recipes list
             navigate('/recipes', { replace: true });
           }
         })
@@ -31,7 +31,6 @@ const Recipes = () => {
           navigate('/recipes', { replace: true });
         });
     } else {
-      // No slug in URL - clear selected recipe
       setSelectedRecipe(null);
       setShowAddForm(false);
       setEditingRecipe(null);
@@ -40,11 +39,9 @@ const Recipes = () => {
   }, [slug]);
 
   const handleRecipeSelect = (recipe: any) => {
-    // Navigate to recipe URL using slug if available, otherwise use ID
     if (recipe.slug) {
       navigate(`/recipes/${recipe.slug}`);
     } else {
-      // Fallback to ID if slug not available (for backwards compatibility)
       navigate(`/recipes/${recipe.id}`);
     }
     setSelectedRecipe(recipe);
@@ -71,12 +68,13 @@ const Recipes = () => {
 
   const handleCloseDetail = () => {
     setSelectedRecipe(null);
-    navigate('/recipes'); // Navigate back to recipes list
+    navigate('/recipes');
   };
+
+  const showList = !showAddForm && !selectedRecipe && !editingRecipe;
 
   return (
     <div className="bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {(showAddForm || editingRecipe) && (
           <div className="animate-fade-in">
@@ -84,7 +82,6 @@ const Recipes = () => {
               recipe={editingRecipe}
               onSave={() => {
                 handleCloseForm();
-                // Refresh recipe list
               }}
               onCancel={handleCloseForm}
             />
@@ -99,13 +96,27 @@ const Recipes = () => {
           />
         )}
 
-        {!showAddForm && !selectedRecipe && !editingRecipe && (
-          <div className="animate-fade-in">
-            <RecipeList
-              onRecipeSelect={handleRecipeSelect}
-              onAddRecipe={handleAddRecipe}
-              onEditRecipe={handleEditRecipe}
-            />
+        {showList && (
+          <div className="flex gap-6 animate-fade-in">
+            {/* Collections Sidebar */}
+            <div className="hidden lg:block w-52 shrink-0">
+              <div className="sticky top-4 rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-4">
+                <CollectionsSidebar
+                  selectedCollectionId={selectedCollectionId}
+                  onSelectCollection={setSelectedCollectionId}
+                />
+              </div>
+            </div>
+
+            {/* Recipe List */}
+            <div className="flex-1 min-w-0">
+              <RecipeList
+                onRecipeSelect={handleRecipeSelect}
+                onAddRecipe={handleAddRecipe}
+                onEditRecipe={handleEditRecipe}
+                collectionId={selectedCollectionId}
+              />
+            </div>
           </div>
         )}
       </div>

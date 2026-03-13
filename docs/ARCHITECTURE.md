@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-03-11
-**Last updated:** 2026-03-11 (removed n8n dependency, added direct RAG search, layout architecture)
+**Last reviewed:** 2026-03-12
+**Last updated:** 2026-03-12 (household model, recipe visibility, updated auth flow and RLS)
 
 ---
 
@@ -71,7 +71,9 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 3. Database trigger `handle_new_user()` fires on INSERT:
    - Creates `profiles` row with email, display_name from OAuth metadata
    - Assigns default `user` role in `user_roles`
-4. Frontend `authStore` (Zustand) tracks session state
+   - Creates a `households` row (default name "My Household")
+   - Inserts user into `household_members` as `owner`
+4. Frontend `authStore` (Zustand) tracks session state + household membership
 5. Supabase client auto-refreshes JWT tokens
 6. Edge functions validate JWT from `Authorization: Bearer` header
 
@@ -152,7 +154,7 @@ Handled directly in the `chat-api` edge function (`handleRAGSearch`):
 | `/settings` | Settings | Protected |
 
 ### State Management
-- **Zustand stores** (`src/stores/`): Auth state, theme state — client-side, persistent
+- **Zustand stores** (`src/stores/`): Auth state (incl. household membership), theme state — client-side, persistent
 - **React Query** (`src/services/api.ts`): Server state for recipes, chat, meal plans, preferences — cached, auto-refetched
 - **React Context** (`src/contexts/`): MeasurementSystemContext (metric/imperial preference)
 
@@ -192,7 +194,7 @@ src/components/
 ├── debug/         # Debug utilities
 ├── family/        # Family member management
 ├── meal-planning/ # MealPlanCalendar
-├── recipes/       # RecipeList, RecipeCard, RecipeDetail, RecipeForm, RecipeSearch
+├── recipes/       # RecipeList, RecipeCard, RecipeDetail, RecipeForm, RecipeSearch, VisibilityPicker
 └── ui/            # Radix-based primitives (alert, dialog, select, etc.)
 ```
 
@@ -242,8 +244,9 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 
 **General pattern:**
 - Users can only read/write their own data
-- Exception: `recipes` — users can read public recipes (`is_public = true`)
-- Exception: `family_members` — users can access members in their family group
+- Exception: `recipes` — three-tier visibility: `private` (owner only), `household` (owner + household members), `public` (all users). Controlled by `recipes.visibility` column, replacing the legacy `is_public` boolean.
+- Exception: `family_members` — users can access members in their household
+- Exception: `households`, `household_members` — members can view their own household and its members
 - Exception: `ingredients`, `roles` — read-only for all authenticated users (shared catalogs)
 
 ### API Security

@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-03-11
-**Last updated:** 2026-03-11 (added multi-recipe support, recipe pipeline docs, image constraints, system prompt reference)
+**Last reviewed:** 2026-03-12
+**Last updated:** 2026-03-12 (recipe collections CRUD, collection recipes management)
 
 ---
 
@@ -400,6 +400,34 @@ get_recipe_recommendations(
 | `ragIngredients(ingredients, userId, limit)` | Ingredient-based search |
 | `ragRecommendations(userId, preferences, limit)` | Get recommendations |
 
+### Households
+
+| Method | Description |
+|--------|-------------|
+| `getMyHousehold()` | Get user's household with members and dependents |
+| `updateHousehold(id, data)` | Update household name |
+| `createHouseholdInvite(householdId, email)` | Send invite to email |
+| `getMyPendingInvites()` | Get invites addressed to current user |
+| `respondToInvite(inviteId, accept)` | Accept or decline invite |
+| `updateRecipeVisibility(recipeId, visibility)` | Set recipe visibility (private/household/public) |
+
+**React Query hooks:** `useMyHousehold`, `useUpdateHousehold`, `useCreateHouseholdInvite`, `useMyPendingInvites`, `useRespondToInvite`, `useUpdateRecipeVisibility`
+
+### Recipe Collections
+
+| Method | Description |
+|--------|-------------|
+| `getMyCollections()` | Get all collections owned by the current user |
+| `getCollection(collectionId)` | Get a single collection by ID |
+| `getCollectionRecipes(collectionId)` | Get recipes in a collection (with full recipe data) |
+| `createCollection(name, description?, icon?)` | Create a new collection |
+| `updateCollection(collectionId, updates)` | Update collection name, description, icon, or visibility |
+| `deleteCollection(collectionId)` | Delete a collection (recipes are not deleted) |
+| `addRecipeToCollection(collectionId, recipeId)` | Add a recipe to a collection |
+| `removeRecipeFromCollection(collectionId, recipeId)` | Remove a recipe from a collection |
+
+**React Query hooks:** `useMyCollections`, `useCollection`, `useCollectionRecipes`, `useCreateCollection`, `useUpdateCollection`, `useDeleteCollection`, `useAddRecipeToCollection`, `useRemoveRecipeFromCollection`
+
 ### Field Mapping
 
 The API client automatically converts between frontend camelCase and database snake_case:
@@ -410,7 +438,10 @@ The API client automatically converts between frontend camelCase and database sn
 - `imageUrl` ↔ `image_url`
 - `nutritionInfo` ↔ `nutrition_info`
 - `sourceUrl` ↔ `source_url`
-- `isPublic` ↔ `is_public`
+- `visibility` ↔ `visibility`
+- `isPublic` ↔ `is_public` (legacy, synced via trigger)
+- `householdId` ↔ `household_id`
+- `managedBy` ↔ `managed_by`
 - `createdAt` ↔ `created_at`
 - `updatedAt` ↔ `updated_at`
 

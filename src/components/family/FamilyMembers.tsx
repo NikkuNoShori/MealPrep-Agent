@@ -15,10 +15,14 @@ interface FamilyMember {
   dietaryRestrictions: string[];
   allergies: string[];
   preferences: Record<string, any>;
+  householdId?: string;
+  managedBy?: string;
 }
 
 interface FamilyMembersProps {
   members: FamilyMember[];
+  householdId?: string;
+  currentUserId?: string;
   onAddMember: (member: Omit<FamilyMember, 'id'>) => void;
   onUpdateMember: (id: string, updates: Partial<FamilyMember>) => void;
   onDeleteMember: (id: string) => void;
@@ -60,6 +64,8 @@ const COMMON_ALLERGIES = [
 
 export const FamilyMembers: React.FC<FamilyMembersProps> = ({
   members,
+  householdId,
+  currentUserId,
   onAddMember,
   onUpdateMember,
   onDeleteMember
@@ -85,7 +91,9 @@ export const FamilyMembers: React.FC<FamilyMembersProps> = ({
       age: formData.age ? parseInt(formData.age) : undefined,
       dietaryRestrictions: formData.dietaryRestrictions,
       allergies: formData.allergies,
-      preferences: {}
+      preferences: {},
+      householdId,
+      managedBy: currentUserId,
     });
 
     setFormData({

@@ -9,7 +9,8 @@
       "Bash(find /c/dev/MealPrep-Agent -name *.md -type f)",
       "Bash(find /c/dev/MealPrep-Agent/docs -type f -name *.md)",
       "Bash(node -e \"require\\(''fs''\\).readFileSync\\(''c:/dev/MealPrep-Agent/supabase/functions/_shared/recipe-prompts.ts'', ''utf8''\\); console.log\\(''Parses OK''\\)\")",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm run:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\nickn\\.claude"
