@@ -1,11 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { useTheme } from '../providers/ThemeProvider';
 import { useAuthStore } from '../stores/authStore';
 import { useMeasurementSystem } from "../contexts/MeasurementSystemContext";
+import {
+  useMyHousehold,
+  useUpdateHousehold,
+  useCreateHouseholdInvite,
+  useMyPendingInvites,
+  useRespondToInvite,
+} from '../services/api';
 import {
   Moon,
   Sun,
@@ -16,8 +25,29 @@ import {
   Ruler,
   Save,
   X,
+  Home,
+  UserPlus,
+  Crown,
+  Shield,
+  User,
+  Mail,
+  Check,
+  XCircle,
+  Pencil,
 } from "lucide-react";
 import toast from 'react-hot-toast';
+
+const roleIcons: Record<string, React.ElementType> = {
+  owner: Crown,
+  admin: Shield,
+  member: User,
+};
+
+const roleLabels: Record<string, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  member: 'Member',
+};
 
 const Settings = () => {
   const { theme, setTheme, colorScheme, availableColorSchemes, setColorScheme } = useTheme();
@@ -33,8 +63,20 @@ const Settings = () => {
   const [stagedColorScheme, setStagedColorScheme] = useState<string>(colorScheme.name);
   const [stagedMeasurementSystem, setStagedMeasurementSystem] = useState<typeof system>(system);
 
+  // Household state
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
+
+  // Household queries
+  const { data: householdData, isLoading: householdLoading } = useMyHousehold();
+  const updateHousehold = useUpdateHousehold();
+  const createInvite = useCreateHouseholdInvite();
+  const { data: pendingInvites } = useMyPendingInvites();
+  const respondToInvite = useRespondToInvite();
+
   // Check if there are unsaved changes
-  const hasUnsavedChanges = 
+  const hasUnsavedChanges =
     stagedTheme !== theme ||
     stagedColorScheme !== colorScheme.name ||
     stagedMeasurementSystem !== system;
@@ -70,7 +112,7 @@ const Settings = () => {
     if (!confirm('Are you sure you want to unlink your Google account? You will need to use email/password to sign in.')) {
       return;
     }
-    
+
     try {
       await unlinkGoogleAccount();
       toast.success('Google account unlinked successfully');
@@ -80,21 +122,15 @@ const Settings = () => {
   };
 
   const handleSave = () => {
-    // Apply staged theme
     if (stagedTheme !== theme) {
       setTheme(stagedTheme);
     }
-
-    // Apply staged color scheme
     if (stagedColorScheme !== colorScheme.name) {
       setColorScheme(stagedColorScheme);
     }
-
-    // Apply staged measurement system
     if (stagedMeasurementSystem !== system) {
       setSystem(stagedMeasurementSystem);
     }
-
     toast.success('Settings saved successfully');
   };
 
@@ -105,11 +141,60 @@ const Settings = () => {
     toast('Changes reset');
   };
 
+  const handleSendInvite = () => {
+    if (!inviteEmail.trim() || !householdData?.household?.id) return;
+    createInvite.mutate(
+      { householdId: householdData.household.id, email: inviteEmail.trim() },
+      {
+        onSuccess: () => {
+          toast.success(`Invite sent to ${inviteEmail.trim()}`);
+          setInviteEmail('');
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Failed to send invite');
+        },
+      }
+    );
+  };
+
+  const handleSaveHouseholdName = () => {
+    if (!editedName.trim() || !householdData?.household?.id) return;
+    updateHousehold.mutate(
+      { householdId: householdData.household.id, name: editedName.trim() },
+      {
+        onSuccess: () => {
+          toast.success('Household name updated');
+          setIsEditingName(false);
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Failed to update name');
+        },
+      }
+    );
+  };
+
+  const handleRespondInvite = (inviteId: string, accept: boolean) => {
+    respondToInvite.mutate(
+      { inviteId, accept },
+      {
+        onSuccess: () => {
+          toast.success(accept ? 'Joined household!' : 'Invite declined');
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Failed to respond to invite');
+        },
+      }
+    );
+  };
+
   const themeOptions = [
     { value: 'light', label: 'Light', icon: Sun },
     { value: 'dark', label: 'Dark', icon: Moon },
     { value: 'system', label: 'System', icon: Monitor },
   ];
+
+  const myRole = householdData?.myRole;
+  const canInvite = myRole === 'owner' || myRole === 'admin';
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -139,6 +224,210 @@ const Settings = () => {
             </div>
           )}
         </div>
+
+        {/* ── Pending Invites Banner ── */}
+        {pendingInvites && pendingInvites.length > 0 && (
+          <div className="space-y-3">
+            {pendingInvites.map((invite: any) => (
+              <div
+                key={invite.id}
+                className="flex items-center justify-between p-4 rounded-xl border border-primary/30 bg-primary/5 dark:bg-primary/10"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10 dark:bg-primary/20">
+                    <Mail className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">
+                      You've been invited to join <span className="text-primary">{invite.households?.name || 'a household'}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Respond to this invite to join the household
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleRespondInvite(invite.id, false)}
+                    disabled={respondToInvite.isPending}
+                    className="gap-1.5"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    Decline
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleRespondInvite(invite.id, true)}
+                    disabled={respondToInvite.isPending}
+                    className="gap-1.5"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Accept
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Household Settings ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Home className="h-5 w-5" />
+              Household
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {householdLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !householdData ? (
+              <p className="text-sm text-muted-foreground">
+                No household found. One should have been created when you signed up.
+              </p>
+            ) : (
+              <>
+                {/* Household Name */}
+                <div className="space-y-2">
+                  <Label>Household Name</Label>
+                  {isEditingName ? (
+                    <div className="flex gap-2">
+                      <Input
+                        value={editedName}
+                        onChange={(e) => setEditedName(e.target.value)}
+                        placeholder="Enter household name"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveHouseholdName();
+                          if (e.key === 'Escape') setIsEditingName(false);
+                        }}
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleSaveHouseholdName}
+                        disabled={updateHousehold.isPending || !editedName.trim()}
+                      >
+                        {updateHousehold.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsEditingName(false)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">
+                        {householdData.household?.name || 'My Household'}
+                      </p>
+                      {myRole === 'owner' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => {
+                            setEditedName(householdData.household?.name || '');
+                            setIsEditingName(true);
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Your role: <span className="font-medium capitalize">{myRole || 'member'}</span>
+                  </p>
+                </div>
+
+                {/* Members List */}
+                <div className="space-y-3">
+                  <Label>Members</Label>
+                  <div className="space-y-2">
+                    {(householdData.members || []).map((member: any) => {
+                      const RoleIcon = roleIcons[member.role] || User;
+                      const isCurrentUser = member.userId === user?.id;
+                      return (
+                        <div
+                          key={member.id}
+                          className={`flex items-center justify-between p-3 rounded-xl border transition-colors duration-150 ${
+                            isCurrentUser ? 'border-primary/30 bg-primary/5 dark:bg-primary/10' : 'border-border/60 hover:bg-accent/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold ${
+                              isCurrentUser
+                                ? 'bg-primary/20 text-primary'
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {member.profiles?.displayName?.charAt(0)?.toUpperCase() ||
+                               member.profiles?.email?.charAt(0)?.toUpperCase() || '?'}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">
+                                {member.profiles?.displayName || member.profiles?.email || 'Unknown'}
+                                {isCurrentUser && <span className="text-xs text-muted-foreground ml-1.5">(you)</span>}
+                              </p>
+                              {member.profiles?.displayName && member.profiles?.email && (
+                                <p className="text-xs text-muted-foreground">{member.profiles.email}</p>
+                              )}
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="gap-1 text-xs"
+                          >
+                            <RoleIcon className="h-3 w-3" />
+                            {roleLabels[member.role] || member.role}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Invite Member */}
+                {canInvite && (
+                  <div className="space-y-2">
+                    <Label>Invite Member</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="Enter email address"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSendInvite();
+                        }}
+                      />
+                      <Button
+                        onClick={handleSendInvite}
+                        disabled={createInvite.isPending || !inviteEmail.trim()}
+                        className="gap-1.5 shrink-0"
+                      >
+                        {createInvite.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserPlus className="h-4 w-4" />
+                        )}
+                        Invite
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Send an invite to add someone to your household. They'll be able to see your household-shared recipes.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Theme Settings */}
         <Card>
@@ -326,7 +615,7 @@ const Settings = () => {
               </div>
               {!hasEmailPassword && hasGoogleLinked && (
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  ⚠️ You must have an email/password account to unlink Google.
+                  You must have an email/password account to unlink Google.
                   Please set a password first.
                 </p>
               )}

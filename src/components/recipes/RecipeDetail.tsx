@@ -1,15 +1,17 @@
 import React, { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useMeasurementSystem } from '@/contexts/MeasurementSystemContext'
 import { convertIngredient, optimizeUnit, formatConvertedValue, Unit } from '@/utils/unitConverter'
-import { 
-  ArrowLeft, 
-  Edit, 
-  Clock, 
-  Users, 
-  Star, 
+import { VisibilityPicker, type RecipeVisibility } from '@/components/recipes/VisibilityPicker'
+import { AddToCollectionMenu } from '@/components/recipes/AddToCollectionMenu'
+import { useUpdateRecipeVisibility } from '@/services/api'
+import {
+  ArrowLeft,
+  Edit,
+  Clock,
+  Users,
+  Star,
   ChefHat,
   Heart,
   ThumbsUp,
@@ -19,7 +21,10 @@ import {
   TrendingUp,
   TrendingDown,
   MinusCircle,
-  Flame
+  Flame,
+  UtensilsCrossed,
+  ListChecks,
+  ChevronDown
 } from 'lucide-react'
 
 interface RecipeDetailProps {
@@ -41,6 +46,7 @@ interface RecipeDetailProps {
       category?: string
     }>
     instructions?: string[]
+    visibility?: RecipeVisibility
     familyPreferences?: { [memberId: string]: 'love' | 'like' | 'neutral' | 'dislike' }
     nutritionInfo?: {
       calories?: number
@@ -53,15 +59,17 @@ interface RecipeDetailProps {
   onClose?: () => void
 }
 
-export const RecipeDetail: React.FC<RecipeDetailProps> = ({ 
-  recipe, 
-  onEdit, 
-  onClose 
+export const RecipeDetail: React.FC<RecipeDetailProps> = ({
+  recipe,
+  onEdit,
+  onClose
 }) => {
   const [isImageFullscreen, setIsImageFullscreen] = useState(false)
+  const [showAllIngredients, setShowAllIngredients] = useState(false)
   const { system } = useMeasurementSystem()
+  const updateVisibility = useUpdateRecipeVisibility()
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0)
-  
+
   const getDifficultyIcon = (difficulty: string) => {
     switch (difficulty) {
       case 'easy': return TrendingDown
@@ -73,10 +81,10 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return 'text-green-600 dark:text-green-400'
-      case 'medium': return 'text-yellow-600 dark:text-yellow-400'
-      case 'hard': return 'text-red-600 dark:text-red-400'
-      default: return 'text-gray-600 dark:text-gray-400'
+      case 'easy': return 'text-green-500 bg-green-500/10 dark:bg-green-500/20'
+      case 'medium': return 'text-yellow-500 bg-yellow-500/10 dark:bg-yellow-500/20'
+      case 'hard': return 'text-red-500 bg-red-500/10 dark:bg-red-500/20'
+      default: return 'text-muted-foreground bg-muted'
     }
   }
 
@@ -99,282 +107,388 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
     }
   }
 
+  const hasImage = recipe.imageUrl && recipe.imageUrl !== 'none'
+  const hasNutrition = recipe.nutritionInfo && (
+    (recipe.nutritionInfo.calories && recipe.nutritionInfo.calories > 0) ||
+    (recipe.nutritionInfo.protein && recipe.nutritionInfo.protein > 0) ||
+    (recipe.nutritionInfo.carbs && recipe.nutritionInfo.carbs > 0) ||
+    (recipe.nutritionInfo.fat && recipe.nutritionInfo.fat > 0)
+  )
+
+  const maxNutrient = Math.max(
+    recipe.nutritionInfo?.protein || 0,
+    recipe.nutritionInfo?.carbs || 0,
+    recipe.nutritionInfo?.fat || 0
+  )
+
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header with Image */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            {onClose && (
-              <Button variant="outline" size="icon" onClick={onClose}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <h1 className="text-3xl font-bold">{recipe.title}</h1>
-          </div>
+    <div className="max-w-6xl mx-auto animate-fade-in">
+      {/* ── Top Bar ── */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {onClose && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onClose}
+              className="rounded-xl border-border/60 bg-background/80 backdrop-blur-sm hover:bg-accent/50 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
           {onEdit && (
-            <Button onClick={onEdit}>
+            <Button
+              onClick={onEdit}
+              className="rounded-xl hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 shadow-sm hover:shadow-md"
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
           )}
+          <AddToCollectionMenu recipeId={recipe.id} size="sm" />
+          <VisibilityPicker
+            value={recipe.visibility || 'private'}
+            onChange={(v) => updateVisibility.mutate({ recipeId: recipe.id, visibility: v })}
+            size="sm"
+          />
         </div>
-
-        {/* Recipe Image - Compact header size */}
-        {recipe.imageUrl && (
-          <>
-            <div 
-              className="rounded-lg overflow-hidden bg-muted/50 mb-4 cursor-pointer hover:opacity-95 transition-all group shadow-md hover:shadow-lg"
-              onClick={() => setIsImageFullscreen(true)}
-            >
-              <div className="relative w-full h-56">
-                <img 
-                  src={recipe.imageUrl} 
-                  alt={recipe.title}
-                  className="w-full h-full object-cover"
-                  style={{ 
-                    imageRendering: '-webkit-optimize-contrast',
-                    backfaceVisibility: 'hidden',
-                    transform: 'translateZ(0)',
-                    willChange: 'transform'
-                  }}
-                  loading="lazy"
-                  onError={(e) => {
-                    console.error('Image failed to load:', recipe.imageUrl);
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
-                  <div className="text-white text-xs bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-sm">
-                    Click to view full size
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Fullscreen Image Modal */}
-            {isImageFullscreen && (
-              <div
-                className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-                onClick={() => setIsImageFullscreen(false)}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-4 right-4 text-white hover:bg-white/20"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsImageFullscreen(false);
-                  }}
-                >
-                  <X className="h-6 w-6" />
-                </Button>
-                <div
-                  className="relative max-w-full max-h-full"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <img
-                    src={recipe.imageUrl}
-                    alt={recipe.title}
-                    className="max-w-full max-h-[90vh] object-contain rounded-lg"
-                  />
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Description */}
-        {recipe.description && (
-          <p className="text-muted-foreground text-lg leading-relaxed">{recipe.description}</p>
-        )}
       </div>
 
-      {/* Recipe Meta */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Recipe Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {totalTime > 0 && (
-              <div className="text-center">
-                <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Total Time</p>
-                <p className="font-semibold">{totalTime} min</p>
+      {/* ── Hero Image (full width) ── */}
+      {hasImage && (
+        <>
+          <div
+            className="relative rounded-2xl overflow-hidden cursor-pointer group shadow-lg hover:shadow-2xl transition-all duration-500 mb-6"
+            onClick={() => setIsImageFullscreen(true)}
+          >
+            <div className="relative w-full h-72 sm:h-80 lg:h-96">
+              <img
+                src={recipe.imageUrl}
+                alt={recipe.title}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                style={{
+                  imageRendering: '-webkit-optimize-contrast',
+                  backfaceVisibility: 'hidden',
+                  transform: 'translateZ(0)',
+                }}
+                loading="lazy"
+                onError={(e) => {
+                  console.error('Image failed to load:', recipe.imageUrl)
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8">
+                <h1 className="text-3xl sm:text-4xl font-bold text-white drop-shadow-lg leading-tight">
+                  {recipe.title}
+                </h1>
+                {recipe.description && (
+                  <p className="text-white/80 text-sm sm:text-base mt-2 line-clamp-2 max-w-2xl">
+                    {recipe.description}
+                  </p>
+                )}
               </div>
-            )}
-            {recipe.prepTime && (
-              <div className="text-center">
-                <ChefHat className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Prep Time</p>
-                <p className="font-semibold">{recipe.prepTime} min</p>
+              <div className="absolute top-4 right-4 text-white text-xs bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                Click to enlarge
               </div>
-            )}
-            {recipe.cookTime && (
-              <div className="text-center">
-                <Flame className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Cook Time</p>
-                <p className="font-semibold">{recipe.cookTime} min</p>
-              </div>
-            )}
-            {recipe.servings && (
-              <div className="text-center">
-                <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Servings</p>
-                <p className="font-semibold">{recipe.servings}</p>
-              </div>
-            )}
-            {recipe.difficulty && (() => {
-              const DifficultyIcon = getDifficultyIcon(recipe.difficulty);
-              return (
-                <div className="text-center">
-                  <DifficultyIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Difficulty</p>
-                  <p className="font-semibold">{getDifficultyLabel(recipe.difficulty)}</p>
-                </div>
-              );
-            })()}
-            {!recipe.difficulty && recipe.rating && (
-              <div className="text-center">
-                <Star className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Rating</p>
-                <p className="font-semibold">{recipe.rating.toFixed(1)}</p>
-              </div>
-            )}
+            </div>
           </div>
 
-          {/* Tags */}
-          {recipe.tags && recipe.tags.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-muted-foreground">Tags:</span>
-              {recipe.tags.map((tag, index) => (
-                <Badge key={index} variant="secondary">
-                  {tag}
-                </Badge>
-              ))}
+          {isImageFullscreen && (
+            <div
+              className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+              onClick={() => setIsImageFullscreen(false)}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 text-white hover:bg-white/20 rounded-xl"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsImageFullscreen(false)
+                }}
+              >
+                <X className="h-6 w-6" />
+              </Button>
+              <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+                <img
+                  src={recipe.imageUrl}
+                  alt={recipe.title}
+                  className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+                />
+              </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </>
+      )}
 
-      {/* Ingredients */}
-      {recipe.ingredients && recipe.ingredients.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Ingredients</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {recipe.ingredients.map((ingredient, index) => {
-                // Ensure amount is a valid number
-                const amount = typeof ingredient.amount === 'number' ? ingredient.amount : parseFloat(ingredient.amount) || 0;
-                const unit = (ingredient.unit || 'piece') as Unit;
-                
-                // Convert ingredient to user's preferred measurement system
-                const converted = convertIngredient(
-                  amount,
-                  unit,
-                  system
-                );
-                const optimized = optimizeUnit(converted.amount, converted.unit);
-                const displayValue = formatConvertedValue(optimized.value, optimized.unit);
-                
+      {/* ── Title (no-image fallback) ── */}
+      {!hasImage && (
+        <div className="mb-6">
+          <h1 className="text-3xl sm:text-4xl font-bold">{recipe.title}</h1>
+          {recipe.description && (
+            <p className="text-muted-foreground text-base sm:text-lg leading-relaxed mt-3 max-w-2xl">
+              {recipe.description}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Quick Stats Pills ── */}
+      {(totalTime > 0 || recipe.servings || recipe.difficulty) && (
+        <div className="flex flex-wrap gap-3 mb-6 animate-slide-up">
+          {totalTime > 0 && (
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+              <Clock className="h-4 w-4 text-blue-500" />
+              <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">{totalTime} min</span>
+            </div>
+          )}
+          {recipe.prepTime !== undefined && recipe.prepTime > 0 && (
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-violet-500/10 dark:bg-violet-500/20 border border-violet-500/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+              <ChefHat className="h-4 w-4 text-violet-500" />
+              <span className="text-sm font-semibold text-violet-700 dark:text-violet-300">Prep {recipe.prepTime}m</span>
+            </div>
+          )}
+          {recipe.cookTime !== undefined && recipe.cookTime > 0 && (
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-orange-500/10 dark:bg-orange-500/20 border border-orange-500/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+              <Flame className="h-4 w-4 text-orange-500" />
+              <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">Cook {recipe.cookTime}m</span>
+            </div>
+          )}
+          {recipe.servings && (
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+              <Users className="h-4 w-4 text-emerald-500" />
+              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{recipe.servings} servings</span>
+            </div>
+          )}
+          {recipe.difficulty && (() => {
+            const DifficultyIcon = getDifficultyIcon(recipe.difficulty)
+            const colorClasses = getDifficultyColor(recipe.difficulty)
+            return (
+              <div className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-current/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${colorClasses}`}>
+                <DifficultyIcon className="h-4 w-4" />
+                <span className="text-sm font-semibold">{getDifficultyLabel(recipe.difficulty)}</span>
+              </div>
+            )
+          })()}
+          {!recipe.difficulty && recipe.rating && (
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-yellow-500/10 dark:bg-yellow-500/20 border border-yellow-500/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+              <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">{recipe.rating.toFixed(1)}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tags ── */}
+      {recipe.tags && recipe.tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-6">
+          {recipe.tags.map((tag, index) => (
+            <Badge
+              key={index}
+              variant="secondary"
+              className="rounded-full px-3 py-1 text-xs font-medium bg-primary/5 dark:bg-primary/10 text-primary border-primary/20 hover:bg-primary/10 dark:hover:bg-primary/20 transition-colors duration-200"
+            >
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {/* ── Two-Column Content Layout ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+        {/* Left Column — Ingredients + Nutrition */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Ingredients */}
+          {recipe.ingredients && recipe.ingredients.length > 0 && (
+            <div className="rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-5 transition-all duration-300 hover:shadow-md">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-xl bg-primary/10 dark:bg-primary/20">
+                  <UtensilsCrossed className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="text-lg font-bold">Ingredients</h2>
+                <span className="text-xs text-muted-foreground ml-auto bg-muted/60 px-2.5 py-1 rounded-full">
+                  {recipe.ingredients.length}
+                </span>
+              </div>
+              {(() => {
+                const INGREDIENT_LIMIT = 10
+                const allIngredients = recipe.ingredients!
+                const isOverLimit = allIngredients.length > INGREDIENT_LIMIT
+                const visibleIngredients = showAllIngredients ? allIngredients : allIngredients.slice(0, INGREDIENT_LIMIT)
+                const hiddenCount = allIngredients.length - INGREDIENT_LIMIT
+
                 return (
-                  <div key={index} className="flex items-center justify-between py-2">
-                    <span className="font-medium">{ingredient.name}</span>
-                    <span className="text-muted-foreground">
-                      {displayValue}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  <>
+                    <div className="space-y-0.5">
+                      {visibleIngredients.map((ingredient, index) => {
+                        const amount = typeof ingredient.amount === 'number' ? ingredient.amount : parseFloat(ingredient.amount) || 0
+                        const unit = (ingredient.unit || 'piece') as Unit
+                        const converted = convertIngredient(amount, unit, system)
+                        const optimized = optimizeUnit(converted.amount, converted.unit)
+                        const displayValue = formatConvertedValue(optimized.value, optimized.unit)
 
-      {/* Instructions */}
-      {recipe.instructions && recipe.instructions.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Instructions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recipe.instructions.map((instruction, index) => (
-                <div key={index} className="flex gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold">
-                    {index + 1}
-                  </div>
-                  <p className="flex-1">{instruction}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                        return (
+                          <div
+                            key={index}
+                            className={`flex items-center justify-between py-2.5 px-2.5 rounded-lg transition-colors duration-150 hover:bg-accent/40 ${
+                              index !== visibleIngredients.length - 1 ? 'border-b border-border/30' : ''
+                            }`}
+                          >
+                            <span className="font-medium text-sm">{ingredient.name}</span>
+                            <span className="text-sm text-muted-foreground font-mono tabular-nums ml-3 shrink-0">
+                              {displayValue}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
 
-      {/* Family Preferences */}
-      {recipe.familyPreferences && Object.keys(recipe.familyPreferences).length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Family Preferences</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {Object.entries(recipe.familyPreferences).map(([memberId, preference]) => (
-                <div key={memberId} className="flex items-center justify-between">
-                  <span className="font-medium">{memberId}</span>
-                  <div className="flex items-center gap-1">
-                    {getPreferenceIcon(preference)}
-                    <span className="text-sm capitalize">{preference}</span>
-                  </div>
-                </div>
-              ))}
+                    {isOverLimit && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllIngredients(!showAllIngredients)}
+                        className="w-full mt-3 py-2.5 flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-primary bg-primary/5 dark:bg-primary/10 hover:bg-primary/10 dark:hover:bg-primary/20 border border-primary/15 transition-all duration-200 hover:shadow-sm active:scale-[0.98] group"
+                      >
+                        <span>
+                          {showAllIngredients ? 'Show less' : `Show ${hiddenCount} more`}
+                        </span>
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${showAllIngredients ? 'rotate-180' : 'group-hover:translate-y-0.5'}`} />
+                      </button>
+                    )}
+                  </>
+                )
+              })()}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
 
-      {/* Nutrition Information */}
-      {recipe.nutritionInfo && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Nutrition (per serving)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recipe.nutritionInfo.calories && (
-                <div className="flex justify-between">
-                  <span>Calories</span>
-                  <span className="font-medium">{recipe.nutritionInfo.calories}</span>
+          {/* Nutrition */}
+          {hasNutrition && (
+            <div className="rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-5 transition-all duration-300 hover:shadow-md">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-xl bg-orange-500/10 dark:bg-orange-500/20">
+                  <Flame className="h-5 w-5 text-orange-500" />
                 </div>
-              )}
-              {recipe.nutritionInfo.protein && (
-                <div className="flex justify-between">
-                  <span>Protein</span>
-                  <span className="font-medium">{recipe.nutritionInfo.protein}g</span>
-                </div>
-              )}
-              {recipe.nutritionInfo.carbs && (
-                <div className="flex justify-between">
-                  <span>Carbohydrates</span>
-                  <span className="font-medium">{recipe.nutritionInfo.carbs}g</span>
-                </div>
-              )}
-              {recipe.nutritionInfo.fat && (
-                <div className="flex justify-between">
-                  <span>Fat</span>
-                  <span className="font-medium">{recipe.nutritionInfo.fat}g</span>
-                </div>
-              )}
+                <h2 className="text-lg font-bold">Nutrition</h2>
+                <span className="text-xs text-muted-foreground ml-auto">per serving</span>
+              </div>
+
+              <div className="space-y-4">
+                {recipe.nutritionInfo!.calories !== undefined && recipe.nutritionInfo!.calories > 0 && (
+                  <div className="text-center p-3.5 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 dark:from-orange-500/20 dark:to-red-500/20 border border-orange-500/20">
+                    <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                      {recipe.nutritionInfo!.calories}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 font-medium uppercase tracking-wider">Calories</div>
+                  </div>
+                )}
+
+                {recipe.nutritionInfo!.protein !== undefined && recipe.nutritionInfo!.protein > 0 && (
+                  <div>
+                    <div className="flex justify-between text-sm mb-1.5">
+                      <span className="font-medium">Protein</span>
+                      <span className="text-muted-foreground font-mono">{recipe.nutritionInfo!.protein}g</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-700"
+                        style={{ width: maxNutrient > 0 ? `${(recipe.nutritionInfo!.protein! / maxNutrient) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {recipe.nutritionInfo!.carbs !== undefined && recipe.nutritionInfo!.carbs > 0 && (
+                  <div>
+                    <div className="flex justify-between text-sm mb-1.5">
+                      <span className="font-medium">Carbs</span>
+                      <span className="text-muted-foreground font-mono">{recipe.nutritionInfo!.carbs}g</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-700"
+                        style={{ width: maxNutrient > 0 ? `${(recipe.nutritionInfo!.carbs! / maxNutrient) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {recipe.nutritionInfo!.fat !== undefined && recipe.nutritionInfo!.fat > 0 && (
+                  <div>
+                    <div className="flex justify-between text-sm mb-1.5">
+                      <span className="font-medium">Fat</span>
+                      <span className="text-muted-foreground font-mono">{recipe.nutritionInfo!.fat}g</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-rose-500 to-pink-400 transition-all duration-700"
+                        style={{ width: maxNutrient > 0 ? `${(recipe.nutritionInfo!.fat! / maxNutrient) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {/* Family Preferences */}
+          {recipe.familyPreferences && Object.keys(recipe.familyPreferences).length > 0 && (
+            <div className="rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-5 transition-all duration-300 hover:shadow-md">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-xl bg-pink-500/10 dark:bg-pink-500/20">
+                  <Heart className="h-5 w-5 text-pink-500" />
+                </div>
+                <h2 className="text-lg font-bold">Family</h2>
+              </div>
+              <div className="space-y-2">
+                {Object.entries(recipe.familyPreferences).map(([memberId, preference]) => (
+                  <div
+                    key={memberId}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-accent/30 hover:bg-accent/50 transition-colors duration-150"
+                  >
+                    <span className="font-medium text-sm">{memberId}</span>
+                    <div className="flex items-center gap-1.5">
+                      {getPreferenceIcon(preference)}
+                      <span className="text-xs capitalize text-muted-foreground">{preference}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column — Instructions */}
+        <div className="lg:col-span-3">
+          {recipe.instructions && recipe.instructions.length > 0 && (
+            <div className="rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-5 transition-all duration-300 hover:shadow-md">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20">
+                  <ListChecks className="h-5 w-5 text-emerald-500" />
+                </div>
+                <h2 className="text-lg font-bold">Instructions</h2>
+                <span className="text-xs text-muted-foreground ml-auto bg-muted/60 px-2.5 py-1 rounded-full">
+                  {recipe.instructions.length} steps
+                </span>
+              </div>
+              <div className="space-y-5">
+                {recipe.instructions.map((instruction, index) => (
+                  <div key={index} className="flex gap-4 group">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-sm font-bold shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-200">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 pt-1">
+                      <p className="text-sm leading-relaxed text-foreground/90">{instruction}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
-
-

@@ -2,8 +2,8 @@
 
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
-**Last reviewed:** 2026-03-11
-**Last updated:** 2026-03-11 (added layout whitespace and recipe service entries)
+**Last reviewed:** 2026-03-12
+**Last updated:** 2026-03-12 (added migration dependency order entry)
 
 ---
 
@@ -406,6 +406,68 @@ grep -n 'localhost:3000\|LOCAL_API' src/services/recipeService.ts
 
 ---
 
+## Household: Infinite recursion in RLS policies
+
+### Symptom
+- 500 errors on `household_members`, `recipes`, or `family_members` queries
+- PostgreSQL error: `infinite recursion detected in policy for relation "household_members"`
+- Recipes page fails to load
+
+### Likely causes
+- `household_members` RLS policies reference `household_members` in subqueries, causing circular evaluation
+- Any table policy that subqueries `household_members` triggers its RLS, which subqueries itself
+
+### Verification steps
+```sql
+-- Check if helper functions exist
+SELECT proname FROM pg_proc WHERE proname IN ('is_household_member', 'get_household_role');
+
+-- Check if functions are SECURITY DEFINER (bypasses RLS)
+SELECT proname, prosecdef FROM pg_proc WHERE proname IN ('is_household_member', 'get_household_role');
+
+-- Check policies on household_members
+SELECT policyname, qual FROM pg_policies WHERE tablename = 'household_members';
+```
+
+### Fix steps
+1. Ensure `is_household_member()` and `get_household_role()` helper functions exist as `SECURITY DEFINER`
+2. All policies on `household_members` must use these helpers instead of direct subqueries
+3. All policies on other tables that reference `household_members` should also use these helpers
+4. Re-run migration 009 or apply the helper functions + updated policies manually
+
+**Added:** 2026-03-12
+
+---
+
+## Household: Profile not created with household on signup
+
+### Symptom
+- New user signs up but has no household
+- `authStore.household` is null after login
+- Household features don't work for new accounts
+
+### Likely causes
+- `handle_new_user()` trigger not updated to create household
+- Migration 009 not applied
+
+### Verification steps
+```sql
+-- Check if user has a household membership
+SELECT * FROM household_members WHERE user_id = '<user-uuid>';
+
+-- Check trigger function includes household creation
+SELECT prosrc FROM pg_proc WHERE proname = 'handle_new_user';
+```
+
+### Fix steps
+1. If migration 009 hasn't run, apply it
+2. For existing users without households, run the backfill block from migration 009 section 4
+3. Verify the trigger function creates both `households` and `household_members` rows
+
+**Added:** 2026-03-12
+
+---
+
 ## Development: Local dev server won't start
 
 ### Symptom
@@ -437,3 +499,30 @@ ls node_modules/.package-lock.json 2>/dev/null
 4. Run `npm run dev`
 
 **Added:** 2026-03-10
+
+---
+
+## Migration: DROP COLUMN fails with "other objects depend on it"
+
+### Symptom
+- `supabase db push` fails with `SQLSTATE 2BP01`
+- Error: `cannot drop column X of table Y because other objects depend on it`
+- Lists RLS policies that reference the column being dropped
+
+### Likely causes
+- RLS policies reference the column in their USING/WITH CHECK expressions
+- The migration attempts to drop the column before dropping the dependent policies
+
+### Verification steps
+```sql
+-- Find all policies on a table
+SELECT policyname, qual, with_check FROM pg_policies WHERE tablename = 'recipes';
+```
+
+### Fix steps
+1. In the migration, DROP all RLS policies that reference the column **before** the ALTER TABLE DROP COLUMN
+2. Recreate the policies without the dropped column reference after the column is removed
+3. If the migration already partially ran, repair it first: `supabase migration repair --status reverted <version>`
+4. Then push again: `supabase db push`
+
+**Added:** 2026-03-12

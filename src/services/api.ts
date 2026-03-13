@@ -25,7 +25,6 @@ const RECIPE_FIELD_MAP: Record<string, string> = {
   imageUrl: 'image_url',
   nutritionInfo: 'nutrition_info',
   sourceUrl: 'source_url',
-  isPublic: 'is_public',
   createdAt: 'created_at',
   updatedAt: 'updated_at',
   userId: 'user_id',
@@ -36,7 +35,6 @@ const RECIPE_FIELD_MAP: Record<string, string> = {
   image_url: 'imageUrl',
   nutrition_info: 'nutritionInfo',
   source_url: 'sourceUrl',
-  is_public: 'isPublic',
   created_at: 'createdAt',
   updated_at: 'updatedAt',
   user_id: 'userId',
@@ -218,18 +216,20 @@ class ApiClient {
     return !!data; // Returns true if duplicate exists
   }
 
-  async createRecipe(data: any) {
+  async createRecipe(data: any, options?: { skipDuplicateCheck?: boolean }) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    // Check for duplicate recipe name
-    const isDuplicate = await this.checkDuplicateRecipe(data.title);
-    if (isDuplicate) {
-      throw new Error(
-        `A recipe with the name "${data.title}" already exists. Please choose a different name.`
-      );
+    // Check for duplicate recipe name (skip if caller already checked)
+    if (!options?.skipDuplicateCheck) {
+      const isDuplicate = await this.checkDuplicateRecipe(data.title);
+      if (isDuplicate) {
+        throw new Error(
+          `A recipe with the name "${data.title}" already exists. Please choose a different name.`
+        );
+      }
     }
 
     // Transform camelCase to snake_case for database
@@ -769,6 +769,55 @@ class ApiClient {
     });
   }
 
+  // ── Duplicate & Similarity checks ──
+
+  /**
+   * Check if a recipe with the same title already exists (Phase 1 — pre-save).
+   * Returns the existing recipe's id and title if found.
+   */
+  async checkDuplicateTitle(title: string): Promise<{ isDuplicate: boolean; existingId?: string; existingTitle?: string }> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("id, title")
+      .eq("user_id", user.id)
+      .ilike("title", title.trim().toLowerCase())
+      .maybeSingle();
+
+    if (error && error.code !== "PGRST116") throw error;
+
+    const record = data as { id: string; title: string } | null;
+    return {
+      isDuplicate: !!record,
+      existingId: record?.id,
+      existingTitle: record?.title,
+    };
+  }
+
+  /**
+   * Check for semantically similar recipes (Phase 2 — post-embedding).
+   * Sends recipe data to backend which generates an embedding and searches.
+   * Returns similar recipes above the similarity threshold.
+   */
+  async checkSimilarRecipes(recipeData: {
+    title: string;
+    description?: string;
+    ingredients?: any[];
+    instructions?: string[];
+    tags?: string[];
+    cuisine?: string;
+    difficulty?: string;
+  }): Promise<{ similar: Array<{ id: string; title: string; similarity: number }> }> {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/check-similar`, {
+      method: "POST",
+      body: JSON.stringify(recipeData),
+    });
+  }
+
   // ── Recipe Pipeline endpoints ──
 
   async ingestRecipeFromUrl(url: string, autoSave = true) {
@@ -804,6 +853,242 @@ class ApiClient {
       body: JSON.stringify({ source_type: sourceType, ...data }),
     });
   }
+
+  // ── Household endpoints ──
+
+  async getMyHousehold() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Get the first household this user belongs to (v1 assumes one household per user)
+    // Note: "as any" casts needed until supabase types are regenerated with new tables
+    const { data: membership, error: memError } = await (supabase
+      .from("household_members") as any)
+      .select("household_id, role, households(id, name, created_by, created_at, updated_at)")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (memError) throw memError;
+    if (!membership) return null;
+
+    // Get all members of this household
+    const { data: members, error: membersError } = await (supabase
+      .from("household_members") as any)
+      .select("id, user_id, role, joined_at, profiles(id, email, display_name, avatar_url)")
+      .eq("household_id", membership.household_id);
+
+    if (membersError) throw membersError;
+
+    // Get dependents (family_members) in this household
+    const { data: dependents, error: depsError } = await (supabase
+      .from("family_members") as any)
+      .select("*")
+      .eq("household_id", membership.household_id)
+      .eq("is_active", true);
+
+    if (depsError) throw depsError;
+
+    return {
+      household: snakeToCamel(membership.households),
+      myRole: membership.role,
+      members: (members || []).map((m: any) => snakeToCamel(m)),
+      dependents: (dependents || []).map((d: any) => snakeToCamel(d)),
+    };
+  }
+
+  async updateHousehold(householdId: string, data: { name: string }) {
+    const { data: household, error } = await (supabase
+      .from("households") as any)
+      .update({ name: data.name })
+      .eq("id", householdId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(household);
+  }
+
+  async createHouseholdInvite(householdId: string, email: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data: invite, error } = await (supabase
+      .from("household_invites") as any)
+      .insert({
+        household_id: householdId,
+        invited_by: user.id,
+        invited_email: email,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(invite);
+  }
+
+  async getMyPendingInvites() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Get user's email to find invites
+    const { data: profile } = await (supabase
+      .from("profiles") as any)
+      .select("email")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile) return [];
+
+    const { data: invites, error } = await (supabase
+      .from("household_invites") as any)
+      .select("*, households(id, name)")
+      .eq("invited_email", (profile as any).email)
+      .eq("status", "pending");
+
+    if (error) throw error;
+    return (invites || []).map((i: any) => snakeToCamel(i));
+  }
+
+  async respondToInvite(inviteId: string, accept: boolean) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Update invite status
+    const { data: invite, error: updateError } = await (supabase
+      .from("household_invites") as any)
+      .update({ status: accept ? "accepted" : "declined" })
+      .eq("id", inviteId)
+      .select("*, households(id, name)")
+      .single();
+
+    if (updateError) throw updateError;
+
+    // If accepted, add user to household
+    if (accept && invite) {
+      const { error: joinError } = await (supabase
+        .from("household_members") as any)
+        .insert({
+          household_id: invite.household_id,
+          user_id: user.id,
+          role: "member",
+        });
+
+      if (joinError) throw joinError;
+    }
+
+    return snakeToCamel(invite);
+  }
+
+  async updateRecipeVisibility(recipeId: string, visibility: 'private' | 'household' | 'public') {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { error } = await (supabase
+      .from("recipes") as any)
+      .update({ visibility })
+      .eq("id", recipeId)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+    return { id: recipeId, visibility };
+  }
+
+  // ── Recipe Collections ──
+
+  async getMyCollections() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await (supabase
+      .from("recipe_collections") as any)
+      .select("*")
+      .eq("user_id", user.id)
+      .order("sort_order", { ascending: true });
+
+    if (error) throw error;
+    return (data || []).map((c: any) => snakeToCamel(c));
+  }
+
+  async getCollection(collectionId: string) {
+    const { data, error } = await (supabase
+      .from("recipe_collections") as any)
+      .select("*")
+      .eq("id", collectionId)
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async getCollectionRecipes(collectionId: string) {
+    const { data, error } = await (supabase
+      .from("collection_recipes") as any)
+      .select("recipe_id, sort_order, added_at, recipes(*)")
+      .eq("collection_id", collectionId)
+      .order("sort_order", { ascending: true });
+
+    if (error) throw error;
+    return (data || []).map((cr: any) => snakeToCamel(cr));
+  }
+
+  async createCollection(name: string, description?: string, icon?: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await (supabase
+      .from("recipe_collections") as any)
+      .insert({
+        user_id: user.id,
+        name,
+        description: description || null,
+        icon: icon || null,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async updateCollection(collectionId: string, updates: { name?: string; description?: string; icon?: string; visibility?: string }) {
+    const { data, error } = await (supabase
+      .from("recipe_collections") as any)
+      .update(updates)
+      .eq("id", collectionId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async deleteCollection(collectionId: string) {
+    const { error } = await (supabase
+      .from("recipe_collections") as any)
+      .delete()
+      .eq("id", collectionId);
+
+    if (error) throw error;
+  }
+
+  async addRecipeToCollection(collectionId: string, recipeId: string) {
+    const { error } = await (supabase
+      .from("collection_recipes") as any)
+      .insert({ collection_id: collectionId, recipe_id: recipeId });
+
+    if (error) throw error;
+  }
+
+  async removeRecipeFromCollection(collectionId: string, recipeId: string) {
+    const { error } = await (supabase
+      .from("collection_recipes") as any)
+      .delete()
+      .eq("collection_id", collectionId)
+      .eq("recipe_id", recipeId);
+
+    if (error) throw error;
+  }
 }
 
 // Create singleton instance
@@ -832,7 +1117,8 @@ export const useCreateRecipe = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: any) => apiClient.createRecipe(data),
+    mutationFn: ({ data, options }: { data: any; options?: { skipDuplicateCheck?: boolean } }) =>
+      apiClient.createRecipe(data, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
     },
@@ -937,6 +1223,165 @@ export const useUpdatePreferences = () => {
     mutationFn: (data: any) => apiClient.updatePreferences(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["preferences"] });
+    },
+  });
+};
+
+// ── Household hooks ──
+
+export const useMyHousehold = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+
+  return useQuery({
+    queryKey: ["household"],
+    queryFn: () => apiClient.getMyHousehold(),
+    enabled: !authLoading && !!user,
+    retry: false,
+  });
+};
+
+export const useUpdateHousehold = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ householdId, name }: { householdId: string; name: string }) =>
+      apiClient.updateHousehold(householdId, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useCreateHouseholdInvite = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ householdId, email }: { householdId: string; email: string }) =>
+      apiClient.createHouseholdInvite(householdId, email),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useMyPendingInvites = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+
+  return useQuery({
+    queryKey: ["household-invites"],
+    queryFn: () => apiClient.getMyPendingInvites(),
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useRespondToInvite = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ inviteId, accept }: { inviteId: string; accept: boolean }) =>
+      apiClient.respondToInvite(inviteId, accept),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+      queryClient.invalidateQueries({ queryKey: ["household-invites"] });
+    },
+  });
+};
+
+export const useUpdateRecipeVisibility = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ recipeId, visibility }: { recipeId: string; visibility: 'private' | 'household' | 'public' }) =>
+      apiClient.updateRecipeVisibility(recipeId, visibility),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+    },
+  });
+};
+
+// ── Collection Hooks ──
+
+export const useMyCollections = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+
+  return useQuery({
+    queryKey: ["collections"],
+    queryFn: () => apiClient.getMyCollections(),
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useCollection = (collectionId: string) => {
+  return useQuery({
+    queryKey: ["collections", collectionId],
+    queryFn: () => apiClient.getCollection(collectionId),
+    enabled: !!collectionId,
+  });
+};
+
+export const useCollectionRecipes = (collectionId: string) => {
+  return useQuery({
+    queryKey: ["collections", collectionId, "recipes"],
+    queryFn: () => apiClient.getCollectionRecipes(collectionId),
+    enabled: !!collectionId,
+  });
+};
+
+export const useCreateCollection = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ name, description, icon }: { name: string; description?: string; icon?: string }) =>
+      apiClient.createCollection(name, description, icon),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+    },
+  });
+};
+
+export const useUpdateCollection = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ collectionId, updates }: { collectionId: string; updates: { name?: string; description?: string; icon?: string; visibility?: string } }) =>
+      apiClient.updateCollection(collectionId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+    },
+  });
+};
+
+export const useDeleteCollection = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (collectionId: string) => apiClient.deleteCollection(collectionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+    },
+  });
+};
+
+export const useAddRecipeToCollection = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ collectionId, recipeId }: { collectionId: string; recipeId: string }) =>
+      apiClient.addRecipeToCollection(collectionId, recipeId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["collections", variables.collectionId, "recipes"] });
+    },
+  });
+};
+
+export const useRemoveRecipeFromCollection = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ collectionId, recipeId }: { collectionId: string; recipeId: string }) =>
+      apiClient.removeRecipeFromCollection(collectionId, recipeId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["collections", variables.collectionId, "recipes"] });
     },
   });
 };

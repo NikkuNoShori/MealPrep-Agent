@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { authService } from '@/services/supabase'
+import { supabase } from '@/services/supabase'
 
 export interface AuthUser {
   id: string
@@ -7,11 +8,18 @@ export interface AuthUser {
   [key: string]: any
 }
 
+export interface HouseholdMembership {
+  householdId: string
+  householdName: string
+  role: 'owner' | 'admin' | 'member'
+}
+
 interface AuthState {
   user: AuthUser | null
   isLoading: boolean
   error: string | null
   linkedAccounts: Array<{ provider: string; id: string; created_at: string }>
+  household: HouseholdMembership | null
   initialize: () => Promise<void>
   refreshUser: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
@@ -20,6 +28,7 @@ interface AuthState {
   linkGoogleAccount: (redirectTo?: string) => Promise<void>
   unlinkGoogleAccount: () => Promise<void>
   loadLinkedAccounts: () => Promise<void>
+  loadHousehold: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<void>
   signOut: () => Promise<void>
 }
@@ -32,22 +41,23 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   error: null,
   linkedAccounts: [],
+  household: null,
 
   initialize: async () => {
     // Prevent multiple simultaneous initializations
     if (initializationStarted) {
       return // Already initializing
     }
-    
+
     initializationStarted = true
     set({ isLoading: true, error: null })
     try {
       // Add timeout to prevent hanging
       const getUserPromise = authService.getUser()
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Auth initialization timeout')), 5000)
       )
-      
+
       const currentUser = await Promise.race([getUserPromise, timeoutPromise]) as any
       set({ user: currentUser || null })
       if (currentUser) {
@@ -57,6 +67,28 @@ export const useAuthStore = create<AuthState>((set) => ({
         } catch (err) {
           // Don't fail initialization if linked accounts fail
           console.warn('Failed to load linked accounts:', err)
+        }
+        // Load household membership
+        try {
+          const { data: membership } = await (supabase
+            .from("household_members") as any)
+            .select("household_id, role, households(name)")
+            .eq("user_id", currentUser.id)
+            .limit(1)
+            .maybeSingle()
+
+          if (membership) {
+            set({
+              household: {
+                householdId: membership.household_id,
+                householdName: membership.households?.name || 'My Household',
+                role: membership.role as 'owner' | 'admin' | 'member',
+              }
+            })
+          }
+        } catch (err) {
+          // Don't fail initialization if household load fails (table may not exist yet)
+          console.warn('Failed to load household:', err)
         }
       }
     } catch (err: any) {
@@ -111,13 +143,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const signUpResult = await authService.signUp(email, password)
-      
-      // If signup succeeded but no session (email confirmation required), 
+
+      // If signup succeeded but no session (email confirmation required),
       // automatically sign in the user
       if (signUpResult.user && !signUpResult.session) {
         await authService.signIn(email, password)
       }
-      
+
       const currentUser = await authService.getUser()
       set({ user: currentUser || null })
       if (currentUser) {
@@ -184,6 +216,34 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  loadHousehold: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: membership } = await (supabase
+        .from("household_members") as any)
+        .select("household_id, role, households(name)")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (membership) {
+        set({
+          household: {
+            householdId: membership.household_id,
+            householdName: membership.households?.name || 'My Household',
+            role: membership.role as 'owner' | 'admin' | 'member',
+          }
+        })
+      } else {
+        set({ household: null })
+      }
+    } catch (err: any) {
+      console.warn('Failed to load household:', err)
+    }
+  },
+
   requestPasswordReset: async (email: string) => {
     set({ isLoading: true, error: null })
     try {
@@ -200,7 +260,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       await authService.signOut()
-      set({ user: null, linkedAccounts: [] })
+      set({ user: null, linkedAccounts: [], household: null })
     } catch (err: any) {
       set({ error: err?.message || 'Sign out failed' })
       throw err
@@ -209,5 +269,3 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   }
 }))
-
-

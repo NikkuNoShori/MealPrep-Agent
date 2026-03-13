@@ -54,7 +54,7 @@ export async function load(
       source_url: recipe.source_url,
       source_name: recipe.source_name,
       slug: recipe.slug,
-      is_public: false,
+      visibility: 'private',
       is_favorite: false,
       ...(embedding ? { embedding_vector: `[${embedding.join(",")}]` } : {}),
     })

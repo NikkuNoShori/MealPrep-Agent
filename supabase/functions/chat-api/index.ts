@@ -68,7 +68,7 @@ async function extractRecipe(
   message: string,
   images: string[],
   userToken: string
-): Promise<{ success: boolean; recipe?: any; error?: string; source_url?: string }> {
+): Promise<{ success: boolean; recipe?: any; recipes?: any[]; error?: string; source_url?: string }> {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -108,8 +108,17 @@ async function extractRecipe(
 
     const result = await response.json();
 
-    if (result.success && result.recipe) {
-      console.log("Recipe extracted via pipeline:", result.recipe.title);
+    if (result.success && (result.recipe || result.recipes)) {
+      if (result.recipes && result.recipes.length > 1) {
+        console.log(`Multi-recipe extracted via pipeline: ${result.recipes.length} recipes`);
+        return {
+          success: true,
+          recipe: result.recipes[0],
+          recipes: result.recipes,
+          source_url: detectedUrl || undefined,
+        };
+      }
+      console.log("Recipe extracted via pipeline:", result.recipe?.title);
       return { success: true, recipe: result.recipe, source_url: detectedUrl || undefined };
     }
 
@@ -424,13 +433,53 @@ async function handleSendMessage(
 
     const isFirstMessage = !existingConv || !!findError;
 
-    // Save user message
+    // Upload chat images to Supabase Storage and collect public URLs
+    const imageUrls: string[] = [];
+    if (images.length > 0) {
+      for (let i = 0; i < images.length; i++) {
+        try {
+          const base64Data = images[i];
+          // Extract mime type and raw base64
+          const mimeMatch = base64Data.match(/^data:(image\/\w+);base64,/);
+          if (!mimeMatch) continue;
+          const mimeType = mimeMatch[1];
+          const ext = mimeType.split("/")[1] || "jpg";
+          const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
+          const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+
+          const filePath = `chat/${user.id}/${conversationId}/${Date.now()}-${i}.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("chat-images")
+            .upload(filePath, bytes, { contentType: mimeType, upsert: false });
+
+          if (uploadError) {
+            console.warn(`Chat image upload failed: ${uploadError.message}`);
+            continue;
+          }
+
+          const { data: urlData } = supabase.storage
+            .from("chat-images")
+            .getPublicUrl(filePath);
+          if (urlData?.publicUrl) {
+            imageUrls.push(urlData.publicUrl);
+          }
+        } catch (e) {
+          console.warn(`Failed to upload chat image ${i}:`, e.message);
+        }
+      }
+    }
+
+    // Save user message with image URLs in metadata
     await supabase.from("chat_messages").insert({
       conversation_id: conversationId,
       content: message || "[Images only]",
       sender: "user",
       message_type: "text",
-      metadata: { images: images.length, hasImages: images.length > 0 },
+      metadata: {
+        imagesCount: images.length,
+        hasImages: images.length > 0,
+        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      },
     });
 
     // ── Intent routing ──
@@ -455,14 +504,22 @@ async function handleSendMessage(
     // ── Route to service ──
     let aiResponse: string;
     let recipe: any = null;
+    let recipes: any[] | null = null;
 
     if (routingIntent === "recipe_extraction") {
       const extractionResult = await extractRecipe(message || "", images, userToken);
       if (extractionResult.success) {
         recipe = extractionResult.recipe;
-        aiResponse = extractionResult.source_url
-          ? `I've fetched and extracted the recipe from that URL! Here's what I found:`
-          : "I've extracted the recipe! Here's what I found:";
+        recipes = extractionResult.recipes || null;
+        if (recipes && recipes.length > 1) {
+          aiResponse = extractionResult.source_url
+            ? `I've fetched and extracted ${recipes.length} recipes from that URL! Here's what I found:`
+            : `I've extracted ${recipes.length} recipes! Here's what I found:`;
+        } else {
+          aiResponse = extractionResult.source_url
+            ? `I've fetched and extracted the recipe from that URL! Here's what I found:`
+            : "I've extracted the recipe! Here's what I found:";
+        }
       } else {
         aiResponse = `I had trouble extracting the recipe: ${extractionResult.error}`;
       }
@@ -482,7 +539,7 @@ async function handleSendMessage(
         content: aiResponse,
         sender: "ai",
         message_type: recipe ? "recipe" : "text",
-        metadata: { ...intentMetadata, recipe, routingDuration },
+        metadata: { ...intentMetadata, recipe, recipes, routingDuration },
       })
       .select()
       .single();
@@ -518,6 +575,7 @@ async function handleSendMessage(
         timestamp: new Date().toISOString(),
       },
       recipe,
+      recipes: recipes && recipes.length > 1 ? recipes : undefined,
       conversationId,
       sessionId: session_id,
       intentMetadata,

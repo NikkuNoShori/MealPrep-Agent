@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, createRef } from 'react'
 import { useSendMessage, useChatHistory } from "../../services/api";
 import { apiClient } from "../../services/api";
 import { detectIntent } from "../../services/ragService";
@@ -20,11 +20,90 @@ import {
   Check,
   PanelLeftClose,
   PanelLeftOpen,
+  Save,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { ChatMessageResponse, StructuredRecipe } from "../../types";
 import { useAuthStore } from "../../stores/authStore";
-import { StructuredRecipeDisplay } from "./StructuredRecipeDisplay";
+import { StructuredRecipeDisplay, StructuredRecipeDisplayHandle } from "./StructuredRecipeDisplay";
+
+/** Maximum image file size in bytes (5MB) */
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+/** Maximum image dimension for compression */
+const MAX_IMAGE_DIMENSION = 1200;
+/** JPEG compression quality */
+const COMPRESSION_QUALITY = 0.8;
+
+/**
+ * Validate and compress an image file.
+ * Returns the compressed File, or throws if invalid.
+ */
+async function validateAndCompressImage(file: File): Promise<File> {
+  // Validate type
+  if (!file.type.startsWith("image/")) {
+    throw new Error(`"${file.name}" is not an image file`);
+  }
+
+  // Validate size (reject if over 5MB raw)
+  if (file.size > MAX_IMAGE_SIZE) {
+    throw new Error(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is 5MB.`);
+  }
+
+  // Compress using canvas
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      let { width, height } = img;
+
+      // Only resize if larger than max dimension
+      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+        const ratio = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(file); // Fallback: return original if canvas fails
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const compressedFile = new File([blob], file.name, {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          });
+          console.log(
+            `Image compressed: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB (${width}x${height})`
+          );
+          resolve(compressedFile);
+        },
+        "image/jpeg",
+        COMPRESSION_QUALITY
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error(`"${file.name}" could not be loaded — the file may be corrupt`));
+    };
+
+    img.src = url;
+  });
+}
 
 interface Message {
   id: string;
@@ -33,6 +112,7 @@ interface Message {
   timestamp: Date;
   images?: string[]; // Array of image URLs or base64 data URLs
   recipe?: StructuredRecipe; // Optional structured recipe data
+  recipes?: StructuredRecipe[]; // Optional multiple recipes
 }
 
 interface Conversation {
@@ -75,6 +155,8 @@ export const ChatInterface: React.FC = () => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   const sendMessageMutation = useSendMessage();
   const { user } = useAuthStore();
@@ -123,7 +205,9 @@ export const ChatInterface: React.FC = () => {
                     content: msg.content,
                     sender: msg.sender as "user" | "ai",
                     timestamp: new Date(msg.timestamp),
+                    images: msg.metadata?.imageUrls || undefined,
                     recipe: msg.metadata?.recipe || undefined,
+                    recipes: msg.metadata?.recipes || undefined,
                   }));
                 }
               } catch (error) {
@@ -419,7 +503,7 @@ export const ChatInterface: React.FC = () => {
   };
 
   // Handle image file selection
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
 
@@ -427,7 +511,20 @@ export const ChatInterface: React.FC = () => {
     const remainingSlots = 4 - pendingImages.length;
     const filesToAdd = imageFiles.slice(0, remainingSlots);
 
-    setPendingImages((prev) => [...prev, ...filesToAdd]);
+    // Validate and compress each image
+    const processedFiles: File[] = [];
+    for (const file of filesToAdd) {
+      try {
+        const compressed = await validateAndCompressImage(file);
+        processedFiles.push(compressed);
+      } catch (error: any) {
+        toast.error(error.message || "Invalid image file");
+      }
+    }
+
+    if (processedFiles.length > 0) {
+      setPendingImages((prev) => [...prev, ...processedFiles]);
+    }
 
     // Reset file input
     if (fileInputRef.current) {
@@ -436,7 +533,7 @@ export const ChatInterface: React.FC = () => {
   };
 
   // Handle paste images from clipboard
-  const handlePaste = (e: React.ClipboardEvent) => {
+  const handlePaste = async (e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData.items);
     const imageItems = items.filter((item) => item.type.startsWith("image/"));
 
@@ -444,12 +541,17 @@ export const ChatInterface: React.FC = () => {
       const remainingSlots = 4 - pendingImages.length;
       const itemsToProcess = imageItems.slice(0, remainingSlots);
 
-      itemsToProcess.forEach((item) => {
+      for (const item of itemsToProcess) {
         const file = item.getAsFile();
         if (file) {
-          setPendingImages((prev) => [...prev, file]);
+          try {
+            const compressed = await validateAndCompressImage(file);
+            setPendingImages((prev) => [...prev, compressed]);
+          } catch (error: any) {
+            toast.error(error.message || "Invalid pasted image");
+          }
         }
-      });
+      }
     }
   };
 
@@ -766,16 +868,27 @@ export const ChatInterface: React.FC = () => {
         response = sendResponse;
       }
 
+      // Handle multi-recipe or single recipe response
+      const responseRecipes = (response as any).recipes as StructuredRecipe[] | undefined;
       const aiMessage: Message = {
         id: response.response.id,
         content: response.response.content,
         sender: "ai",
         timestamp: new Date(response.response.timestamp),
-        recipe: response.recipe, // Include structured recipe if present
+        recipe: response.recipe, // Include structured recipe if present (backwards compat)
+        recipes: responseRecipes && responseRecipes.length > 1 ? responseRecipes : undefined,
       };
 
       // Log successful response
-      if (response.recipe) {
+      if (responseRecipes && responseRecipes.length > 1) {
+        responseRecipes.forEach((r) => {
+          Logger.chat.recipeExtracted(
+            currentConversationId,
+            r.title || 'Unknown',
+            true
+          );
+        });
+      } else if (response.recipe) {
         Logger.chat.recipeExtracted(
           currentConversationId,
           response.recipe.title || 'Unknown',
@@ -801,6 +914,7 @@ export const ChatInterface: React.FC = () => {
       Logger.chat.stateChange('message_received', {
         conversationId: currentConversationId,
         hasRecipe: !!response.recipe,
+        recipeCount: responseRecipes?.length || (response.recipe ? 1 : 0),
       });
     } catch (error) {
       Logger.chat.error('sendMessage', error as Error, {
@@ -1080,7 +1194,7 @@ export const ChatInterface: React.FC = () => {
         {/* Messages Area */}
         <div
           ref={messagesContainerRef}
-          className={`flex-1 p-4 space-y-4 min-h-0 ${
+          className={`flex-1 p-4 space-y-4 min-h-0 overflow-x-hidden ${
             currentConversation && currentConversation.messages.length > 0
               ? "overflow-y-auto"
               : "overflow-hidden"
@@ -1112,20 +1226,20 @@ export const ChatInterface: React.FC = () => {
               </div>
             </div>
           ) : (
-            currentConversation.messages.map((message) => (
+            currentConversation.messages.map((message, msgIndex) => (
               <div
                 key={message.id}
                 className={`group/msg flex gap-3 ${
                   message.sender === "user" ? "justify-end" : "justify-start"
-                } ${message.recipe && message.sender === "ai" ? "w-full" : ""}`}
+                } ${(message.recipe || message.recipes) && message.sender === "ai" ? "w-full" : ""}`}
               >
                 {message.sender === "ai" && (
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <Bot className="h-4 w-4 text-primary" />
                   </div>
                 )}
-                {message.recipe && message.sender === "ai" ? (
-                  // Full-width recipe display
+                {(message.recipe || message.recipes) && message.sender === "ai" ? (
+                  // Full-width recipe display (single or multi)
                   <div className="flex-1">
                     {message.content && (
                       <div className="relative mb-3 max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
@@ -1134,7 +1248,7 @@ export const ChatInterface: React.FC = () => {
                         </p>
                         <button
                           onClick={() => copyMessage(message.id, message.content)}
-                          className="absolute -bottom-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                          className="absolute -top-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 shadow-sm"
                           title="Copy message"
                         >
                           {copiedMessageId === message.id ? (
@@ -1145,77 +1259,112 @@ export const ChatInterface: React.FC = () => {
                         </button>
                       </div>
                     )}
-                    <StructuredRecipeDisplay
-                      recipe={message.recipe}
-                      onSave={(result) => {
-                        if (!currentConversationId) return;
-                        const now = new Date();
+                    {/* Render multiple recipe cards or single */}
+                    {(() => {
+                      const recipeList = message.recipes && message.recipes.length > 1 ? message.recipes : [message.recipe!];
+                      const isMulti = recipeList.length > 1;
+                      const cardRefs = isMulti ? recipeList.map(() => createRef<StructuredRecipeDisplayHandle>()) : [];
+                      const prevUserMsg = currentConversation.messages.slice(0, msgIndex).reverse().find(m => m.sender === "user" && m.images?.length);
+                      const userImage = prevUserMsg?.images?.[0];
 
-                        // Inject a "Save Recipe" user message
-                        const saveRequestMsg: Message = {
-                          id: `save-req-${Date.now()}`,
-                          content: "Save Recipe",
-                          sender: "user",
-                          timestamp: now,
-                        };
+                      return (
+                        <>
+                          {isMulti && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="mb-2 gap-1.5"
+                              onClick={() => {
+                                cardRefs.forEach((r) => r.current?.triggerSave());
+                              }}
+                            >
+                              <Save className="h-3.5 w-3.5" />
+                              Save All ({recipeList.length})
+                            </Button>
+                          )}
+                          {recipeList.map((recipeItem, recipeIdx) => (
+                            <StructuredRecipeDisplay
+                              key={`${message.id}-recipe-${recipeIdx}`}
+                              ref={isMulti ? cardRefs[recipeIdx] : undefined}
+                              recipe={recipeItem}
+                              userImageDataUrl={userImage}
+                              onSave={(result) => {
+                                if (!currentConversationId) return;
+                                const now = new Date();
 
-                        // Inject success/fail AI response
-                        const saveResponseMsg: Message = {
-                          id: `save-res-${Date.now()}`,
-                          content: result.success
-                            ? `"${message.recipe!.title}" has been saved to your recipe collection!`
-                            : `Failed to save recipe: ${result.error || "Unknown error"}`,
-                          sender: "ai",
-                          timestamp: new Date(now.getTime() + 1),
-                        };
-
-                        setConversations((prev) =>
-                          prev.map((conv) =>
-                            conv.id === currentConversationId
-                              ? {
-                                  ...conv,
-                                  messages: [...conv.messages, saveRequestMsg, saveResponseMsg],
-                                  lastMessage: saveResponseMsg.content,
+                                const saveRequestMsg: Message = {
+                                  id: `save-req-${Date.now()}-${recipeIdx}`,
+                                  content: "Save Recipe",
+                                  sender: "user",
                                   timestamp: now,
-                                }
-                              : conv
-                          )
-                        );
+                                };
 
-                        if (result.success) {
-                          toast.success(`"${message.recipe!.title}" saved!`);
-                        } else {
-                          toast.error(result.error || "Failed to save recipe");
-                        }
-                      }}
-                    />
+                                const saveResponseMsg: Message = {
+                                  id: `save-res-${Date.now()}-${recipeIdx}`,
+                                  content: result.success
+                                    ? `"${recipeItem.title}" has been saved to your recipe collection!`
+                                    : `Failed to save recipe: ${result.error || "Unknown error"}`,
+                                  sender: "ai",
+                                  timestamp: new Date(now.getTime() + 1),
+                                };
+
+                                setConversations((prev) =>
+                                  prev.map((conv) =>
+                                    conv.id === currentConversationId
+                                      ? {
+                                          ...conv,
+                                          messages: [...conv.messages, saveRequestMsg, saveResponseMsg],
+                                          lastMessage: saveResponseMsg.content,
+                                          timestamp: now,
+                                        }
+                                      : conv
+                                  )
+                                );
+
+                                if (result.success) {
+                                  toast.success(`"${recipeItem.title}" saved!`);
+                                } else {
+                                  toast.error(result.error || "Failed to save recipe");
+                                }
+                              }}
+                            />
+                          ))}
+                        </>
+                      );
+                    })()}
                   </div>
                 ) : (
                   // Regular message display
-                  <div className="relative group/bubble">
+                  <div className="relative group/bubble max-w-[70%] min-w-0">
                     <div
-                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                      className={`rounded-lg px-4 py-2 ${
                         message.sender === "user"
                           ? "bg-primary text-white"
                           : "bg-gray-100 dark:bg-gray-800"
                       }`}
                     >
-                      {/* Display images if present */}
+                      {/* Display images as thumbnails — click to expand */}
                       {message.images && message.images.length > 0 && (
-                        <div className="mb-2 grid grid-cols-2 gap-2">
-                          {message.images.map((imageUrl, idx) => (
-                            <img
+                        <div className={`mb-2 flex flex-wrap gap-1.5 ${message.images.length === 1 ? "" : ""}`}>
+                          {message.images.map((imgUrl, idx) => (
+                            <button
                               key={idx}
-                              src={imageUrl}
-                              alt={`Uploaded image ${idx + 1}`}
-                              className="rounded-lg max-w-full h-auto object-cover"
-                            />
+                              onClick={() => setLightboxImage(imgUrl)}
+                              className="relative rounded-md overflow-hidden hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-white/50"
+                              title="Click to view full size"
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={`Uploaded image ${idx + 1}`}
+                                className="w-20 h-20 object-cover rounded-md"
+                              />
+                            </button>
                           ))}
                         </div>
                       )}
                       {message.content && (
                         <p
-                          className={`text-sm whitespace-pre-wrap ${
+                          className={`text-sm whitespace-pre-wrap break-words ${
                             message.sender === "user"
                               ? "text-white"
                               : "text-gray-900 dark:text-gray-100"
@@ -1236,8 +1385,8 @@ export const ChatInterface: React.FC = () => {
                     </div>
                     <button
                       onClick={() => copyMessage(message.id, message.content)}
-                      className={`absolute -bottom-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 ${
-                        message.sender === "user" ? "left-1" : "right-1"
+                      className={`absolute -top-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 shadow-sm ${
+                        message.sender === "user" ? "right-1" : "right-1"
                       }`}
                       title="Copy message"
                     >
@@ -1250,8 +1399,21 @@ export const ChatInterface: React.FC = () => {
                   </div>
                 )}
                 {message.sender === "user" && (
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                    <User className="h-4 w-4 text-primary-foreground" />
+                  <div className="w-8 h-8 rounded-full flex-shrink-0 overflow-hidden">
+                    {user?.avatar_url && !avatarError ? (
+                      <img
+                        src={user.avatar_url}
+                        alt="You"
+                        className="w-8 h-8 rounded-full object-cover"
+                        crossOrigin="anonymous"
+                        referrerPolicy="no-referrer"
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                        <User className="h-4 w-4 text-primary-foreground" />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1374,6 +1536,27 @@ export const ChatInterface: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Image lightbox overlay */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+            onClick={() => setLightboxImage(null)}
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Full size"
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

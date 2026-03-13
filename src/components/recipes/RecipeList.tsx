@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useRecipes, useCreateRecipe, useDeleteRecipe } from '@/services/api'
+import { useRecipes, useCreateRecipe, useDeleteRecipe, useCollectionRecipes } from '@/services/api'
 import { RecipeCard } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
 
@@ -11,12 +11,16 @@ interface RecipeListProps {
   onRecipeSelect?: (recipe: any) => void;
   onAddRecipe?: () => void;
   onEditRecipe?: (recipe: any) => void;
+  collectionId?: string | null;
+  collectionName?: string | null;
 }
 
 export const RecipeList: React.FC<RecipeListProps> = ({
   onRecipeSelect,
   onAddRecipe,
   onEditRecipe,
+  collectionId,
+  collectionName,
 }) => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -27,10 +31,16 @@ export const RecipeList: React.FC<RecipeListProps> = ({
     tags: [] as string[],
   });
   const { data: recipes, isLoading, error } = useRecipes({ limit: 50 });
+  const { data: collectionRecipes, isLoading: collectionLoading } = useCollectionRecipes(collectionId || '');
   const deleteRecipeMutation = useDeleteRecipe();
 
+  // When a collection is selected, use its recipes; otherwise use all recipes
+  const baseRecipes = collectionId
+    ? (collectionRecipes || []).map((cr: any) => cr.recipes).filter(Boolean)
+    : (recipes as any)?.recipes || [];
+
   const filteredRecipes =
-    (recipes as any)?.recipes?.filter((recipe: any) => {
+    baseRecipes.filter((recipe: any) => {
       // Search filter
       if (
         searchQuery &&
@@ -65,7 +75,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
       }
 
       return true;
-    }) || [];
+    });
 
   const handleDeleteRecipe = async (recipeId: string) => {
     if (
@@ -83,7 +93,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
     }
   };
 
-  if (isLoading) {
+  if (isLoading || (collectionId && collectionLoading)) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -111,12 +121,12 @@ export const RecipeList: React.FC<RecipeListProps> = ({
           <div className="flex items-center gap-3">
             <div className="w-2 h-8 bg-gradient-to-b from-primary-600 to-secondary-600 rounded-full"></div>
             <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-200 bg-clip-text text-transparent">
-              Your Recipes
+              {collectionName || "Your Recipes"}
             </h2>
           </div>
           <p className="text-slate-600 dark:text-slate-400 text-lg">
             {filteredRecipes.length} recipe
-            {filteredRecipes.length !== 1 ? "s" : ""} in your collection
+            {filteredRecipes.length !== 1 ? "s" : ""}{collectionName ? ` in ${collectionName}` : " in your collection"}
           </p>
         </div>
 

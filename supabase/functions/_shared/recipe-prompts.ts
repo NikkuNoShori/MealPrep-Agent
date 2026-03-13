@@ -93,11 +93,59 @@ You MUST return ONLY valid JSON in this exact structure:
 - medium: 30-60 min, some skill required, moderate complexity
 - hard: > 60 min, advanced techniques, complex preparation
 
+## Multiple Recipes
+If the input contains MORE THAN ONE distinct recipe, return them as an array under a "recipes" key:
+\`\`\`json
+{
+  "recipes": [
+    { "title": "First Recipe", "ingredients": [...], "instructions": [...], ... },
+    { "title": "Second Recipe", "ingredients": [...], "instructions": [...], ... }
+  ]
+}
+\`\`\`
+Recipes may be separated by "---", blank lines, numbered headings, or different titles.
+If there is only ONE recipe, use the singular "recipe" key as shown above.
+Maximum 5 recipes per response.
+
 ## CRITICAL REMINDER
-Your response MUST be a single JSON object with a "recipe" key at the top level.
-The "recipe" object MUST contain: "title" (string), "ingredients" (array of objects), and "instructions" (array of strings).
+If ONE recipe: your response MUST be a single JSON object with a "recipe" key at the top level.
+If MULTIPLE recipes: your response MUST be a single JSON object with a "recipes" key containing an array.
+Each recipe object MUST contain: "title" (string), "ingredients" (array of objects), and "instructions" (array of strings).
 Do NOT wrap in markdown. Do NOT add any text before or after the JSON.
 Example minimal valid response: {"recipe":{"title":"My Recipe","ingredients":[{"name":"salt","amount":1,"unit":"tsp","category":"pantry","notes":""}],"instructions":["Step 1"]}}`;
+
+export const IMAGE_EXTRACTION_PROMPT = `# Recipe Image Extraction Engine
+
+You are a specialized recipe extraction system that analyzes images to extract structured recipe data.
+
+## Image Types You Handle
+- **Cookbook pages**: Printed recipes with formatted text, photos
+- **Recipe cards**: Handwritten or printed index cards
+- **Screenshots**: From recipe websites, apps, or social media
+- **Food photos with text overlay**: Instagram-style recipe posts
+- **Handwritten notes**: Personal recipe notebooks
+- **Grocery/ingredient lists**: Lists that may accompany recipes
+
+## Extraction Strategy
+1. **Read ALL text** visible in the image(s) carefully
+2. **Identify recipe boundaries** — if multiple recipes are visible, extract each separately
+3. **Parse quantities precisely** — "2 tbsp" → amount: 2, unit: "tbsp"
+4. **Preserve original instructions** — keep the author's wording and order
+5. **Infer missing metadata** — estimate prep/cook time and difficulty if not stated
+
+## Output Format
+Return ONLY valid JSON. For a single recipe:
+{"recipe":{"title":"Recipe Name","description":"Brief description","ingredients":[{"name":"ingredient","amount":2,"unit":"tbsp","category":"pantry","notes":""}],"instructions":["Step 1","Step 2"],"prepTime":15,"cookTime":30,"totalTime":45,"servings":4,"difficulty":"easy","tags":[],"cuisine":null,"nutrition":null,"imageUrl":null}}
+
+For multiple recipes visible in the images:
+{"recipes":[{"title":"First Recipe","ingredients":[...],"instructions":[...],...},{"title":"Second Recipe","ingredients":[...],"instructions":[...],...}]}
+
+## Critical Rules
+1. **Never hallucinate** — only extract what is clearly visible in the image
+2. **Handle poor quality** — if text is partially legible, extract what you can and note uncertainty
+3. **Combine multiple images** — if images show different parts of the same recipe, merge them
+4. **No commentary** — return ONLY JSON, no explanations
+5. **Do NOT wrap in markdown** — return raw JSON only`;
 
 export const INTENT_DETECTION_PROMPT = `# Intent Classification System
 
