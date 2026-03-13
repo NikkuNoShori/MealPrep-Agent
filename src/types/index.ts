@@ -92,7 +92,7 @@ export interface MealPlanContext {
 // Meal Planning types
 export interface MealPlan {
   id: string
-  familyId: string
+  householdId: string
   startDate: Date
   meals: PlannedMeal[]
   groceryList: GroceryItem[]

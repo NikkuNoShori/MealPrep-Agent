@@ -3,9 +3,20 @@
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
 **Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (MOP-0002 P1/P2 collections, invite UI, recipe page redesign)
+**Last updated:** 2026-03-12 (deprecation cleanup — migration 013)
 
 ---
+
+## 2026-03-12 (Deprecation cleanup — migration 013) `enhancement/chat`
+
+- Dropped `recipes.is_public` column and `sync_recipe_visibility` trigger — `visibility` column is now the sole mechanism
+- Dropped `profiles.family_id` column and `validate_family_id` trigger — replaced by `households` model
+- Dropped `family_members.family_id` column, made `household_id` NOT NULL
+- Simplified `family_members` RLS policies to household-only (removed backward-compat `family_id` OR clauses)
+- Fixed `handle_new_user()` trigger — restored OAuth name extraction lost in migration 011, added default collection creation
+- Removed `isPublic`/`is_public` from frontend API field mapping and recipe-pipeline load stage
+- Added collection name display in recipe list header, inline rename in sidebar, stronger active indicator
+- Widened collections sidebar to 256px
 
 ## 2026-03-12 (Recipe collections, invite UI, recipe page modernization — MOP-0002 P1/P2) `enhancement/chat`
 

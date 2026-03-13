@@ -3,7 +3,7 @@
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
 **Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (added household RLS recursion entry)
+**Last updated:** 2026-03-12 (added migration dependency order entry)
 
 ---
 
@@ -499,3 +499,30 @@ ls node_modules/.package-lock.json 2>/dev/null
 4. Run `npm run dev`
 
 **Added:** 2026-03-10
+
+---
+
+## Migration: DROP COLUMN fails with "other objects depend on it"
+
+### Symptom
+- `supabase db push` fails with `SQLSTATE 2BP01`
+- Error: `cannot drop column X of table Y because other objects depend on it`
+- Lists RLS policies that reference the column being dropped
+
+### Likely causes
+- RLS policies reference the column in their USING/WITH CHECK expressions
+- The migration attempts to drop the column before dropping the dependent policies
+
+### Verification steps
+```sql
+-- Find all policies on a table
+SELECT policyname, qual, with_check FROM pg_policies WHERE tablename = 'recipes';
+```
+
+### Fix steps
+1. In the migration, DROP all RLS policies that reference the column **before** the ALTER TABLE DROP COLUMN
+2. Recreate the policies without the dropped column reference after the column is removed
+3. If the migration already partially ran, repair it first: `supabase migration repair --status reverted <version>`
+4. Then push again: `supabase db push`
+
+**Added:** 2026-03-12

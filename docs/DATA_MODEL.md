@@ -3,7 +3,7 @@
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
 **Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (recipe_collections, collection_recipes tables; collection sharing inheritance RLS; updated handle_new_user trigger)
+**Last updated:** 2026-03-12 (deprecation cleanup: dropped is_public, family_id columns; simplified family_members RLS)
 
 ---
 
@@ -33,11 +33,10 @@ User profiles, created automatically via trigger on `auth.users` INSERT.
 | `avatar_url` | TEXT | | Google OAuth avatar |
 | `timezone` | VARCHAR(50) | DEFAULT 'UTC' | |
 | `household_size` | INT | DEFAULT 1 | |
-| `family_id` | UUID | DEFAULT gen_random_uuid() | Groups family members |
 | `created_at` | TIMESTAMPTZ | DEFAULT now() | |
 | `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
 
-**Indexes:** email, family_id
+**Indexes:** email
 **RLS:** Users can only view/update their own profile
 **Triggers:** `update_profiles_updated_at` (auto-update `updated_at`)
 
@@ -69,7 +68,6 @@ User recipe collection with vector embeddings for semantic search.
 | `source_url` | TEXT | | |
 | `source_name` | VARCHAR | | |
 | `visibility` | TEXT | NOT NULL DEFAULT 'private', CHECK ('private','household','public') | Three-tier sharing (migration 009) |
-| `is_public` | BOOLEAN | DEFAULT false | Legacy — synced from `visibility` via trigger |
 | `is_favorite` | BOOLEAN | DEFAULT false | |
 | `embedding_vector` | VECTOR(1536) | | OpenAI ada-002 embeddings |
 | `searchable_text` | TEXT | | Auto-generated for full-text search |
@@ -90,9 +88,7 @@ User recipe collection with vector embeddings for semantic search.
 - `update_recipes_updated_at` — auto-update `updated_at`
 - `update_recipe_searchable_text_trigger` — concatenates title + description + difficulty + tags + ingredients + instructions into `searchable_text`
 - `trigger_update_recipe_embedding` — clears `embedding_vector` when recipe content changes (must be regenerated separately)
-- `sync_recipe_visibility_trigger` — syncs `is_public` from `visibility` on INSERT/UPDATE (keeps legacy column in sync)
-
-**Migration history:** 007 (create), 008 (RLS), 009 (search functions + household visibility), 014 (unique title per user)
+**Migration history:** 007 (create), 008 (RLS), 009 (search functions + household visibility), 013 (dropped is_public), 014 (unique title per user)
 
 ---
 
@@ -220,8 +216,7 @@ Family member profiles with dietary information.
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | `id` | UUID | PK | |
-| `family_id` | UUID | | References `profiles.family_id` (validated via trigger) |
-| `household_id` | UUID | FK → `households(id)` ON DELETE CASCADE | Links dependent to household (migration 009) |
+| `household_id` | UUID | NOT NULL, FK → `households(id)` ON DELETE CASCADE | Links dependent to household |
 | `managed_by` | UUID | FK → `profiles(id)` | Authenticated user who manages this dependent |
 | `name` | VARCHAR(255) | NOT NULL | |
 | `relationship` | VARCHAR(100) | | |
@@ -233,13 +228,10 @@ Family member profiles with dietary information.
 | `created_at` | TIMESTAMPTZ | DEFAULT now() | |
 | `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
 
-**Indexes:** family_id, household_id
-**RLS:** Users can access family members in their household (via `is_household_member()` helper) OR via legacy `family_id` path
-**Triggers:**
-- `update_family_members_updated_at`
-- `validate_family_member_family_id` — ensures `family_id` exists in `profiles`
-
-**Note:** `family_id` is not a true FK constraint. Validation is enforced via trigger because `family_id` is not unique in `profiles` (multiple users can share a family). The `household_id` column is a real FK and is the preferred path going forward.
+**Indexes:** household_id
+**RLS:** Users can access family members in their household via `is_household_member()` helper
+**Triggers:** `update_family_members_updated_at`
+**Migration:** 001 (create), 009 (add household_id, managed_by), 013 (drop family_id, make household_id NOT NULL)
 
 ---
 

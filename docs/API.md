@@ -3,7 +3,7 @@
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
 **Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (recipe collections CRUD, collection recipes management)
+**Last updated:** 2026-03-12 (removed isPublic/is_public mapping — column dropped in migration 013)
 
 ---
 
@@ -439,7 +439,6 @@ The API client automatically converts between frontend camelCase and database sn
 - `nutritionInfo` ↔ `nutrition_info`
 - `sourceUrl` ↔ `source_url`
 - `visibility` ↔ `visibility`
-- `isPublic` ↔ `is_public` (legacy, synced via trigger)
 - `householdId` ↔ `household_id`
 - `managedBy` ↔ `managed_by`
 - `createdAt` ↔ `created_at`

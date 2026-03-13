@@ -3,7 +3,7 @@
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
 **Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (MOP-0002 status update to in-progress)
+**Last updated:** 2026-03-12 (MOP-0002 P0-P2 code-complete, deprecation cleanup deployed)
 
 ---
 

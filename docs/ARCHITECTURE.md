@@ -3,7 +3,7 @@
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
 **Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (household model, recipe visibility, updated auth flow and RLS)
+**Last updated:** 2026-03-12 (deprecation cleanup: dropped is_public, family_id; collections UI components)
 
 ---
 
@@ -194,7 +194,7 @@ src/components/
 ├── debug/         # Debug utilities
 ├── family/        # Family member management
 ├── meal-planning/ # MealPlanCalendar
-├── recipes/       # RecipeList, RecipeCard, RecipeDetail, RecipeForm, RecipeSearch, VisibilityPicker
+├── recipes/       # RecipeList, RecipeCard, RecipeDetail, RecipeForm, RecipeSearch, VisibilityPicker, CollectionsSidebar, AddToCollectionMenu
 └── ui/            # Radix-based primitives (alert, dialog, select, etc.)
 ```
 
@@ -244,7 +244,8 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 
 **General pattern:**
 - Users can only read/write their own data
-- Exception: `recipes` — three-tier visibility: `private` (owner only), `household` (owner + household members), `public` (all users). Controlled by `recipes.visibility` column, replacing the legacy `is_public` boolean.
+- Exception: `recipes` — three-tier visibility: `private` (owner only), `household` (owner + household members), `public` (all users). Controlled by `recipes.visibility` column. Collection-level sharing inheritance also applies (recipes in shared collections are visible to collection audience).
+- Exception: `recipe_collections` — same three-tier visibility as recipes. `collection_recipes` join table visibility is derived from parent collection.
 - Exception: `family_members` — users can access members in their household
 - Exception: `households`, `household_members` — members can view their own household and its members
 - Exception: `ingredients`, `roles` — read-only for all authenticated users (shared catalogs)
