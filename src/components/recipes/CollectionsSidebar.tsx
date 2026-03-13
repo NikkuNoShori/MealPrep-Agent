@@ -5,6 +5,7 @@ import {
   useMyCollections,
   useCreateCollection,
   useDeleteCollection,
+  useUpdateCollection,
 } from '@/services/api'
 import {
   BookOpen,
@@ -15,12 +16,18 @@ import {
   Trash2,
   Check,
   X,
+  Lock,
+  Home,
+  Globe,
+  Link as LinkIcon,
+  Pencil,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface CollectionsSidebarProps {
   selectedCollectionId: string | null
   onSelectCollection: (collectionId: string | null) => void
+  onCollectionNameChange?: (name: string | null) => void
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -28,15 +35,25 @@ const iconMap: Record<string, React.ElementType> = {
   book: BookOpen,
 }
 
+const visibilityIcons: Record<string, React.ElementType> = {
+  private: Lock,
+  household: Home,
+  public: Globe,
+}
+
 export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
   selectedCollectionId,
   onSelectCollection,
+  onCollectionNameChange,
 }) => {
   const { data: collections, isLoading } = useMyCollections()
   const createCollection = useCreateCollection()
   const deleteCollection = useDeleteCollection()
+  const updateCollection = useUpdateCollection()
   const [isCreating, setIsCreating] = useState(false)
   const [newName, setNewName] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
 
   const handleCreate = () => {
     if (!newName.trim()) return
@@ -68,6 +85,68 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
       onError: (err: any) => {
         toast.error(err?.message || 'Failed to delete collection')
       },
+    })
+  }
+
+  const handleCycleVisibility = (e: React.MouseEvent, collection: any) => {
+    e.stopPropagation()
+    const order = ['private', 'household', 'public']
+    const currentIdx = order.indexOf(collection.visibility || 'private')
+    const next = order[(currentIdx + 1) % order.length]
+    updateCollection.mutate(
+      { collectionId: collection.id, updates: { visibility: next } },
+      {
+        onSuccess: () => {
+          toast.success(`Collection set to ${next}`)
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Failed to update visibility')
+        },
+      }
+    )
+  }
+
+  const handleStartRename = (e: React.MouseEvent, collection: any) => {
+    e.stopPropagation()
+    setEditingId(collection.id)
+    setEditName(collection.name)
+  }
+
+  const handleSaveRename = (collectionId: string) => {
+    if (!editName.trim() || editName.trim() === editingId) {
+      setEditingId(null)
+      return
+    }
+    updateCollection.mutate(
+      { collectionId, updates: { name: editName.trim() } },
+      {
+        onSuccess: () => {
+          toast.success('Collection renamed')
+          if (selectedCollectionId === collectionId) {
+            onCollectionNameChange?.(editName.trim())
+          }
+          setEditingId(null)
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Failed to rename')
+          setEditingId(null)
+        },
+      }
+    )
+  }
+
+  const handleSelectCollection = (collectionId: string | null, name: string | null) => {
+    onSelectCollection(collectionId)
+    onCollectionNameChange?.(name)
+  }
+
+  const handleCopyLink = (e: React.MouseEvent, collectionId: string) => {
+    e.stopPropagation()
+    const url = `${window.location.origin}/collections/${collectionId}`
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success('Link copied to clipboard')
+    }).catch(() => {
+      toast.error('Failed to copy link')
     })
   }
 
@@ -128,10 +207,10 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
         {/* All Recipes */}
         <button
           type="button"
-          onClick={() => onSelectCollection(null)}
+          onClick={() => handleSelectCollection(null, null)}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
             selectedCollectionId === null
-              ? 'bg-primary/10 text-primary dark:bg-primary/20'
+              ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
               : 'text-foreground hover:bg-accent/50'
           }`}
         >
@@ -148,29 +227,100 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             const Icon = iconMap[collection.icon] || FolderOpen
             const isActive = selectedCollectionId === collection.id
             const isDefault = collection.name === 'Favorites' || collection.name === 'My Recipes'
+            const VisIcon = visibilityIcons[collection.visibility || 'private'] || Lock
+            const isEditing = editingId === collection.id
+
+            if (isEditing) {
+              return (
+                <div key={collection.id} className="flex gap-1 px-1 py-1">
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="h-7 text-xs flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveRename(collection.id)
+                      if (e.key === 'Escape') setEditingId(null)
+                    }}
+                    autoFocus
+                  />
+                  <Button
+                    size="sm"
+                    className="h-7 w-7 p-0 shrink-0"
+                    onClick={() => handleSaveRename(collection.id)}
+                    disabled={updateCollection.isPending}
+                  >
+                    <Check className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 shrink-0"
+                    onClick={() => setEditingId(null)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )
+            }
 
             return (
               <button
                 key={collection.id}
                 type="button"
-                onClick={() => onSelectCollection(collection.id)}
+                onClick={() => handleSelectCollection(collection.id, collection.name)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 group ${
                   isActive
-                    ? 'bg-primary/10 text-primary dark:bg-primary/20'
+                    ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
                     : 'text-foreground hover:bg-accent/50'
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="truncate flex-1 text-left">{collection.name}</span>
-                {!isDefault && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleDelete(e, collection.id, collection.name)}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/10 hover:text-destructive transition-all duration-150"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                )}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  {/* Rename */}
+                  {!isDefault && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleStartRename(e, collection)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent transition-all duration-150"
+                      title="Rename collection"
+                    >
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  )}
+                  {/* Visibility toggle */}
+                  {!isDefault && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleCycleVisibility(e, collection)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent transition-all duration-150"
+                      title={`Visibility: ${collection.visibility || 'private'}`}
+                    >
+                      <VisIcon className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  )}
+                  {/* Share link (public only) */}
+                  {collection.visibility === 'public' && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyLink(e, collection.id)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent transition-all duration-150"
+                      title="Copy share link"
+                    >
+                      <LinkIcon className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  )}
+                  {/* Delete */}
+                  {!isDefault && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(e, collection.id, collection.name)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/10 hover:text-destructive transition-all duration-150"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               </button>
             )
           })

@@ -13,6 +13,7 @@ const Recipes = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<any>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
 
   // Load recipe from URL slug if present
   useEffect(() => {
@@ -99,11 +100,12 @@ const Recipes = () => {
         {showList && (
           <div className="flex gap-6 animate-fade-in">
             {/* Collections Sidebar */}
-            <div className="hidden lg:block w-52 shrink-0">
+            <div className="hidden lg:block w-64 shrink-0">
               <div className="sticky top-4 rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-4">
                 <CollectionsSidebar
                   selectedCollectionId={selectedCollectionId}
                   onSelectCollection={setSelectedCollectionId}
+                  onCollectionNameChange={setSelectedCollectionName}
                 />
               </div>
             </div>
@@ -115,6 +117,7 @@ const Recipes = () => {
                 onAddRecipe={handleAddRecipe}
                 onEditRecipe={handleEditRecipe}
                 collectionId={selectedCollectionId}
+                collectionName={selectedCollectionName}
               />
             </div>
           </div>

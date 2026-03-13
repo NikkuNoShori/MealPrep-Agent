@@ -12,6 +12,7 @@ interface RecipeListProps {
   onAddRecipe?: () => void;
   onEditRecipe?: (recipe: any) => void;
   collectionId?: string | null;
+  collectionName?: string | null;
 }
 
 export const RecipeList: React.FC<RecipeListProps> = ({
@@ -19,6 +20,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   onAddRecipe,
   onEditRecipe,
   collectionId,
+  collectionName,
 }) => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -119,12 +121,12 @@ export const RecipeList: React.FC<RecipeListProps> = ({
           <div className="flex items-center gap-3">
             <div className="w-2 h-8 bg-gradient-to-b from-primary-600 to-secondary-600 rounded-full"></div>
             <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-200 bg-clip-text text-transparent">
-              Your Recipes
+              {collectionName || "Your Recipes"}
             </h2>
           </div>
           <p className="text-slate-600 dark:text-slate-400 text-lg">
             {filteredRecipes.length} recipe
-            {filteredRecipes.length !== 1 ? "s" : ""} in your collection
+            {filteredRecipes.length !== 1 ? "s" : ""}{collectionName ? ` in ${collectionName}` : " in your collection"}
           </p>
         </div>
 
