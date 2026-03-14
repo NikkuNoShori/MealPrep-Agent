@@ -5,7 +5,6 @@ import {
   useAdminInvites,
   useAdminHouseholds,
   useAdminDeleteUser,
-  useAdminUpdateUser,
   useAdminDeleteInvite,
   useAdminRemoveHouseholdMember,
   useAdminDeleteHousehold,
@@ -75,7 +74,6 @@ const Admin: React.FC = () => {
 const UsersTab: React.FC<{ currentUserId?: string }> = ({ currentUserId }) => {
   const { data: users, isLoading } = useAdminUsers()
   const deleteUser = useAdminDeleteUser()
-  const updateUser = useAdminUpdateUser()
 
   const handleDelete = (userId: string, name: string) => {
     if (userId === currentUserId) {
@@ -89,22 +87,18 @@ const UsersTab: React.FC<{ currentUserId?: string }> = ({ currentUserId }) => {
     })
   }
 
-  const handleToggleSetup = (userId: string, current: boolean) => {
-    updateUser.mutate(
-      { userId, updates: { setup_completed: !current } },
-      {
-        onSuccess: () => toast.success(`Setup status updated`),
-        onError: (err: any) => toast.error(err.message || 'Failed to update'),
-      }
-    )
-  }
-
   if (isLoading) return <LoadingState />
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/60 dark:border-white/[0.06] overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5">
-        <p className="text-sm text-gray-500 dark:text-gray-400">{users?.length || 0} users</p>
+      <div className="px-6 py-3 border-b border-gray-100 dark:border-white/5 flex items-center gap-4">
+        <div className="w-9 flex-shrink-0" />
+        <span className="flex-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">User ({users?.length || 0})</span>
+        <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider hidden lg:block">Provider</span>
+        <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">Status</span>
+        <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider hidden md:block">Last Sign In</span>
+        <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider hidden md:block">Joined</span>
+        <div className="w-8" />
       </div>
       <div className="divide-y divide-gray-100 dark:divide-white/5">
         {(users || []).map((u: any) => (
@@ -112,7 +106,13 @@ const UsersTab: React.FC<{ currentUserId?: string }> = ({ currentUserId }) => {
             {/* Avatar */}
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0">
               {u.avatar_url ? (
-                <img src={u.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
+                <img
+                  src={u.avatar_url}
+                  alt=""
+                  className="w-9 h-9 rounded-full object-cover"
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 <span className="text-white text-sm font-semibold">
                   {(u.display_name || u.email || '?')[0].toUpperCase()}
@@ -140,17 +140,13 @@ const UsersTab: React.FC<{ currentUserId?: string }> = ({ currentUserId }) => {
             </span>
 
             {/* Setup status */}
-            <button
-              onClick={() => handleToggleSetup(u.id, u.setup_completed)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                u.setup_completed
-                  ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
-              }`}
-              title="Toggle setup_completed"
-            >
+            <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+              u.setup_completed
+                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                : 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
+            }`}>
               {u.setup_completed ? 'Active' : 'Pending Setup'}
-            </button>
+            </span>
 
             {/* Last sign in */}
             <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:block" title="Last sign in">

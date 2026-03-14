@@ -92,6 +92,18 @@ async function handleDeleteUser(req: Request): Promise<Response> {
   const { userId } = await req.json();
   if (!userId) return corsError("userId is required", 400);
 
+  // Look up user email before deleting (needed to clean up invites)
+  const { data: { user: targetUser } } = await admin.auth.admin.getUserById(userId);
+  const userEmail = targetUser?.email?.toLowerCase();
+
+  // Clean up invites for this user's email
+  if (userEmail) {
+    await admin
+      .from("household_invites")
+      .delete()
+      .eq("invited_email", userEmail);
+  }
+
   // Delete from auth (cascades to profiles via FK)
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) {

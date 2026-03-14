@@ -128,7 +128,7 @@ export const authService = {
           display_name: profile?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
           first_name: profile?.first_name || user.user_metadata?.first_name || user.user_metadata?.given_name || profile?.display_name?.split(' ')[0] || user.email?.split('@')[0] || 'User',
           avatar_url: avatarUrl,
-          setup_completed: profile?.setup_completed ?? true,
+          setup_completed: profile ? (profile.setup_completed ?? true) : false,
         }
       }
 
@@ -193,7 +193,7 @@ export const authService = {
         display_name: profile?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
         first_name: profile?.first_name || user.user_metadata?.first_name || user.user_metadata?.given_name || profile?.display_name?.split(' ')[0] || user.email?.split('@')[0] || 'User',
         avatar_url: avatarUrl,
-        setup_completed: profile?.setup_completed ?? true,
+        setup_completed: profile ? (profile.setup_completed ?? true) : false,
       }
     } catch (err: any) {
       // Handle any other errors gracefully
@@ -217,26 +217,8 @@ export const authService = {
         throw new Error(error.message)
       }
       
-      // After auth user is created, create/update profile in profiles table
-      // Note: The trigger should handle this automatically, but we do it here as backup
-      if (data.user) {
-        const { error: profileError } = await (supabase
-          .from('profiles') as any)
-          .upsert({
-            id: data.user.id, // Use auth.users.id as the primary key
-            email: data.user.email,
-            display_name: data.user.email?.split('@')[0] || 'User',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'id'
-          })
-        
-        if (profileError) {
-          console.error('Error creating user profile:', profileError)
-          // Don't throw - auth user is created, profile can be created later
-        }
-      }
+      // Profile creation is handled by the handle_new_user() trigger.
+      // Do NOT upsert here — it can overwrite trigger data (setup_completed, display_name).
       
       return {
         user: data.user ? {
@@ -279,24 +261,8 @@ export const authService = {
         throw new Error(error.message)
       }
       
-      // After successful sign in, ensure profile exists in profiles table
-      // Note: The trigger should handle this automatically, but we do it here as backup
-      if (data.user) {
-        const { error: profileError } = await (supabase
-          .from('profiles') as any)
-          .upsert({
-            id: data.user.id,
-            email: data.user.email,
-            display_name: data.user.email?.split('@')[0] || 'User',
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'id'
-          })
-        
-        if (profileError) {
-          console.error('Error syncing user profile:', profileError)
-        }
-      }
+      // Profile creation is handled by the handle_new_user() trigger.
+      // Do NOT upsert here — it can overwrite trigger data (setup_completed, display_name).
       
       return {
         user: data.user ? {
@@ -481,37 +447,15 @@ export const authService = {
         }
 
         try {
-          // Ensure profile exists
+          // Profile is created by handle_new_user() trigger.
+          // Only update avatar for OAuth users (Google picture URL may change).
           if (session?.user) {
-            const { error: profileError } = await (supabase
-              .from("profiles") as any)
-              .upsert(
-                {
-                  id: session.user.id,
-                  email: session.user.email,
-                  display_name:
-                    session.user.user_metadata?.full_name ||
-                    session.user.user_metadata?.name ||
-                    session.user.email?.split("@")[0] ||
-                    "User",
-                  first_name:
-                    session.user.user_metadata?.first_name ||
-                    session.user.user_metadata?.given_name ||
-                    session.user.user_metadata?.full_name?.split(" ")[0] ||
-                    "",
-                  avatar_url:
-                    session.user.user_metadata?.avatar_url ||
-                    session.user.user_metadata?.picture,
-                  updated_at: new Date().toISOString(),
-                },
-                {
-                  onConflict: "id",
-                }
-              );
-            
-            if (profileError) {
-              console.error('Error syncing user profile:', profileError)
-              // Don't throw - profile can be created later
+            const oauthAvatar = session.user.user_metadata?.avatar_url ||
+                               session.user.user_metadata?.picture;
+            if (oauthAvatar) {
+              await (supabase.from("profiles") as any)
+                .update({ avatar_url: oauthAvatar, updated_at: new Date().toISOString() })
+                .eq("id", session.user.id);
             }
           }
 

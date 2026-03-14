@@ -29,7 +29,7 @@ async function handleSend(req: Request): Promise<Response> {
   const auth = await getUserFromToken(token);
   if (!auth) return corsError("Invalid token", 401);
 
-  const { householdId, email } = await req.json();
+  const { householdId, email, origin } = await req.json();
   if (!householdId || !email) return corsError("householdId and email are required", 400);
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -115,8 +115,8 @@ async function handleSend(req: Request): Promise<Response> {
     return corsError("Failed to create invite", 500);
   }
 
-  // Send invite via Supabase Auth
-  const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
+  // Send invite via Supabase Auth — use caller's origin so dev invites redirect to localhost
+  const appUrl = origin || Deno.env.get("APP_URL") || "http://localhost:5173";
   const redirectTo = `${appUrl}/invite/accept?id=${invite.id}`;
 
   try {
@@ -302,7 +302,7 @@ async function handleResend(req: Request): Promise<Response> {
   const auth = await getUserFromToken(userToken);
   if (!auth) return corsError("Invalid token", 401);
 
-  const { inviteId } = await req.json();
+  const { inviteId, origin } = await req.json();
   if (!inviteId) return corsError("inviteId is required", 400);
 
   const admin = createServiceClient();
@@ -337,8 +337,8 @@ async function handleResend(req: Request): Promise<Response> {
     .update({ expires_at: expiresAt })
     .eq("id", invite.id);
 
-  // Resend via Supabase Auth
-  const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
+  // Resend via Supabase Auth — use caller's origin so dev invites redirect to localhost
+  const appUrl = origin || Deno.env.get("APP_URL") || "http://localhost:5173";
   const redirectTo = `${appUrl}/invite/accept?id=${invite.id}`;
 
   const inviterName = invite.inviter_name || "Someone";

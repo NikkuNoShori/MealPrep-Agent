@@ -34,6 +34,7 @@ import {
   Heart,
   ThumbsUp,
   ThumbsDown,
+  Clock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -493,6 +494,31 @@ const Household = () => {
                         </div>
                       );
                     })}
+                    {/* Pending invites */}
+                    {(householdData.pendingInvites || []).map((invite: any) => (
+                      <div
+                        key={invite.id}
+                        className="flex items-center justify-between p-3 rounded-xl border border-dashed border-amber-300/50 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                            <Mail className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              {invite.invitedEmail}
+                            </p>
+                            <p className="text-xs text-muted-foreground/70">
+                              Invited {new Date(invite.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="gap-1 text-xs border-amber-300 dark:border-amber-500/30 text-amber-600 dark:text-amber-400">
+                          <Clock className="h-3 w-3" />
+                          Pending
+                        </Badge>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>

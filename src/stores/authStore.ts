@@ -135,6 +135,46 @@ export const useAuthStore = create<AuthState>((set) => ({
         } catch (err) {
           // Ignore linked accounts errors
         }
+        // Reload household membership (may have changed after invite accept)
+        try {
+          const { data: membership } = await (supabase
+            .from("household_members") as any)
+            .select("household_id, role, households(name)")
+            .eq("user_id", currentUser.id)
+            .limit(1)
+            .maybeSingle()
+
+          if (membership) {
+            set({
+              household: {
+                householdId: membership.household_id,
+                householdName: membership.households?.name || 'My Household',
+                role: membership.role as 'owner' | 'admin' | 'member',
+              }
+            })
+          } else {
+            set({ household: null })
+          }
+        } catch (err) {
+          console.warn('Failed to reload household:', err)
+        }
+        // Reload app role
+        try {
+          const { data: userRole } = await (supabase
+            .from("user_roles") as any)
+            .select("roles(name)")
+            .eq("user_id", currentUser.id)
+            .limit(1)
+            .maybeSingle()
+
+          const roleName = userRole?.roles?.name as AppRole | undefined
+          set({
+            appRole: roleName || 'user',
+            isAdmin: roleName === 'admin',
+          })
+        } catch (err) {
+          console.warn('Failed to reload app role:', err)
+        }
       }
     } catch (err: any) {
       console.error('AuthStore: Refresh user error:', err)

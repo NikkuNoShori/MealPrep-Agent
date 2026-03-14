@@ -12,7 +12,8 @@ const CompleteSetup: React.FC = () => {
   const navigate = useNavigate()
   const { user, refreshUser } = useAuthStore()
 
-  const [displayName, setDisplayName] = useState(user?.display_name || '')
+  const [firstName, setFirstName] = useState(user?.first_name || '')
+  const [lastName, setLastName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -20,7 +21,8 @@ const CompleteSetup: React.FC = () => {
   const [googleLinked, setGoogleLinked] = useState(false)
 
   const hasPassword = password.length >= 6
-  const canSubmit = displayName.trim().length >= 2 && (hasPassword || googleLinked)
+  const displayName = `${firstName.trim()} ${lastName.trim()}`.trim()
+  const canSubmit = firstName.trim().length >= 1 && lastName.trim().length >= 1 && (hasPassword || googleLinked)
 
   const handleLinkGoogle = async () => {
     setIsLinkingGoogle(true)
@@ -64,11 +66,13 @@ const CompleteSetup: React.FC = () => {
         if (pwError) throw pwError
       }
 
-      // Update profile: display_name + setup_completed
+      // Update profile: first_name, last_name, display_name + setup_completed
       const { error: profileError } = await (supabase
         .from('profiles') as any)
         .update({
-          display_name: displayName.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          display_name: displayName,
           setup_completed: true,
         })
         .eq('id', user?.id)
@@ -120,19 +124,35 @@ const CompleteSetup: React.FC = () => {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Display Name */}
+              {/* First Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Your Name
+                  First Name
                 </label>
                 <input
                   type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Enter your name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Enter your first name"
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
                   required
-                  minLength={2}
+                  minLength={1}
+                />
+              </div>
+
+              {/* Last Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Enter your last name"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                  required
+                  minLength={1}
                 />
               </div>
 
@@ -244,7 +264,7 @@ const CompleteSetup: React.FC = () => {
 
               {!canSubmit && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-                  Enter your name and either link Google or set a password to continue.
+                  Enter your first and last name, and either link Google or set a password to continue.
                 </p>
               )}
             </form>

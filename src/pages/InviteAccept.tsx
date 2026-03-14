@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { supabase } from '@/services/supabase';
 import { apiClient, useAcceptInviteById } from '@/services/api';
 import { Loader2, CheckCircle, XCircle, Home, LogIn, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,11 +16,21 @@ type InviteState =
 const InviteAccept: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, isLoading: authLoading } = useAuthStore();
+  const { user, isLoading: authLoading, refreshUser } = useAuthStore();
   const inviteId = searchParams.get('id');
   const [state, setState] = useState<InviteState>({ status: 'loading' });
   const acceptMutation = useAcceptInviteById();
   const hasAttemptedAccept = useRef(false);
+
+  // Listen for auth state changes (handles invite email redirect with tokens in URL hash)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        await refreshUser();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [refreshUser]);
 
   // Fetch invite details on mount
   useEffect(() => {
@@ -71,7 +82,17 @@ const InviteAccept: React.FC = () => {
     setState({ status: 'accepting' });
 
     acceptMutation.mutate(inviteId, {
-      onSuccess: (data: any) => {
+      onSuccess: async (data: any) => {
+        // Refresh user state (reloads profile, household, role)
+        await refreshUser();
+        const { user: freshUser } = useAuthStore.getState();
+
+        // If user needs to complete setup, redirect there
+        if (freshUser?.setup_completed === false) {
+          navigate('/complete-setup', { replace: true });
+          return;
+        }
+
         setState({
           status: 'accepted',
           householdName: data.householdName || 'the household',
@@ -85,7 +106,7 @@ const InviteAccept: React.FC = () => {
         });
       },
     });
-  }, [authLoading, user, inviteId, state.status, acceptMutation]);
+  }, [authLoading, user, inviteId, state.status, acceptMutation, refreshUser, navigate]);
 
   const handleSignIn = () => {
     if (inviteId) sessionStorage.setItem('pendingInviteId', inviteId);

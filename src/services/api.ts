@@ -889,11 +889,20 @@ class ApiClient {
 
     if (depsError) throw depsError;
 
+    // Get pending/sent invites for this household
+    const { data: invites } = await (supabase
+      .from("household_invites") as any)
+      .select("id, invited_email, inviter_name, status, created_at, expires_at")
+      .eq("household_id", membership.household_id)
+      .in("status", ["pending"])
+      .order("created_at", { ascending: false });
+
     return {
       household: snakeToCamel(membership.households),
       myRole: membership.role,
       members: (members || []).map((m: any) => snakeToCamel(m)),
       dependents: (dependents || []).map((d: any) => snakeToCamel(d)),
+      pendingInvites: (invites || []).map((i: any) => snakeToCamel(i)),
     };
   }
 
@@ -912,7 +921,7 @@ class ApiClient {
   async createHouseholdInvite(householdId: string, email: string) {
     return this.request<any>(`${SUPABASE_FUNCTIONS_URL}/household-invite/send`, {
       method: "POST",
-      body: JSON.stringify({ householdId, email }),
+      body: JSON.stringify({ householdId, email, origin: window.location.origin }),
     });
   }
 
@@ -932,7 +941,7 @@ class ApiClient {
   async resendHouseholdInvite(inviteId: string) {
     return this.request<any>(`${SUPABASE_FUNCTIONS_URL}/household-invite/resend`, {
       method: "POST",
-      body: JSON.stringify({ inviteId }),
+      body: JSON.stringify({ inviteId, origin: window.location.origin }),
     });
   }
 
@@ -1065,17 +1074,29 @@ class ApiClient {
 
     const { data, error } = await (supabase
       .from("recipe_reactions") as any)
-      .select("id, recipe_id, user_id, family_member_id, reaction, family_members(id, name), profiles(id, display_name)")
+      .select("id, recipe_id, user_id, family_member_id, reaction, family_members(id, name)")
       .in("recipe_id", recipeIds);
 
     if (error) throw error;
+
+    // Fetch display names for user reactions (no FK from recipe_reactions to profiles)
+    const userIds = [...new Set((data || []).filter((r: any) => r.user_id).map((r: any) => r.user_id))];
+    let profileMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await (supabase
+        .from("profiles") as any)
+        .select("id, display_name")
+        .in("id", userIds);
+      profileMap = Object.fromEntries((profiles || []).map((p: any) => [p.id, p.display_name]));
+    }
+
     return (data || []).map((r: any) => ({
       id: r.id,
       recipeId: r.recipe_id,
       userId: r.user_id,
       familyMemberId: r.family_member_id,
       reaction: r.reaction,
-      name: r.family_members?.name || r.profiles?.display_name || "Unknown",
+      name: r.family_members?.name || profileMap[r.user_id] || "Unknown",
     }));
   }
 
@@ -1296,16 +1317,16 @@ class ApiClient {
   // ── Admin Methods (via admin-api edge function) ──
 
   async adminGetAllUsers() {
-    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/users`, { method: "GET" });
+    return this.request<any[]>(`${SUPABASE_FUNCTIONS_URL}/admin-api/users`, { method: "GET" });
   }
 
   async adminGetAllInvites() {
-    const data = await this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/invites`, { method: "GET" });
+    const data = await this.request<any[]>(`${SUPABASE_FUNCTIONS_URL}/admin-api/invites`, { method: "GET" });
     return (data || []).map((i: any) => snakeToCamel(i));
   }
 
   async adminGetAllHouseholds() {
-    const data = await this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/households`, { method: "GET" });
+    const data = await this.request<any[]>(`${SUPABASE_FUNCTIONS_URL}/admin-api/households`, { method: "GET" });
     return (data || []).map((h: any) => snakeToCamel(h));
   }
 
