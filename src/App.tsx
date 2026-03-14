@@ -14,6 +14,10 @@ import Recipes from "./pages/Recipes";
 import MealPlanner from "./pages/MealPlanner";
 import Settings from "./pages/Settings";
 import Household from "./pages/Household";
+import InviteAccept from "./pages/InviteAccept";
+import CompleteSetup from "./pages/CompleteSetup";
+import Admin from "./pages/Admin";
+import AdminRoute from "./components/auth/AdminRoute";
 import { useAuthStore } from "./stores/authStore";
 
 function AppRoutes() {
@@ -30,6 +34,15 @@ function AppRoutes() {
       <Route path="/signin" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/invite/accept" element={<InviteAccept />} />
+      <Route
+        path="/complete-setup"
+        element={
+          <ProtectedRoute>
+            <CompleteSetup />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard"
         element={
@@ -88,6 +101,16 @@ function AppRoutes() {
               <Settings />
             </Layout>
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <Layout>
+              <Admin />
+            </Layout>
+          </AdminRoute>
         }
       />
     </Routes>

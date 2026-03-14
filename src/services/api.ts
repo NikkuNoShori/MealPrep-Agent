@@ -910,21 +910,30 @@ class ApiClient {
   }
 
   async createHouseholdInvite(householdId: string, email: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    return this.request<any>(`${SUPABASE_FUNCTIONS_URL}/household-invite/send`, {
+      method: "POST",
+      body: JSON.stringify({ householdId, email }),
+    });
+  }
 
-    const { data: invite, error } = await (supabase
-      .from("household_invites") as any)
-      .insert({
-        household_id: householdId,
-        invited_by: user.id,
-        invited_email: email,
-      })
-      .select()
-      .single();
+  async getInviteDetails(inviteId: string) {
+    return this.request<any>(
+      `${SUPABASE_FUNCTIONS_URL}/household-invite/details?id=${encodeURIComponent(inviteId)}`
+    );
+  }
 
-    if (error) throw error;
-    return snakeToCamel(invite);
+  async acceptInviteById(inviteId: string) {
+    return this.request<any>(`${SUPABASE_FUNCTIONS_URL}/household-invite/accept`, {
+      method: "POST",
+      body: JSON.stringify({ inviteId }),
+    });
+  }
+
+  async resendHouseholdInvite(inviteId: string) {
+    return this.request<any>(`${SUPABASE_FUNCTIONS_URL}/household-invite/resend`, {
+      method: "POST",
+      body: JSON.stringify({ inviteId }),
+    });
   }
 
   async getMyPendingInvites() {
@@ -1284,6 +1293,60 @@ class ApiClient {
     return snakeToCamel(data);
   }
 
+  // ── Admin Methods (via admin-api edge function) ──
+
+  async adminGetAllUsers() {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/users`, { method: "GET" });
+  }
+
+  async adminGetAllInvites() {
+    const data = await this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/invites`, { method: "GET" });
+    return (data || []).map((i: any) => snakeToCamel(i));
+  }
+
+  async adminGetAllHouseholds() {
+    const data = await this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/households`, { method: "GET" });
+    return (data || []).map((h: any) => snakeToCamel(h));
+  }
+
+  async adminDeleteUser(userId: string) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/users`, {
+      method: "DELETE",
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  async adminUpdateUser(userId: string, updates: { display_name?: string; setup_completed?: boolean }) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/users`, {
+      method: "PATCH",
+      body: JSON.stringify({ userId, updates: camelToSnake(updates) }),
+    });
+  }
+
+  async adminDeleteInvite(inviteId: string) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/invites`, {
+      method: "DELETE",
+      body: JSON.stringify({ inviteId }),
+    });
+  }
+
+  async adminRemoveHouseholdMember(memberId: string) {
+    // Keep using direct Supabase for member removal (RLS handles it)
+    const { error } = await (supabase
+      .from("household_members") as any)
+      .delete()
+      .eq("id", memberId);
+
+    if (error) throw error;
+  }
+
+  async adminDeleteHousehold(householdId: string) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/households`, {
+      method: "DELETE",
+      body: JSON.stringify({ householdId }),
+    });
+  }
+
   async updateUsername(username: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
@@ -1504,6 +1567,24 @@ export const useRespondToInvite = () => {
   });
 };
 
+export const useAcceptInviteById = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (inviteId: string) => apiClient.acceptInviteById(inviteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+      queryClient.invalidateQueries({ queryKey: ["household-invites"] });
+    },
+  });
+};
+
+export const useResendHouseholdInvite = () => {
+  return useMutation({
+    mutationFn: (inviteId: string) => apiClient.resendHouseholdInvite(inviteId),
+  });
+};
+
 // ── Family Member Hooks ──
 
 export const useCreateFamilyMember = () => {
@@ -1703,6 +1784,86 @@ export const useToggleRecipeReaction = () => {
     }) => apiClient.toggleRecipeReaction(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipe-reactions"] });
+    },
+  });
+};
+
+// ── Admin Hooks ──
+
+export const useAdminUsers = () => {
+  const { isAdmin } = useAuthStore();
+  return useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: () => apiClient.adminGetAllUsers(),
+    enabled: isAdmin,
+  });
+};
+
+export const useAdminInvites = () => {
+  const { isAdmin } = useAuthStore();
+  return useQuery({
+    queryKey: ["admin", "invites"],
+    queryFn: () => apiClient.adminGetAllInvites(),
+    enabled: isAdmin,
+  });
+};
+
+export const useAdminHouseholds = () => {
+  const { isAdmin } = useAuthStore();
+  return useQuery({
+    queryKey: ["admin", "households"],
+    queryFn: () => apiClient.adminGetAllHouseholds(),
+    enabled: isAdmin,
+  });
+};
+
+export const useAdminDeleteUser = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => apiClient.adminDeleteUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useAdminUpdateUser = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, updates }: { userId: string; updates: { display_name?: string; setup_completed?: boolean } }) =>
+      apiClient.adminUpdateUser(userId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useAdminDeleteInvite = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (inviteId: string) => apiClient.adminDeleteInvite(inviteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useAdminRemoveHouseholdMember = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (memberId: string) => apiClient.adminRemoveHouseholdMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useAdminDeleteHousehold = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (householdId: string) => apiClient.adminDeleteHousehold(householdId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
     },
   });
 };

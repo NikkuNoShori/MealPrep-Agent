@@ -14,12 +14,16 @@ export interface HouseholdMembership {
   role: 'owner' | 'admin' | 'member'
 }
 
+export type AppRole = 'admin' | 'user' | 'family_member'
+
 interface AuthState {
   user: AuthUser | null
   isLoading: boolean
   error: string | null
   linkedAccounts: Array<{ provider: string; id: string; created_at: string }>
   household: HouseholdMembership | null
+  appRole: AppRole | null
+  isAdmin: boolean
   initialize: () => Promise<void>
   refreshUser: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
@@ -42,6 +46,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
   linkedAccounts: [],
   household: null,
+  appRole: null,
+  isAdmin: false,
 
   initialize: async () => {
     // Prevent multiple simultaneous initializations
@@ -89,6 +95,23 @@ export const useAuthStore = create<AuthState>((set) => ({
         } catch (err) {
           // Don't fail initialization if household load fails (table may not exist yet)
           console.warn('Failed to load household:', err)
+        }
+        // Load app role (admin/user)
+        try {
+          const { data: userRole } = await (supabase
+            .from("user_roles") as any)
+            .select("roles(name)")
+            .eq("user_id", currentUser.id)
+            .limit(1)
+            .maybeSingle()
+
+          const roleName = userRole?.roles?.name as AppRole | undefined
+          set({
+            appRole: roleName || 'user',
+            isAdmin: roleName === 'admin',
+          })
+        } catch (err) {
+          console.warn('Failed to load app role:', err)
         }
       }
     } catch (err: any) {
@@ -260,7 +283,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       await authService.signOut()
-      set({ user: null, linkedAccounts: [], household: null })
+      set({ user: null, linkedAccounts: [], household: null, appRole: null, isAdmin: false })
     } catch (err: any) {
       set({ error: err?.message || 'Sign out failed' })
       throw err

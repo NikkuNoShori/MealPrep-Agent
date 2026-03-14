@@ -13,12 +13,22 @@ const SignIn: React.FC = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (user && !isLoading) {
-      navigate('/dashboard', { replace: true })
+      const pendingInviteId = sessionStorage.getItem('pendingInviteId');
+      if (pendingInviteId) {
+        navigate(`/invite/accept?id=${encodeURIComponent(pendingInviteId)}`, { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     }
   }, [user, isLoading, navigate])
 
   const handleAuthSuccess = () => {
-    navigate('/dashboard')
+    const pendingInviteId = sessionStorage.getItem('pendingInviteId');
+    if (pendingInviteId) {
+      navigate(`/invite/accept?id=${encodeURIComponent(pendingInviteId)}`);
+    } else {
+      navigate('/dashboard')
+    }
   }
 
   // Show loading while checking auth

@@ -11,6 +11,18 @@ const AuthCallback: React.FC = () => {
   const { refreshUser } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
 
+  const getPostAuthRedirect = () => {
+    const completingSetup = sessionStorage.getItem('completing_setup');
+    if (completingSetup) {
+      return '/complete-setup';
+    }
+    const pendingInviteId = sessionStorage.getItem('pendingInviteId');
+    if (pendingInviteId) {
+      return `/invite/accept?id=${encodeURIComponent(pendingInviteId)}`;
+    }
+    return '/dashboard';
+  };
+
   useEffect(() => {
     let resolved = false
     let subscription: any = null
@@ -62,7 +74,7 @@ const AuthCallback: React.FC = () => {
               // Additional delay to ensure Zustand state is propagated to all components
               await new Promise(resolve => setTimeout(resolve, 500))
               
-              navigate('/dashboard', { replace: true })
+              navigate(getPostAuthRedirect(), { replace: true })
             } else if (event === 'SIGNED_OUT' && !resolved) {
               resolved = true
               if (subscription) {
@@ -86,7 +98,7 @@ const AuthCallback: React.FC = () => {
               
               await refreshUser()
               await new Promise(resolve => setTimeout(resolve, 200))
-              navigate('/dashboard', { replace: true })
+              navigate(getPostAuthRedirect(), { replace: true })
             }
           }
         )
@@ -118,7 +130,7 @@ const AuthCallback: React.FC = () => {
           // Small delay to ensure state is updated
           await new Promise(resolve => setTimeout(resolve, 200))
           
-          navigate('/dashboard', { replace: true })
+          navigate(getPostAuthRedirect(), { replace: true })
           return
         }
         
@@ -138,7 +150,7 @@ const AuthCallback: React.FC = () => {
             
             await refreshUser()
             await new Promise(resolve => setTimeout(resolve, 200))
-            navigate('/dashboard', { replace: true })
+            navigate(getPostAuthRedirect(), { replace: true })
             return
           }
           

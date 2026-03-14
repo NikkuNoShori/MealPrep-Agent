@@ -11,24 +11,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const location = useLocation()
   const { user, isLoading } = useAuthStore()
   const [waitingForAuth, setWaitingForAuth] = React.useState(false)
-  
+
   // Auth is initialized in App.tsx - no need to initialize here
-  
+
   React.useEffect(() => {
     // If no user but we might be coming from OAuth, wait a moment
     if (!user && !isLoading && !waitingForAuth) {
       const isOAuthCallback = document.referrer.includes('/auth/callback') ||
                               sessionStorage.getItem('oauth_redirecting') === 'true'
-      
+
       if (isOAuthCallback) {
         setWaitingForAuth(true)
         sessionStorage.removeItem('oauth_redirecting')
-        
+
         // Wait up to 2 seconds for auth state to update
         const timer = setTimeout(() => {
           setWaitingForAuth(false)
         }, 2000)
-        
+
         return () => clearTimeout(timer)
       }
     }
@@ -44,14 +44,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
       </div>
     )
   }
-  
+
   if (!user) {
     return <Navigate to="/signin" state={{ from: location }} replace />
+  }
+
+  // Redirect users who haven't completed setup (e.g. invited via email)
+  if (user.setup_completed === false && location.pathname !== '/complete-setup') {
+    return <Navigate to="/complete-setup" replace />
   }
 
   return <>{children}</>
 }
 
 export default ProtectedRoute
-
-

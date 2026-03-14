@@ -105,7 +105,7 @@ export const authService = {
         try {
           const { data, error } = await supabase
             .from('profiles')
-            .select('display_name, first_name, last_name, avatar_url')
+            .select('display_name, first_name, last_name, avatar_url, setup_completed')
             .eq('id', user.id)
             .single()
           if (!error) {
@@ -128,9 +128,10 @@ export const authService = {
           display_name: profile?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
           first_name: profile?.first_name || user.user_metadata?.first_name || user.user_metadata?.given_name || profile?.display_name?.split(' ')[0] || user.email?.split('@')[0] || 'User',
           avatar_url: avatarUrl,
+          setup_completed: profile?.setup_completed ?? true,
         }
       }
-      
+
       // Fallback: Try getUser() if no session (for cases where session isn't available yet)
       const getUserPromise = supabase.auth.getUser()
       const timeoutPromise = new Promise((_, reject) => 
@@ -169,7 +170,7 @@ export const authService = {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, first_name, last_name, avatar_url')
+          .select('display_name, first_name, last_name, avatar_url, setup_completed')
           .eq('id', user.id)
           .single()
         if (!error) {
@@ -192,6 +193,7 @@ export const authService = {
         display_name: profile?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
         first_name: profile?.first_name || user.user_metadata?.first_name || user.user_metadata?.given_name || profile?.display_name?.split(' ')[0] || user.email?.split('@')[0] || 'User',
         avatar_url: avatarUrl,
+        setup_completed: profile?.setup_completed ?? true,
       }
     } catch (err: any) {
       // Handle any other errors gracefully

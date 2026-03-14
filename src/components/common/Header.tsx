@@ -1,11 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X, LogOut, Settings, ChevronDown, Home } from "lucide-react";
+import { Menu, X, LogOut, Settings, ChevronDown, Home, Shield } from "lucide-react";
 import { useState, useRef } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import React from "react";
 
 const Header = () => {
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, isAdmin } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -149,6 +149,16 @@ const Header = () => {
                         <Settings className="w-4 h-4 text-stone-400 dark:text-gray-500" />
                         <span>Settings</span>
                       </Link>
+                      {isAdmin && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="w-full px-4 py-2 text-left text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 flex items-center space-x-2.5 transition-colors"
+                        >
+                          <Shield className="w-4 h-4" />
+                          <span>Admin</span>
+                        </Link>
+                      )}
                       <button
                         onClick={() => { setIsUserMenuOpen(false); signOut(); }}
                         className="w-full px-4 py-2 text-left text-sm text-stone-600 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 flex items-center space-x-2.5 transition-colors"
