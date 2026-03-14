@@ -989,6 +989,7 @@ class ApiClient {
     age?: number;
     dietaryRestrictions?: string[];
     allergies?: string[];
+    preferences?: Record<string, any>;
   }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
@@ -1003,7 +1004,7 @@ class ApiClient {
         age: data.age || null,
         dietary_restrictions: data.dietaryRestrictions || [],
         allergies: data.allergies || [],
-        preferences: {},
+        preferences: data.preferences || {},
       })
       .select()
       .single();
@@ -1018,6 +1019,7 @@ class ApiClient {
     age?: number | null;
     dietaryRestrictions?: string[];
     allergies?: string[];
+    preferences?: Record<string, any>;
   }) {
     const payload: any = {};
     if (updates.name !== undefined) payload.name = updates.name;
@@ -1025,6 +1027,7 @@ class ApiClient {
     if (updates.age !== undefined) payload.age = updates.age;
     if (updates.dietaryRestrictions !== undefined) payload.dietary_restrictions = updates.dietaryRestrictions;
     if (updates.allergies !== undefined) payload.allergies = updates.allergies;
+    if (updates.preferences !== undefined) payload.preferences = updates.preferences;
 
     const { data: member, error } = await (supabase
       .from("family_members") as any)
@@ -1044,6 +1047,88 @@ class ApiClient {
       .eq("id", memberId);
 
     if (error) throw error;
+  }
+
+  // ── Recipe Reactions ──
+
+  async getRecipeReactions(recipeIds: string[]) {
+    if (recipeIds.length === 0) return [];
+
+    const { data, error } = await (supabase
+      .from("recipe_reactions") as any)
+      .select("id, recipe_id, user_id, family_member_id, reaction, family_members(id, name), profiles(id, display_name)")
+      .in("recipe_id", recipeIds);
+
+    if (error) throw error;
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      recipeId: r.recipe_id,
+      userId: r.user_id,
+      familyMemberId: r.family_member_id,
+      reaction: r.reaction,
+      name: r.family_members?.name || r.profiles?.display_name || "Unknown",
+    }));
+  }
+
+  async toggleRecipeReaction(data: {
+    recipeId: string;
+    reaction: 'thumbs_up' | 'thumbs_down';
+    familyMemberId?: string;
+  }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const isForDependent = !!data.familyMemberId;
+    const matchFilter: any = { recipe_id: data.recipeId };
+    if (isForDependent) {
+      matchFilter.family_member_id = data.familyMemberId;
+    } else {
+      matchFilter.user_id = user.id;
+    }
+
+    // Check for existing reaction
+    const { data: existing } = await (supabase
+      .from("recipe_reactions") as any)
+      .select("id, reaction")
+      .match(matchFilter)
+      .maybeSingle();
+
+    if (existing) {
+      if (existing.reaction === data.reaction) {
+        // Same reaction = remove it (toggle off)
+        const { error } = await (supabase
+          .from("recipe_reactions") as any)
+          .delete()
+          .eq("id", existing.id);
+        if (error) throw error;
+        return { action: "removed" as const };
+      } else {
+        // Different reaction = update it
+        const { error } = await (supabase
+          .from("recipe_reactions") as any)
+          .update({ reaction: data.reaction, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+        if (error) throw error;
+        return { action: "updated" as const };
+      }
+    } else {
+      // No existing reaction = insert
+      const insertData: any = {
+        recipe_id: data.recipeId,
+        reaction: data.reaction,
+      };
+      if (isForDependent) {
+        insertData.family_member_id = data.familyMemberId;
+      } else {
+        insertData.user_id = user.id;
+      }
+
+      const { error } = await (supabase
+        .from("recipe_reactions") as any)
+        .insert(insertData);
+      if (error) throw error;
+      return { action: "added" as const };
+    }
   }
 
   async updateRecipeVisibility(recipeId: string, visibility: 'private' | 'household' | 'public') {
@@ -1432,6 +1517,7 @@ export const useCreateFamilyMember = () => {
       age?: number;
       dietaryRestrictions?: string[];
       allergies?: string[];
+      preferences?: Record<string, any>;
     }) => apiClient.createFamilyMember(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["household"] });
@@ -1445,7 +1531,7 @@ export const useUpdateFamilyMember = () => {
   return useMutation({
     mutationFn: ({ memberId, updates }: {
       memberId: string;
-      updates: { name?: string; relationship?: string; age?: number | null; dietaryRestrictions?: string[]; allergies?: string[] };
+      updates: { name?: string; relationship?: string; age?: number | null; dietaryRestrictions?: string[]; allergies?: string[]; preferences?: Record<string, any> };
     }) => apiClient.updateFamilyMember(memberId, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["household"] });
@@ -1592,6 +1678,31 @@ export const useUpdateUsername = () => {
     mutationFn: (username: string) => apiClient.updateUsername(username),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+};
+
+// ── Recipe Reaction Hooks ──
+
+export const useRecipeReactions = (recipeIds: string[]) => {
+  return useQuery({
+    queryKey: ["recipe-reactions", recipeIds],
+    queryFn: () => apiClient.getRecipeReactions(recipeIds),
+    enabled: recipeIds.length > 0,
+  });
+};
+
+export const useToggleRecipeReaction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      recipeId: string;
+      reaction: 'thumbs_up' | 'thumbs_down';
+      familyMemberId?: string;
+    }) => apiClient.toggleRecipeReaction(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recipe-reactions"] });
     },
   });
 };

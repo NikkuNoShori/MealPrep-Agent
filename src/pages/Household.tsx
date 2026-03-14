@@ -32,6 +32,8 @@ import {
   Trash2,
   Users,
   Heart,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -83,6 +85,8 @@ const Household = () => {
     age: '',
     dietaryRestrictions: [] as string[],
     allergies: [] as string[],
+    likedFoods: '',
+    dislikedFoods: '',
   });
 
   // Queries & mutations
@@ -145,13 +149,16 @@ const Household = () => {
   };
 
   const resetDepForm = () => {
-    setDepForm({ name: '', relationship: '', age: '', dietaryRestrictions: [], allergies: [] });
+    setDepForm({ name: '', relationship: '', age: '', dietaryRestrictions: [], allergies: [], likedFoods: '', dislikedFoods: '' });
     setIsAddingDependent(false);
     setEditingDependentId(null);
   };
 
   const handleAddDependent = () => {
     if (!depForm.name.trim() || !depForm.relationship || !householdData?.household?.id) return;
+    const prefs: Record<string, any> = {};
+    if (depForm.likedFoods.trim()) prefs.likedFoods = depForm.likedFoods.split(',').map((s) => s.trim()).filter(Boolean);
+    if (depForm.dislikedFoods.trim()) prefs.dislikedFoods = depForm.dislikedFoods.split(',').map((s) => s.trim()).filter(Boolean);
     createFamilyMember.mutate(
       {
         householdId: householdData.household.id,
@@ -160,6 +167,7 @@ const Household = () => {
         age: depForm.age ? parseInt(depForm.age) : undefined,
         dietaryRestrictions: depForm.dietaryRestrictions,
         allergies: depForm.allergies,
+        preferences: prefs,
       },
       {
         onSuccess: () => {
@@ -175,6 +183,11 @@ const Household = () => {
 
   const handleUpdateDependent = () => {
     if (!editingDependentId || !depForm.name.trim() || !depForm.relationship) return;
+    const updatePrefs: Record<string, any> = {};
+    if (depForm.likedFoods.trim()) updatePrefs.likedFoods = depForm.likedFoods.split(',').map((s) => s.trim()).filter(Boolean);
+    else updatePrefs.likedFoods = [];
+    if (depForm.dislikedFoods.trim()) updatePrefs.dislikedFoods = depForm.dislikedFoods.split(',').map((s) => s.trim()).filter(Boolean);
+    else updatePrefs.dislikedFoods = [];
     updateFamilyMember.mutate(
       {
         memberId: editingDependentId,
@@ -184,6 +197,7 @@ const Household = () => {
           age: depForm.age ? parseInt(depForm.age) : null,
           dietaryRestrictions: depForm.dietaryRestrictions,
           allergies: depForm.allergies,
+          preferences: updatePrefs,
         },
       },
       {
@@ -215,6 +229,8 @@ const Household = () => {
       age: dep.age?.toString() || '',
       dietaryRestrictions: dep.dietaryRestrictions || [],
       allergies: dep.allergies || [],
+      likedFoods: (dep.preferences?.likedFoods || []).join(', '),
+      dislikedFoods: (dep.preferences?.dislikedFoods || []).join(', '),
     });
   };
 
@@ -558,35 +574,117 @@ const Household = () => {
 
                     {/* Dietary Restrictions */}
                     <div className="space-y-1.5">
-                      <Label>Dietary Restrictions</Label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {DIETARY_RESTRICTIONS.map((r) => (
-                          <Badge
-                            key={r}
-                            variant={depForm.dietaryRestrictions.includes(r) ? 'default' : 'outline'}
-                            className="cursor-pointer transition-colors"
-                            onClick={() => toggleRestriction(r)}
+                      <div className="flex items-center justify-between">
+                        <Label>Dietary Restrictions</Label>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                            onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}
                           >
-                            {r}
-                          </Badge>
-                        ))}
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                            onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [] }))}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {DIETARY_RESTRICTIONS.map((r) => {
+                          const selected = depForm.dietaryRestrictions.includes(r);
+                          return (
+                            <Badge
+                              key={r}
+                              variant={selected ? 'default' : 'outline'}
+                              className={`cursor-pointer transition-all duration-150 ${
+                                selected
+                                  ? 'shadow-sm scale-[1.02]'
+                                  : 'opacity-70 hover:opacity-100 hover:border-primary/40'
+                              }`}
+                              onClick={() => toggleRestriction(r)}
+                            >
+                              {selected && <Check className="h-2.5 w-2.5 mr-0.5" />}
+                              {r}
+                            </Badge>
+                          );
+                        })}
                       </div>
                     </div>
 
                     {/* Allergies */}
                     <div className="space-y-1.5">
-                      <Label>Allergies</Label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {COMMON_ALLERGIES.map((a) => (
-                          <Badge
-                            key={a}
-                            variant={depForm.allergies.includes(a) ? 'destructive' : 'outline'}
-                            className="cursor-pointer transition-colors"
-                            onClick={() => toggleAllergy(a)}
+                      <div className="flex items-center justify-between">
+                        <Label>Allergies</Label>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                            onClick={() => setDepForm((p) => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}
                           >
-                            {a}
-                          </Badge>
-                        ))}
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                            onClick={() => setDepForm((p) => ({ ...p, allergies: [] }))}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {COMMON_ALLERGIES.map((a) => {
+                          const selected = depForm.allergies.includes(a);
+                          return (
+                            <Badge
+                              key={a}
+                              variant={selected ? 'destructive' : 'outline'}
+                              className={`cursor-pointer transition-all duration-150 ${
+                                selected
+                                  ? 'shadow-sm scale-[1.02]'
+                                  : 'opacity-70 hover:opacity-100 hover:border-destructive/40'
+                              }`}
+                              onClick={() => toggleAllergy(a)}
+                            >
+                              {selected && <Check className="h-2.5 w-2.5 mr-0.5" />}
+                              {a}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Liked / Disliked Foods */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="dep-liked" className="flex items-center gap-1.5">
+                          <ThumbsUp className="h-3.5 w-3.5 text-green-500" />
+                          Liked Foods
+                        </Label>
+                        <Input
+                          id="dep-liked"
+                          value={depForm.likedFoods}
+                          onChange={(e) => setDepForm((p) => ({ ...p, likedFoods: e.target.value }))}
+                          placeholder="e.g. pasta, chicken, broccoli"
+                        />
+                        <p className="text-[10px] text-muted-foreground">Comma-separated</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="dep-disliked" className="flex items-center gap-1.5">
+                          <ThumbsDown className="h-3.5 w-3.5 text-red-500" />
+                          Disliked Foods
+                        </Label>
+                        <Input
+                          id="dep-disliked"
+                          value={depForm.dislikedFoods}
+                          onChange={(e) => setDepForm((p) => ({ ...p, dislikedFoods: e.target.value }))}
+                          placeholder="e.g. mushrooms, olives"
+                        />
+                        <p className="text-[10px] text-muted-foreground">Comma-separated</p>
                       </div>
                     </div>
 
@@ -672,6 +770,22 @@ const Household = () => {
                               </Badge>
                             ))}
                           </div>
+                          {((dep.preferences?.likedFoods?.length > 0) || (dep.preferences?.dislikedFoods?.length > 0)) && (
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {dep.preferences?.likedFoods?.length > 0 && (
+                                <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-0.5">
+                                  <ThumbsUp className="h-2.5 w-2.5" />
+                                  {dep.preferences.likedFoods.join(', ')}
+                                </span>
+                              )}
+                              {dep.preferences?.dislikedFoods?.length > 0 && (
+                                <span className="text-[10px] text-red-500 dark:text-red-400 flex items-center gap-0.5">
+                                  <ThumbsDown className="h-2.5 w-2.5" />
+                                  {dep.preferences.dislikedFoods.join(', ')}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-1 shrink-0 ml-2">
                           <Button

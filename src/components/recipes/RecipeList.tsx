@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { useRecipes, useCreateRecipe, useDeleteRecipe, useCollectionRecipes, usePublicRecipes } from '@/services/api'
-import { RecipeCard } from './RecipeCard'
+import { useMemo } from 'react'
+import { useRecipes, useCreateRecipe, useDeleteRecipe, useCollectionRecipes, usePublicRecipes, useRecipeReactions, useToggleRecipeReaction, useMyHousehold } from '@/services/api'
+import { RecipeCard, RecipeReaction } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
 
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,12 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   const { data: publicRecipesData, isLoading: publicLoading } = usePublicRecipes({ limit: 50 });
   const { data: collectionRecipes, isLoading: collectionLoading } = useCollectionRecipes(collectionId || '');
   const deleteRecipeMutation = useDeleteRecipe();
+  const toggleReaction = useToggleRecipeReaction();
+  const { data: householdData } = useMyHousehold();
+  const dependents = useMemo(() => {
+    if (!householdData) return [];
+    return ((householdData as any)?.dependents || []).map((d: any) => ({ id: d.id, name: d.name }));
+  }, [householdData]);
 
   // Determine which recipes to show based on feed mode
   const baseRecipes = feedMode === 'collection' && collectionId
@@ -81,6 +88,25 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 
       return true;
     });
+
+  // Fetch reactions for all visible recipes
+  const recipeIds = useMemo(() => filteredRecipes.map((r: any) => r.id), [filteredRecipes]);
+  const { data: allReactions } = useRecipeReactions(recipeIds);
+
+  const reactionsByRecipe = useMemo(() => {
+    const map: Record<string, RecipeReaction[]> = {};
+    if (allReactions) {
+      for (const r of allReactions as RecipeReaction[]) {
+        if (!map[r.recipeId]) map[r.recipeId] = [];
+        map[r.recipeId].push(r);
+      }
+    }
+    return map;
+  }, [allReactions]);
+
+  const handleReact = (recipeId: string, reaction: "thumbs_up" | "thumbs_down", familyMemberId?: string) => {
+    toggleReaction.mutate({ recipeId, reaction, familyMemberId });
+  };
 
   const handleDeleteRecipe = async (recipeId: string) => {
     if (
@@ -248,6 +274,9 @@ export const RecipeList: React.FC<RecipeListProps> = ({
               <RecipeCard
                 recipe={recipe}
                 viewMode={viewMode}
+                reactions={reactionsByRecipe[recipe.id] || []}
+                dependents={dependents}
+                onReact={handleReact}
                 onClick={() => onRecipeSelect?.(recipe)}
                 onEdit={onEditRecipe}
                 onDelete={handleDeleteRecipe}
