@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X, LogOut, Settings, ChevronDown } from "lucide-react";
+import { Menu, X, LogOut, Settings, ChevronDown, Home } from "lucide-react";
 import { useState, useRef } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import React from "react";
@@ -133,6 +133,14 @@ const Header = () => {
                       <p className="text-xs text-stone-500 dark:text-gray-400 truncate">{user?.email}</p>
                     </div>
                     <div className="py-1">
+                      <Link
+                        to="/household"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full px-4 py-2 text-left text-sm text-stone-600 dark:text-gray-300 hover:bg-stone-50 dark:hover:bg-white/5 flex items-center space-x-2.5 transition-colors"
+                      >
+                        <Home className="w-4 h-4 text-stone-400 dark:text-gray-500" />
+                        <span>Household</span>
+                      </Link>
                       <Link
                         to="/settings"
                         onClick={() => setIsUserMenuOpen(false)}

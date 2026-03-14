@@ -13,6 +13,7 @@ import Chat from "./pages/Chat";
 import Recipes from "./pages/Recipes";
 import MealPlanner from "./pages/MealPlanner";
 import Settings from "./pages/Settings";
+import Household from "./pages/Household";
 import { useAuthStore } from "./stores/authStore";
 
 function AppRoutes() {
@@ -65,6 +66,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <MealPlanner />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/household"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Household />
             </Layout>
           </ProtectedRoute>
         }

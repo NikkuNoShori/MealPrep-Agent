@@ -12,7 +12,8 @@
       "WebSearch",
       "Bash(npm run:*)",
       "Read(//c/Users/nickn/AppData/Local/Temp/claude/c--dev-MealPrep-Agent/90654cd7-049e-4107-a143-2d7a927e2462/tasks/**)",
-      "Bash(ls c:/dev/MealPrep-Agent/supabase/migrations/0*.sql)"
+      "Bash(ls c:/dev/MealPrep-Agent/supabase/migrations/0*.sql)",
+      "Bash(grep -l recipes /c/dev/MealPrep-Agent/supabase/migrations/20260313000001_*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\nickn\\.claude"

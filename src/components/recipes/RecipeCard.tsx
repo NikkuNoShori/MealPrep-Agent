@@ -19,6 +19,11 @@ interface RecipeCardProps {
     familyPreferences?: {
       [memberId: string]: "love" | "like" | "neutral" | "dislike";
     };
+    author?: {
+      displayName?: string;
+      username?: string;
+      avatarUrl?: string;
+    };
   };
   viewMode: "grid" | "list";
   onClick?: () => void;
@@ -171,6 +176,11 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                     <h3 className="font-bold text-xl text-slate-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200" title={recipe.title}>
                       {displayTitle}
                     </h3>
+                    {recipe.author && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        by <span className="font-medium text-primary/80">@{recipe.author.username || recipe.author.displayName}</span>
+                      </p>
+                    )}
                     {recipe.description && (
                       <div
                         className="relative"
@@ -400,6 +410,11 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 )}
               </div>
             </div>
+            {recipe.author && (
+              <p className="text-xs text-muted-foreground mb-1">
+                by <span className="font-medium text-primary/80">@{recipe.author.username || recipe.author.displayName}</span>
+              </p>
+            )}
             {recipe.description && (
               <div
                 className="relative"

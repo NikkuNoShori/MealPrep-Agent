@@ -980,15 +980,77 @@ class ApiClient {
     return snakeToCamel(invite);
   }
 
-  async updateRecipeVisibility(recipeId: string, visibility: 'private' | 'household' | 'public') {
+  // ── Family Members (Dependents) ──
+
+  async createFamilyMember(data: {
+    householdId: string;
+    name: string;
+    relationship: string;
+    age?: number;
+    dietaryRestrictions?: string[];
+    allergies?: string[];
+  }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    const { data: member, error } = await (supabase
+      .from("family_members") as any)
+      .insert({
+        household_id: data.householdId,
+        managed_by: user.id,
+        name: data.name,
+        relationship: data.relationship,
+        age: data.age || null,
+        dietary_restrictions: data.dietaryRestrictions || [],
+        allergies: data.allergies || [],
+        preferences: {},
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(member);
+  }
+
+  async updateFamilyMember(memberId: string, updates: {
+    name?: string;
+    relationship?: string;
+    age?: number | null;
+    dietaryRestrictions?: string[];
+    allergies?: string[];
+  }) {
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.relationship !== undefined) payload.relationship = updates.relationship;
+    if (updates.age !== undefined) payload.age = updates.age;
+    if (updates.dietaryRestrictions !== undefined) payload.dietary_restrictions = updates.dietaryRestrictions;
+    if (updates.allergies !== undefined) payload.allergies = updates.allergies;
+
+    const { data: member, error } = await (supabase
+      .from("family_members") as any)
+      .update(payload)
+      .eq("id", memberId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(member);
+  }
+
+  async deleteFamilyMember(memberId: string) {
+    const { error } = await (supabase
+      .from("family_members") as any)
+      .update({ is_active: false })
+      .eq("id", memberId);
+
+    if (error) throw error;
+  }
+
+  async updateRecipeVisibility(recipeId: string, visibility: 'private' | 'household' | 'public') {
     const { error } = await (supabase
       .from("recipes") as any)
       .update({ visibility })
-      .eq("id", recipeId)
-      .eq("user_id", user.id);
+      .eq("id", recipeId);
 
     if (error) throw error;
     return { id: recipeId, visibility };
@@ -1088,6 +1150,76 @@ class ApiClient {
       .eq("recipe_id", recipeId);
 
     if (error) throw error;
+  }
+
+  // ── Public Recipes ──
+
+  async getPublicRecipes(params?: { limit?: number; offset?: number }) {
+    const limit = params?.limit || 50;
+    const offset = params?.offset || 0;
+
+    const { data, error } = await (supabase
+      .from("recipes") as any)
+      .select("*, profiles!recipes_user_id_fkey(display_name, username, avatar_url)")
+      .eq("visibility", "public")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const camelRecipes = (data || []).map((r: any) => {
+      const recipe = snakeToCamel(r);
+      // Flatten author info
+      if (r.profiles) {
+        recipe.author = {
+          displayName: r.profiles.display_name,
+          username: r.profiles.username,
+          avatarUrl: r.profiles.avatar_url,
+        };
+      }
+      return recipe;
+    });
+
+    return { recipes: camelRecipes, total: camelRecipes.length };
+  }
+
+  // ── Username / Profile ──
+
+  async getMyProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await (supabase
+      .from("profiles") as any)
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async updateUsername(username: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Validate format
+    if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+      throw new Error("Username must be 3-30 characters, lowercase letters, numbers, and underscores only");
+    }
+
+    const { data, error } = await (supabase
+      .from("profiles") as any)
+      .update({ username })
+      .eq("id", user.id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') throw new Error("Username already taken");
+      throw error;
+    }
+    return snakeToCamel(data);
   }
 }
 
@@ -1287,6 +1419,51 @@ export const useRespondToInvite = () => {
   });
 };
 
+// ── Family Member Hooks ──
+
+export const useCreateFamilyMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      householdId: string;
+      name: string;
+      relationship: string;
+      age?: number;
+      dietaryRestrictions?: string[];
+      allergies?: string[];
+    }) => apiClient.createFamilyMember(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useUpdateFamilyMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ memberId, updates }: {
+      memberId: string;
+      updates: { name?: string; relationship?: string; age?: number | null; dietaryRestrictions?: string[]; allergies?: string[] };
+    }) => apiClient.updateFamilyMember(memberId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useDeleteFamilyMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (memberId: string) => apiClient.deleteFamilyMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
 export const useUpdateRecipeVisibility = () => {
   const queryClient = useQueryClient();
 
@@ -1295,6 +1472,7 @@ export const useUpdateRecipeVisibility = () => {
       apiClient.updateRecipeVisibility(recipeId, visibility),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
+      queryClient.invalidateQueries({ queryKey: ["public-recipes"] });
     },
   });
 };
@@ -1382,6 +1560,38 @@ export const useRemoveRecipeFromCollection = () => {
       apiClient.removeRecipeFromCollection(collectionId, recipeId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["collections", variables.collectionId, "recipes"] });
+    },
+  });
+};
+
+// ── Public Recipes Hook ──
+
+export const usePublicRecipes = (params?: { limit?: number; offset?: number }) => {
+  return useQuery({
+    queryKey: ["public-recipes", params],
+    queryFn: () => apiClient.getPublicRecipes(params),
+  });
+};
+
+// ── Profile / Username Hooks ──
+
+export const useMyProfile = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+
+  return useQuery({
+    queryKey: ["profile"],
+    queryFn: () => apiClient.getMyProfile(),
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useUpdateUsername = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (username: string) => apiClient.updateUsername(username),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 };
