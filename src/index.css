@@ -24,6 +24,26 @@
     --input: 20 6% 90%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.75rem;
+
+    /* Recipe selector modal */
+    --rs-bg: #ffffff;
+    --rs-bg-elevated: #f9fafb;
+    --rs-border: #e5e7eb;
+    --rs-border-subtle: #f3f4f6;
+    --rs-text-primary: #1f2937;
+    --rs-text-secondary: #6b7280;
+    --rs-text-tertiary: #9ca3af;
+    --rs-accent: #1D9E75;
+    --rs-accent-light: #d1fae5;
+    --rs-accent-hover: #178c66;
+    --rs-overlay: rgba(0, 0, 0, 0.4);
+    --rs-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --rs-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --rs-selected-bg: #f0fdf8;
+    --rs-toggle-bg: #f3f4f6;
+    --rs-toggle-active-bg: var(--rs-text-primary);
+    --rs-toggle-active-fg: #ffffff;
+    --rs-search-bg: #f9fafb;
   }
 
   .dark {
@@ -46,6 +66,26 @@
     --border: 220 16% 16%;
     --input: 220 16% 16%;
     --ring: 224.3 76.3% 94.1%;
+
+    /* Recipe selector modal — dark */
+    --rs-bg: #1a1f2e;
+    --rs-bg-elevated: #232838;
+    --rs-border: #2d3348;
+    --rs-border-subtle: #252a3a;
+    --rs-text-primary: #f1f5f9;
+    --rs-text-secondary: #94a3b8;
+    --rs-text-tertiary: #64748b;
+    --rs-accent: #34d399;
+    --rs-accent-light: rgba(52, 211, 153, 0.12);
+    --rs-accent-hover: #2cc48a;
+    --rs-overlay: rgba(0, 0, 0, 0.6);
+    --rs-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --rs-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --rs-selected-bg: rgba(52, 211, 153, 0.08);
+    --rs-toggle-bg: #2d3348;
+    --rs-toggle-active-bg: #f1f5f9;
+    --rs-toggle-active-fg: #1a1f2e;
+    --rs-search-bg: #232838;
   }
 
   html, body, #root {

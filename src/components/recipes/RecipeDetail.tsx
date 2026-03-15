@@ -6,6 +6,7 @@ import { useMeasurementSystem } from '@/contexts/MeasurementSystemContext'
 import { convertIngredient, optimizeUnit, formatConvertedValue, Unit } from '@/utils/unitConverter'
 import { VisibilityPicker, type RecipeVisibility } from '@/components/recipes/VisibilityPicker'
 import { AddToCollectionMenu } from '@/components/recipes/AddToCollectionMenu'
+import AddToPlanButton from '@/components/meal-planning/AddToPlanButton'
 import { useUpdateRecipeVisibility } from '@/services/api'
 import {
   ArrowLeft,
@@ -149,6 +150,15 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
               Edit
             </Button>
           )}
+          <AddToPlanButton
+            recipeId={recipe.id}
+            recipeName={recipe.title}
+            recipeImage={recipe.imageUrl}
+            servings={recipe.servings}
+            prepTime={recipe.prepTime}
+            cookTime={recipe.cookTime}
+            size="sm"
+          />
           <AddToCollectionMenu recipeId={recipe.id} size="sm" />
           <VisibilityPicker
             value={localVisibility}

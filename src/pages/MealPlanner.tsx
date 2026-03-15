@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,6 @@ import {
   ChevronRight,
   ShoppingCart,
   Clock,
-  Utensils,
   ChefHat,
   Loader2,
   MoreHorizontal,
@@ -28,8 +27,6 @@ import {
   Trash2,
   Archive,
   CheckCircle2,
-  FileText,
-  Sparkles,
   Sun,
   Coffee,
   Moon,
@@ -37,18 +34,29 @@ import {
   X,
   Pencil,
   Play,
+  LayoutGrid,
+  Rows,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { MealPlanStatus, MealSlot, PlannedMealEntry } from '@/types/mealPlan';
-import RecipePickerModal from '@/components/meal-planning/RecipePickerModal';
+import type { SelectedRecipeInfo } from '@/components/meal-planning/recipeTypes';
+import RecipeSelectorModal from '@/components/grocery/RecipeSelectorModal';
+import ServingsModal from '@/components/meal-planning/ServingsModal';
+import GroceryCart from '@/components/meal-planning/GroceryCart';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const MEAL_SLOTS: { key: MealSlot; label: string; icon: React.ElementType; color: string }[] = [
+// Daily meal slots (shown per-day in the calendar grid)
+const DAILY_SLOTS: { key: MealSlot; label: string; icon: React.ElementType; color: string }[] = [
   { key: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'text-amber-500' },
   { key: 'lunch', label: 'Lunch', icon: Sun, color: 'text-orange-500' },
   { key: 'dinner', label: 'Dinner', icon: Moon, color: 'text-indigo-500' },
-  { key: 'snacks', label: 'Snacks', icon: Cookie, color: 'text-pink-500' },
+];
+
+// Plan-level lists (shown below the calendar as weekly lists)
+const PLAN_LISTS: { key: string; label: string; icon: React.ElementType; color: string; description: string }[] = [
+  { key: '_snacks', label: 'Snacks', icon: Cookie, color: 'text-pink-500', description: 'Weekly snacks — not tied to a specific day' },
+  { key: '_non_recipe', label: 'Non-Recipe Items', icon: ShoppingCart, color: 'text-teal-500', description: 'Extras like paper towels, foil, etc.' },
 ];
 
 const STATUS_CONFIG: Record<MealPlanStatus, { label: string; color: string; bg: string }> = {
@@ -82,17 +90,24 @@ function getMealCount(meals: any, dateStr: string): number {
   if (!dayMeals) return 0;
   return (dayMeals.breakfast?.length || 0) +
     (dayMeals.lunch?.length || 0) +
-    (dayMeals.dinner?.length || 0) +
-    (dayMeals.snacks?.length || 0);
+    (dayMeals.dinner?.length || 0);
+}
+
+function getPlanListCount(meals: any, key: string): number {
+  return meals?.[key]?.length || 0;
 }
 
 function getWeekMealCount(meals: any, weekDates: Date[]): number {
-  return weekDates.reduce((sum, d) => sum + getMealCount(meals, formatDateKey(d)), 0);
+  const dailyCount = weekDates.reduce((sum, d) => sum + getMealCount(meals, formatDateKey(d)), 0);
+  const snacksCount = getPlanListCount(meals, '_snacks');
+  const nonRecipeCount = getPlanListCount(meals, '_non_recipe');
+  return dailyCount + snacksCount + nonRecipeCount;
 }
 
 const MealPlanner = () => {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('calendar');
+  const [calendarView, setCalendarView] = useState<'days' | 'meals'>('days');
   const [currentWeek, setCurrentWeek] = useState(() => getWeekStart(new Date()));
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
@@ -100,9 +115,12 @@ const MealPlanner = () => {
   const [isEditingPlanTitle, setIsEditingPlanTitle] = useState(false);
   const [editedPlanTitle, setEditedPlanTitle] = useState('');
   const [bannerMenuOpen, setBannerMenuOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerDate, setPickerDate] = useState('');
-  const [pickerSlot, setPickerSlot] = useState<MealSlot>('dinner');
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [selectorSlot, setSelectorSlot] = useState<MealSlot>('dinner');
+  const [selectorDate, setSelectorDate] = useState('');
+  const [pendingMultiRecipes, setPendingMultiRecipes] = useState<SelectedRecipeInfo[]>([]);
+  const [showServingsModal, setShowServingsModal] = useState(false);
+  const [planListInputs, setPlanListInputs] = useState<Record<string, string>>({});
   const titleInputRef = useRef<HTMLInputElement>(null);
   const titleEditRef = useRef<HTMLDivElement>(null);
   const bannerMenuRef = useRef<HTMLDivElement>(null);
@@ -246,139 +264,147 @@ const MealPlanner = () => {
     );
   };
 
+  const openRecipeSelector = (date: string, slot: MealSlot) => {
+    setSelectorDate(date);
+    setSelectorSlot(slot);
+    setSelectorOpen(true);
+  };
+
+  const handleMultiSelectDone = (recipes: SelectedRecipeInfo[]) => {
+    setSelectorOpen(false);
+    if (recipes.length === 0) return;
+    setPendingMultiRecipes(recipes);
+    setShowServingsModal(true);
+  };
+
+  const handleServingsConfirmed = (recipes: SelectedRecipeInfo[]) => {
+    setShowServingsModal(false);
+    if (!weekPlan || recipes.length === 0) return;
+
+    const targetDate = selectorDate;
+    const targetSlot = selectorSlot;
+    const currentMeals = { ...(weekPlan.meals || {}) };
+
+    for (const recipe of recipes) {
+      const entry: PlannedMealEntry = {
+        id: crypto.randomUUID(),
+        recipeId: recipe.recipeId,
+        recipeName: recipe.recipeName,
+        recipeImage: recipe.recipeImage,
+        servings: recipe.servings,
+      };
+
+      if (targetDate.startsWith('_')) {
+        const listItems = [...(currentMeals[targetDate] || [])];
+        listItems.push(entry);
+        currentMeals[targetDate] = listItems;
+      } else {
+        const dayMeals = { ...(currentMeals[targetDate] || {}) };
+        const slotMeals = [...(dayMeals[targetSlot] || [])];
+        slotMeals.push(entry);
+        dayMeals[targetSlot] = slotMeals;
+        currentMeals[targetDate] = dayMeals;
+      }
+    }
+
+    updateMealPlan.mutate(
+      { id: weekPlan.id, data: { meals: currentMeals } },
+      {
+        onSuccess: () => toast.success(`Added ${recipes.length} ${recipes.length === 1 ? 'recipe' : 'recipes'}`),
+        onError: (err: any) => toast.error(err?.message || 'Failed to add recipes'),
+      }
+    );
+  };
+
+  const handleAddPlanListItem = (listKey: string, name: string) => {
+    if (!weekPlan || !name.trim()) return;
+    const currentMeals = { ...(weekPlan.meals || {}) };
+    const listItems = [...(currentMeals[listKey] || [])];
+
+    listItems.push({
+      id: crypto.randomUUID(),
+      recipeName: name.trim(),
+      recipeId: '',
+      servings: 1,
+    });
+    currentMeals[listKey] = listItems;
+
+    updateMealPlan.mutate(
+      { id: weekPlan.id, data: { meals: currentMeals } },
+      {
+        onSuccess: () => toast.success(`Added "${name.trim()}"`),
+        onError: (err: any) => toast.error(err?.message || 'Failed to add item'),
+      }
+    );
+  };
+
+  const handleRemovePlanListItem = (listKey: string, itemId: string) => {
+    if (!weekPlan) return;
+    const currentMeals = { ...(weekPlan.meals || {}) };
+    const listItems = (currentMeals[listKey] || []).filter((m: any) => m.id !== itemId);
+    currentMeals[listKey] = listItems;
+
+    updateMealPlan.mutate(
+      { id: weekPlan.id, data: { meals: currentMeals } },
+      {
+        onSuccess: () => toast.success('Item removed'),
+        onError: (err: any) => toast.error(err?.message || 'Failed to remove item'),
+      }
+    );
+  };
+
+  const handleRemoveMeal = (dateStr: string, slot: MealSlot, mealId: string) => {
+    if (!weekPlan) return;
+    const currentMeals = { ...(weekPlan.meals || {}) };
+    const dayMeals = { ...(currentMeals[dateStr] || {}) };
+    const slotMeals = (dayMeals[slot] || []).filter((m: any) => m.id !== mealId);
+    dayMeals[slot] = slotMeals;
+    currentMeals[dateStr] = dayMeals;
+
+    updateMealPlan.mutate(
+      { id: weekPlan.id, data: { meals: currentMeals } },
+      {
+        onSuccess: () => toast.success('Meal removed'),
+        onError: (err: any) => toast.error(err?.message || 'Failed to remove meal'),
+      }
+    );
+  };
+
   const weekLabel = `${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   return (
     <div className="bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 animate-fade-in">
 
-        {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-stone-900 dark:text-white">
-              Meal Planner
-            </h1>
-            <p className="text-stone-500 dark:text-gray-400 mt-1">
-              Plan meals, build grocery lists, eat better.
-            </p>
-          </div>
-          {!weekPlan && (
-            <Button
-              onClick={() => setShowCreateForm(true)}
-              className="gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
-            >
-              <Plus className="h-4 w-4" />
-              New Plan
-            </Button>
-          )}
-        </div>
-
-        {/* ── Quick Stats ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            {
-              label: 'This Week',
-              value: weekPlan ? getWeekMealCount(weekPlan.meals, weekDates) : 0,
-              suffix: 'meals',
-              hint: weekPlan ? 'View calendar' : 'Create a plan',
-              icon: Utensils,
-              gradient: 'from-emerald-500 to-teal-600',
-              glow: 'shadow-emerald-500/20',
-              onClick: () => {
-                if (weekPlan) {
-                  setActiveTab('calendar');
-                } else {
-                  setShowCreateForm(true);
-                }
-              },
-            },
-            {
-              label: 'Plan Status',
-              value: weekPlan ? STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.label || weekPlan.status : 'None',
-              hint: weekPlan
-                ? weekPlan.status === 'draft' ? 'Click to start'
-                : weekPlan.status === 'active' ? 'Click to complete'
-                : weekPlan.status === 'completed' ? 'Click to modify'
-                : ''
-                : 'No plan yet',
-              icon: FileText,
-              gradient: 'from-blue-500 to-indigo-600',
-              glow: 'shadow-blue-500/20',
-              onClick: () => {
-                if (!weekPlan) return;
-                if (weekPlan.status === 'draft') handleStatusChange(weekPlan.id, 'active');
-                else if (weekPlan.status === 'active') handleStatusChange(weekPlan.id, 'completed');
-                else if (weekPlan.status === 'completed') handleStatusChange(weekPlan.id, 'active');
-              },
-            },
-            {
-              label: 'Grocery Items',
-              value: weekPlan?.groceryList?.items?.filter((i: any) => !i.isRemoved)?.length || 0,
-              suffix: 'items',
-              hint: 'View grocery cart',
-              icon: ShoppingCart,
-              gradient: 'from-amber-500 to-orange-600',
-              glow: 'shadow-amber-500/20',
-              onClick: () => setActiveTab('grocery'),
-            },
-            {
-              label: 'Total Plans',
-              value: mealPlans?.length || 0,
-              suffix: 'saved',
-              hint: 'View history',
-              icon: Calendar,
-              gradient: 'from-violet-500 to-purple-600',
-              glow: 'shadow-violet-500/20',
-              onClick: () => setActiveTab('history'),
-            },
-          ].map((stat) => (
-            <button
-              key={stat.label}
-              onClick={stat.onClick}
-              className={`stat-card group relative overflow-hidden rounded-2xl p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98] bg-white dark:bg-white/[0.03] border border-stone-200/80 dark:border-white/[0.06] shadow-sm hover:shadow-lg ${stat.glow} cursor-pointer`}
-            >
-              <div className={`absolute top-0 right-0 w-20 h-20 rounded-full bg-gradient-to-br ${stat.gradient} opacity-[0.06] dark:opacity-[0.08] -translate-y-6 translate-x-6 group-hover:scale-150 transition-transform duration-500`} />
-              <div className="flex items-start justify-between relative">
-                <div>
-                  <p className="text-xs font-medium text-stone-500 dark:text-gray-400 uppercase tracking-wider">
-                    {stat.label}
-                  </p>
-                  <p className="text-2xl font-bold text-stone-900 dark:text-white mt-1">
-                    {stat.value}
-                    {stat.suffix && (
-                      <span className="text-xs font-normal text-stone-400 dark:text-gray-500 ml-1">{stat.suffix}</span>
-                    )}
-                  </p>
-                  <p className="text-[10px] text-stone-400 dark:text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    {stat.hint}
-                  </p>
-                </div>
-                <div className={`p-2 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg ${stat.glow} group-hover:shadow-xl transition-shadow duration-300`}>
-                  <stat.icon className="h-4 w-4 text-white" />
-                </div>
-              </div>
-            </button>
-          ))}
+        {/* ── Header: Title + Tabs ── */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
+            Meal Planner
+          </h1>
+            <TabsList className="gap-1 p-1 rounded-xl bg-stone-100/80 dark:bg-white/[0.04] border border-stone-200/60 dark:border-white/[0.06]">
+              <TabsTrigger value="calendar" className="gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 data-[state=active]:shadow-md">
+                <Calendar className="h-3.5 w-3.5" />
+                Calendar
+              </TabsTrigger>
+              <TabsTrigger value="grocery" className="gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 data-[state=active]:shadow-md">
+                <ShoppingCart className="h-3.5 w-3.5" />
+                Grocery
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 data-[state=active]:shadow-md">
+                <Clock className="h-3.5 w-3.5" />
+                History
+              </TabsTrigger>
+            </TabsList>
         </div>
 
         {/* ── Create Plan Form ── */}
         {showCreateForm && (
           <Card className="border-primary/20 shadow-lg shadow-primary/5 animate-slide-up">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg shadow-primary/25">
-                  <Sparkles className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900 dark:text-white">New Meal Plan</h3>
-                  <p className="text-xs text-stone-500 dark:text-gray-400">
-                    For {weekLabel}
-                  </p>
-                </div>
-              </div>
+            <CardContent className="p-4">
               <div className="flex items-end gap-3">
                 <div className="flex-1">
-                  <Label htmlFor="plan-title" className="text-xs font-medium">Plan Title (optional)</Label>
+                  <Label htmlFor="plan-title" className="text-xs font-medium">New Plan for {weekLabel}</Label>
                   <Input
                     id="plan-title"
                     placeholder={`Week of ${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
@@ -391,7 +417,7 @@ const MealPlanner = () => {
                   {createMealPlan.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Create
                 </Button>
-                <Button variant="ghost" onClick={() => { setShowCreateForm(false); setNewPlanTitle(''); }}>
+                <Button variant="ghost" size="sm" onClick={() => { setShowCreateForm(false); setNewPlanTitle(''); }}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -399,159 +425,154 @@ const MealPlanner = () => {
           </Card>
         )}
 
-        {/* ── Tabs ── */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full sm:w-auto gap-1 p-1.5 rounded-xl bg-stone-100/80 dark:bg-white/[0.04] border border-stone-200/60 dark:border-white/[0.06]">
-            <TabsTrigger value="calendar" className="gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 data-[state=active]:shadow-md">
-              <Calendar className="h-4 w-4" />
-              Calendar
-            </TabsTrigger>
-            <TabsTrigger value="grocery" className="gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 data-[state=active]:shadow-md">
-              <ShoppingCart className="h-4 w-4" />
-              Grocery Cart
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 data-[state=active]:shadow-md">
-              <Clock className="h-4 w-4" />
-              History
-            </TabsTrigger>
-          </TabsList>
-
           {/* ── Calendar Tab ── */}
-          <TabsContent value="calendar" className="mt-6 space-y-4">
-            {/* Week Navigation */}
-            <div className="flex items-center justify-between">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateWeek('prev')}
-                className="gap-1.5 rounded-xl hover:shadow-md transition-all duration-200"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Prev
-              </Button>
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-stone-900 dark:text-white">
+          <TabsContent value="calendar" className="mt-4 space-y-3">
+            {/* Week Navigation + Plan Info — single compact row */}
+            <div className="flex items-center justify-between gap-2">
+              {/* Left: prev + week label + next */}
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigateWeek('prev')}
+                  className="h-8 w-8 p-0 rounded-lg"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <h2 className="text-sm font-semibold text-stone-900 dark:text-white whitespace-nowrap">
                   {weekLabel}
                 </h2>
-                {weekPlan && (
-                  <p className="text-xs text-stone-500 dark:text-gray-400 mt-0.5">
-                    {weekPlan.title || 'Untitled Plan'}
-                    <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium ${STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.bg} ${STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.color}`}>
-                      {STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.label}
-                    </span>
-                  </p>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigateWeek('next')}
+                  className="h-8 w-8 p-0 rounded-lg"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateWeek('next')}
-                className="gap-1.5 rounded-xl hover:shadow-md transition-all duration-200"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+
+              {/* Center: plan title + status (if plan exists) */}
+              {weekPlan && (
+                <div className="flex items-center gap-2 min-w-0">
+                  {isEditingPlanTitle ? (
+                    <div ref={titleEditRef}>
+                      <Input
+                        ref={titleInputRef}
+                        value={editedPlanTitle}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedPlanTitle(e.target.value)}
+                        onKeyDown={(e: React.KeyboardEvent) => {
+                          if (e.key === 'Enter') handleSavePlanTitle();
+                          if (e.key === 'Escape') setIsEditingPlanTitle(false);
+                        }}
+                        className="h-7 text-xs w-36"
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      className="text-xs font-medium text-stone-600 dark:text-gray-300 hover:text-primary transition-colors truncate max-w-[160px]"
+                      onClick={() => {
+                        setEditedPlanTitle(weekPlan.title || '');
+                        setIsEditingPlanTitle(true);
+                      }}
+                      title="Click to rename"
+                    >
+                      {weekPlan.title || 'Untitled Plan'}
+                    </button>
+                  )}
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium flex-shrink-0 ${STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.bg} ${STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.color}`}>
+                    {STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.label}
+                  </span>
+                  <span className="text-[10px] text-stone-400 dark:text-gray-500 flex-shrink-0">
+                    {getWeekMealCount(weekPlan.meals, weekDates)} meals
+                  </span>
+                  {/* Ellipsis menu */}
+                  <div className="relative flex-shrink-0" ref={bannerMenuRef}>
+                    <button
+                      className="p-1 rounded-md text-stone-400 hover:text-stone-600 dark:hover:text-gray-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] transition-colors"
+                      onClick={() => setBannerMenuOpen(!bannerMenuOpen)}
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                    {bannerMenuOpen && (
+                      <div className="absolute right-0 top-7 z-50 min-w-[140px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-gray-900 p-1 shadow-xl animate-scale-in">
+                        {weekPlan.status === 'draft' && (
+                          <button
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-emerald-600 dark:text-emerald-400"
+                            onClick={() => { handleStatusChange(weekPlan.id, 'active'); setBannerMenuOpen(false); }}
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                            Start Plan
+                          </button>
+                        )}
+                        {weekPlan.status === 'active' && (
+                          <button
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-blue-600 dark:text-blue-400"
+                            onClick={() => { handleStatusChange(weekPlan.id, 'completed'); setBannerMenuOpen(false); }}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Complete
+                          </button>
+                        )}
+                        {weekPlan.status === 'completed' && (
+                          <button
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors"
+                            onClick={() => { handleStatusChange(weekPlan.id, 'active'); setBannerMenuOpen(false); }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Modify
+                          </button>
+                        )}
+                        <div className="my-0.5 border-t border-stone-100 dark:border-white/[0.06]" />
+                        <button
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/5 transition-colors"
+                          onClick={() => { handleStatusChange(weekPlan.id, 'archived'); setBannerMenuOpen(false); }}
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                          Archive
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {!weekPlan && !isLoading && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowCreateForm(true)}
+                  className="gap-1.5 rounded-xl text-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New Plan
+                </Button>
+              )}
+
+              {/* Right: view toggle */}
+              <div className="flex items-center rounded-lg border border-stone-200/80 dark:border-white/[0.08] bg-stone-100/60 dark:bg-white/[0.03] p-0.5 flex-shrink-0">
+                <button
+                  className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'days' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary' : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300'}`}
+                  onClick={() => setCalendarView('days')}
+                  title="Days view"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'meals' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary' : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300'}`}
+                  onClick={() => setCalendarView('meals')}
+                  title="Meals view"
+                >
+                  <Rows className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
 
-            {/* Active Plan Banner */}
-            {weekPlan && (
-              <div className="flex items-center justify-between p-3.5 rounded-2xl border border-primary/15 bg-gradient-to-r from-primary/[0.04] to-transparent dark:from-primary/[0.06] dark:to-transparent animate-fade-in">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-xl ${STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.bg}`}>
-                    <FileText className={`h-4 w-4 ${STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.color}`} />
-                  </div>
-                  <div>
-                    {isEditingPlanTitle ? (
-                      <div ref={titleEditRef} className="flex items-center gap-2">
-                        <Input
-                          ref={titleInputRef}
-                          value={editedPlanTitle}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedPlanTitle(e.target.value)}
-                          onKeyDown={(e: React.KeyboardEvent) => {
-                            if (e.key === 'Enter') handleSavePlanTitle();
-                            if (e.key === 'Escape') setIsEditingPlanTitle(false);
-                          }}
-                          className="h-7 text-sm w-48"
-                          autoFocus
-                        />
-                      </div>
-                    ) : (
-                      <button
-                        className="flex items-center gap-2 group/title"
-                        onClick={() => {
-                          setEditedPlanTitle(weekPlan.title || '');
-                          setIsEditingPlanTitle(true);
-                        }}
-                      >
-                        <p className="text-sm font-semibold text-stone-800 dark:text-gray-200 group-hover/title:text-primary transition-colors">
-                          {weekPlan.title || 'Untitled Plan'}
-                        </p>
-                      </button>
-                    )}
-                    <p className="text-[11px] text-stone-500 dark:text-gray-400">
-                      {getWeekMealCount(weekPlan.meals, weekDates)} meals planned
-                      {weekPlan.notes && <span className="ml-1.5">· {weekPlan.notes}</span>}
-                    </p>
-                  </div>
-                </div>
-                <div className="relative" ref={bannerMenuRef}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 rounded-xl text-stone-400 hover:text-stone-600 dark:hover:text-gray-300"
-                    onClick={() => setBannerMenuOpen(!bannerMenuOpen)}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                  {bannerMenuOpen && (
-                    <div className="absolute right-0 top-9 z-50 min-w-[160px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-gray-900 p-1.5 shadow-xl animate-scale-in">
-                      {weekPlan.status === 'draft' && (
-                        <button
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-emerald-600 dark:text-emerald-400"
-                          onClick={() => { handleStatusChange(weekPlan.id, 'active'); setBannerMenuOpen(false); }}
-                        >
-                          <Play className="h-4 w-4" />
-                          Start Plan
-                        </button>
-                      )}
-                      {weekPlan.status === 'active' && (
-                        <button
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-blue-600 dark:text-blue-400"
-                          onClick={() => { handleStatusChange(weekPlan.id, 'completed'); setBannerMenuOpen(false); }}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          Complete
-                        </button>
-                      )}
-                      {weekPlan.status === 'completed' && (
-                        <button
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors"
-                          onClick={() => { handleStatusChange(weekPlan.id, 'active'); setBannerMenuOpen(false); }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Modify
-                        </button>
-                      )}
-                      <div className="my-1 border-t border-stone-100 dark:border-white/[0.06]" />
-                      <button
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/5 transition-colors"
-                        onClick={() => { handleStatusChange(weekPlan.id, 'archived'); setBannerMenuOpen(false); }}
-                      >
-                        <Archive className="h-4 w-4" />
-                        Archive
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Calendar Grid */}
+            {/* Calendar Grid — Days View or Meals View */}
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
               </div>
-            ) : (
+            ) : calendarView === 'days' ? (
               <div className="grid grid-cols-7 gap-2">
                 {/* Day Headers */}
                 {weekDates.map((date, i) => {
@@ -574,7 +595,7 @@ const MealPlanner = () => {
                 })}
 
                 {/* Day Columns */}
-                {weekDates.map((date, i) => {
+                {weekDates.map((date) => {
                   const dateStr = formatDateKey(date);
                   const isToday = dateStr === today;
                   const dayMeals = weekPlan?.meals?.[dateStr];
@@ -594,7 +615,7 @@ const MealPlanner = () => {
                       )}
 
                       <div className="space-y-1.5">
-                        {MEAL_SLOTS.map((slot) => {
+                        {DAILY_SLOTS.map((slot) => {
                           const slotMeals = dayMeals?.[slot.key] || [];
                           return (
                             <div key={slot.key} className="group/slot">
@@ -605,22 +626,34 @@ const MealPlanner = () => {
                                 </span>
                               </div>
                               {slotMeals.length > 0 ? (
-                                slotMeals.map((meal: any) => (
-                                  <div
-                                    key={meal.id}
-                                    className="px-2 py-1 rounded-lg bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-xs text-stone-700 dark:text-gray-300 truncate transition-all duration-200 hover:bg-stone-100 dark:hover:bg-white/[0.08] hover:shadow-sm cursor-default"
-                                    title={meal.recipeName}
+                                <>
+                                  {slotMeals.map((meal: any) => (
+                                    <div
+                                      key={meal.id}
+                                      className="group/meal flex items-center gap-1 px-2 py-1 rounded-lg bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-xs text-stone-700 dark:text-gray-300 transition-all duration-200 hover:bg-stone-100 dark:hover:bg-white/[0.08] hover:shadow-sm"
+                                      title={meal.recipeName}
+                                    >
+                                      <span className="truncate flex-1">{meal.recipeName}</span>
+                                      <button
+                                        className="flex-shrink-0 opacity-0 group-hover/meal:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                                        onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
+                                        title="Remove"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    className="w-full px-2 py-0.5 rounded-lg text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary/60 transition-all duration-200 opacity-0 group-hover/slot:opacity-100"
+                                    onClick={() => openRecipeSelector(dateStr, slot.key)}
                                   >
-                                    {meal.recipeName}
-                                  </div>
-                                ))
+                                    + Add more
+                                  </button>
+                                </>
                               ) : (
                                 <button
                                   className="w-full px-2 py-1 rounded-lg border border-dashed border-stone-200/60 dark:border-white/[0.06] text-[10px] text-stone-300 dark:text-gray-600 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/[0.02] transition-all duration-200 opacity-0 group-hover/slot:opacity-100 group-hover:opacity-60"
-                                  onClick={() => {
-                                    // TODO: Open recipe picker (P1)
-                                    toast('Recipe picker coming in P1', { icon: '🍳' });
-                                  }}
+                                  onClick={() => openRecipeSelector(dateStr, slot.key)}
                                 >
                                   + Add
                                 </button>
@@ -628,6 +661,249 @@ const MealPlanner = () => {
                             </div>
                           );
                         })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* ── Meals View: rows by meal type, columns by day ── */
+              <div className="space-y-3 animate-fade-in">
+                {[...DAILY_SLOTS, { key: 'snacks' as MealSlot, label: 'Snacks', icon: Cookie, color: 'text-pink-500' }].map((slot) => {
+                  const isSnacks = slot.key === 'snacks';
+                  const snackItems: PlannedMealEntry[] = isSnacks ? (weekPlan?.meals?.['_snacks'] || []) as PlannedMealEntry[] : [];
+                  const totalForSlot = isSnacks
+                    ? snackItems.length
+                    : weekDates.reduce((sum, date) => {
+                        const dateStr = formatDateKey(date);
+                        return sum + (weekPlan?.meals?.[dateStr]?.[slot.key]?.length || 0);
+                      }, 0);
+
+                  return (
+                    <div
+                      key={slot.key}
+                      className="rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] overflow-hidden transition-all duration-300 hover:shadow-md"
+                    >
+                      {/* Slot header */}
+                      <div className="flex items-center gap-3 px-4 py-3 border-b border-stone-100 dark:border-white/[0.04]">
+                        <div className={`p-2 rounded-xl bg-gradient-to-br ${
+                          slot.key === 'breakfast' ? 'from-amber-500/10 to-amber-500/5' :
+                          slot.key === 'lunch' ? 'from-orange-500/10 to-orange-500/5' :
+                          slot.key === 'dinner' ? 'from-indigo-500/10 to-indigo-500/5' :
+                          'from-pink-500/10 to-pink-500/5'
+                        }`}>
+                          <slot.icon className={`h-4 w-4 ${slot.color}`} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-semibold text-stone-800 dark:text-gray-200">
+                            {slot.label}
+                          </h3>
+                          <p className="text-[10px] text-stone-400 dark:text-gray-500">
+                            {totalForSlot} {totalForSlot === 1 ? 'recipe' : 'recipes'} planned
+                          </p>
+                        </div>
+                        {!isSnacks && weekPlan && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1 rounded-lg text-xs text-stone-400 hover:text-primary"
+                            onClick={() => openRecipeSelector(formatDateKey(weekDates[0]), slot.key)}
+                            title={`Add ${slot.label}`}
+                          >
+                            <Plus className="h-3 w-3" />
+                            Add
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      {isSnacks ? (
+                        /* Snacks: plan-level list (not per-day) */
+                        <div className="p-3">
+                          {snackItems.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {snackItems.map((item: PlannedMealEntry) => (
+                                <div
+                                  key={item.id}
+                                  className="group/item flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-xs text-stone-700 dark:text-gray-300 transition-all hover:bg-stone-100 dark:hover:bg-white/[0.08]"
+                                >
+                                  <Cookie className="h-3 w-3 text-pink-400 flex-shrink-0" />
+                                  <span className="truncate">{item.recipeName}</span>
+                                  <button
+                                    className="flex-shrink-0 opacity-0 group-hover/item:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                                    onClick={() => handleRemovePlanListItem('_snacks', item.id)}
+                                    title="Remove"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-stone-400 dark:text-gray-500 text-center py-3">
+                              No snacks added yet
+                            </p>
+                          )}
+                          {weekPlan && (
+                            <div className="mt-2 flex justify-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 gap-1 rounded-lg text-xs text-stone-400 hover:text-primary"
+                                onClick={() => openRecipeSelector('_snacks', 'snacks')}
+                              >
+                                <Plus className="h-3 w-3" />
+                                Add Snack
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        /* Daily slots: 7-day horizontal grid */
+                        <div className="grid grid-cols-7 divide-x divide-stone-100 dark:divide-white/[0.04]">
+                          {weekDates.map((date) => {
+                            const dateStr = formatDateKey(date);
+                            const isToday = dateStr === today;
+                            const slotMeals = weekPlan?.meals?.[dateStr]?.[slot.key] || [];
+
+                            return (
+                              <div
+                                key={dateStr}
+                                className={`group p-2 min-h-[80px] transition-colors ${
+                                  isToday ? 'bg-primary/[0.03] dark:bg-primary/[0.05]' : ''
+                                }`}
+                              >
+                                {/* Day label */}
+                                <p className={`text-[10px] font-semibold text-center mb-1.5 ${
+                                  isToday ? 'text-primary' : 'text-stone-400 dark:text-gray-500'
+                                }`}>
+                                  {DAYS_SHORT[date.getDay()]} {date.getDate()}
+                                </p>
+
+                                {/* Meals */}
+                                <div className="space-y-1">
+                                  {slotMeals.map((meal: any) => (
+                                    <div
+                                      key={meal.id}
+                                      className="group/meal flex items-center gap-0.5 px-1.5 py-1 rounded-md bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-[10px] text-stone-700 dark:text-gray-300 transition-all hover:bg-stone-100 dark:hover:bg-white/[0.08]"
+                                      title={meal.recipeName}
+                                    >
+                                      <span className="truncate flex-1">{meal.recipeName}</span>
+                                      <button
+                                        className="flex-shrink-0 opacity-0 group-hover/meal:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                                        onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
+                                      >
+                                        <X className="h-2.5 w-2.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+
+                                  {/* Add button */}
+                                  {weekPlan && (
+                                    <button
+                                      className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary/60 hover:bg-primary/[0.02] transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                      onClick={() => openRecipeSelector(dateStr, slot.key)}
+                                    >
+                                      + Add
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Plan-level Lists (Snacks, Non-Recipe Items) — days view only */}
+            {!isLoading && weekPlan && calendarView === 'days' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                {PLAN_LISTS.map((list) => {
+                  const items = weekPlan.meals?.[list.key] || [];
+                  const inputVal = planListInputs[list.key] || '';
+                  return (
+                    <div
+                      key={list.key}
+                      className="rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 transition-all duration-300 hover:shadow-md"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <list.icon className={`h-4 w-4 ${list.color}`} />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-stone-800 dark:text-gray-200">
+                            {list.label}
+                          </h4>
+                          <p className="text-[10px] text-stone-400 dark:text-gray-500">{list.description}</p>
+                        </div>
+                        {items.length > 0 && (
+                          <Badge variant="secondary" className="text-[10px] h-5">
+                            {items.length}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Items */}
+                      <div className="space-y-1 mb-2">
+                        {items.map((item: any) => (
+                          <div
+                            key={item.id}
+                            className="group/item flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-xs text-stone-700 dark:text-gray-300 transition-all duration-200 hover:bg-stone-100 dark:hover:bg-white/[0.08]"
+                          >
+                            <span className="truncate flex-1">{item.recipeName}</span>
+                            <button
+                              className="flex-shrink-0 opacity-0 group-hover/item:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                              onClick={() => handleRemovePlanListItem(list.key, item.id)}
+                              title="Remove"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Add input */}
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          value={inputVal}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setPlanListInputs((prev) => ({ ...prev, [list.key]: e.target.value }))
+                          }
+                          onKeyDown={(e: React.KeyboardEvent) => {
+                            if (e.key === 'Enter' && inputVal.trim()) {
+                              handleAddPlanListItem(list.key, inputVal);
+                              setPlanListInputs((prev) => ({ ...prev, [list.key]: '' }));
+                            }
+                          }}
+                          placeholder={`Add ${list.label.toLowerCase()}...`}
+                          className="h-8 text-xs rounded-lg flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 rounded-lg"
+                          onClick={() => {
+                            if (inputVal.trim()) {
+                              handleAddPlanListItem(list.key, inputVal);
+                              setPlanListInputs((prev) => ({ ...prev, [list.key]: '' }));
+                            }
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                        {list.key === '_snacks' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 rounded-lg text-stone-400 hover:text-primary"
+                            onClick={() => openRecipeSelector('_snacks', 'snacks')}
+                            title="Pick from recipes"
+                          >
+                            <ChefHat className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
@@ -662,25 +938,7 @@ const MealPlanner = () => {
 
           {/* ── Grocery Cart Tab ── */}
           <TabsContent value="grocery" className="mt-6">
-            <Card className="border-stone-200/60 dark:border-white/[0.06]">
-              <CardContent className="p-8">
-                <div className="text-center py-8">
-                  <div className="relative inline-flex mb-5">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/10 flex items-center justify-center">
-                      <ShoppingCart className="w-8 h-8 text-amber-500/60" />
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-semibold text-stone-800 dark:text-gray-200 mb-1.5">
-                    Grocery Cart
-                  </h3>
-                  <p className="text-sm text-stone-500 dark:text-gray-400 max-w-md mx-auto">
-                    {weekPlan
-                      ? 'Add recipes to your meal plan and the grocery list will be generated automatically.'
-                      : 'Create a meal plan first, then add recipes to generate your grocery list.'}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <GroceryCart plan={weekPlan} />
           </TabsContent>
 
           {/* ── History Tab ── */}
@@ -792,6 +1050,22 @@ const MealPlanner = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Recipe Selector Modal (all recipe selection) */}
+      <RecipeSelectorModal
+        open={selectorOpen}
+        onClose={() => setSelectorOpen(false)}
+        onConfirm={handleMultiSelectDone}
+        ctaVerb="Select"
+      />
+
+      {/* Servings Modal (after multi-select) */}
+      <ServingsModal
+        open={showServingsModal}
+        recipes={pendingMultiRecipes}
+        onConfirm={handleServingsConfirmed}
+        onClose={() => setShowServingsModal(false)}
+      />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Clock, Users, ChefHat, Edit, Trash2, ThumbsUp, ThumbsDown, Flame } from "lucide-react";
+import AddToPlanButton from "@/components/meal-planning/AddToPlanButton";
 
 export interface RecipeReaction {
   id: string;
@@ -256,6 +257,15 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 {/* Hover actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
                   <ReactionButtons compact />
+                  <AddToPlanButton
+                    recipeId={recipe.id}
+                    recipeName={recipe.title}
+                    recipeImage={recipe.imageUrl}
+                    servings={recipe.servings}
+                    prepTime={recipe.prepTime}
+                    cookTime={recipe.cookTime}
+                    compact
+                  />
                   {onEdit && (
                     <button onClick={(e) => { e.stopPropagation(); onEdit(recipe); }} className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center transition-colors" title="Edit">
                       <Edit className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
@@ -364,29 +374,36 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             </div>
           )}
 
-          {/* Top-left: hover edit/delete */}
-          {(onEdit || onDelete) && (
-            <div className="absolute top-2.5 left-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-              {onEdit && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onEdit(recipe); }}
-                  className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-white dark:hover:bg-white/20 hover:scale-110 active:scale-95 transition-all duration-150"
-                  title="Edit"
-                >
-                  <Edit className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(recipe.id); }}
-                  className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:scale-110 active:scale-95 transition-all duration-150"
-                  title="Delete"
-                >
-                  <Trash2 className="h-3.5 w-3.5 text-gray-600 hover:text-rose-500 dark:text-gray-300 dark:hover:text-rose-400 transition-colors" />
-                </button>
-              )}
-            </div>
-          )}
+          {/* Top-left: hover edit/delete/plan */}
+          <div className="absolute top-2.5 left-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+            <AddToPlanButton
+              recipeId={recipe.id}
+              recipeName={recipe.title}
+              recipeImage={recipe.imageUrl}
+              servings={recipe.servings}
+              prepTime={recipe.prepTime}
+              cookTime={recipe.cookTime}
+              compact
+            />
+            {onEdit && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit(recipe); }}
+                className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-white dark:hover:bg-white/20 hover:scale-110 active:scale-95 transition-all duration-150"
+                title="Edit"
+              >
+                <Edit className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(recipe.id); }}
+                className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:scale-110 active:scale-95 transition-all duration-150"
+                title="Delete"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-gray-600 hover:text-rose-500 dark:text-gray-300 dark:hover:text-rose-400 transition-colors" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content area */}

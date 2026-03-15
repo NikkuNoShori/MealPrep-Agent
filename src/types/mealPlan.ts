@@ -15,14 +15,17 @@ export interface PlannedMealEntry {
   notes?: string;
 }
 
-// meals JSONB: keyed by ISO date, then by meal slot
+// Daily slot structure for date-keyed entries
+export interface DayMealSlots {
+  breakfast?: PlannedMealEntry[];
+  lunch?: PlannedMealEntry[];
+  dinner?: PlannedMealEntry[];
+  snacks?: PlannedMealEntry[];
+}
+
+// meals JSONB: ISO date keys → DayMealSlots, underscore keys → plan-level lists
 export interface MealPlanMeals {
-  [date: string]: {
-    breakfast?: PlannedMealEntry[];
-    lunch?: PlannedMealEntry[];
-    dinner?: PlannedMealEntry[];
-    snacks?: PlannedMealEntry[];
-  };
+  [key: string]: DayMealSlots | PlannedMealEntry[];
 }
 
 export interface GroceryItem {
