@@ -1021,7 +1021,7 @@ export const ChatInterface: React.FC = () => {
               variant="outline"
               size="icon"
               title="New Chat"
-              className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] hover:bg-stone-200 dark:hover:bg-white/[0.08] border-stone-200 dark:border-white/[0.08]"
+              className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-stone-200 dark:border-white/[0.08] hover:text-stone-900 dark:hover:text-white"
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -1033,7 +1033,7 @@ export const ChatInterface: React.FC = () => {
                     onClick={() => setIsMultiSelectMode(true)}
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] hover:bg-stone-200 dark:hover:bg-white/[0.08] border-stone-200 dark:border-white/[0.08]"
+                    className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-stone-200 dark:border-white/[0.08] hover:text-stone-900 dark:hover:text-white"
                     title="Select"
                   >
                     <CheckSquare className="h-3.5 w-3.5" />
@@ -1044,7 +1044,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={selectAllConversations}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] hover:bg-stone-200 dark:hover:bg-white/[0.08] border-stone-200 dark:border-white/[0.08]"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-stone-200 dark:border-white/[0.08] hover:text-stone-900 dark:hover:text-white"
                       title="Select All"
                     >
                       <CheckSquare className="h-3.5 w-3.5" />
@@ -1053,7 +1053,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={clearSelection}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] hover:bg-stone-200 dark:hover:bg-white/[0.08] border-stone-200 dark:border-white/[0.08]"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-stone-200 dark:border-white/[0.08] hover:text-stone-900 dark:hover:text-white"
                       title="Cancel"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -1084,7 +1084,7 @@ export const ChatInterface: React.FC = () => {
             .map((conversation) => (
               <div
                 key={conversation.id}
-                className={`p-3 border-b border-stone-200/40 dark:border-white/[0.04] cursor-pointer hover:bg-stone-200/50 dark:hover:bg-white/[0.04] transition-colors group ${
+                className={`p-3 border-b border-stone-200/40 dark:border-white/[0.04] cursor-pointer transition-colors group ${
                   currentConversationId === conversation.id
                     ? "bg-white dark:bg-white/[0.06] shadow-sm"
                     : ""
@@ -1248,7 +1248,7 @@ export const ChatInterface: React.FC = () => {
                         </p>
                         <button
                           onClick={() => copyMessage(message.id, message.content)}
-                          className="absolute -top-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 shadow-sm"
+                          className="absolute -top-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
                           title="Copy message"
                         >
                           {copiedMessageId === message.id ? (
@@ -1385,7 +1385,7 @@ export const ChatInterface: React.FC = () => {
                     </div>
                     <button
                       onClick={() => copyMessage(message.id, message.content)}
-                      className={`absolute -top-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 shadow-sm ${
+                      className={`absolute -top-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 ${
                         message.sender === "user" ? "right-1" : "right-1"
                       }`}
                       title="Copy message"

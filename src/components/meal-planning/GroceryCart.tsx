@@ -225,7 +225,7 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
           </Button>
           <Button
             size="sm"
-            className="gap-1.5 rounded-xl text-xs shadow-lg shadow-primary/20"
+            className="gap-1.5 rounded-xl text-xs shadow-lg shadow-[#1D9E75]/20"
             onClick={handleGenerate}
             disabled={!hasMeals || updateMealPlan.isPending}
           >
@@ -241,7 +241,7 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
 
       {/* Add manual item form */}
       {addingManual && (
-        <Card className="border-primary/20 animate-slide-up">
+        <Card className="border-[#1D9E75]/20 animate-slide-up">
           <CardContent className="p-4">
             <div className="flex items-end gap-2">
               <div className="flex-1">
@@ -308,7 +308,7 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
             return (
               <Card key={category} className="border-stone-200/60 dark:border-white/[0.06] overflow-hidden">
                 <button
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-stone-50/50 dark:hover:bg-white/[0.02] transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 transition-colors"
                   onClick={() => toggleCategory(category)}
                 >
                   <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
                         className={`group flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 ${
                           item.isChecked
                             ? 'bg-stone-50 dark:bg-white/[0.02] opacity-60'
-                            : 'hover:bg-stone-50 dark:hover:bg-white/[0.03]'
+                            : ''
                         }`}
                       >
                         <button

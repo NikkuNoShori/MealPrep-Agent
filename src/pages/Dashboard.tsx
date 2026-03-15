@@ -109,7 +109,7 @@ const Dashboard = () => {
               <Link
                 key={recipe.id}
                 to="/recipes"
-                className="flex items-center gap-3 px-3 py-2.5 -mx-3 rounded-xl hover:bg-stone-50 dark:hover:bg-white/[0.03] transition-all duration-150 group"
+                className="flex items-center gap-3 px-3 py-2.5 -mx-3 rounded-xl transition-all duration-150 group"
               >
                 {recipe.imageUrl ? (
                   <img

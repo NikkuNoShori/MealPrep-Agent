@@ -79,7 +79,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
     <div className="space-y-3">
       {/* Compact Search Bar */}
       <div className="flex gap-2">
-        <div className="relative flex-1">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-stone-400" />
           <Input
             placeholder="Search recipes by name, ingredients, or tags..."
@@ -176,25 +176,25 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
       {/* Enhanced Filter Panel */}
       {showFilters && (
         <div className="animate-fade-in">
-          <Card className="border-0 shadow-xl bg-white/90 dark:bg-white/[0.04] backdrop-blur-sm">
-            <CardContent className="p-8 space-y-8">
+          <Card className="border-0 shadow-lg bg-white/90 dark:bg-white/[0.04] backdrop-blur-sm">
+            <CardContent className="p-5 space-y-5">
               {/* Dietary Restrictions */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                    <span className="text-[#1D9E75] dark:text-emerald-400 text-sm">🥗</span>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-emerald-100 dark:bg-emerald-900/30 rounded-md flex items-center justify-center">
+                    <span className="text-[#1D9E75] dark:text-emerald-400 text-xs">🥗</span>
                   </div>
-                  <h4 className="text-lg font-semibold text-stone-900 dark:text-white">Dietary Restrictions</h4>
+                  <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Dietary Restrictions</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {DIETARY_RESTRICTIONS.map(restriction => (
                     <Badge
                       key={restriction}
                       variant={filters.dietaryRestrictions.includes(restriction) ? 'default' : 'outline'}
-                      className={`cursor-pointer px-4 py-2 rounded-lg transition-all duration-200 ${
+                      className={`cursor-pointer px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         filters.dietaryRestrictions.includes(restriction)
-                          ? 'bg-[#1D9E75] hover:bg-[#178c66] text-white shadow-lg'
-                          : 'border-2 border-stone-200 dark:border-white/[0.08] hover:border-emerald-500 dark:hover:border-emerald-400 bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm'
+                          ? 'bg-[#1D9E75] hover:bg-[#178c66] text-white shadow'
+                          : 'border border-stone-200 dark:border-white/[0.08] hover:border-emerald-500 dark:hover:border-emerald-400 bg-white/80 dark:bg-white/[0.04]'
                       }`}
                       onClick={() => toggleDietaryRestriction(restriction)}
                     >
@@ -205,22 +205,22 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               </div>
 
               {/* Prep Time */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-md flex items-center justify-center">
+                    <Clock className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
                   </div>
-                  <h4 className="text-lg font-semibold text-stone-900 dark:text-white">Prep Time</h4>
+                  <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Prep Time</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {PREP_TIME_RANGES.map(range => (
                     <Badge
                       key={range.value}
                       variant={filters.prepTime === range.value ? 'default' : 'outline'}
-                      className={`cursor-pointer px-4 py-2 rounded-lg transition-all duration-200 ${
+                      className={`cursor-pointer px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         filters.prepTime === range.value
-                          ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg'
-                          : 'border-2 border-stone-200 dark:border-white/[0.08] hover:border-green-500 dark:hover:border-green-400 bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm'
+                          ? 'bg-green-600 hover:bg-green-700 text-white shadow'
+                          : 'border border-stone-200 dark:border-white/[0.08] hover:border-green-500 dark:hover:border-green-400 bg-white/80 dark:bg-white/[0.04]'
                       }`}
                       onClick={() => updateFilter('prepTime', filters.prepTime === range.value ? '' : range.value)}
                     >
@@ -231,22 +231,22 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               </div>
 
               {/* Difficulty */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                    <span className="text-[#1D9E75] dark:text-emerald-400 text-sm">⚡</span>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-emerald-100 dark:bg-emerald-900/30 rounded-md flex items-center justify-center">
+                    <span className="text-[#1D9E75] dark:text-emerald-400 text-xs">⚡</span>
                   </div>
-                  <h4 className="text-lg font-semibold text-stone-900 dark:text-white">Difficulty Level</h4>
+                  <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Difficulty Level</h4>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   {DIFFICULTY_LEVELS.map(difficulty => (
                     <Badge
                       key={difficulty}
                       variant={filters.difficulty === difficulty ? 'default' : 'outline'}
-                      className={`cursor-pointer px-6 py-2 rounded-lg transition-all duration-200 capitalize ${
+                      className={`cursor-pointer px-4 py-1.5 rounded-md text-xs transition-all duration-200 capitalize ${
                         filters.difficulty === difficulty
-                          ? 'bg-[#1D9E75] hover:bg-[#178c66] text-white shadow-lg'
-                          : 'border-2 border-stone-200 dark:border-white/[0.08] hover:border-emerald-500 dark:hover:border-emerald-400 bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm'
+                          ? 'bg-[#1D9E75] hover:bg-[#178c66] text-white shadow'
+                          : 'border border-stone-200 dark:border-white/[0.08] hover:border-emerald-500 dark:hover:border-emerald-400 bg-white/80 dark:bg-white/[0.04]'
                       }`}
                       onClick={() => updateFilter('difficulty', filters.difficulty === difficulty ? '' : difficulty)}
                     >
@@ -257,22 +257,22 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               </div>
 
               {/* Popular Tags */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                    <span className="text-orange-600 dark:text-orange-400 text-sm">🏷️</span>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-orange-100 dark:bg-orange-900/30 rounded-md flex items-center justify-center">
+                    <span className="text-orange-600 dark:text-orange-400 text-xs">🏷️</span>
                   </div>
-                  <h4 className="text-lg font-semibold text-stone-900 dark:text-white">Popular Tags</h4>
+                  <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Popular Tags</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {['Quick', 'Healthy', 'Budget-Friendly', 'Family-Friendly', 'Spicy', 'Sweet', 'Savory'].map(tag => (
                     <Badge
                       key={tag}
                       variant={filters.tags.includes(tag) ? 'default' : 'outline'}
-                      className={`cursor-pointer px-4 py-2 rounded-lg transition-all duration-200 ${
+                      className={`cursor-pointer px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         filters.tags.includes(tag)
-                          ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-lg'
-                          : 'border-2 border-stone-200 dark:border-white/[0.08] hover:border-orange-500 dark:hover:border-orange-400 bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm'
+                          ? 'bg-orange-600 hover:bg-orange-700 text-white shadow'
+                          : 'border border-stone-200 dark:border-white/[0.08] hover:border-orange-500 dark:hover:border-orange-400 bg-white/80 dark:bg-white/[0.04]'
                       }`}
                       onClick={() => toggleTag(tag)}
                     >

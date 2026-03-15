@@ -78,7 +78,7 @@ const Recipes = () => {
   const showList = !showAddForm && !selectedRecipe && !editingRecipe;
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
+    <div className="bg-stone-50 dark:bg-[#0e0f13]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {(showAddForm || editingRecipe) && (
           <div className="animate-fade-in">
@@ -101,7 +101,15 @@ const Recipes = () => {
         )}
 
         {showList && (
-          <div className="flex gap-6 animate-fade-in">
+          <div className="animate-fade-in">
+            {/* Page Title */}
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
+                {viewMode === 'collection' && selectedCollectionName ? selectedCollectionName : viewMode === 'household' ? 'Household Recipes' : viewMode === 'public' ? 'Public Recipes' : 'My Recipes'}
+              </h1>
+            </div>
+
+            <div className="flex gap-6">
             {/* Mobile Collections Drawer */}
             {mobileCollectionsOpen && (
               <div className="fixed inset-0 z-50 lg:hidden">
@@ -109,14 +117,14 @@ const Recipes = () => {
                   className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                   onClick={() => setMobileCollectionsOpen(false)}
                 />
-                <div className="absolute inset-y-0 left-0 w-80 max-w-[85vw] bg-white dark:bg-slate-900 shadow-2xl animate-slide-up p-5 overflow-y-auto">
+                <div className="absolute inset-y-0 left-0 w-80 max-w-[85vw] bg-white dark:bg-[#16171c] shadow-2xl animate-slide-up p-5 overflow-y-auto">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Collections</h3>
+                    <h3 className="text-lg font-semibold text-stone-900 dark:text-white">Collections</h3>
                     <button
                       onClick={() => setMobileCollectionsOpen(false)}
-                      className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      className="p-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
                     >
-                      <X className="h-5 w-5 text-slate-500" />
+                      <X className="h-5 w-5 text-stone-500" />
                     </button>
                   </div>
                   <CollectionsSidebar
@@ -155,7 +163,7 @@ const Recipes = () => {
               <div className="lg:hidden mb-4">
                 <button
                   onClick={() => setMobileCollectionsOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm text-sm font-medium text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
                 >
                   <Filter className="h-4 w-4" />
                   Collections & Filters
@@ -170,6 +178,7 @@ const Recipes = () => {
                 feedMode={viewMode}
               />
             </div>
+          </div>
           </div>
         )}
       </div>

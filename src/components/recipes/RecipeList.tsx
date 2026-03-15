@@ -161,71 +161,55 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Modern Header with Actions */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-8 bg-[#1D9E75] rounded-full"></div>
-            <h2 className="text-3xl font-bold text-stone-900 dark:text-white">
-              {feedMode === 'collection' && collectionName ? collectionName : feedMode === 'household' ? 'Household Recipes' : feedMode === 'public' ? 'Public Recipes' : 'My Recipes'}
-            </h2>
-          </div>
-          <p className="text-stone-600 dark:text-stone-400 text-lg">
-            {filteredRecipes.length} recipe
-            {filteredRecipes.length !== 1 ? "s" : ""}{feedMode === 'collection' && collectionName ? ` in ${collectionName}` : feedMode === 'household' ? ' shared by your household' : feedMode === 'public' ? ' shared by the community' : ' in your collection'}
-          </p>
+    <div className="space-y-6">
+      {/* Search, Filters & Actions Bar */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <RecipeSearch
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filters={filters}
+            onFiltersChange={setFilters}
+          />
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          <div className="flex items-center bg-stone-100 dark:bg-white/[0.04] rounded-xl p-1">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("grid")}
-              className={`rounded-lg transition-all duration-200 ${
-                viewMode === "grid"
-                  ? "bg-white dark:bg-white/[0.08] shadow-sm"
-                  : "hover:bg-stone-200 dark:hover:bg-white/[0.08]"
-              }`}
-            >
-              <Grid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className={`rounded-lg transition-all duration-200 ${
-                viewMode === "list"
-                  ? "bg-white dark:bg-white/[0.08] shadow-sm"
-                  : "hover:bg-stone-200 dark:hover:bg-white/[0.08]"
-              }`}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {onAddRecipe && (
-            <Button
-              onClick={onAddRecipe}
-              className="bg-[#1D9E75] hover:bg-[#178c66] text-white px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Recipe
-            </Button>
-          )}
+        {/* View Toggle */}
+        <div className="flex items-center bg-stone-100 dark:bg-white/[0.04] rounded-xl p-1 shrink-0">
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("grid")}
+            className={`rounded-lg transition-all duration-200 ${
+              viewMode === "grid"
+                ? "bg-white dark:bg-white/[0.08] shadow-sm"
+                : ""
+            }`}
+          >
+            <Grid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className={`rounded-lg transition-all duration-200 ${
+              viewMode === "list"
+                ? "bg-white dark:bg-white/[0.08] shadow-sm"
+                : ""
+            }`}
+          >
+            <List className="h-4 w-4" />
+          </Button>
         </div>
-      </div>
 
-      {/* Compact Search and Filters */}
-      <div className="bg-white/60 dark:bg-white/[0.04] backdrop-blur-sm rounded-lg border border-stone-200/50 dark:border-white/[0.08] p-3 shadow-sm">
-        <RecipeSearch
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
+        {onAddRecipe && (
+          <Button
+            onClick={onAddRecipe}
+            className="bg-[#1D9E75] hover:bg-[#178c66] text-white px-5 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 shrink-0"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Recipe
+          </Button>
+        )}
       </div>
 
       {/* Recipe Grid/List with Enhanced Empty State */}

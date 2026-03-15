@@ -490,7 +490,7 @@ const MealPlanner = () => {
                   {/* Ellipsis menu */}
                   <div className="relative flex-shrink-0" ref={bannerMenuRef}>
                     <button
-                      className="p-1 rounded-md text-stone-400 hover:text-stone-600 dark:hover:text-gray-300 hover:bg-stone-100 dark:hover:bg-white/[0.06] transition-colors"
+                      className="p-1 rounded-md text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
                       onClick={() => setBannerMenuOpen(!bannerMenuOpen)}
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
@@ -499,7 +499,7 @@ const MealPlanner = () => {
                       <div className="absolute right-0 top-7 z-50 min-w-[140px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] p-1 shadow-xl animate-scale-in">
                         {weekPlan.status === 'draft' && (
                           <button
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-emerald-600 dark:text-emerald-400"
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-emerald-600/70 dark:text-emerald-400/70 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                             onClick={() => { handleStatusChange(weekPlan.id, 'active'); setBannerMenuOpen(false); }}
                           >
                             <Play className="h-3.5 w-3.5" />
@@ -508,7 +508,7 @@ const MealPlanner = () => {
                         )}
                         {weekPlan.status === 'active' && (
                           <button
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-emerald-600 dark:text-emerald-400"
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-emerald-600/70 dark:text-emerald-400/70 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                             onClick={() => { handleStatusChange(weekPlan.id, 'completed'); setBannerMenuOpen(false); }}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -517,7 +517,7 @@ const MealPlanner = () => {
                         )}
                         {weekPlan.status === 'completed' && (
                           <button
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors"
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
                             onClick={() => { handleStatusChange(weekPlan.id, 'active'); setBannerMenuOpen(false); }}
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -526,7 +526,7 @@ const MealPlanner = () => {
                         )}
                         <div className="my-0.5 border-t border-stone-100 dark:border-white/[0.06]" />
                         <button
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/5 transition-colors"
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
                           onClick={() => { handleStatusChange(weekPlan.id, 'archived'); setBannerMenuOpen(false); }}
                         >
                           <Archive className="h-3.5 w-3.5" />
@@ -644,7 +644,7 @@ const MealPlanner = () => {
                                     </div>
                                   ))}
                                   <button
-                                    className="w-full px-2 py-0.5 rounded-lg text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary/60 transition-all duration-200 opacity-0 group-hover/slot:opacity-100"
+                                    className="w-full px-2 py-0.5 rounded-lg text-[10px] text-stone-300 dark:text-gray-600 hover:text-[#1D9E75]/60 transition-all duration-200 opacity-0 group-hover/slot:opacity-100"
                                     onClick={() => openRecipeSelector(dateStr, slot.key)}
                                   >
                                     + Add more
@@ -652,7 +652,7 @@ const MealPlanner = () => {
                                 </>
                               ) : (
                                 <button
-                                  className="w-full px-2 py-1 rounded-lg border border-dashed border-stone-200/60 dark:border-white/[0.06] text-[10px] text-stone-300 dark:text-gray-600 hover:border-primary/40 hover:text-primary/60 hover:bg-primary/[0.02] transition-all duration-200 opacity-0 group-hover/slot:opacity-100 group-hover:opacity-60"
+                                  className="w-full px-2 py-1 rounded-lg border border-dashed border-stone-200/60 dark:border-white/[0.06] text-[10px] text-stone-300 dark:text-gray-600 hover:border-[#1D9E75]/40 hover:text-[#1D9E75]/60 hover:bg-[#1D9E75]/[0.02] transition-all duration-200 opacity-0 group-hover/slot:opacity-100 group-hover:opacity-60"
                                   onClick={() => openRecipeSelector(dateStr, slot.key)}
                                 >
                                   + Add
@@ -706,7 +706,7 @@ const MealPlanner = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 gap-1 rounded-lg text-xs text-stone-400 hover:text-primary"
+                            className="h-7 gap-1 rounded-lg text-xs text-stone-400 hover:text-[#1D9E75]"
                             onClick={() => openRecipeSelector(formatDateKey(weekDates[0]), slot.key)}
                             title={`Add ${slot.label}`}
                           >
@@ -749,7 +749,7 @@ const MealPlanner = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 gap-1 rounded-lg text-xs text-stone-400 hover:text-primary"
+                                className="h-7 gap-1 rounded-lg text-xs text-stone-400 hover:text-[#1D9E75]"
                                 onClick={() => openRecipeSelector('_snacks', 'snacks')}
                               >
                                 <Plus className="h-3 w-3" />
@@ -770,12 +770,12 @@ const MealPlanner = () => {
                               <div
                                 key={dateStr}
                                 className={`group p-2 min-h-[80px] transition-colors ${
-                                  isToday ? 'bg-primary/[0.03] dark:bg-primary/[0.05]' : ''
+                                  isToday ? 'bg-[#1D9E75]/[0.03] dark:bg-[#1D9E75]/[0.05]' : ''
                                 }`}
                               >
                                 {/* Day label */}
                                 <p className={`text-[10px] font-semibold text-center mb-1.5 ${
-                                  isToday ? 'text-primary' : 'text-stone-400 dark:text-gray-500'
+                                  isToday ? 'text-[#1D9E75]' : 'text-stone-400 dark:text-gray-500'
                                 }`}>
                                   {DAYS_SHORT[date.getDay()]} {date.getDate()}
                                 </p>
@@ -801,7 +801,7 @@ const MealPlanner = () => {
                                   {/* Add button */}
                                   {weekPlan && (
                                     <button
-                                      className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary/60 hover:bg-primary/[0.02] transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                      className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-[#1D9E75]/60 hover:bg-[#1D9E75]/[0.02] transition-all duration-200 opacity-0 group-hover:opacity-100"
                                       onClick={() => openRecipeSelector(dateStr, slot.key)}
                                     >
                                       + Add
@@ -897,7 +897,7 @@ const MealPlanner = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 rounded-lg text-stone-400 hover:text-primary"
+                            className="h-8 w-8 p-0 rounded-lg text-stone-400 hover:text-[#1D9E75]"
                             onClick={() => openRecipeSelector('_snacks', 'snacks')}
                             title="Pick from recipes"
                           >
@@ -915,8 +915,8 @@ const MealPlanner = () => {
             {!isLoading && !weekPlan && (
               <div className="text-center py-12">
                 <div className="relative inline-flex mb-5">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 flex items-center justify-center">
-                    <ChefHat className="w-8 h-8 text-primary/60" />
+                  <div className="w-16 h-16 rounded-2xl bg-[#1D9E75]/8 dark:bg-[#34d399]/15 flex items-center justify-center">
+                    <ChefHat className="w-8 h-8 text-[#1D9E75]/60" />
                   </div>
                   <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[#1D9E75] flex items-center justify-center shadow-lg shadow-[#1D9E75]/30">
                     <Plus className="w-3 h-3 text-white" />
@@ -1012,10 +1012,10 @@ const MealPlanner = () => {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                         {planMenuOpen === plan.id && (
-                          <div className="absolute right-0 top-9 z-50 min-w-[160px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-gray-900 p-1.5 shadow-xl animate-scale-in">
+                          <div className="absolute right-0 top-9 z-50 min-w-[160px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] p-1.5 shadow-xl animate-scale-in">
                             {plan.status === 'archived' && (
                               <button
-                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors"
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
                                 onClick={() => handleStatusChange(plan.id, 'completed')}
                               >
                                 <CheckCircle2 className="h-4 w-4" />
@@ -1024,7 +1024,7 @@ const MealPlanner = () => {
                             )}
                             {plan.status !== 'archived' && (
                               <button
-                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors"
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
                                 onClick={() => handleStatusChange(plan.id, 'archived')}
                               >
                                 <Archive className="h-4 w-4" />
@@ -1033,7 +1033,7 @@ const MealPlanner = () => {
                             )}
                             <div className="my-1 border-t border-stone-100 dark:border-white/[0.06]" />
                             <button
-                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/5 transition-colors"
+                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
                               onClick={() => handleDeletePlan(plan.id)}
                             >
                               <Trash2 className="h-4 w-4" />

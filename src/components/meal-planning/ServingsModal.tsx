@@ -80,10 +80,10 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
     >
       {phase === 'ask' ? (
         /* ── Phase 1: Ask whether to modify servings ── */
-        <div className="w-full max-w-md mx-4 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-stone-200/60 dark:border-white/[0.08] overflow-hidden animate-scale-in">
+        <div className="w-full max-w-md mx-4 bg-white dark:bg-[#16171c] rounded-2xl shadow-2xl border border-stone-200/60 dark:border-white/[0.08] overflow-hidden animate-scale-in">
           <div className="p-6 text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 mb-4">
-              <Users className="h-7 w-7 text-primary/70" />
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#1D9E75]/8 dark:bg-[#34d399]/15 mb-4">
+              <Users className="h-7 w-7 text-[#1D9E75]/70" />
             </div>
             <h3 className="text-lg font-semibold text-stone-900 dark:text-white">
               Modify serving sizes?
@@ -120,7 +120,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
               No, use defaults
             </Button>
             <Button
-              className="flex-1 rounded-xl h-10 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-200"
+              className="flex-1 rounded-xl h-10 shadow-lg shadow-[#1D9E75]/20 hover:shadow-xl hover:shadow-[#1D9E75]/30 transition-all duration-200"
               onClick={() => setPhase('adjust')}
             >
               Yes, adjust servings
@@ -129,7 +129,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
         </div>
       ) : (
         /* ── Phase 2: Adjust servings per recipe ── */
-        <div className="w-full max-w-lg max-h-[80vh] mx-4 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-stone-200/60 dark:border-white/[0.08] flex flex-col overflow-hidden animate-scale-in">
+        <div className="w-full max-w-lg max-h-[80vh] mx-4 bg-white dark:bg-[#16171c] rounded-2xl shadow-2xl border border-stone-200/60 dark:border-white/[0.08] flex flex-col overflow-hidden animate-scale-in">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200/60 dark:border-white/[0.06]">
             <div>
@@ -157,7 +157,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
               return (
                 <div
                   key={recipe.recipeId}
-                  className="group flex items-center gap-3 p-3 rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-stone-50/50 dark:bg-white/[0.02] hover:bg-stone-50 dark:hover:bg-white/[0.04] hover:shadow-md hover:border-stone-300/60 dark:hover:border-white/[0.1] transition-all duration-200"
+                  className="group flex items-center gap-3 p-3 rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-stone-50/50 dark:bg-white/[0.02] hover:border-stone-300/60 dark:hover:border-white/[0.1] transition-all duration-200"
                 >
                   <RecipeImage src={recipe.recipeImage} alt={recipe.recipeName} size="sm" />
                   <div className="flex-1 min-w-0">
@@ -170,7 +170,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
-                      className="w-7 h-7 rounded-lg border border-stone-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] flex items-center justify-center text-stone-500 hover:text-primary hover:border-primary/30 hover:shadow-sm active:scale-95 transition-all duration-150 disabled:opacity-30 disabled:hover:text-stone-500"
+                      className="w-7 h-7 rounded-lg border border-stone-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] flex items-center justify-center text-stone-500 hover:text-[#1D9E75] hover:border-[#1D9E75]/30 hover:shadow-sm active:scale-95 transition-all duration-150 disabled:opacity-30 disabled:hover:text-stone-500"
                       onClick={() => updateServings(recipe.recipeId, -1)}
                       disabled={currentServings <= 1}
                     >
@@ -180,7 +180,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
                       {currentServings}
                     </span>
                     <button
-                      className="w-7 h-7 rounded-lg border border-stone-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] flex items-center justify-center text-stone-500 hover:text-primary hover:border-primary/30 hover:shadow-sm active:scale-95 transition-all duration-150"
+                      className="w-7 h-7 rounded-lg border border-stone-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] flex items-center justify-center text-stone-500 hover:text-[#1D9E75] hover:border-[#1D9E75]/30 hover:shadow-sm active:scale-95 transition-all duration-150"
                       onClick={() => updateServings(recipe.recipeId, 1)}
                     >
                       <Plus className="h-3 w-3" />
@@ -201,7 +201,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
             </button>
             <Button
               size="sm"
-              className="gap-1.5 rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+              className="gap-1.5 rounded-xl shadow-lg shadow-[#1D9E75]/20 hover:shadow-xl hover:shadow-[#1D9E75]/30 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
               onClick={handleConfirmServings}
             >
               <Check className="h-3.5 w-3.5" />

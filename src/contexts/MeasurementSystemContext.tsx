@@ -14,31 +14,28 @@ export const MeasurementSystemProvider: React.FC<{ children: ReactNode }> = ({ c
   const { data: preferences, isLoading } = usePreferences();
   const updatePreferences = useUpdatePreferences();
   const [system, setSystemState] = useState<MeasurementSystem>('metric');
+  const [hasUserOverride, setHasUserOverride] = useState(false);
 
-  // Load preference from database
+  // Load preference from database — only when we actually get data back
   useEffect(() => {
-    const prefs = preferences as any; // Type assertion for preferences
+    const prefs = preferences as any;
     if (prefs?.measurement_system) {
       setSystemState(prefs.measurement_system);
-    } else {
-      // Preferences don't exist yet or column doesn't exist, use default (metric)
-      setSystemState('metric');
     }
+    // Don't reset to metric when prefs is null/undefined — that would
+    // overwrite an in-memory selection the user just made
   }, [preferences]);
 
   // Update system and save to database
   const setSystem = async (newSystem: MeasurementSystem) => {
-    const previousSystem = system;
     setSystemState(newSystem);
+    setHasUserOverride(true);
     try {
       await updatePreferences.mutateAsync({
         measurement_system: newSystem,
       });
     } catch (error: any) {
       console.warn('Failed to update measurement system (migration may not be run):', error?.message);
-      // Don't revert - keep the new system in memory even if DB update fails
-      // This allows the feature to work even before the migration is applied
-      // The preference will be saved once the migration is run
     }
   };
 

@@ -15,9 +15,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           {
             'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-px': variant === 'default',
             'bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md shadow-destructive/20': variant === 'destructive',
-            'border border-stone-200 dark:border-white/10 hover:bg-stone-50 dark:hover:bg-white/5 hover:text-accent-foreground hover:border-stone-300 dark:hover:border-white/20 hover:-translate-y-px': variant === 'outline',
+            'border border-stone-200 dark:border-white/10 hover:text-stone-900 dark:hover:text-white hover:border-stone-300 dark:hover:border-white/20 hover:-translate-y-px': variant === 'outline',
             'bg-secondary text-secondary-foreground hover:bg-secondary/80': variant === 'secondary',
-            'hover:bg-stone-100 dark:hover:bg-white/5 hover:text-accent-foreground': variant === 'ghost',
+            'hover:text-stone-900 dark:hover:text-white': variant === 'ghost',
             'underline-offset-4 hover:underline text-primary': variant === 'link',
             'bg-[#1D9E75] text-white shadow-lg shadow-[#1D9E75]/25 hover:shadow-xl hover:shadow-[#1D9E75]/30 hover:bg-[#178c66] hover:-translate-y-0.5': variant === 'glow',
           },
