@@ -143,7 +143,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   if (isLoading || publicLoading || (collectionId && collectionLoading)) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1D9E75]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     );
   }
@@ -204,7 +204,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
         {onAddRecipe && (
           <Button
             onClick={onAddRecipe}
-            className="bg-[#1D9E75] hover:bg-[#178c66] text-white px-5 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 shrink-0"
+            className="bg-primary-500 hover:bg-primary-600 text-white px-5 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 shrink-0"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Recipe
@@ -217,8 +217,8 @@ export const RecipeList: React.FC<RecipeListProps> = ({
         <div className="text-center py-16">
           <div className="max-w-md mx-auto">
             <div className="relative mb-8">
-              <div className="w-32 h-32 bg-emerald-100 dark:bg-emerald-900/30 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
-                <div className="w-20 h-20 bg-[#1D9E75] rounded-2xl flex items-center justify-center">
+              <div className="w-32 h-32 bg-primary-100 dark:bg-primary-900/30 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+                <div className="w-20 h-20 bg-primary-500 rounded-2xl flex items-center justify-center">
                   <span className="text-3xl">📖</span>
                 </div>
               </div>
@@ -245,7 +245,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                 <Button
                   onClick={onAddRecipe}
                   size="lg"
-                  className="bg-[#1D9E75] hover:bg-[#178c66] text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
+                  className="bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
                 >
                   <Plus className="h-5 w-5 mr-2" />
                   {searchQuery ||

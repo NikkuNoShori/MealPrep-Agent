@@ -24,7 +24,7 @@ const Dashboard = () => {
   const recentRecipes = recipes.slice(0, 5)
 
   const stats = [
-    { label: 'Recipes', value: recipes.length, icon: BookOpen, color: 'text-emerald-600 dark:text-emerald-400', loading: recipesLoading },
+    { label: 'Recipes', value: recipes.length, icon: BookOpen, color: 'text-primary-600 dark:text-primary-400', loading: recipesLoading },
     { label: 'This week', value: thisWeekMeals, icon: Calendar, color: 'text-amber-600 dark:text-amber-400', loading: mealPlansLoading },
     { label: 'Family', value: 0, icon: Users, color: 'text-rose-500 dark:text-rose-400', loading: false },
     { label: 'Grocery', value: 0, icon: ShoppingCart, color: 'text-teal-600 dark:text-teal-400', loading: false },
@@ -66,8 +66,8 @@ const Dashboard = () => {
       {/* Quick actions — horizontal row */}
       <div className="flex items-center gap-2">
         <Link to="/recipes">
-          <button className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] text-sm text-stone-700 dark:text-gray-300 hover:border-[#1D9E75]/30 dark:hover:border-[#34d399]/20 hover:shadow-sm transition-all duration-200" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            <Plus className="h-3.5 w-3.5 text-[#1D9E75] dark:text-[#34d399]" />
+          <button className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] text-sm text-stone-700 dark:text-gray-300 hover:border-primary-500/30 dark:hover:border-primary-400/20 hover:shadow-sm transition-all duration-200" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <Plus className="h-3.5 w-3.5 text-primary-500 dark:text-primary-400" />
             Add Recipe
           </button>
         </Link>
@@ -92,7 +92,7 @@ const Dashboard = () => {
             Recent Recipes
           </h2>
           <Link to="/recipes">
-            <button className="text-xs text-stone-400 hover:text-[#1D9E75] dark:text-gray-500 dark:hover:text-[#34d399] transition-colors flex items-center gap-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <button className="text-xs text-stone-400 hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400 transition-colors flex items-center gap-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               View all
               <ArrowRight className="h-3 w-3" />
             </button>
@@ -123,7 +123,7 @@ const Dashboard = () => {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-stone-800 dark:text-gray-200 group-hover:text-[#1D9E75] dark:group-hover:text-[#34d399] transition-colors truncate" style={{ fontFamily: "'Fraunces', serif" }}>
+                  <p className="text-sm font-medium text-stone-800 dark:text-gray-200 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-colors truncate" style={{ fontFamily: "'Fraunces', serif" }}>
                     {recipe.title}
                   </p>
                   <div className="flex items-center gap-3 mt-0.5 text-xs text-stone-400 dark:text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>

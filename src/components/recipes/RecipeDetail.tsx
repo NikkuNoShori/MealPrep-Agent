@@ -17,7 +17,8 @@ import {
   Minus,
   ThumbsDown,
   X,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react'
 
 interface RecipeDetailProps {
@@ -50,12 +51,14 @@ interface RecipeDetailProps {
   }
   onEdit?: () => void
   onClose?: () => void
+  onDelete?: () => void
 }
 
 export const RecipeDetail: React.FC<RecipeDetailProps> = ({
   recipe,
   onEdit,
-  onClose
+  onClose,
+  onDelete,
 }) => {
   const [isImageFullscreen, setIsImageFullscreen] = useState(false)
   const [showAllIngredients, setShowAllIngredients] = useState(false)
@@ -105,6 +108,17 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {onDelete && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onDelete}
+              className="rounded-xl border-border/60 text-stone-400 hover:text-rose-500 dark:hover:text-rose-400 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
+              title="Delete recipe"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
           {onEdit && (
             <Button
               onClick={onEdit}
@@ -315,7 +329,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                       <button
                         type="button"
                         onClick={() => setShowAllIngredients(!showAllIngredients)}
-                        className="w-full mt-3 py-2.5 flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-[#1D9E75]/70 dark:text-[#34d399]/70 hover:text-[#1D9E75] dark:hover:text-[#34d399] transition-all duration-200 active:scale-[0.98] group"
+                        className="w-full mt-3 py-2.5 flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-primary-500/70 dark:text-primary-400/70 hover:text-primary-500 dark:hover:text-primary-400 transition-all duration-200 active:scale-[0.98] group"
                       >
                         <span>
                           {showAllIngredients ? 'Show less' : `Show ${hiddenCount} more`}
@@ -432,8 +446,8 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
               <div className="space-y-5">
                 {recipe.instructions.map((instruction, index) => (
                   <div key={index} className="flex gap-4">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-stone-100 dark:bg-white/[0.06] flex items-center justify-center text-xs font-semibold text-stone-500 dark:text-stone-400">
-                      {index + 1}
+                    <div className="flex-shrink-0 text-xs font-semibold text-stone-400 dark:text-stone-500 w-6 pt-0.5 text-right">
+                      {index + 1}.
                     </div>
                     <div className="flex-1 pt-0.5">
                       <p className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">{instruction}</p>

@@ -205,7 +205,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
             <Card
               key={dateString}
               className={`min-h-[200px] ${
-                isToday ? "ring-2 ring-[#1D9E75]" : ""
+                isToday ? "ring-2 ring-primary-500" : ""
               }`}
             >
               <CardHeader className="pb-2">
@@ -328,7 +328,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-[#1D9E75]">
+              <div className="text-2xl font-bold text-primary-500">
                 {getWeekDates().reduce(
                   (total, date) => total + getMealCount(formatDate(date)),
                   0
@@ -350,7 +350,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-[#178c66]">
+              <div className="text-2xl font-bold text-primary-600">
                 {
                   getWeekDates().filter(
                     (date) => getMealCount(formatDate(date)) > 0

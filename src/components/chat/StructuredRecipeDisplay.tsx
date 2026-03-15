@@ -483,21 +483,21 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
 
         {/* ── Phase 2 Prompt: Similar recipes found ── */}
         {savePhase === "similar_found" && similarRecipes.length > 0 && (
-          <div className="border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-3 space-y-2">
+          <div className="border border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-950/30 rounded-lg p-3 space-y-2">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-[#1D9E75] dark:text-emerald-400 mt-0.5 flex-shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-primary-500 dark:text-primary-400 mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <p className="font-medium text-emerald-800 dark:text-emerald-200">
+                <p className="font-medium text-primary-800 dark:text-primary-200">
                   Similar recipes detected
                 </p>
-                <p className="text-emerald-700 dark:text-emerald-300 mt-0.5">
+                <p className="text-primary-700 dark:text-primary-300 mt-0.5">
                   We found recipes in your collection that look similar:
                 </p>
                 <ul className="mt-1.5 space-y-1">
                   {similarRecipes.map((match) => (
-                    <li key={match.id} className="text-emerald-700 dark:text-emerald-300">
+                    <li key={match.id} className="text-primary-700 dark:text-primary-300">
                       <span className="font-medium">{match.title}</span>
-                      <span className="text-[#1D9E75] dark:text-emerald-400 ml-1.5">
+                      <span className="text-primary-500 dark:text-primary-400 ml-1.5">
                         ({Math.round(match.similarity * 100)}% similar)
                       </span>
                     </li>

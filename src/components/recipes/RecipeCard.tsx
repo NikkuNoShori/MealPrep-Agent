@@ -135,12 +135,12 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       <div className="flex items-center gap-1.5">
         {thumbsUp.length > 0 && (
           <div
-            className={`relative inline-flex items-center gap-1 ${px} rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 cursor-default`}
+            className={`relative inline-flex items-center gap-1 ${px} rounded-full bg-primary-500/10 dark:bg-primary-400/10 cursor-default`}
             onMouseEnter={() => handleReactionMouseEnter("up")}
             onMouseLeave={handleReactionMouseLeave}
           >
-            <ThumbsUp className={`${iconSize} text-emerald-500 dark:text-emerald-400`} />
-            <span className={`${textSize} font-semibold text-emerald-600 dark:text-emerald-300`}>{thumbsUp.length}</span>
+            <ThumbsUp className={`${iconSize} text-primary-500 dark:text-primary-400`} />
+            <span className={`${textSize} font-semibold text-primary-600 dark:text-primary-300`}>{thumbsUp.length}</span>
             {showReactionTooltip === "up" && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
                 {thumbsUp.map((r) => r.name).join(", ")}
@@ -178,10 +178,10 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       <div className="flex items-center gap-1" ref={reactionPopoverRef}>
         <button
           onClick={(e) => handleReactionClick(e, "thumbs_up")}
-          className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-500/20 hover:scale-110 active:scale-95 transition-all duration-150`}
+          className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-primary-50 dark:hover:bg-primary-500/20 hover:scale-110 active:scale-95 transition-all duration-150`}
           title="Thumbs up"
         >
-          <ThumbsUp className={`${iconSize} text-emerald-600 dark:text-emerald-400`} />
+          <ThumbsUp className={`${iconSize} text-primary-600 dark:text-primary-400`} />
         </button>
         <button
           onClick={(e) => handleReactionClick(e, "thumbs_down")}
@@ -194,7 +194,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setShowReactionPopover(!showReactionPopover); }}
-              className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-[#1D9E75]/10 dark:hover:bg-[#1D9E75]/20 hover:scale-110 active:scale-95 transition-all duration-150`}
+              className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-primary-500/10 dark:hover:bg-primary-500/20 hover:scale-110 active:scale-95 transition-all duration-150`}
               title="React for family member"
             >
               <Users className={`${iconSize} text-stone-500 dark:text-stone-400`} />
@@ -211,9 +211,9 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                     <div className="flex items-center gap-0.5">
                       <button
                         onClick={(e) => { handleReactionClick(e, "thumbs_up", dep.id); setShowReactionPopover(false); }}
-                        className="w-7 h-7 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 flex items-center justify-center transition-colors"
+                        className="w-7 h-7 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-500/20 flex items-center justify-center transition-colors"
                       >
-                        <ThumbsUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <ThumbsUp className="h-3.5 w-3.5 text-primary-600 dark:text-primary-400" />
                       </button>
                       <button
                         onClick={(e) => { handleReactionClick(e, "thumbs_down", dep.id); setShowReactionPopover(false); }}
@@ -242,7 +242,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-white dark:hover:bg-white/20 hover:scale-110 active:scale-95 transition-all duration-150"
           title={copiedLink ? "Copied!" : "Share"}
         >
-          {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Share2 className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />}
+          {copiedLink ? <Check className="h-3.5 w-3.5 text-primary-500" /> : <Share2 className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />}
         </button>
       );
     }
@@ -265,7 +265,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
               onClick={handleShare}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
             >
-              {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Share2 className="h-3.5 w-3.5" />}
+              {copiedLink ? <Check className="h-3.5 w-3.5 text-primary-500" /> : <Share2 className="h-3.5 w-3.5" />}
               {copiedLink ? "Copied!" : "Copy link"}
             </button>
             {onEdit && (

@@ -166,7 +166,7 @@ const AddToPlanButton = ({
       {compact ? (
         <button
           onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-          className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:text-[#1D9E75] hover:scale-110 active:scale-95 transition-all duration-150"
+          className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:text-primary-500 hover:scale-110 active:scale-95 transition-all duration-150"
           title="Add to Meal Plan"
         >
           <CalendarPlus className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />
@@ -220,16 +220,16 @@ const AddToPlanButton = ({
               return (
                 <div key={formatDateKey(date)} className="mb-1.5 last:mb-0">
                   <p className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 ${
-                    isToday ? 'text-[#1D9E75]' : 'text-stone-400 dark:text-gray-500'
+                    isToday ? 'text-primary-500' : 'text-stone-400 dark:text-gray-500'
                   }`}>
                     {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                    {isToday && <span className="ml-1 text-[#1D9E75]">· today</span>}
+                    {isToday && <span className="ml-1 text-primary-500">· today</span>}
                   </p>
                   <div className="grid grid-cols-3 gap-1 px-1">
                     {DAILY_SLOTS.map((slot) => (
                       <button
                         key={slot.key}
-                        className="flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg text-stone-500 dark:text-gray-400 hover:text-[#1D9E75] dark:hover:text-[#34d399] transition-all duration-150 disabled:opacity-30"
+                        className="flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg text-stone-500 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-all duration-150 disabled:opacity-30"
                         onClick={() => handleAdd(date, slot.key)}
                         disabled={!targetPlan || updateMealPlan.isPending}
                         title={`Add to ${slot.label}`}

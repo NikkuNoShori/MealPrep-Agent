@@ -30,7 +30,7 @@ const LandingPage = () => {
       <section className="relative px-4 pt-20 pb-24 sm:pt-28 sm:pb-32">
         <div className="max-w-3xl mx-auto text-center">
           <p
-            className="text-sm font-medium tracking-wide uppercase text-[#1D9E75] dark:text-[#34d399] mb-4"
+            className="text-sm font-medium tracking-wide uppercase text-primary-500 dark:text-primary-400 mb-4"
             style={{ fontFamily: "'DM Sans', sans-serif" }}
           >
             AI-Powered Meal Planning
@@ -114,8 +114,8 @@ const LandingPage = () => {
               },
             ].map((f) => (
               <div key={f.title} className="flex gap-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#1D9E75]/10 dark:bg-[#34d399]/10 flex items-center justify-center">
-                  <f.icon className="w-5 h-5 text-[#1D9E75] dark:text-[#34d399]" />
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary-500/10 dark:bg-primary-400/10 flex items-center justify-center">
+                  <f.icon className="w-5 h-5 text-primary-500 dark:text-primary-400" />
                 </div>
                 <div>
                   <h3
@@ -172,11 +172,11 @@ const LandingPage = () => {
             ].map((s) => (
               <div
                 key={s.step}
-                className="flex gap-5 items-start p-5 rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] transition-all duration-200 hover:border-[#1D9E75]/20 dark:hover:border-[#34d399]/10"
+                className="flex gap-5 items-start p-5 rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] transition-all duration-200 hover:border-primary-500/20 dark:hover:border-primary-400/10"
               >
                 <div className="flex-shrink-0">
                   <span
-                    className="block text-xs font-bold text-[#1D9E75] dark:text-[#34d399] tracking-wider mb-1"
+                    className="block text-xs font-bold text-primary-500 dark:text-primary-400 tracking-wider mb-1"
                     style={{ fontFamily: "'DM Sans', sans-serif" }}
                   >
                     STEP {s.step}

@@ -225,7 +225,7 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
           </Button>
           <Button
             size="sm"
-            className="gap-1.5 rounded-xl text-xs shadow-lg shadow-[#1D9E75]/20"
+            className="gap-1.5 rounded-xl text-xs shadow-lg shadow-primary-500/20"
             onClick={handleGenerate}
             disabled={!hasMeals || updateMealPlan.isPending}
           >
@@ -241,7 +241,7 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
 
       {/* Add manual item form */}
       {addingManual && (
-        <Card className="border-[#1D9E75]/20 animate-slide-up">
+        <Card className="border-primary-500/20 animate-slide-up">
           <CardContent className="p-4">
             <div className="flex items-end gap-2">
               <div className="flex-1">
@@ -340,8 +340,8 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
                         <button
                           className={`flex-shrink-0 w-5 h-5 rounded-md border-2 transition-all duration-200 flex items-center justify-center ${
                             item.isChecked
-                              ? 'bg-emerald-500 border-emerald-500 text-white'
-                              : 'border-stone-300 dark:border-gray-600 hover:border-emerald-400'
+                              ? 'bg-primary-500 border-primary-500 text-white'
+                              : 'border-stone-300 dark:border-gray-600 hover:border-primary-400'
                           }`}
                           onClick={() => handleToggleCheck(item.id)}
                         >

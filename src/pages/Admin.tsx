@@ -142,7 +142,7 @@ const UsersTab: React.FC<{ currentUserId?: string }> = ({ currentUserId }) => {
             {/* Setup status */}
             <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
               u.setup_completed
-                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400'
                 : 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
             }`}>
               {u.setup_completed ? 'Active' : 'Pending Setup'}
@@ -192,7 +192,7 @@ const InvitesTab: React.FC = () => {
 
   const statusConfig: Record<string, { icon: React.ElementType; color: string }> = {
     pending: { icon: Clock, color: 'text-amber-500' },
-    accepted: { icon: CheckCircle, color: 'text-emerald-500' },
+    accepted: { icon: CheckCircle, color: 'text-primary-500' },
     declined: { icon: XCircle, color: 'text-red-500' },
     expired: { icon: XCircle, color: 'text-gray-400' },
   }
@@ -224,7 +224,7 @@ const InvitesTab: React.FC = () => {
               </div>
               <span className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize ${
                 inv.status === 'pending' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' :
-                inv.status === 'accepted' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                inv.status === 'accepted' ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400' :
                 'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400'
               }`}>
                 {inv.status}
@@ -313,7 +313,7 @@ const HouseholdsTab: React.FC = () => {
                 </div>
                 <span className={`px-2 py-0.5 rounded-md text-xs font-medium capitalize ${
                   m.role === 'owner' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' :
-                  m.role === 'admin' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                  m.role === 'admin' ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400' :
                   'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400'
                 }`}>
                   {m.role}

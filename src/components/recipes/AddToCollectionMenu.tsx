@@ -102,9 +102,9 @@ export const AddToCollectionMenu: React.FC<AddToCollectionMenuProps> = ({
           e.stopPropagation()
           setIsOpen(!isOpen)
         }}
-        className={`inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 backdrop-blur-sm shadow-sm transition-all duration-200 hover:border-[#1D9E75]/40 hover:text-[#1D9E75] dark:hover:text-[#34d399] active:scale-[0.97] ${
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 backdrop-blur-sm shadow-sm transition-all duration-200 hover:border-primary-500/40 hover:text-primary-500 dark:hover:text-primary-400 active:scale-[0.97] ${
           isSmall ? 'h-8 px-2.5 text-xs' : 'h-9 px-3 text-sm'
-        } ${isOpen ? 'border-[#1D9E75]/50 shadow-md ring-1 ring-[#1D9E75]/20' : ''}`}
+        } ${isOpen ? 'border-primary-500/50 shadow-md ring-1 ring-primary-500/20' : ''}`}
         title="Add to collection"
       >
         <FolderPlus className={`${isSmall ? 'h-3 w-3' : 'h-3.5 w-3.5'} text-muted-foreground`} />
@@ -139,13 +139,13 @@ export const AddToCollectionMenu: React.FC<AddToCollectionMenuProps> = ({
                     disabled={addToCollection.isPending || removeFromCollection.isPending}
                     className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-all duration-150 ${
                       isIn
-                        ? 'text-[#1D9E75] dark:text-[#34d399]'
+                        ? 'text-primary-500 dark:text-primary-400'
                         : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
                     }`}
                   >
                     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors duration-150 ${
                       isIn
-                        ? 'bg-[#1D9E75] border-[#1D9E75] text-white'
+                        ? 'bg-primary-500 border-primary-500 text-white'
                         : 'border-border/80'
                     }`}>
                       {isIn && <Check className="h-3 w-3" />}

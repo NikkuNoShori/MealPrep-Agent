@@ -218,14 +218,14 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
               onClick={item.handler}
               className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
                 isActive
-                  ? 'text-[#1D9E75] dark:text-[#34d399]'
+                  ? 'text-primary-500 dark:text-primary-400'
                   : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
               }`}
             >
-              <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-[#1D9E75] dark:text-[#34d399]' : ''}`} />
+              <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
               <span className="truncate">{item.label}</span>
               {isActive && (
-                <div className="ml-auto w-1 h-1 rounded-full bg-[#1D9E75] dark:bg-[#34d399]" />
+                <div className="ml-auto w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400" />
               )}
             </button>
           )
@@ -244,7 +244,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
           <button
             type="button"
             onClick={() => setIsCreating(!isCreating)}
-            className="text-stone-400 dark:text-stone-500 hover:text-[#1D9E75] dark:hover:text-[#34d399] transition-colors"
+            className="text-stone-400 dark:text-stone-500 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -267,7 +267,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             <button
               onClick={handleCreate}
               disabled={createCollection.isPending || !newName.trim()}
-              className="shrink-0 text-[#1D9E75] hover:text-[#178c66] disabled:text-stone-300 dark:disabled:text-stone-600 transition-colors"
+              className="shrink-0 text-primary-500 hover:text-primary-600 disabled:text-stone-300 dark:disabled:text-stone-600 transition-colors"
             >
               {createCollection.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -313,7 +313,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                   <button
                     onClick={() => handleSaveRename(collection.id)}
                     disabled={updateCollection.isPending}
-                    className="shrink-0 text-[#1D9E75] hover:text-[#178c66] transition-colors"
+                    className="shrink-0 text-primary-500 hover:text-primary-600 transition-colors"
                   >
                     <Check className="h-3.5 w-3.5" />
                   </button>
@@ -337,15 +337,15 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                   onClick={() => handleSelectCollection(collection.id, collection.name)}
                   className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
                     isActive
-                      ? 'text-[#1D9E75] dark:text-[#34d399]'
+                      ? 'text-primary-500 dark:text-primary-400'
                       : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
                   }`}
                 >
-                  <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-[#1D9E75] dark:text-[#34d399]' : ''}`} />
+                  <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
                   <span className="truncate flex-1 text-left">{collection.name}</span>
                   <VisIcon className="h-3 w-3 shrink-0 text-stone-300 dark:text-stone-600" />
                   {isActive && (
-                    <div className="w-1 h-1 rounded-full bg-[#1D9E75] dark:bg-[#34d399] shrink-0" />
+                    <div className="w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400 shrink-0" />
                   )}
                 </button>
 

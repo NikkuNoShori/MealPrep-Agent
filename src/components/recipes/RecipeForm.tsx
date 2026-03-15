@@ -134,7 +134,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
       >
         <GripVertical className="h-5 w-5" />
       </button>
-      <div className="flex-shrink-0 w-6 h-6 bg-[#1D9E75] text-white rounded-full flex items-center justify-center text-sm font-semibold">
+      <div className="flex-shrink-0 w-6 h-6 bg-primary-500 text-white rounded-full flex items-center justify-center text-sm font-semibold">
         {index + 1}
       </div>
       {isEditing ? (
@@ -155,7 +155,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
               onClick={handleSave}
               className="h-8 w-8"
             >
-              <Check className="h-4 w-4 text-[#1D9E75]" />
+              <Check className="h-4 w-4 text-primary-500" />
             </Button>
             <Button
               type="button"
@@ -171,7 +171,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
       ) : (
         <>
           <p
-            className="flex-1 cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-colors hover:text-[#1D9E75] dark:hover:text-[#34d399]"
+            className="flex-1 cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-colors hover:text-primary-500 dark:hover:text-primary-400"
             onClick={() => setIsEditing(true)}
             title="Click to edit"
           >

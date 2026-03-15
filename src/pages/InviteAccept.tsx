@@ -130,11 +130,11 @@ const InviteAccept: React.FC = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-[#1D9E75] rounded-xl flex items-center justify-center shadow-lg shadow-[#1D9E75]/25">
+            <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25">
               <span className="text-white font-bold text-sm">M</span>
             </div>
             <span className="text-lg font-bold text-stone-900 dark:text-white tracking-tight">
-              MealPrep <span className="text-[#1D9E75]">Agent</span>
+              MealPrep <span className="text-primary-500">Agent</span>
             </span>
           </Link>
         </div>
@@ -144,7 +144,7 @@ const InviteAccept: React.FC = () => {
           {/* Loading */}
           {(state.status === 'loading' || state.status === 'accepting') && (
             <div className="px-8 py-16 text-center">
-              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-[#1D9E75]" />
+              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-primary-500" />
               <p className="text-gray-500 dark:text-gray-400 text-sm">
                 {state.status === 'loading' ? 'Loading invite details...' : 'Joining household...'}
               </p>
@@ -154,8 +154,8 @@ const InviteAccept: React.FC = () => {
           {/* Invite Details (not logged in) */}
           {state.status === 'details' && !user && !authLoading && (
             <div className="px-8 py-10">
-              <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Home className="w-7 h-7 text-[#1D9E75] dark:text-emerald-400" />
+              <div className="w-14 h-14 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Home className="w-7 h-7 text-primary-500 dark:text-primary-400" />
               </div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">
                 You're invited!
@@ -174,7 +174,7 @@ const InviteAccept: React.FC = () => {
               <div className="space-y-3">
                 <Button
                   onClick={handleSignIn}
-                  className="w-full bg-[#1D9E75] hover:bg-[#178c66] text-white rounded-xl h-11"
+                  className="w-full bg-primary-500 hover:bg-primary-600 text-white rounded-xl h-11"
                 >
                   <LogIn className="w-4 h-4 mr-2" />
                   Sign In to Join
@@ -198,7 +198,7 @@ const InviteAccept: React.FC = () => {
           {/* Details loaded but user is authenticated — accepting happens via useEffect */}
           {state.status === 'details' && user && (
             <div className="px-8 py-16 text-center">
-              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-[#1D9E75]" />
+              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-primary-500" />
               <p className="text-gray-500 dark:text-gray-400 text-sm">Joining household...</p>
             </div>
           )}
@@ -206,8 +206,8 @@ const InviteAccept: React.FC = () => {
           {/* Accepted */}
           {state.status === 'accepted' && (
             <div className="px-8 py-10 text-center">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-100 to-green-100 dark:from-emerald-900/30 dark:to-green-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-14 h-14 bg-gradient-to-br from-primary-100 to-green-100 dark:from-primary-900/30 dark:to-green-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-7 h-7 text-primary-600 dark:text-primary-400" />
               </div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                 Welcome!
@@ -217,7 +217,7 @@ const InviteAccept: React.FC = () => {
               </p>
               <Button
                 onClick={() => navigate('/household', { replace: true })}
-                className="bg-[#1D9E75] hover:bg-[#178c66] text-white rounded-xl h-11 px-8"
+                className="bg-primary-500 hover:bg-primary-600 text-white rounded-xl h-11 px-8"
               >
                 <Home className="w-4 h-4 mr-2" />
                 Go to Household

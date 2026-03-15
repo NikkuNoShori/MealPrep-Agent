@@ -4,7 +4,9 @@ import { RecipeList } from "@/components/recipes/RecipeList";
 import { RecipeDetail } from "@/components/recipes/RecipeDetail";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
 import { CollectionsSidebar } from "@/components/recipes/CollectionsSidebar";
-import { apiClient } from "@/services/api";
+import { apiClient, useDeleteRecipe } from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
+import toast from "react-hot-toast";
 import { Filter, X } from "lucide-react";
 
 const Recipes = () => {
@@ -17,6 +19,8 @@ const Recipes = () => {
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'collection'>('public');
   const [mobileCollectionsOpen, setMobileCollectionsOpen] = useState(false);
+  const { user } = useAuthStore();
+  const deleteRecipeMutation = useDeleteRecipe();
 
   // Load recipe from URL slug if present
   useEffect(() => {
@@ -75,6 +79,18 @@ const Recipes = () => {
     navigate('/recipes');
   };
 
+  const handleDeleteRecipe = async () => {
+    if (!selectedRecipe) return;
+    if (!window.confirm("Are you sure you want to delete this recipe? This action cannot be undone.")) return;
+    try {
+      await deleteRecipeMutation.mutateAsync(selectedRecipe.id);
+      toast.success("Recipe deleted");
+      handleCloseDetail();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete recipe");
+    }
+  };
+
   const showList = !showAddForm && !selectedRecipe && !editingRecipe;
 
   return (
@@ -95,8 +111,9 @@ const Recipes = () => {
         {selectedRecipe && !showAddForm && !editingRecipe && (
           <RecipeDetail
             recipe={selectedRecipe}
-            onEdit={() => handleEditRecipe(selectedRecipe)}
+            onEdit={selectedRecipe.userId === user?.id ? () => handleEditRecipe(selectedRecipe) : undefined}
             onClose={handleCloseDetail}
+            onDelete={selectedRecipe.userId === user?.id ? handleDeleteRecipe : undefined}
           />
         )}
 

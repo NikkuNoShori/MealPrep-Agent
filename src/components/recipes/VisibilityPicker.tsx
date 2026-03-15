@@ -46,9 +46,9 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
           bg-background/80 backdrop-blur-sm shadow-sm
           ${isSmall ? 'h-8 px-2.5 text-xs' : 'h-9 px-3 text-sm'}
           transition-all duration-200 ease-out
-          hover:border-[#1D9E75]/40 hover:text-[#1D9E75] dark:hover:text-[#34d399]
+          hover:border-primary-500/40 hover:text-primary-500 dark:hover:text-primary-400
           active:scale-[0.97]
-          ${isOpen ? 'border-[#1D9E75]/50 shadow-md ring-1 ring-[#1D9E75]/20' : ''}
+          ${isOpen ? 'border-primary-500/50 shadow-md ring-1 ring-primary-500/20' : ''}
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
       >
@@ -84,7 +84,7 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
                     w-full flex items-start gap-2.5 rounded-lg px-2.5 py-2
                     transition-all duration-150 ease-out
                     ${isActive
-                      ? 'text-[#1D9E75] dark:text-[#34d399]'
+                      ? 'text-primary-500 dark:text-primary-400'
                       : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
                     }
                   `}
@@ -92,12 +92,12 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
                   <div className={`
                     mt-0.5 rounded-md p-1
                     transition-colors duration-150
-                    ${isActive ? 'bg-[#1D9E75]/15' : 'bg-muted/60'}
+                    ${isActive ? 'bg-primary-500/15' : 'bg-muted/60'}
                   `}>
                     <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="text-left">
-                    <div className={`text-sm font-medium leading-tight ${isActive ? 'text-[#1D9E75] dark:text-[#34d399]' : ''}`}>
+                    <div className={`text-sm font-medium leading-tight ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`}>
                       {option.label}
                     </div>
                     <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">

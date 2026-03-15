@@ -154,7 +154,7 @@ const Settings = () => {
             >
               Reset
             </button>
-            <Button onClick={handleSave} size="sm" className="bg-[#1D9E75] hover:bg-[#178c66] text-white rounded-lg">
+            <Button onClick={handleSave} size="sm" className="bg-primary-500 hover:bg-primary-600 text-white rounded-lg">
               <Save className="h-3.5 w-3.5 mr-1.5" />
               Save
             </Button>

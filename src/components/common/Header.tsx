@@ -61,7 +61,7 @@ const Header = () => {
         <div className="flex justify-between items-center h-14">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 bg-[#1D9E75] dark:bg-[#34d399] rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow duration-200">
+            <div className="w-8 h-8 bg-primary-500 dark:bg-primary-400 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow duration-200">
               <span className="text-white font-bold text-xs" style={{ fontFamily: "'Fraunces', serif" }}>M</span>
             </div>
             <span className="text-base font-semibold text-stone-900 dark:text-white tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -76,11 +76,11 @@ const Header = () => {
                 const active = isActive(item.href);
                 const baseClasses = `relative px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 ${
                   active
-                    ? "text-[#1D9E75] dark:text-[#34d399]"
+                    ? "text-primary-500 dark:text-primary-400"
                     : "text-stone-500 dark:text-gray-400 hover:text-stone-900 dark:hover:text-white"
                 }`;
 
-                const indicator = active ? <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-[#1D9E75] dark:bg-[#34d399]" /> : null;
+                const indicator = active ? <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary-500 dark:bg-primary-400" /> : null;
 
                 return item.name === "Chat" ? (
                   <button key={item.name} onClick={handleChatClick} className={baseClasses} style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -118,7 +118,7 @@ const Header = () => {
                       onLoad={() => setAvatarError(false)}
                     />
                   ) : (
-                    <div className="w-7 h-7 rounded-full bg-[#1D9E75] dark:bg-[#34d399] flex items-center justify-center">
+                    <div className="w-7 h-7 rounded-full bg-primary-500 dark:bg-primary-400 flex items-center justify-center">
                       <span className="text-white text-xs font-semibold" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                         {getFirstName().charAt(0).toUpperCase()}
                       </span>
@@ -203,10 +203,10 @@ const Header = () => {
                 const active = isActive(item.href);
                 const classes = `relative px-3.5 py-2 text-sm font-medium rounded-lg transition-all duration-150 ${
                   active
-                    ? "text-[#1D9E75] dark:text-[#34d399]"
+                    ? "text-primary-500 dark:text-primary-400"
                     : "text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
                 }`;
-                const mobileIndicator = active ? <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full bg-[#1D9E75] dark:bg-[#34d399]" /> : null;
+                const mobileIndicator = active ? <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full bg-primary-500 dark:bg-primary-400" /> : null;
 
                 return item.name === "Chat" ? (
                   <button
