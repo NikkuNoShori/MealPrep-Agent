@@ -70,9 +70,10 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 | MOP | Title | Status |
 |-----|-------|--------|
 | [MOP-0001](MOPs/MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | complete |
-| [MOP-0002](MOPs/MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | in-progress |
+| [MOP-0002](MOPs/MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | complete |
 | [MOP-0003](MOPs/MOP-0003.md) | Dietary Profiles & Allergen Detection | draft |
 | [MOP-0004](MOPs/MOP-0004.md) | Meal Planner & Grocery Cart | draft |
+| [MOP-0005](MOPs/MOP-0005.md) | Test Coverage & Testing Infrastructure | draft |
 
 ---
 

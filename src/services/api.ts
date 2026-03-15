@@ -938,6 +938,51 @@ class ApiClient {
     return snakeToCamel(invite);
   }
 
+  // ── Household Member Management ──
+
+  async updateMemberRole(memberId: string, role: 'admin' | 'member') {
+    const { data, error } = await (supabase
+      .from("household_members") as any)
+      .update({ role })
+      .eq("id", memberId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async removeHouseholdMember(memberId: string) {
+    const { error } = await (supabase
+      .from("household_members") as any)
+      .delete()
+      .eq("id", memberId);
+
+    if (error) throw error;
+  }
+
+  async transferOwnership(memberId: string, householdId: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Promote target to owner
+    const { error: promoteError } = await (supabase
+      .from("household_members") as any)
+      .update({ role: 'owner' })
+      .eq("id", memberId);
+
+    if (promoteError) throw promoteError;
+
+    // Demote self to admin
+    const { error: demoteError } = await (supabase
+      .from("household_members") as any)
+      .update({ role: 'admin' })
+      .eq("household_id", householdId)
+      .eq("user_id", user.id);
+
+    if (demoteError) throw demoteError;
+  }
+
   // ── Family Members (Dependents) ──
 
   async createFamilyMember(data: {
@@ -1551,6 +1596,43 @@ export const useDeleteFamilyMember = () => {
 
   return useMutation({
     mutationFn: (memberId: string) => apiClient.deleteFamilyMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+// ── Household Member Management Hooks ──
+
+export const useUpdateMemberRole = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ memberId, role }: { memberId: string; role: 'admin' | 'member' }) =>
+      apiClient.updateMemberRole(memberId, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useRemoveHouseholdMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (memberId: string) => apiClient.removeHouseholdMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useTransferOwnership = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ memberId, householdId }: { memberId: string; householdId: string }) =>
+      apiClient.transferOwnership(memberId, householdId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["household"] });
     },

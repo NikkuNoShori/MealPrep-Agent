@@ -15,6 +15,9 @@ import {
   useCreateFamilyMember,
   useUpdateFamilyMember,
   useDeleteFamilyMember,
+  useUpdateMemberRole,
+  useRemoveHouseholdMember,
+  useTransferOwnership,
 } from '../services/api';
 import {
   Loader2,
@@ -35,6 +38,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   Clock,
+  ChevronDown,
+  LogOut,
+  ArrowRightLeft,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -99,9 +105,17 @@ const Household = () => {
   const createFamilyMember = useCreateFamilyMember();
   const updateFamilyMember = useUpdateFamilyMember();
   const deleteFamilyMember = useDeleteFamilyMember();
+  const updateMemberRole = useUpdateMemberRole();
+  const removeMember = useRemoveHouseholdMember();
+  const transferOwnership = useTransferOwnership();
+
+  // Member management state
+  const [memberMenuOpen, setMemberMenuOpen] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'remove' | 'transfer'; memberId: string; memberName: string } | null>(null);
 
   const myRole = householdData?.myRole;
   const canInvite = myRole === 'owner' || myRole === 'admin';
+  const isOwner = myRole === 'owner';
 
   const handleSendInvite = () => {
     if (!inviteEmail.trim() || !householdData?.household?.id) return;
@@ -144,6 +158,53 @@ const Household = () => {
         },
         onError: (err: any) => {
           toast.error(err?.message || 'Failed to respond to invite');
+        },
+      }
+    );
+  };
+
+  const handleChangeRole = (memberId: string, newRole: 'admin' | 'member', memberName: string) => {
+    updateMemberRole.mutate(
+      { memberId, role: newRole },
+      {
+        onSuccess: () => {
+          toast.success(`${memberName} is now ${newRole === 'admin' ? 'an admin' : 'a member'}`);
+          setMemberMenuOpen(null);
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Failed to update role');
+        },
+      }
+    );
+  };
+
+  const handleRemoveMember = (memberId: string) => {
+    removeMember.mutate(memberId, {
+      onSuccess: () => {
+        toast.success(`${confirmAction?.memberName || 'Member'} removed from household`);
+        setConfirmAction(null);
+        setMemberMenuOpen(null);
+      },
+      onError: (err: any) => {
+        toast.error(err?.message || 'Failed to remove member');
+        setConfirmAction(null);
+      },
+    });
+  };
+
+  const handleTransferOwnership = (memberId: string) => {
+    if (!householdData?.household?.id) return;
+    transferOwnership.mutate(
+      { memberId, householdId: householdData.household.id },
+      {
+        onSuccess: () => {
+          toast.success(`Ownership transferred to ${confirmAction?.memberName || 'member'}`);
+          setConfirmAction(null);
+          setMemberMenuOpen(null);
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Failed to transfer ownership');
+          setConfirmAction(null);
         },
       }
     );
@@ -450,6 +511,8 @@ const Household = () => {
                     {(householdData.members || []).map((member: any) => {
                       const RoleIcon = roleIcons[member.role] || User;
                       const isCurrentUser = member.userId === user?.id;
+                      const memberName = member.profiles?.displayName || member.profiles?.email || 'Unknown';
+                      const canManage = isOwner && !isCurrentUser && member.role !== 'owner';
                       return (
                         <div
                           key={member.id}
@@ -473,9 +536,7 @@ const Household = () => {
                             </div>
                             <div>
                               <p className="text-sm font-medium">
-                                {member.profiles?.displayName ||
-                                  member.profiles?.email ||
-                                  'Unknown'}
+                                {memberName}
                                 {isCurrentUser && (
                                   <span className="text-xs text-muted-foreground ml-1.5">(you)</span>
                                 )}
@@ -487,10 +548,66 @@ const Household = () => {
                               )}
                             </div>
                           </div>
-                          <Badge variant="secondary" className="gap-1 text-xs">
-                            <RoleIcon className="h-3 w-3" />
-                            {roleLabels[member.role] || member.role}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                              <RoleIcon className="h-3 w-3" />
+                              {roleLabels[member.role] || member.role}
+                            </Badge>
+                            {canManage && (
+                              <div className="relative">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => setMemberMenuOpen(memberMenuOpen === member.id ? null : member.id)}
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                                {memberMenuOpen === member.id && (
+                                  <div className="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border bg-popover p-1 shadow-lg">
+                                    {member.role === 'member' ? (
+                                      <button
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
+                                        onClick={() => handleChangeRole(member.id, 'admin', memberName)}
+                                      >
+                                        <Shield className="h-4 w-4" />
+                                        Promote to Admin
+                                      </button>
+                                    ) : (
+                                      <button
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
+                                        onClick={() => handleChangeRole(member.id, 'member', memberName)}
+                                      >
+                                        <User className="h-4 w-4" />
+                                        Demote to Member
+                                      </button>
+                                    )}
+                                    <button
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
+                                      onClick={() => {
+                                        setConfirmAction({ type: 'transfer', memberId: member.id, memberName });
+                                        setMemberMenuOpen(null);
+                                      }}
+                                    >
+                                      <ArrowRightLeft className="h-4 w-4" />
+                                      Transfer Ownership
+                                    </button>
+                                    <div className="my-1 border-t" />
+                                    <button
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+                                      onClick={() => {
+                                        setConfirmAction({ type: 'remove', memberId: member.id, memberName });
+                                        setMemberMenuOpen(null);
+                                      }}
+                                    >
+                                      <LogOut className="h-4 w-4" />
+                                      Remove from Household
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -523,6 +640,59 @@ const Household = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Confirmation Dialog */}
+            {confirmAction && (
+              <Card className="border-destructive/50">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-full bg-destructive/10 p-2">
+                      {confirmAction.type === 'remove' ? (
+                        <LogOut className="h-4 w-4 text-destructive" />
+                      ) : (
+                        <ArrowRightLeft className="h-4 w-4 text-amber-500" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">
+                        {confirmAction.type === 'remove'
+                          ? `Remove ${confirmAction.memberName}?`
+                          : `Transfer ownership to ${confirmAction.memberName}?`}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {confirmAction.type === 'remove'
+                          ? 'They will lose access to household recipes and data. This can be undone by re-inviting them.'
+                          : 'You will become an admin. Only the new owner can transfer ownership back.'}
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() =>
+                            confirmAction.type === 'remove'
+                              ? handleRemoveMember(confirmAction.memberId)
+                              : handleTransferOwnership(confirmAction.memberId)
+                          }
+                          disabled={removeMember.isPending || transferOwnership.isPending}
+                        >
+                          {(removeMember.isPending || transferOwnership.isPending) && (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          )}
+                          {confirmAction.type === 'remove' ? 'Remove' : 'Transfer'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConfirmAction(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Family Members / Dependents */}
             <Card>
