@@ -330,7 +330,7 @@ const Household = () => {
         {/* Header */}
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-2 h-8 bg-gradient-to-b from-primary-600 to-secondary-600 rounded-full" />
+            <div className="w-2 h-8 bg-[#1D9E75] rounded-full" />
             <h1 className="text-3xl font-bold">Household</h1>
           </div>
           <p className="text-muted-foreground">

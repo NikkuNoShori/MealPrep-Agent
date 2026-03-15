@@ -313,7 +313,7 @@ const HouseholdsTab: React.FC = () => {
                 </div>
                 <span className={`px-2 py-0.5 rounded-md text-xs font-medium capitalize ${
                   m.role === 'owner' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' :
-                  m.role === 'admin' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                  m.role === 'admin' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
                   'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400'
                 }`}>
                   {m.role}

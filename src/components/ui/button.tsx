@@ -19,7 +19,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             'bg-secondary text-secondary-foreground hover:bg-secondary/80': variant === 'secondary',
             'hover:bg-stone-100 dark:hover:bg-white/5 hover:text-accent-foreground': variant === 'ghost',
             'underline-offset-4 hover:underline text-primary': variant === 'link',
-            'bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-lg shadow-primary-600/25 hover:shadow-xl hover:shadow-primary-500/30 hover:-translate-y-0.5': variant === 'glow',
+            'bg-[#1D9E75] text-white shadow-lg shadow-[#1D9E75]/25 hover:shadow-xl hover:shadow-[#1D9E75]/30 hover:bg-[#178c66] hover:-translate-y-0.5': variant === 'glow',
           },
           {
             'h-10 py-2 px-4': size === 'default',

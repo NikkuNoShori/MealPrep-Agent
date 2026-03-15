@@ -60,9 +60,9 @@ const PLAN_LISTS: { key: string; label: string; icon: React.ElementType; color: 
 ];
 
 const STATUS_CONFIG: Record<MealPlanStatus, { label: string; color: string; bg: string }> = {
-  draft: { label: 'Draft', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800' },
+  draft: { label: 'Draft', color: 'text-stone-600 dark:text-stone-400', bg: 'bg-stone-100 dark:bg-white/[0.04]' },
   active: { label: 'Active', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
-  completed: { label: 'Done', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+  completed: { label: 'Done', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
   archived: { label: 'Archived', color: 'text-stone-500 dark:text-stone-500', bg: 'bg-stone-100 dark:bg-stone-800' },
 };
 
@@ -373,7 +373,7 @@ const MealPlanner = () => {
   const weekLabel = `${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20 dark:from-slate-900 dark:via-gray-900 dark:to-gray-900">
+    <div className="bg-stone-50 dark:bg-[#0e0f13]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 animate-fade-in">
 
         {/* ── Header: Title + Tabs ── */}
@@ -400,7 +400,7 @@ const MealPlanner = () => {
 
         {/* ── Create Plan Form ── */}
         {showCreateForm && (
-          <Card className="border-primary/20 shadow-lg shadow-primary/5 animate-slide-up">
+          <Card className="border-[#1D9E75]/20 shadow-lg shadow-[#1D9E75]/5 animate-slide-up">
             <CardContent className="p-4">
               <div className="flex items-end gap-3">
                 <div className="flex-1">
@@ -471,7 +471,7 @@ const MealPlanner = () => {
                     </div>
                   ) : (
                     <button
-                      className="text-xs font-medium text-stone-600 dark:text-gray-300 hover:text-primary transition-colors truncate max-w-[160px]"
+                      className="text-xs font-medium text-stone-600 dark:text-gray-300 hover:text-[#1D9E75] transition-colors truncate max-w-[160px]"
                       onClick={() => {
                         setEditedPlanTitle(weekPlan.title || '');
                         setIsEditingPlanTitle(true);
@@ -496,7 +496,7 @@ const MealPlanner = () => {
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
                     {bannerMenuOpen && (
-                      <div className="absolute right-0 top-7 z-50 min-w-[140px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-gray-900 p-1 shadow-xl animate-scale-in">
+                      <div className="absolute right-0 top-7 z-50 min-w-[140px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] p-1 shadow-xl animate-scale-in">
                         {weekPlan.status === 'draft' && (
                           <button
                             className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-emerald-600 dark:text-emerald-400"
@@ -508,7 +508,7 @@ const MealPlanner = () => {
                         )}
                         {weekPlan.status === 'active' && (
                           <button
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-blue-600 dark:text-blue-400"
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-stone-50 dark:hover:bg-white/[0.04] transition-colors text-emerald-600 dark:text-emerald-400"
                             onClick={() => { handleStatusChange(weekPlan.id, 'completed'); setBannerMenuOpen(false); }}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -551,14 +551,14 @@ const MealPlanner = () => {
               {/* Right: view toggle */}
               <div className="flex items-center rounded-lg border border-stone-200/80 dark:border-white/[0.08] bg-stone-100/60 dark:bg-white/[0.03] p-0.5 flex-shrink-0">
                 <button
-                  className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'days' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary' : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300'}`}
+                  className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'days' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-[#1D9E75]' : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300'}`}
                   onClick={() => setCalendarView('days')}
                   title="Days view"
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'meals' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary' : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300'}`}
+                  className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'meals' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-[#1D9E75]' : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300'}`}
                   onClick={() => setCalendarView('meals')}
                   title="Meals view"
                 >
@@ -570,7 +570,7 @@ const MealPlanner = () => {
             {/* Calendar Grid — Days View or Meals View */}
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+                <Loader2 className="h-8 w-8 animate-spin text-[#1D9E75]/50" />
               </div>
             ) : calendarView === 'days' ? (
               <div className="grid grid-cols-7 gap-2">
@@ -585,7 +585,7 @@ const MealPlanner = () => {
                       </p>
                       <p className={`text-lg font-bold mt-0.5 transition-colors ${
                         isToday
-                          ? 'text-primary'
+                          ? 'text-[#1D9E75]'
                           : 'text-stone-700 dark:text-gray-300'
                       }`}>
                         {date.getDate()}
@@ -605,13 +605,13 @@ const MealPlanner = () => {
                       key={dateStr}
                       className={`group relative rounded-2xl border p-2.5 min-h-[220px] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
                         isToday
-                          ? 'border-primary/30 bg-primary/[0.03] dark:bg-primary/[0.05] shadow-md shadow-primary/10 ring-1 ring-primary/20'
+                          ? 'border-[#1D9E75]/30 bg-[#1D9E75]/[0.03] dark:bg-[#1D9E75]/[0.05] shadow-md shadow-[#1D9E75]/10 ring-1 ring-[#1D9E75]/20'
                           : 'border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] hover:border-stone-300 dark:hover:border-white/[0.12]'
                       }`}
                     >
                       {/* Today indicator dot */}
                       {isToday && (
-                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary animate-pulse-slow" />
+                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#1D9E75] animate-pulse-slow" />
                       )}
 
                       <div className="space-y-1.5">
@@ -918,7 +918,7 @@ const MealPlanner = () => {
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 flex items-center justify-center">
                     <ChefHat className="w-8 h-8 text-primary/60" />
                   </div>
-                  <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center shadow-lg shadow-primary/30">
+                  <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[#1D9E75] flex items-center justify-center shadow-lg shadow-[#1D9E75]/30">
                     <Plus className="w-3 h-3 text-white" />
                   </div>
                 </div>
@@ -945,7 +945,7 @@ const MealPlanner = () => {
           <TabsContent value="history" className="mt-6 space-y-3">
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+                <Loader2 className="h-8 w-8 animate-spin text-[#1D9E75]/50" />
               </div>
             ) : historyPlans.length === 0 ? (
               <div className="text-center py-12">

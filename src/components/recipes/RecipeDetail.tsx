@@ -264,9 +264,9 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
       {(totalTime > 0 || recipe.servings || recipe.difficulty) && (
         <div className="flex flex-wrap gap-3 mb-6 animate-slide-up">
           {totalTime > 0 && (
-            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
-              <Clock className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">{totalTime} min</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+              <Clock className="h-4 w-4 text-emerald-500" />
+              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{totalTime} min</span>
             </div>
           )}
           {recipe.prepTime !== undefined && recipe.prepTime > 0 && (
@@ -417,7 +417,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                     </div>
                     <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-700"
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-700"
                         style={{ width: maxNutrient > 0 ? `${(recipe.nutritionInfo!.protein! / maxNutrient) * 100}%` : '0%' }}
                       />
                     </div>
