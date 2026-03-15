@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (removed isPublic/is_public mapping — column dropped in migration 013)
+**Last reviewed:** 2026-03-14
+**Last updated:** 2026-03-14 (household-invite + admin-api edge functions, 5 data-access RPC functions, recipe reactions, admin, invite, and profile API methods)
 
 ---
 
@@ -162,6 +162,66 @@ Full pipeline: adapter → extract → transform → load.
 ### POST `/functions/v1/recipe-pipeline/extract-only`
 
 Same as `/ingest` but with `auto_save: false` — extract and validate without saving to DB.
+
+---
+
+### POST `/functions/v1/household-invite`
+
+Household invite management — create invites and send email notifications.
+
+**Location:** `supabase/functions/household-invite/index.ts`
+
+**Headers:** Same as chat-api (Authorization + apikey)
+
+**Request body:**
+```json
+{
+  "householdId": "uuid",
+  "email": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "inviteId": "uuid",
+  "message": "Invite sent to email@example.com"
+}
+```
+
+**Behavior:**
+- Validates user is owner/admin of the household
+- Creates `household_invites` row with `inviter_name`
+- Sends invite email via `supabase.auth.admin.inviteUserByEmail()` with redirect URL to `/invite/accept?id=<invite-id>`
+- Returns error if email is already a household member or has a pending invite
+
+**Additional endpoints:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/household-invite?id=<invite-id>` | Get invite details (valid/invalid, inviter name, household name, expiry) |
+| POST | `/household-invite/accept` | Accept invite by ID (body: `{ inviteId }`) — adds user to household |
+
+---
+
+### `/functions/v1/admin-api`
+
+Admin-only endpoints for user/household/invite management.
+
+**Location:** `supabase/functions/admin-api/index.ts`
+
+**Headers:** Same as chat-api (Authorization + apikey). Requires `admin` role in `user_roles`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin-api/users` | List all users with profiles |
+| PATCH | `/admin-api/users` | Update user (body: `{ userId, updates }`) |
+| DELETE | `/admin-api/users` | Delete user (body: `{ userId }`) |
+| GET | `/admin-api/invites` | List all invites |
+| DELETE | `/admin-api/invites` | Delete invite (body: `{ inviteId }`) |
+| GET | `/admin-api/households` | List all households with members |
+| DELETE | `/admin-api/households` | Delete household (body: `{ householdId }`) |
 
 ---
 
@@ -334,6 +394,79 @@ get_recipe_recommendations(
 
 ---
 
+### Data Access RPC Functions (Migration 025)
+
+Five `SECURITY DEFINER` functions that replace multi-query API methods with single database calls. All validate `auth.uid()` internally and return JSON.
+
+---
+
+### get_my_household
+
+Returns the authenticated user's household with members, dependents, and pending invites.
+
+```sql
+get_my_household()  -- uses auth.uid()
+```
+
+**Returns:** `{ household, my_role, members: [{ ...member, profiles: {...} }], dependents, pending_invites }` or `NULL` if no household.
+
+---
+
+### toggle_recipe_reaction
+
+Atomic check-then-write for recipe reactions (eliminates race conditions).
+
+```sql
+toggle_recipe_reaction(
+  p_recipe_id UUID,
+  p_reaction VARCHAR(20),        -- 'thumbs_up' or 'thumbs_down'
+  p_family_member_id UUID DEFAULT NULL  -- NULL = authenticated user reaction
+)
+```
+
+**Returns:** `{ action: 'added' | 'removed' | 'updated' }`
+
+---
+
+### get_household_recipes
+
+Fetches household-visible recipes with author profiles.
+
+```sql
+get_household_recipes(
+  p_limit INTEGER DEFAULT 50,
+  p_offset INTEGER DEFAULT 0
+)
+```
+
+**Returns:** `{ recipes: [{ ...recipe, profiles: { display_name, username, avatar_url } }], total }`
+
+---
+
+### get_recipe_reactions
+
+Fetches reactions for multiple recipes with resolved names (via JOIN on profiles + family_members).
+
+```sql
+get_recipe_reactions(p_recipe_ids UUID[])
+```
+
+**Returns:** `[{ id, recipe_id, user_id, family_member_id, reaction, name }]`
+
+---
+
+### get_my_pending_invites
+
+Returns pending invites addressed to the authenticated user's email, with household names.
+
+```sql
+get_my_pending_invites()  -- uses auth.uid()
+```
+
+**Returns:** `[{ id, household_id, invited_email, inviter_name, status, ..., households: { id, name } }]`
+
+---
+
 ## Frontend API Client
 
 `src/services/api.ts` — singleton HTTP client wrapping Supabase calls.
@@ -404,14 +537,47 @@ get_recipe_recommendations(
 
 | Method | Description |
 |--------|-------------|
-| `getMyHousehold()` | Get user's household with members and dependents |
+| `getMyHousehold()` | Get user's household with members and dependents (via RPC) |
 | `updateHousehold(id, data)` | Update household name |
-| `createHouseholdInvite(householdId, email)` | Send invite to email |
-| `getMyPendingInvites()` | Get invites addressed to current user |
+| `createHouseholdInvite(householdId, email)` | Send invite via household-invite edge function |
+| `getInviteDetails(inviteId)` | Get invite details (valid/invalid, names, expiry) |
+| `acceptInviteById(inviteId)` | Accept an invite (adds user to household) |
+| `getMyPendingInvites()` | Get invites addressed to current user (via RPC) |
 | `respondToInvite(inviteId, accept)` | Accept or decline invite |
+| `getHouseholdRecipes(params?)` | Get household-visible recipes with author profiles (via RPC) |
+| `getPublicRecipes(params?)` | Get all public recipes with author profiles |
 | `updateRecipeVisibility(recipeId, visibility)` | Set recipe visibility (private/household/public) |
 
-**React Query hooks:** `useMyHousehold`, `useUpdateHousehold`, `useCreateHouseholdInvite`, `useMyPendingInvites`, `useRespondToInvite`, `useUpdateRecipeVisibility`
+**React Query hooks:** `useMyHousehold`, `useUpdateHousehold`, `useCreateHouseholdInvite`, `useMyPendingInvites`, `useRespondToInvite`, `useUpdateRecipeVisibility`, `useHouseholdRecipes`, `useAcceptInviteById`
+
+### Recipe Reactions
+
+| Method | Description |
+|--------|-------------|
+| `getRecipeReactions(recipeIds)` | Get reactions for recipes with resolved names (via RPC) |
+| `toggleRecipeReaction(data)` | Toggle thumbs up/down on a recipe (atomic via RPC) |
+
+**React Query hooks:** `useRecipeReactions`, `useToggleRecipeReaction`
+
+### Profile
+
+| Method | Description |
+|--------|-------------|
+| `getMyProfile()` | Get current user's profile |
+| `updateUsername(username)` | Update username (3-30 chars, lowercase alphanumeric + underscores) |
+
+### Admin
+
+| Method | Description |
+|--------|-------------|
+| `adminGetAllUsers()` | List all users (admin only) |
+| `adminGetAllInvites()` | List all invites (admin only) |
+| `adminGetAllHouseholds()` | List all households (admin only) |
+| `adminDeleteUser(userId)` | Delete user (admin only) |
+| `adminUpdateUser(userId, updates)` | Update user (admin only) |
+| `adminDeleteInvite(inviteId)` | Delete invite (admin only) |
+| `adminRemoveHouseholdMember(memberId)` | Remove member from household (admin only) |
+| `adminDeleteHousehold(householdId)` | Delete household (admin only) |
 
 ### Recipe Collections
 

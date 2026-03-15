@@ -2,8 +2,8 @@
 
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
-**Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (MOP-0002 P0-P2 code-complete, deprecation cleanup deployed)
+**Last reviewed:** 2026-03-14
+**Last updated:** 2026-03-14 (MOP-0002: invite flow, reactions, admin, RPC optimization complete)
 
 ---
 
@@ -23,7 +23,7 @@
 | MOP | Title | Status | Submitted | Updated | Completed | Submitted By |
 |-----|-------|--------|-----------|---------|-----------|--------------|
 | [MOP-0001](MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | complete | 2026-03-11 | 2026-03-11 | 2026-03-11 | Nick Neal |
-| [MOP-0002](MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | in-progress | 2026-03-11 | 2026-03-12 | — | Nick Neal |
+| [MOP-0002](MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | in-progress | 2026-03-11 | 2026-03-14 | — | Nick Neal |
 | [MOP-0003](MOP-0003.md) | Dietary Profiles & Allergen Detection | draft | 2026-03-12 | 2026-03-12 | — | Nick Neal |
 | [MOP-0004](MOP-0004.md) | Meal Planner & Grocery Cart | draft | 2026-03-12 | 2026-03-12 | — | Nick Neal |
 

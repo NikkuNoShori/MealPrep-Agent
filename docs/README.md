@@ -2,8 +2,8 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (MOP-0002 status updated to in-progress)
+**Last reviewed:** 2026-03-14
+**Last updated:** 2026-03-14 (reviewed — no structural changes needed)
 
 ---
 

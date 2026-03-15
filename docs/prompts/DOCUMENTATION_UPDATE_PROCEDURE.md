@@ -242,3 +242,4 @@ Append to the update log at the bottom of this document:
 | 2026-03-12 | Nick Neal | enhancement/chat (MOP-0002 P0: households, visibility, RLS) | ARCHITECTURE, DATA_MODEL, API, RUNBOOK, CHANGELOG, docs/README |
 | 2026-03-12 | Nick Neal | enhancement/chat (MOP-0002 P1/P2: collections, invite UI, recipe page) | DATA_MODEL, API, CHANGELOG, docs/README, MOP-0002, REGISTRY |
 | 2026-03-12 | Nick Neal | enhancement/chat (migration 013: deprecation cleanup, collections UI polish) | ARCHITECTURE, DATA_MODEL, API, RUNBOOK, CHANGELOG, MOP-0002, REGISTRY |
+| 2026-03-14 | Nick | enhancement/feature-release (invites, reactions, admin, setup, RPC optimization, migrations 014-025) | ARCHITECTURE, DATA_MODEL, API, RUNBOOK, CHANGELOG, docs/README, MOP-0002, REGISTRY |

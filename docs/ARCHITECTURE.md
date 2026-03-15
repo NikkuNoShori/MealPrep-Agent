@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (deprecation cleanup: dropped is_public, family_id; collections UI components)
+**Last reviewed:** 2026-03-14
+**Last updated:** 2026-03-14 (invite flow, admin panel, complete-setup, recipe reactions, RPC optimization, profile visibility)
 
 ---
 
@@ -54,7 +54,7 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 ### Key boundaries:
 - **Frontend ↔ Supabase**: All DB access goes through Supabase client (JS SDK). No direct SQL from frontend.
 - **Frontend ↔ OpenRouter**: Direct API calls from `src/lib/openrouter.ts` for chat, embeddings, and intent detection.
-- **Edge Functions**: `chat-api` handles server-side chat processing with intent routing, accessible via Supabase Functions invoke.
+- **Edge Functions**: `chat-api` handles server-side chat processing with intent routing; `household-invite` handles invite creation/email; `admin-api` handles admin operations. All accessible via Supabase Functions invoke.
 - **Storage**: Recipe images stored in Supabase Storage bucket `recipe-images`, accessed via signed URLs.
 
 ---
@@ -73,9 +73,20 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
    - Assigns default `user` role in `user_roles`
    - Creates a `households` row (default name "My Household")
    - Inserts user into `household_members` as `owner`
-4. Frontend `authStore` (Zustand) tracks session state + household membership
-5. Supabase client auto-refreshes JWT tokens
-6. Edge functions validate JWT from `Authorization: Bearer` header
+   - Creates default collections (Favorites, My Recipes)
+4. If `profiles.setup_completed = false`, user is redirected to `/complete-setup` to set display name, username, and password (migration 020)
+5. Frontend `authStore` (Zustand) tracks session state + household membership
+6. Supabase client auto-refreshes JWT tokens
+7. Edge functions validate JWT from `Authorization: Bearer` header
+
+### Invite Flow
+1. Household owner/admin sends invite via `household-invite` edge function
+2. Edge function creates `household_invites` row and sends email via `supabase.auth.admin.inviteUserByEmail()`
+3. Invitee clicks link → `/invite/accept?id=<invite-id>` page
+4. If not logged in, user is directed to sign in/sign up (invited email stored in sessionStorage)
+5. If `setup_completed = false`, redirected to `/complete-setup` with invite ID preserved in sessionStorage
+6. Once authenticated + setup complete, invite is auto-accepted via `acceptInviteById` API call
+7. User is added to household as `member`
 
 ### Account Linking
 - Users can link/unlink Google to an existing email account
@@ -87,6 +98,9 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 - `src/stores/authStore.ts` — Zustand auth state
 - `src/pages/AuthCallback.tsx` — OAuth redirect handler
 - `src/pages/SignIn.tsx`, `src/pages/SignUp.tsx` — auth pages
+- `src/pages/CompleteSetup.tsx` — post-signup profile setup (username, display name)
+- `src/pages/InviteAccept.tsx` — household invite acceptance
+- `supabase/functions/household-invite/` — invite creation + email edge function
 
 ---
 
@@ -147,11 +161,15 @@ Handled directly in the `chat-api` edge function (`handleRAGSearch`):
 | `/signin` | SignIn | Public |
 | `/signup` | SignUp | Public |
 | `/auth/callback` | AuthCallback | Public (OAuth redirect) |
+| `/invite/accept` | InviteAccept | Public (handles both logged-in and anonymous) |
+| `/complete-setup` | CompleteSetup | Protected (setup_completed = false) |
 | `/dashboard` | Dashboard | Protected |
 | `/chat` | Chat | Protected |
 | `/recipes` | Recipes | Protected |
+| `/household` | Household | Protected |
 | `/meal-planner` | MealPlanner | Protected |
 | `/settings` | Settings | Protected |
+| `/admin` | Admin | Protected (admin role only, via AdminRoute) |
 
 ### State Management
 - **Zustand stores** (`src/stores/`): Auth state (incl. household membership), theme state — client-side, persistent
@@ -188,9 +206,9 @@ The UI uses a glassmorphism design language with:
 ### Component Structure
 ```
 src/components/
-├── auth/          # Auth-related components
+├── auth/          # Auth-related components (ProtectedRoute, AdminRoute, SignupForm)
 ├── chat/          # ChatInterface, StructuredRecipeDisplay
-├── common/        # Layout, Header
+├── common/        # Layout, Header, BackButton
 ├── debug/         # Debug utilities
 ├── family/        # Family member management
 ├── meal-planning/ # MealPlanCalendar
@@ -202,8 +220,9 @@ src/components/
 `src/services/api.ts` is a singleton HTTP client wrapping Supabase calls with:
 - Automatic camelCase ↔ snake_case field mapping
 - React Query hooks for all CRUD operations
-- Methods for: recipes, chat, meal plans, preferences, images, RAG search
+- Methods for: recipes, chat, meal plans, preferences, images, RAG search, households, collections, reactions, admin
 - Recipe lookup by UUID or URL slug (`getRecipe(idOrSlug)`)
+- **RPC optimization**: Five high-traffic methods use PostgreSQL `SECURITY DEFINER` functions via `supabase.rpc()` to collapse multiple round trips into single database calls: `get_my_household`, `toggle_recipe_reaction`, `get_household_recipes`, `get_recipe_reactions`, `get_my_pending_invites` (migration 025)
 
 ---
 
@@ -244,8 +263,10 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 
 **General pattern:**
 - Users can only read/write their own data
+- Exception: `profiles` — users can view profiles of other household members (migration 024 adds cross-household profile visibility)
 - Exception: `recipes` — three-tier visibility: `private` (owner only), `household` (owner + household members), `public` (all users). Controlled by `recipes.visibility` column. Collection-level sharing inheritance also applies (recipes in shared collections are visible to collection audience).
 - Exception: `recipe_collections` — same three-tier visibility as recipes. `collection_recipes` join table visibility is derived from parent collection.
+- Exception: `recipe_reactions` — users can react to any recipe they can view; reactions visible to anyone who can view the recipe
 - Exception: `family_members` — users can access members in their household
 - Exception: `households`, `household_members` — members can view their own household and its members
 - Exception: `ingredients`, `roles` — read-only for all authenticated users (shared catalogs)

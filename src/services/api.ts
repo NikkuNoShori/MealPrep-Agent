@@ -857,53 +857,10 @@ class ApiClient {
   // ── Household endpoints ──
 
   async getMyHousehold() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    // Get the first household this user belongs to (v1 assumes one household per user)
-    // Note: "as any" casts needed until supabase types are regenerated with new tables
-    const { data: membership, error: memError } = await (supabase
-      .from("household_members") as any)
-      .select("household_id, role, households(id, name, created_by, created_at, updated_at)")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (memError) throw memError;
-    if (!membership) return null;
-
-    // Get all members of this household
-    const { data: members, error: membersError } = await (supabase
-      .from("household_members") as any)
-      .select("id, user_id, role, joined_at, profiles(id, email, display_name, avatar_url)")
-      .eq("household_id", membership.household_id);
-
-    if (membersError) throw membersError;
-
-    // Get dependents (family_members) in this household
-    const { data: dependents, error: depsError } = await (supabase
-      .from("family_members") as any)
-      .select("*")
-      .eq("household_id", membership.household_id)
-      .eq("is_active", true);
-
-    if (depsError) throw depsError;
-
-    // Get pending/sent invites for this household
-    const { data: invites } = await (supabase
-      .from("household_invites") as any)
-      .select("id, invited_email, inviter_name, status, created_at, expires_at")
-      .eq("household_id", membership.household_id)
-      .in("status", ["pending"])
-      .order("created_at", { ascending: false });
-
-    return {
-      household: snakeToCamel(membership.households),
-      myRole: membership.role,
-      members: (members || []).map((m: any) => snakeToCamel(m)),
-      dependents: (dependents || []).map((d: any) => snakeToCamel(d)),
-      pendingInvites: (invites || []).map((i: any) => snakeToCamel(i)),
-    };
+    const { data, error } = await (supabase.rpc as any)('get_my_household');
+    if (error) throw error;
+    if (!data) return null;
+    return snakeToCamel(data);
   }
 
   async updateHousehold(householdId: string, data: { name: string }) {
@@ -946,26 +903,9 @@ class ApiClient {
   }
 
   async getMyPendingInvites() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    // Get user's email to find invites
-    const { data: profile } = await (supabase
-      .from("profiles") as any)
-      .select("email")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile) return [];
-
-    const { data: invites, error } = await (supabase
-      .from("household_invites") as any)
-      .select("*, households(id, name)")
-      .eq("invited_email", (profile as any).email)
-      .eq("status", "pending");
-
+    const { data, error } = await (supabase.rpc as any)('get_my_pending_invites');
     if (error) throw error;
-    return (invites || []).map((i: any) => snakeToCamel(i));
+    return (data || []).map((i: any) => snakeToCamel(i));
   }
 
   async respondToInvite(inviteId: string, accept: boolean) {
@@ -1072,23 +1012,10 @@ class ApiClient {
   async getRecipeReactions(recipeIds: string[]) {
     if (recipeIds.length === 0) return [];
 
-    const { data, error } = await (supabase
-      .from("recipe_reactions") as any)
-      .select("id, recipe_id, user_id, family_member_id, reaction, family_members(id, name)")
-      .in("recipe_id", recipeIds);
-
+    const { data, error } = await (supabase.rpc as any)('get_recipe_reactions', {
+      p_recipe_ids: recipeIds,
+    });
     if (error) throw error;
-
-    // Fetch display names for user reactions (no FK from recipe_reactions to profiles)
-    const userIds = [...new Set((data || []).filter((r: any) => r.user_id).map((r: any) => r.user_id))];
-    let profileMap: Record<string, string> = {};
-    if (userIds.length > 0) {
-      const { data: profiles } = await (supabase
-        .from("profiles") as any)
-        .select("id, display_name")
-        .in("id", userIds);
-      profileMap = Object.fromEntries((profiles || []).map((p: any) => [p.id, p.display_name]));
-    }
 
     return (data || []).map((r: any) => ({
       id: r.id,
@@ -1096,7 +1023,7 @@ class ApiClient {
       userId: r.user_id,
       familyMemberId: r.family_member_id,
       reaction: r.reaction,
-      name: r.family_members?.name || profileMap[r.user_id] || "Unknown",
+      name: r.name || "Unknown",
     }));
   }
 
@@ -1105,60 +1032,13 @@ class ApiClient {
     reaction: 'thumbs_up' | 'thumbs_down';
     familyMemberId?: string;
   }) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const isForDependent = !!data.familyMemberId;
-    const matchFilter: any = { recipe_id: data.recipeId };
-    if (isForDependent) {
-      matchFilter.family_member_id = data.familyMemberId;
-    } else {
-      matchFilter.user_id = user.id;
-    }
-
-    // Check for existing reaction
-    const { data: existing } = await (supabase
-      .from("recipe_reactions") as any)
-      .select("id, reaction")
-      .match(matchFilter)
-      .maybeSingle();
-
-    if (existing) {
-      if (existing.reaction === data.reaction) {
-        // Same reaction = remove it (toggle off)
-        const { error } = await (supabase
-          .from("recipe_reactions") as any)
-          .delete()
-          .eq("id", existing.id);
-        if (error) throw error;
-        return { action: "removed" as const };
-      } else {
-        // Different reaction = update it
-        const { error } = await (supabase
-          .from("recipe_reactions") as any)
-          .update({ reaction: data.reaction, updated_at: new Date().toISOString() })
-          .eq("id", existing.id);
-        if (error) throw error;
-        return { action: "updated" as const };
-      }
-    } else {
-      // No existing reaction = insert
-      const insertData: any = {
-        recipe_id: data.recipeId,
-        reaction: data.reaction,
-      };
-      if (isForDependent) {
-        insertData.family_member_id = data.familyMemberId;
-      } else {
-        insertData.user_id = user.id;
-      }
-
-      const { error } = await (supabase
-        .from("recipe_reactions") as any)
-        .insert(insertData);
-      if (error) throw error;
-      return { action: "added" as const };
-    }
+    const { data: result, error } = await (supabase.rpc as any)('toggle_recipe_reaction', {
+      p_recipe_id: data.recipeId,
+      p_reaction: data.reaction,
+      p_family_member_id: data.familyMemberId || null,
+    });
+    if (error) throw error;
+    return result;
   }
 
   async updateRecipeVisibility(recipeId: string, visibility: 'private' | 'household' | 'public') {
@@ -1270,41 +1150,14 @@ class ApiClient {
   // ── Household Recipes ──
 
   async getHouseholdRecipes(params?: { limit?: number; offset?: number }) {
-    const limit = params?.limit || 50;
-    const offset = params?.offset || 0;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    // Get user's household ID
-    const { data: membership } = await (supabase
-      .from("household_members") as any)
-      .select("household_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (!membership) return { recipes: [], total: 0 };
-
-    // Get all household member IDs
-    const { data: members } = await (supabase
-      .from("household_members") as any)
-      .select("user_id")
-      .eq("household_id", membership.household_id);
-
-    const memberIds = (members || []).map((m: any) => m.user_id);
-
-    // Fetch recipes from household members shared with the household
-    const { data, error } = await (supabase
-      .from("recipes") as any)
-      .select("*, profiles!recipes_user_id_fkey(display_name, username, avatar_url)")
-      .in("user_id", memberIds)
-      .eq("visibility", "household")
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-
+    const { data, error } = await (supabase.rpc as any)('get_household_recipes', {
+      p_limit: params?.limit || 50,
+      p_offset: params?.offset || 0,
+    });
     if (error) throw error;
+    if (!data) return { recipes: [], total: 0 };
 
-    const camelRecipes = (data || []).map((r: any) => {
+    const camelRecipes = (data.recipes || []).map((r: any) => {
       const recipe = snakeToCamel(r);
       if (r.profiles) {
         recipe.author = {
@@ -1316,7 +1169,7 @@ class ApiClient {
       return recipe;
     });
 
-    return { recipes: camelRecipes, total: camelRecipes.length };
+    return { recipes: camelRecipes, total: data.total };
   }
 
   // ── Public Recipes ──
