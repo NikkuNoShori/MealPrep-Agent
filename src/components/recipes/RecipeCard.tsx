@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Clock, Users, Star, ChefHat, Edit, Trash2 } from "lucide-react";
+import { Clock, Users, ChefHat, Edit, Trash2, ThumbsUp, ThumbsDown, Flame } from "lucide-react";
+
+export interface RecipeReaction {
+  id: string;
+  recipeId: string;
+  userId?: string;
+  familyMemberId?: string;
+  reaction: "thumbs_up" | "thumbs_down";
+  name: string;
+}
 
 interface RecipeCardProps {
   recipe: {
@@ -19,8 +25,16 @@ interface RecipeCardProps {
     familyPreferences?: {
       [memberId: string]: "love" | "like" | "neutral" | "dislike";
     };
+    author?: {
+      displayName?: string;
+      username?: string;
+      avatarUrl?: string;
+    };
   };
   viewMode: "grid" | "list";
+  reactions?: RecipeReaction[];
+  dependents?: { id: string; name: string }[];
+  onReact?: (recipeId: string, reaction: "thumbs_up" | "thumbs_down", familyMemberId?: string) => void;
   onClick?: () => void;
   onEdit?: (recipe: any) => void;
   onDelete?: (recipeId: string) => void;
@@ -29,491 +43,397 @@ interface RecipeCardProps {
 export const RecipeCard: React.FC<RecipeCardProps> = ({
   recipe,
   viewMode,
+  reactions = [],
+  dependents = [],
+  onReact,
   onClick,
   onEdit,
   onDelete,
 }) => {
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
 
-  // Truncate title to fit on single line
-  // Grid view: ~40-45 characters at text-base (16px) in ~280-320px card width
-  // List view: ~50-60 characters at text-xl (20px) with more available width
-  // Using 50 as safe limit for both views
-  const truncateTitle = (title: string, maxLength: number = 50): string => {
-    if (title.length <= maxLength) return title;
-    return title.slice(0, maxLength) + "...";
+  const difficultyConfig = {
+    easy: { label: "Easy", color: "text-emerald-400", bg: "bg-emerald-400/20" },
+    medium: { label: "Medium", color: "text-amber-400", bg: "bg-amber-400/20" },
+    hard: { label: "Hard", color: "text-rose-400", bg: "bg-rose-400/20" },
   };
 
-  const displayTitle = truncateTitle(recipe.title);
+  // Reaction helpers
+  const thumbsUp = reactions.filter((r) => r.reaction === "thumbs_up");
+  const thumbsDown = reactions.filter((r) => r.reaction === "thumbs_down");
+  const hasReactions = thumbsUp.length > 0 || thumbsDown.length > 0;
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "easy":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "medium":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-      case "hard":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-    }
+  const [showReactionTooltip, setShowReactionTooltip] = useState<"up" | "down" | null>(null);
+  const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showReactionPopover, setShowReactionPopover] = useState(false);
+  const reactionPopoverRef = useRef<HTMLDivElement>(null);
+
+  const handleReactionMouseEnter = (type: "up" | "down") => {
+    if (reactionTimeoutRef.current) clearTimeout(reactionTimeoutRef.current);
+    reactionTimeoutRef.current = setTimeout(() => setShowReactionTooltip(type), 300);
   };
 
-  const getFamilyConsensus = () => {
-    if (!recipe.familyPreferences) return null;
-
-    const preferences = Object.values(recipe.familyPreferences);
-    const loves = preferences.filter((p) => p === "love").length;
-    const likes = preferences.filter((p) => p === "like").length;
-    const dislikes = preferences.filter((p) => p === "dislike").length;
-
-    if (loves > likes && loves > dislikes) return "love";
-    if (likes > loves && likes > dislikes) return "like";
-    if (dislikes > loves && dislikes > likes) return "dislike";
-    return "neutral";
+  const handleReactionMouseLeave = () => {
+    if (reactionTimeoutRef.current) clearTimeout(reactionTimeoutRef.current);
+    setShowReactionTooltip(null);
   };
 
-  const familyConsensus = getFamilyConsensus();
+  const handleReactionClick = (e: React.MouseEvent, reaction: "thumbs_up" | "thumbs_down", familyMemberId?: string) => {
+    e.stopPropagation();
+    onReact?.(recipe.id, reaction, familyMemberId);
+  };
 
-  // Tooltip state with debounce
-  const [showDescTooltip, setShowDescTooltip] = useState(false);
-  const [showTagsTooltip, setShowTagsTooltip] = useState(false);
-  const [tagsTooltipPosition, setTagsTooltipPosition] = useState({ top: 0, left: 0 });
-  const descTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const tagsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const tagsRef = useRef<HTMLDivElement | null>(null);
-  const listTagsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!showReactionPopover) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (reactionPopoverRef.current && !reactionPopoverRef.current.contains(e.target as Node)) {
+        setShowReactionPopover(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showReactionPopover]);
 
   useEffect(() => {
     return () => {
-      if (descTimeoutRef.current) clearTimeout(descTimeoutRef.current);
-      if (tagsTimeoutRef.current) clearTimeout(tagsTimeoutRef.current);
+      if (reactionTimeoutRef.current) clearTimeout(reactionTimeoutRef.current);
     };
   }, []);
 
-  const handleDescMouseEnter = () => {
-    if (descTimeoutRef.current) clearTimeout(descTimeoutRef.current);
-    descTimeoutRef.current = setTimeout(() => {
-      setShowDescTooltip(true);
-    }, 1000);
+  // ── Shared sub-components ──
+
+  const ReactionBadges = ({ size = "sm" }: { size?: "sm" | "md" }) => {
+    if (!hasReactions) return null;
+    const iconSize = size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5";
+    const textSize = size === "sm" ? "text-[11px]" : "text-xs";
+    const px = size === "sm" ? "px-1.5 py-0.5" : "px-2 py-1";
+
+    return (
+      <div className="flex items-center gap-1.5">
+        {thumbsUp.length > 0 && (
+          <div
+            className={`relative inline-flex items-center gap-1 ${px} rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 cursor-default`}
+            onMouseEnter={() => handleReactionMouseEnter("up")}
+            onMouseLeave={handleReactionMouseLeave}
+          >
+            <ThumbsUp className={`${iconSize} text-emerald-500 dark:text-emerald-400`} />
+            <span className={`${textSize} font-semibold text-emerald-600 dark:text-emerald-300`}>{thumbsUp.length}</span>
+            {showReactionTooltip === "up" && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
+                {thumbsUp.map((r) => r.name).join(", ")}
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 dark:bg-gray-100 rotate-45" />
+              </div>
+            )}
+          </div>
+        )}
+        {thumbsDown.length > 0 && (
+          <div
+            className={`relative inline-flex items-center gap-1 ${px} rounded-full bg-rose-500/10 dark:bg-rose-400/10 cursor-default`}
+            onMouseEnter={() => handleReactionMouseEnter("down")}
+            onMouseLeave={handleReactionMouseLeave}
+          >
+            <ThumbsDown className={`${iconSize} text-rose-500 dark:text-rose-400`} />
+            <span className={`${textSize} font-semibold text-rose-600 dark:text-rose-300`}>{thumbsDown.length}</span>
+            {showReactionTooltip === "down" && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
+                {thumbsDown.map((r) => r.name).join(", ")}
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 dark:bg-gray-100 rotate-45" />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
-  const handleDescMouseLeave = () => {
-    if (descTimeoutRef.current) clearTimeout(descTimeoutRef.current);
-    setShowDescTooltip(false);
+  const ReactionButtons = ({ compact = false }: { compact?: boolean }) => {
+    if (!onReact) return null;
+    const btnSize = compact ? "w-7 h-7" : "w-8 h-8";
+    const iconSize = compact ? "h-3.5 w-3.5" : "h-4 w-4";
+
+    return (
+      <div className="flex items-center gap-1" ref={reactionPopoverRef}>
+        <button
+          onClick={(e) => handleReactionClick(e, "thumbs_up")}
+          className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-500/20 hover:scale-110 active:scale-95 transition-all duration-150`}
+          title="Thumbs up"
+        >
+          <ThumbsUp className={`${iconSize} text-emerald-600 dark:text-emerald-400`} />
+        </button>
+        <button
+          onClick={(e) => handleReactionClick(e, "thumbs_down")}
+          className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:scale-110 active:scale-95 transition-all duration-150`}
+          title="Thumbs down"
+        >
+          <ThumbsDown className={`${iconSize} text-rose-500 dark:text-rose-400`} />
+        </button>
+        {dependents.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowReactionPopover(!showReactionPopover); }}
+              className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-primary-50 dark:hover:bg-primary-500/20 hover:scale-110 active:scale-95 transition-all duration-150`}
+              title="React for family member"
+            >
+              <Users className={`${iconSize} text-slate-500 dark:text-slate-400`} />
+            </button>
+            {showReactionPopover && (
+              <div
+                className="absolute bottom-full left-0 mb-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-white/10 py-1.5 min-w-[200px] z-[100] animate-scale-in origin-bottom-left"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">React for</div>
+                {dependents.map((dep) => (
+                  <div key={dep.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{dep.name}</span>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={(e) => { handleReactionClick(e, "thumbs_up", dep.id); setShowReactionPopover(false); }}
+                        className="w-7 h-7 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 flex items-center justify-center transition-colors"
+                      >
+                        <ThumbsUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      </button>
+                      <button
+                        onClick={(e) => { handleReactionClick(e, "thumbs_down", dep.id); setShowReactionPopover(false); }}
+                        className="w-7 h-7 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center transition-colors"
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
-  const handleTagsMouseEnter = (ref: React.RefObject<HTMLDivElement>) => {
-    if (tagsTimeoutRef.current) clearTimeout(tagsTimeoutRef.current);
-    tagsTimeoutRef.current = setTimeout(() => {
-      const elementRef = ref.current || tagsRef.current;
-      if (elementRef) {
-        const rect = elementRef.getBoundingClientRect();
-        setTagsTooltipPosition({
-          top: rect.bottom + window.scrollY + 4,
-          left: rect.left + window.scrollX,
-        });
-      }
-      setShowTagsTooltip(true);
-    }, 1000);
-  };
-
-  const handleTagsMouseLeave = () => {
-    if (tagsTimeoutRef.current) clearTimeout(tagsTimeoutRef.current);
-    setShowTagsTooltip(false);
-  };
-
+  // ── List View ──
   if (viewMode === "list") {
     return (
-      <div onClick={onClick} className="group">
-        <Card className="cursor-pointer hover:shadow-xl transition-all duration-300 border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800 group-hover:scale-[1.02] p-0">
-          <CardContent className="p-[10px]">
-            <div className="flex items-center gap-6">
-              {/* Enhanced Recipe Image */}
-              <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 flex-shrink-0 overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-                {recipe.imageUrl ? (
-                  <img
-                    src={recipe.imageUrl}
-                    alt={recipe.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    loading="lazy"
-                    onError={(e) => {
-                      // Hide broken images gracefully
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <ChefHat className="h-10 w-10 text-slate-400 dark:text-slate-500" />
-                  </div>
-                )}
-                {familyConsensus && (
-                  <div className="absolute -top-2 -right-2">
-                    <Badge
-                      variant={
-                        familyConsensus === "love" ? "default" : "secondary"
-                      }
-                      className="text-xs shadow-lg"
-                    >
-                      {familyConsensus === "love" && (
-                        <Star className="h-3 w-3 mr-1" />
-                      )}
-                      {familyConsensus}
-                    </Badge>
-                  </div>
-                )}
+      <div onClick={onClick} className="group cursor-pointer">
+        <div className="flex items-stretch gap-4 p-3 rounded-2xl bg-white/60 dark:bg-white/[0.03] border border-gray-200/60 dark:border-white/[0.06] hover:bg-white dark:hover:bg-white/[0.05] hover:shadow-lg hover:shadow-black/[0.04] dark:hover:shadow-black/20 hover:border-gray-300/60 dark:hover:border-white/[0.1] transition-all duration-300">
+          {/* Image */}
+          <div className="relative w-28 h-28 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-stone-100 to-stone-200/80 dark:from-gray-800 dark:to-gray-700">
+            {recipe.imageUrl ? (
+              <img
+                src={recipe.imageUrl}
+                alt={recipe.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                loading="lazy"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <ChefHat className="h-10 w-10 text-stone-300 dark:text-gray-600" />
               </div>
-
-              {/* Enhanced Recipe Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-xl text-slate-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200" title={recipe.title}>
-                      {displayTitle}
-                    </h3>
-                    {recipe.description && (
-                      <div
-                        className="relative"
-                        onMouseEnter={handleDescMouseEnter}
-                        onMouseLeave={handleDescMouseLeave}
-                      >
-                        <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 mt-2 leading-relaxed cursor-help">
-                          {recipe.description}
-                        </p>
-                        {showDescTooltip && (
-                          <div className="absolute left-0 top-full mt-1 z-[100] bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm rounded-lg px-3 py-2 shadow-xl max-w-xs whitespace-normal break-words">
-                            {recipe.description}
-                            <div className="absolute -top-1 left-4 w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45"></div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    {onEdit && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit(recipe);
-                        }}
-                        className="h-8 w-8 p-0 hover:bg-primary-100 dark:hover:bg-primary-900/30"
-                      >
-                        <Edit className="h-4 w-4 text-primary-600 dark:text-primary-400" />
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(recipe.id);
-                        }}
-                        className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/30"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Enhanced Recipe Meta */}
-                <div className="flex items-center gap-6 mb-3">
-                  {totalTime > 0 && (
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                      <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-                        <Clock className="h-4 w-4 text-primary-600 dark:text-primary-400" />
-                      </div>
-                      <span className="font-medium">{totalTime} min</span>
-                    </div>
-                  )}
-                  {recipe.servings && (
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                      <div className="w-8 h-8 bg-secondary-100 dark:bg-secondary-900/30 rounded-lg flex items-center justify-center">
-                        <Users className="h-4 w-4 text-secondary-600 dark:text-secondary-400" />
-                      </div>
-                      <span className="font-medium">
-                        {recipe.servings} servings
-                      </span>
-                    </div>
-                  )}
-                  {recipe.difficulty && (
-                    <Badge
-                      variant="outline"
-                      className={`text-xs font-medium ${getDifficultyColor(
-                        recipe.difficulty
-                      )} border-0`}
-                    >
-                      {recipe.difficulty}
-                    </Badge>
-                  )}
-                  {recipe.rating && (
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                      <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      </div>
-                      <span className="font-medium">
-                        {recipe.rating.toFixed(1)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Enhanced Tags */}
-                <div className="flex items-center justify-end">
-                  {recipe.tags && recipe.tags.length > 0 && (
-                    <div
-                      ref={listTagsRef}
-                      className="relative"
-                      onMouseEnter={() => handleTagsMouseEnter(listTagsRef)}
-                      onMouseLeave={handleTagsMouseLeave}
-                    >
-                      <div className="flex gap-1 cursor-help">
-                        {recipe.tags.slice(0, 2).map((tag, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
-                        {recipe.tags.length > 2 && (
-                          <Badge
-                            variant="secondary"
-                            className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
-                          >
-                            +{recipe.tags.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {recipe.tags && recipe.tags.length > 2 && showTagsTooltip && (
-                  <div
-                    className="fixed z-[9999] bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs rounded-lg px-3 py-2 shadow-xl max-w-xs whitespace-normal"
-                    style={{
-                      top: `${tagsTooltipPosition.top}px`,
-                      left: `${tagsTooltipPosition.left}px`,
-                    }}
-                  >
-                    <div className="font-semibold mb-1">All Tags:</div>
-                    <div className="flex flex-wrap gap-1">
-                      {recipe.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="inline-block bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-2 py-0.5 rounded"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45"></div>
-                  </div>
-                )}
+            )}
+            {/* Time chip on image */}
+            {totalTime > 0 && (
+              <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm">
+                <Clock className="h-3 w-3 text-white/80" />
+                <span className="text-[11px] font-medium text-white">{totalTime}m</span>
               </div>
+            )}
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+            {/* Top: title + actions */}
+            <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white leading-snug truncate" title={recipe.title}>
+                    {recipe.title}
+                  </h3>
+                  {recipe.author && (
+                    <p className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
+                      @{recipe.author.username || recipe.author.displayName}
+                    </p>
+                  )}
+                </div>
+                {/* Hover actions */}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
+                  <ReactionButtons compact />
+                  {onEdit && (
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(recipe); }} className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center transition-colors" title="Edit">
+                      <Edit className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(recipe.id); }} className="w-7 h-7 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center justify-center transition-colors" title="Delete">
+                      <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-rose-500 dark:text-gray-500 dark:hover:text-rose-400 transition-colors" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {recipe.description && (
+                <p className="text-[13px] text-gray-500 dark:text-gray-400 line-clamp-2 mt-1 leading-relaxed">
+                  {recipe.description}
+                </p>
+              )}
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Bottom: meta + reactions */}
+            <div className="flex items-center justify-between gap-3 mt-auto">
+              <div className="flex items-center gap-3 text-[12px] text-gray-400 dark:text-gray-500">
+                {recipe.servings && (
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3 w-3" /> {recipe.servings}
+                  </span>
+                )}
+                {recipe.difficulty && (
+                  <span className={`flex items-center gap-1 ${difficultyConfig[recipe.difficulty]?.color || ""}`}>
+                    <Flame className="h-3 w-3" /> {difficultyConfig[recipe.difficulty]?.label}
+                  </span>
+                )}
+                {recipe.tags && recipe.tags.length > 0 && (
+                  <span className="text-gray-300 dark:text-gray-600">|</span>
+                )}
+                {recipe.tags && recipe.tags.slice(0, 2).map((tag, i) => (
+                  <span key={i} className="text-gray-400 dark:text-gray-500">{tag}</span>
+                ))}
+                {recipe.tags && recipe.tags.length > 2 && (
+                  <span className="text-gray-300 dark:text-gray-600">+{recipe.tags.length - 2}</span>
+                )}
+              </div>
+              <ReactionBadges size="sm" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Grid view
+  // ── Grid View ──
   return (
-    <div onClick={onClick} className="group h-full">
-      <Card className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800 h-full group-hover:scale-[1.03] group-hover:-translate-y-1 overflow-hidden p-0">
-        {/* Enhanced Recipe Image - Edge to Edge */}
-        <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
+    <div onClick={onClick} className="group h-full cursor-pointer">
+      <div className="h-full rounded-2xl overflow-hidden bg-white dark:bg-white/[0.03] border border-gray-200/60 dark:border-white/[0.06] hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:border-gray-300/80 dark:hover:border-white/[0.1] hover:-translate-y-1 transition-all duration-300 flex flex-col">
+        {/* Image area */}
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-stone-100 via-stone-50 to-stone-200/80 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700">
           {recipe.imageUrl ? (
             <img
               src={recipe.imageUrl}
               alt={recipe.title}
               loading="lazy"
-              onError={(e) => {
-                // Hide broken images gracefully
-                e.currentTarget.style.display = "none";
-              }}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center">
-              <ChefHat className="h-16 w-16 text-slate-400 dark:text-slate-500" />
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+              <div className="w-16 h-16 rounded-2xl bg-white/40 dark:bg-white/[0.06] flex items-center justify-center">
+                <ChefHat className="h-8 w-8 text-stone-300 dark:text-gray-600" />
+              </div>
             </div>
           )}
 
-          {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          {/* Gradient scrim for overlaid text */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-transparent pointer-events-none" />
 
-          {/* Family Consensus Badge */}
-          {familyConsensus && (
-            <div className="absolute top-2 right-2">
-              <Badge
-                variant={familyConsensus === "love" ? "default" : "secondary"}
-                className="text-xs shadow-lg backdrop-blur-sm"
-              >
-                {familyConsensus === "love" && (
-                  <Star className="h-3 w-3 mr-1" />
-                )}
-                {familyConsensus}
-              </Badge>
+          {/* Top-right: difficulty badge */}
+          {recipe.difficulty && (
+            <div className={`absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-1 rounded-lg ${difficultyConfig[recipe.difficulty]?.bg} backdrop-blur-md`}>
+              <Flame className={`h-3 w-3 ${difficultyConfig[recipe.difficulty]?.color}`} />
+              <span className={`text-[11px] font-semibold ${difficultyConfig[recipe.difficulty]?.color}`}>
+                {difficultyConfig[recipe.difficulty]?.label}
+              </span>
+            </div>
+          )}
+
+          {/* Bottom-left: time + servings overlaid on image */}
+          <div className="absolute bottom-2.5 left-2.5 flex items-center gap-2">
+            {totalTime > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md">
+                <Clock className="h-3 w-3 text-white/80" />
+                <span className="text-[11px] font-medium text-white/90">{totalTime}m</span>
+              </div>
+            )}
+            {recipe.servings && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md">
+                <Users className="h-3 w-3 text-white/80" />
+                <span className="text-[11px] font-medium text-white/90">{recipe.servings}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom-right: hover reaction buttons */}
+          {onReact && (
+            <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+              <ReactionButtons compact />
+            </div>
+          )}
+
+          {/* Top-left: hover edit/delete */}
+          {(onEdit || onDelete) && (
+            <div className="absolute top-2.5 left-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+              {onEdit && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit(recipe); }}
+                  className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-white dark:hover:bg-white/20 hover:scale-110 active:scale-95 transition-all duration-150"
+                  title="Edit"
+                >
+                  <Edit className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(recipe.id); }}
+                  className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:scale-110 active:scale-95 transition-all duration-150"
+                  title="Delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-gray-600 hover:text-rose-500 dark:text-gray-300 dark:hover:text-rose-400 transition-colors" />
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        <CardContent className="p-[10px]">
-          {/* Enhanced Title with Actions */}
-          <div className="mb-2">
-            <div className="flex items-start justify-between gap-2 mb-1.5">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200 leading-tight flex-1 min-w-0" title={recipe.title}>
-                {displayTitle}
-              </h3>
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
-                {onEdit && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(recipe);
-                    }}
-                    className="h-6 w-6 p-0 hover:bg-primary-100 dark:hover:bg-primary-900/30"
-                  >
-                    <Edit className="h-3 w-3 text-primary-600 dark:text-primary-400" />
-                  </Button>
-                )}
-                {onDelete && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(recipe.id);
-                    }}
-                    className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-900/30"
-                  >
-                    <Trash2 className="h-3 w-3 text-red-600 dark:text-red-400" />
-                  </Button>
-                )}
-              </div>
-            </div>
-            {recipe.description && (
-              <div
-                className="relative"
-                onMouseEnter={handleDescMouseEnter}
-                onMouseLeave={handleDescMouseLeave}
-              >
-                <p className="text-slate-600 dark:text-slate-400 text-xs line-clamp-2 leading-relaxed cursor-help mb-2">
-                  {recipe.description}
-                </p>
-                {showDescTooltip && (
-                  <div className="absolute left-0 top-full mt-1 z-[100] bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs rounded-lg px-3 py-2 shadow-xl max-w-xs whitespace-normal break-words">
-                    {recipe.description}
-                    <div className="absolute -top-1 left-4 w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45"></div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        {/* Content area */}
+        <div className="flex flex-col flex-1 px-3.5 pt-3 pb-3">
+          {/* Title */}
+          <h3 className="font-semibold text-[15px] text-gray-900 dark:text-white leading-snug line-clamp-1" title={recipe.title}>
+            {recipe.title}
+          </h3>
 
-          {/* Enhanced Recipe Meta */}
-          <div className="flex items-center gap-2.5 mb-2 flex-wrap">
-            {totalTime > 0 && (
-              <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                <div className="w-4 h-4 bg-primary-100 dark:bg-primary-900/30 rounded flex items-center justify-center">
-                  <Clock className="h-2.5 w-2.5 text-primary-600 dark:text-primary-400" />
-                </div>
-                <span className="text-xs font-medium">{totalTime}m</span>
-              </div>
-            )}
-            {recipe.servings && (
-              <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                <div className="w-4 h-4 bg-secondary-100 dark:bg-secondary-900/30 rounded flex items-center justify-center">
-                  <Users className="h-2.5 w-2.5 text-secondary-600 dark:text-secondary-400" />
-                </div>
-                <span className="text-xs font-medium">{recipe.servings}</span>
-              </div>
-            )}
-            {recipe.difficulty && (
-              <Badge
-                variant="outline"
-                className={`text-xs font-medium px-1.5 py-0.5 ${getDifficultyColor(
-                  recipe.difficulty
-                )} border-0`}
-              >
-                {recipe.difficulty}
-              </Badge>
-            )}
-            {recipe.rating && (
-              <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                <div className="w-4 h-4 bg-yellow-100 dark:bg-yellow-900/30 rounded flex items-center justify-center">
-                  <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-                </div>
-                <span className="text-xs font-medium">
-                  {recipe.rating.toFixed(1)}
+          {/* Author */}
+          {recipe.author && (
+            <p className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
+              @{recipe.author.username || recipe.author.displayName}
+            </p>
+          )}
+
+          {/* Description */}
+          {recipe.description && (
+            <p className="text-[12px] text-gray-500 dark:text-gray-400 line-clamp-2 mt-1.5 leading-relaxed">
+              {recipe.description}
+            </p>
+          )}
+
+          {/* Spacer */}
+          <div className="mt-auto" />
+
+          {/* Footer: tags + reactions */}
+          <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-gray-100 dark:border-white/[0.04]">
+            {/* Tags */}
+            <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
+              {recipe.tags && recipe.tags.slice(0, 2).map((tag, i) => (
+                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/[0.06] text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate max-w-[80px]">
+                  {tag}
                 </span>
-              </div>
-            )}
-          </div>
-
-          {/* Enhanced Tags */}
-          {recipe.tags && recipe.tags.length > 0 && (
-            <div className="flex items-center gap-1 flex-wrap">
-              <div
-                ref={tagsRef}
-                className="relative"
-                onMouseEnter={() => handleTagsMouseEnter(tagsRef)}
-                onMouseLeave={handleTagsMouseLeave}
-              >
-                <div className="flex gap-1 cursor-help">
-                  {recipe.tags.slice(0, 3).map((tag, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                  {recipe.tags.length > 3 && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
-                    >
-                      +{recipe.tags.length - 3}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              {recipe.tags && recipe.tags.length > 3 && showTagsTooltip && (
-                <div 
-                  className="fixed z-[9999] bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs rounded-lg px-3 py-2 shadow-xl max-w-xs whitespace-normal"
-                  style={{
-                    top: `${tagsTooltipPosition.top}px`,
-                    left: `${tagsTooltipPosition.left}px`,
-                  }}
-                >
-                  <div className="font-semibold mb-1">All Tags:</div>
-                  <div className="flex flex-wrap gap-1">
-                    {recipe.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="inline-block bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-2 py-0.5 rounded"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="absolute -top-1 left-4 w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45"></div>
-                </div>
+              ))}
+              {recipe.tags && recipe.tags.length > 2 && (
+                <span className="text-[11px] text-gray-300 dark:text-gray-600 font-medium flex-shrink-0">
+                  +{recipe.tags.length - 2}
+                </span>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Reaction counts */}
+            <ReactionBadges size="sm" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

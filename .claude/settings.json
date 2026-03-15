@@ -12,7 +12,15 @@
       "WebSearch",
       "Bash(npm run:*)",
       "Read(//c/Users/nickn/AppData/Local/Temp/claude/c--dev-MealPrep-Agent/90654cd7-049e-4107-a143-2d7a927e2462/tasks/**)",
-      "Bash(ls c:/dev/MealPrep-Agent/supabase/migrations/0*.sql)"
+      "Bash(ls c:/dev/MealPrep-Agent/supabase/migrations/0*.sql)",
+      "Bash(grep -l recipes /c/dev/MealPrep-Agent/supabase/migrations/20260313000001_*)",
+      "Bash(grep -n \"CREATE TABLE profiles\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
+      "Bash(grep -l \"profiles\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
+      "Bash(grep -n \"username\\\\|setup_completed\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
+      "Bash(find /c/dev/MealPrep-Agent/src -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
+      "Bash(find /c/dev/MealPrep-Agent -path */supabase/functions/household-invite* -type f)",
+      "Bash(ls -ltr /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
+      "Bash(grep -l \"accept_invite\\\\|join_household\\\\|create_household\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)"
     ],
     "additionalDirectories": [
       "C:\\Users\\nickn\\.claude"

@@ -2,10 +2,60 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (deprecation cleanup — migration 013)
+**Last reviewed:** 2026-03-14
+**Last updated:** 2026-03-14 (feature release: invites, reactions, admin, setup, RPC optimization)
 
 ---
+
+## 2026-03-14 (RPC optimization — migration 025) `enhancement/feature-release`
+
+- Converted 5 multi-query API methods to single PostgreSQL RPC function calls, reducing database round trips (14 total queries → 5)
+- New `SECURITY DEFINER` functions: `get_my_household`, `toggle_recipe_reaction`, `get_household_recipes`, `get_recipe_reactions`, `get_my_pending_invites`
+- `toggle_recipe_reaction` is now atomic, eliminating race conditions in the previous check-then-write pattern
+- Added household member profile visibility RLS policy (migration 024) — household members can now see each other's profiles
+
+## 2026-03-14 (Household recipes & visibility fixes) `enhancement/feature-release`
+
+- Added "Household" feed tab on Recipes page showing recipes shared with visibility `household` by household members
+- Fixed household recipes to include the sharing user's own recipes (previously excluded via `.neq("user_id")` filter)
+- Fixed household feed to only show `household` visibility recipes (previously included `public`)
+- Fixed recipe deletion in collection view — now calls `removeRecipeFromCollection()` instead of `deleteRecipe()`
+- Edit/delete buttons hidden for recipes the user doesn't own (except collection remove)
+- Changed "Family Members" section title to "Dietary Profiles" on Household page
+
+## 2026-03-13 (Invite flow, signup, and admin panel) `enhancement/feature-release`
+
+- Added `household-invite` edge function for creating invites and sending emails via `supabase.auth.admin.inviteUserByEmail()`
+- Added `/invite/accept` page with invite details, sign-in/sign-up routing, and auto-accept on authentication
+- Invite email pre-filled and locked on signup form when accepting an invite (via sessionStorage)
+- Added `/complete-setup` page for new users to set display name, username, and password (redirects until `setup_completed = true`)
+- Added username field to profiles (3-30 chars, lowercase alphanumeric + underscores, unique) — migration 014
+- Added `setup_completed` flag to profiles — migration 020
+- Fixed `handle_new_user()` trigger to include email field — migration 023
+- Fixed `.single()` → `.maybeSingle()` on profile fetch to prevent 406 errors when profile doesn't exist yet
+- Added Cancel button on CompleteSetup that signs out and navigates to login
+- Fixed CompleteSetup scroll issue (sealed height chain compliance: `h-full overflow-y-auto` instead of `min-h-screen`)
+- Added `/admin` page with AdminRoute guard — user/invite/household management for admin role
+- Added `admin-api` edge function for admin operations (CRUD on users, invites, households)
+- Admin RLS policies added — migration 021, 022
+
+## 2026-03-13 (Recipe reactions) `enhancement/feature-release`
+
+- Added `recipe_reactions` table (migration 017) supporting thumbs up/down from authenticated users and dependents
+- Added reaction UI on RecipeCard with animated toggle buttons
+- Both authenticated users and family member dependents can react
+- Each person can have one reaction per recipe (same reaction toggles off, different reaction updates)
+- Added `getRecipeReactions()` and `toggleRecipeReaction()` API methods with React Query hooks
+
+## 2026-03-13 (Recipe visibility and user profiles) `enhancement/feature-release`
+
+- Added `username` column to profiles with unique constraint (migration 014)
+- Added unique recipe title per user constraint (migration 014)
+- Fixed recipe RLS auth policies (migration 015)
+- Removed default "My Recipes" collection auto-creation (migration 016)
+- Added Public Recipes feed with author attribution (@username, avatar)
+- Added Household page with member management, invite sending, and dependent (dietary profile) management
+- Added recipe visibility display on RecipeCard and RecipeDetail
 
 ## 2026-03-12 (Deprecation cleanup — migration 013) `enhancement/chat`
 

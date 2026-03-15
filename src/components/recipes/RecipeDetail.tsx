@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useMeasurementSystem } from '@/contexts/MeasurementSystemContext'
@@ -66,6 +67,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
 }) => {
   const [isImageFullscreen, setIsImageFullscreen] = useState(false)
   const [showAllIngredients, setShowAllIngredients] = useState(false)
+  const [localVisibility, setLocalVisibility] = useState<RecipeVisibility>(recipe.visibility || 'private')
   const { system } = useMeasurementSystem()
   const updateVisibility = useUpdateRecipeVisibility()
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0)
@@ -149,8 +151,20 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           )}
           <AddToCollectionMenu recipeId={recipe.id} size="sm" />
           <VisibilityPicker
-            value={recipe.visibility || 'private'}
-            onChange={(v) => updateVisibility.mutate({ recipeId: recipe.id, visibility: v })}
+            value={localVisibility}
+            onChange={(v) => {
+              const prev = localVisibility
+              setLocalVisibility(v)
+              updateVisibility.mutate({ recipeId: recipe.id, visibility: v }, {
+                onSuccess: () => {
+                  toast.success(`Recipe set to ${v}`)
+                },
+                onError: (err: any) => {
+                  toast.error(err?.message || 'Failed to update visibility')
+                  setLocalVisibility(prev)
+                },
+              })
+            }}
             size="sm"
           />
         </div>

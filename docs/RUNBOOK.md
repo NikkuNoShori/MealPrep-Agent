@@ -2,8 +2,8 @@
 
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
-**Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (added migration dependency order entry)
+**Last reviewed:** 2026-03-14
+**Last updated:** 2026-03-14 (added household member names, invite email, setup flow, RPC function entries)
 
 ---
 
@@ -526,3 +526,134 @@ SELECT policyname, qual, with_check FROM pg_policies WHERE tablename = 'recipes'
 4. Then push again: `supabase db push`
 
 **Added:** 2026-03-12
+
+---
+
+## Household: Members show as "Unknown"
+
+### Symptom
+- Household page shows member names as "Unknown" instead of actual display names
+- Member avatars don't load
+- Own profile shows correctly, other members do not
+
+### Likely causes
+- Profiles RLS policy only allows viewing own profile — cross-household profile reads are blocked
+- Migration 024 (`household_member_profile_visibility`) not applied
+
+### Verification steps
+```sql
+-- Check if the cross-household profile visibility policy exists
+SELECT policyname FROM pg_policies
+WHERE tablename = 'profiles'
+  AND policyname LIKE '%household%';
+
+-- Should return: "Household members can view each other's profiles"
+```
+
+### Fix steps
+1. Apply migration 024 which adds the household member profile visibility policy
+2. Alternatively, RPC functions using `SECURITY DEFINER` (migration 025) bypass RLS entirely for profile reads
+
+**Added:** 2026-03-14
+
+---
+
+## Household: Invite email not received
+
+### Symptom
+- Owner sends invite but invitee never receives email
+- Invite row exists in `household_invites` with status `pending`
+- No error shown in the UI
+
+### Likely causes
+- Supabase email sending limits reached (free tier: ~4 emails/hour)
+- Email provider blocking Supabase transactional emails
+- `household-invite` edge function not deployed
+- `SUPABASE_SERVICE_ROLE_KEY` not set in edge function secrets (needed for `auth.admin.inviteUserByEmail()`)
+
+### Verification steps
+```sql
+-- Check invite was created
+SELECT id, invited_email, status, created_at
+FROM household_invites
+WHERE household_id = '<household-uuid>'
+ORDER BY created_at DESC;
+```
+```bash
+# Check edge function logs
+supabase functions logs household-invite --project-ref <project-ref>
+```
+
+### Fix steps
+1. Verify edge function is deployed: `supabase functions deploy household-invite`
+2. Set service role key: `supabase secrets set SUPABASE_SERVICE_ROLE_KEY=<key>`
+3. Check Supabase Dashboard → Authentication → Email Templates for invite template
+4. For testing, check spam folder; Supabase default sender may be flagged
+
+**Added:** 2026-03-14
+
+---
+
+## Auth: User stuck on Complete Setup page
+
+### Symptom
+- User completes the setup form but is redirected back to `/complete-setup`
+- User cannot access the app after signing up
+- `setup_completed` remains `false` in profiles
+
+### Likely causes
+- Profile upsert in CompleteSetup failed silently
+- `setup_completed` column missing (migration 020 not applied)
+- `ProtectedRoute` redirect loop when `setup_completed = false`
+
+### Verification steps
+```sql
+-- Check user's setup status
+SELECT id, email, display_name, username, setup_completed
+FROM profiles
+WHERE email = '<user-email>';
+```
+
+### Fix steps
+1. If `setup_completed` column missing, apply migration 020
+2. Manually fix for a specific user:
+```sql
+UPDATE profiles SET setup_completed = true WHERE email = '<user-email>';
+```
+3. Check browser console for errors during the setup form submission
+
+**Added:** 2026-03-14
+
+---
+
+## Household: RPC functions return errors after migration
+
+### Symptom
+- Household page, recipe reactions, or invite pages fail with "function does not exist" error
+- Console shows `42883` PostgreSQL error code
+- App worked before with multi-query approach
+
+### Likely causes
+- Migration 025 (RPC functions) not applied to the database
+- Frontend code updated but database not yet migrated
+
+### Verification steps
+```sql
+-- Check if RPC functions exist
+SELECT proname FROM pg_proc
+WHERE proname IN (
+  'get_my_household',
+  'toggle_recipe_reaction',
+  'get_household_recipes',
+  'get_recipe_reactions',
+  'get_my_pending_invites'
+);
+-- Should return 5 rows
+```
+
+### Fix steps
+1. Apply migration 025: `supabase db push` or run the SQL in Supabase SQL Editor
+2. Verify all 5 functions exist with the query above
+3. Verify grants: `SELECT * FROM information_schema.routine_privileges WHERE routine_name = 'get_my_household';`
+
+**Added:** 2026-03-14

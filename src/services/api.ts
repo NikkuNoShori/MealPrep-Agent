@@ -857,44 +857,10 @@ class ApiClient {
   // ── Household endpoints ──
 
   async getMyHousehold() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    // Get the first household this user belongs to (v1 assumes one household per user)
-    // Note: "as any" casts needed until supabase types are regenerated with new tables
-    const { data: membership, error: memError } = await (supabase
-      .from("household_members") as any)
-      .select("household_id, role, households(id, name, created_by, created_at, updated_at)")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (memError) throw memError;
-    if (!membership) return null;
-
-    // Get all members of this household
-    const { data: members, error: membersError } = await (supabase
-      .from("household_members") as any)
-      .select("id, user_id, role, joined_at, profiles(id, email, display_name, avatar_url)")
-      .eq("household_id", membership.household_id);
-
-    if (membersError) throw membersError;
-
-    // Get dependents (family_members) in this household
-    const { data: dependents, error: depsError } = await (supabase
-      .from("family_members") as any)
-      .select("*")
-      .eq("household_id", membership.household_id)
-      .eq("is_active", true);
-
-    if (depsError) throw depsError;
-
-    return {
-      household: snakeToCamel(membership.households),
-      myRole: membership.role,
-      members: (members || []).map((m: any) => snakeToCamel(m)),
-      dependents: (dependents || []).map((d: any) => snakeToCamel(d)),
-    };
+    const { data, error } = await (supabase.rpc as any)('get_my_household');
+    if (error) throw error;
+    if (!data) return null;
+    return snakeToCamel(data);
   }
 
   async updateHousehold(householdId: string, data: { name: string }) {
@@ -910,44 +876,36 @@ class ApiClient {
   }
 
   async createHouseholdInvite(householdId: string, email: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    return this.request<any>(`${SUPABASE_FUNCTIONS_URL}/household-invite/send`, {
+      method: "POST",
+      body: JSON.stringify({ householdId, email, origin: window.location.origin }),
+    });
+  }
 
-    const { data: invite, error } = await (supabase
-      .from("household_invites") as any)
-      .insert({
-        household_id: householdId,
-        invited_by: user.id,
-        invited_email: email,
-      })
-      .select()
-      .single();
+  async getInviteDetails(inviteId: string) {
+    return this.request<any>(
+      `${SUPABASE_FUNCTIONS_URL}/household-invite/details?id=${encodeURIComponent(inviteId)}`
+    );
+  }
 
-    if (error) throw error;
-    return snakeToCamel(invite);
+  async acceptInviteById(inviteId: string) {
+    return this.request<any>(`${SUPABASE_FUNCTIONS_URL}/household-invite/accept`, {
+      method: "POST",
+      body: JSON.stringify({ inviteId }),
+    });
+  }
+
+  async resendHouseholdInvite(inviteId: string) {
+    return this.request<any>(`${SUPABASE_FUNCTIONS_URL}/household-invite/resend`, {
+      method: "POST",
+      body: JSON.stringify({ inviteId, origin: window.location.origin }),
+    });
   }
 
   async getMyPendingInvites() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    // Get user's email to find invites
-    const { data: profile } = await (supabase
-      .from("profiles") as any)
-      .select("email")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile) return [];
-
-    const { data: invites, error } = await (supabase
-      .from("household_invites") as any)
-      .select("*, households(id, name)")
-      .eq("invited_email", (profile as any).email)
-      .eq("status", "pending");
-
+    const { data, error } = await (supabase.rpc as any)('get_my_pending_invites');
     if (error) throw error;
-    return (invites || []).map((i: any) => snakeToCamel(i));
+    return (data || []).map((i: any) => snakeToCamel(i));
   }
 
   async respondToInvite(inviteId: string, accept: boolean) {
@@ -980,15 +938,159 @@ class ApiClient {
     return snakeToCamel(invite);
   }
 
-  async updateRecipeVisibility(recipeId: string, visibility: 'private' | 'household' | 'public') {
+  // ── Household Member Management ──
+
+  async updateMemberRole(memberId: string, role: 'admin' | 'member') {
+    const { data, error } = await (supabase
+      .from("household_members") as any)
+      .update({ role })
+      .eq("id", memberId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async removeHouseholdMember(memberId: string) {
+    const { error } = await (supabase
+      .from("household_members") as any)
+      .delete()
+      .eq("id", memberId);
+
+    if (error) throw error;
+  }
+
+  async transferOwnership(memberId: string, householdId: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    // Promote target to owner
+    const { error: promoteError } = await (supabase
+      .from("household_members") as any)
+      .update({ role: 'owner' })
+      .eq("id", memberId);
+
+    if (promoteError) throw promoteError;
+
+    // Demote self to admin
+    const { error: demoteError } = await (supabase
+      .from("household_members") as any)
+      .update({ role: 'admin' })
+      .eq("household_id", householdId)
+      .eq("user_id", user.id);
+
+    if (demoteError) throw demoteError;
+  }
+
+  // ── Family Members (Dependents) ──
+
+  async createFamilyMember(data: {
+    householdId: string;
+    name: string;
+    relationship: string;
+    age?: number;
+    dietaryRestrictions?: string[];
+    allergies?: string[];
+    preferences?: Record<string, any>;
+  }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data: member, error } = await (supabase
+      .from("family_members") as any)
+      .insert({
+        household_id: data.householdId,
+        managed_by: user.id,
+        name: data.name,
+        relationship: data.relationship,
+        age: data.age || null,
+        dietary_restrictions: data.dietaryRestrictions || [],
+        allergies: data.allergies || [],
+        preferences: data.preferences || {},
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(member);
+  }
+
+  async updateFamilyMember(memberId: string, updates: {
+    name?: string;
+    relationship?: string;
+    age?: number | null;
+    dietaryRestrictions?: string[];
+    allergies?: string[];
+    preferences?: Record<string, any>;
+  }) {
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.relationship !== undefined) payload.relationship = updates.relationship;
+    if (updates.age !== undefined) payload.age = updates.age;
+    if (updates.dietaryRestrictions !== undefined) payload.dietary_restrictions = updates.dietaryRestrictions;
+    if (updates.allergies !== undefined) payload.allergies = updates.allergies;
+    if (updates.preferences !== undefined) payload.preferences = updates.preferences;
+
+    const { data: member, error } = await (supabase
+      .from("family_members") as any)
+      .update(payload)
+      .eq("id", memberId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(member);
+  }
+
+  async deleteFamilyMember(memberId: string) {
+    const { error } = await (supabase
+      .from("family_members") as any)
+      .update({ is_active: false })
+      .eq("id", memberId);
+
+    if (error) throw error;
+  }
+
+  // ── Recipe Reactions ──
+
+  async getRecipeReactions(recipeIds: string[]) {
+    if (recipeIds.length === 0) return [];
+
+    const { data, error } = await (supabase.rpc as any)('get_recipe_reactions', {
+      p_recipe_ids: recipeIds,
+    });
+    if (error) throw error;
+
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      recipeId: r.recipe_id,
+      userId: r.user_id,
+      familyMemberId: r.family_member_id,
+      reaction: r.reaction,
+      name: r.name || "Unknown",
+    }));
+  }
+
+  async toggleRecipeReaction(data: {
+    recipeId: string;
+    reaction: 'thumbs_up' | 'thumbs_down';
+    familyMemberId?: string;
+  }) {
+    const { data: result, error } = await (supabase.rpc as any)('toggle_recipe_reaction', {
+      p_recipe_id: data.recipeId,
+      p_reaction: data.reaction,
+      p_family_member_id: data.familyMemberId || null,
+    });
+    if (error) throw error;
+    return result;
+  }
+
+  async updateRecipeVisibility(recipeId: string, visibility: 'private' | 'household' | 'public') {
     const { error } = await (supabase
       .from("recipes") as any)
       .update({ visibility })
-      .eq("id", recipeId)
-      .eq("user_id", user.id);
+      .eq("id", recipeId);
 
     if (error) throw error;
     return { id: recipeId, visibility };
@@ -1088,6 +1190,155 @@ class ApiClient {
       .eq("recipe_id", recipeId);
 
     if (error) throw error;
+  }
+
+  // ── Household Recipes ──
+
+  async getHouseholdRecipes(params?: { limit?: number; offset?: number }) {
+    const { data, error } = await (supabase.rpc as any)('get_household_recipes', {
+      p_limit: params?.limit || 50,
+      p_offset: params?.offset || 0,
+    });
+    if (error) throw error;
+    if (!data) return { recipes: [], total: 0 };
+
+    const camelRecipes = (data.recipes || []).map((r: any) => {
+      const recipe = snakeToCamel(r);
+      if (r.profiles) {
+        recipe.author = {
+          displayName: r.profiles.display_name,
+          username: r.profiles.username,
+          avatarUrl: r.profiles.avatar_url,
+        };
+      }
+      return recipe;
+    });
+
+    return { recipes: camelRecipes, total: data.total };
+  }
+
+  // ── Public Recipes ──
+
+  async getPublicRecipes(params?: { limit?: number; offset?: number }) {
+    const limit = params?.limit || 50;
+    const offset = params?.offset || 0;
+
+    const { data, error } = await (supabase
+      .from("recipes") as any)
+      .select("*, profiles!recipes_user_id_fkey(display_name, username, avatar_url)")
+      .eq("visibility", "public")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const camelRecipes = (data || []).map((r: any) => {
+      const recipe = snakeToCamel(r);
+      // Flatten author info
+      if (r.profiles) {
+        recipe.author = {
+          displayName: r.profiles.display_name,
+          username: r.profiles.username,
+          avatarUrl: r.profiles.avatar_url,
+        };
+      }
+      return recipe;
+    });
+
+    return { recipes: camelRecipes, total: camelRecipes.length };
+  }
+
+  // ── Username / Profile ──
+
+  async getMyProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await (supabase
+      .from("profiles") as any)
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  // ── Admin Methods (via admin-api edge function) ──
+
+  async adminGetAllUsers() {
+    return this.request<any[]>(`${SUPABASE_FUNCTIONS_URL}/admin-api/users`, { method: "GET" });
+  }
+
+  async adminGetAllInvites() {
+    const data = await this.request<any[]>(`${SUPABASE_FUNCTIONS_URL}/admin-api/invites`, { method: "GET" });
+    return (data || []).map((i: any) => snakeToCamel(i));
+  }
+
+  async adminGetAllHouseholds() {
+    const data = await this.request<any[]>(`${SUPABASE_FUNCTIONS_URL}/admin-api/households`, { method: "GET" });
+    return (data || []).map((h: any) => snakeToCamel(h));
+  }
+
+  async adminDeleteUser(userId: string) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/users`, {
+      method: "DELETE",
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  async adminUpdateUser(userId: string, updates: { display_name?: string; setup_completed?: boolean }) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/users`, {
+      method: "PATCH",
+      body: JSON.stringify({ userId, updates: camelToSnake(updates) }),
+    });
+  }
+
+  async adminDeleteInvite(inviteId: string) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/invites`, {
+      method: "DELETE",
+      body: JSON.stringify({ inviteId }),
+    });
+  }
+
+  async adminRemoveHouseholdMember(memberId: string) {
+    // Keep using direct Supabase for member removal (RLS handles it)
+    const { error } = await (supabase
+      .from("household_members") as any)
+      .delete()
+      .eq("id", memberId);
+
+    if (error) throw error;
+  }
+
+  async adminDeleteHousehold(householdId: string) {
+    return this.request(`${SUPABASE_FUNCTIONS_URL}/admin-api/households`, {
+      method: "DELETE",
+      body: JSON.stringify({ householdId }),
+    });
+  }
+
+  async updateUsername(username: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Validate format
+    if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+      throw new Error("Username must be 3-30 characters, lowercase letters, numbers, and underscores only");
+    }
+
+    const { data, error } = await (supabase
+      .from("profiles") as any)
+      .update({ username })
+      .eq("id", user.id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') throw new Error("Username already taken");
+      throw error;
+    }
+    return snakeToCamel(data);
   }
 }
 
@@ -1287,6 +1538,107 @@ export const useRespondToInvite = () => {
   });
 };
 
+export const useAcceptInviteById = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (inviteId: string) => apiClient.acceptInviteById(inviteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+      queryClient.invalidateQueries({ queryKey: ["household-invites"] });
+    },
+  });
+};
+
+export const useResendHouseholdInvite = () => {
+  return useMutation({
+    mutationFn: (inviteId: string) => apiClient.resendHouseholdInvite(inviteId),
+  });
+};
+
+// ── Family Member Hooks ──
+
+export const useCreateFamilyMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      householdId: string;
+      name: string;
+      relationship: string;
+      age?: number;
+      dietaryRestrictions?: string[];
+      allergies?: string[];
+      preferences?: Record<string, any>;
+    }) => apiClient.createFamilyMember(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useUpdateFamilyMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ memberId, updates }: {
+      memberId: string;
+      updates: { name?: string; relationship?: string; age?: number | null; dietaryRestrictions?: string[]; allergies?: string[]; preferences?: Record<string, any> };
+    }) => apiClient.updateFamilyMember(memberId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useDeleteFamilyMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (memberId: string) => apiClient.deleteFamilyMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+// ── Household Member Management Hooks ──
+
+export const useUpdateMemberRole = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ memberId, role }: { memberId: string; role: 'admin' | 'member' }) =>
+      apiClient.updateMemberRole(memberId, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useRemoveHouseholdMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (memberId: string) => apiClient.removeHouseholdMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useTransferOwnership = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ memberId, householdId }: { memberId: string; householdId: string }) =>
+      apiClient.transferOwnership(memberId, householdId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
 export const useUpdateRecipeVisibility = () => {
   const queryClient = useQueryClient();
 
@@ -1295,6 +1647,7 @@ export const useUpdateRecipeVisibility = () => {
       apiClient.updateRecipeVisibility(recipeId, visibility),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
+      queryClient.invalidateQueries({ queryKey: ["public-recipes"] });
     },
   });
 };
@@ -1382,6 +1735,152 @@ export const useRemoveRecipeFromCollection = () => {
       apiClient.removeRecipeFromCollection(collectionId, recipeId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["collections", variables.collectionId, "recipes"] });
+    },
+  });
+};
+
+// ── Household Recipes Hook ──
+
+export const useHouseholdRecipes = (params?: { limit?: number; offset?: number }) => {
+  return useQuery({
+    queryKey: ["household-recipes", params],
+    queryFn: () => apiClient.getHouseholdRecipes(params),
+  });
+};
+
+// ── Public Recipes Hook ──
+
+export const usePublicRecipes = (params?: { limit?: number; offset?: number }) => {
+  return useQuery({
+    queryKey: ["public-recipes", params],
+    queryFn: () => apiClient.getPublicRecipes(params),
+  });
+};
+
+// ── Profile / Username Hooks ──
+
+export const useMyProfile = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+
+  return useQuery({
+    queryKey: ["profile"],
+    queryFn: () => apiClient.getMyProfile(),
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useUpdateUsername = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (username: string) => apiClient.updateUsername(username),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+};
+
+// ── Recipe Reaction Hooks ──
+
+export const useRecipeReactions = (recipeIds: string[]) => {
+  return useQuery({
+    queryKey: ["recipe-reactions", recipeIds],
+    queryFn: () => apiClient.getRecipeReactions(recipeIds),
+    enabled: recipeIds.length > 0,
+  });
+};
+
+export const useToggleRecipeReaction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      recipeId: string;
+      reaction: 'thumbs_up' | 'thumbs_down';
+      familyMemberId?: string;
+    }) => apiClient.toggleRecipeReaction(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recipe-reactions"] });
+    },
+  });
+};
+
+// ── Admin Hooks ──
+
+export const useAdminUsers = () => {
+  const { isAdmin } = useAuthStore();
+  return useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: () => apiClient.adminGetAllUsers(),
+    enabled: isAdmin,
+  });
+};
+
+export const useAdminInvites = () => {
+  const { isAdmin } = useAuthStore();
+  return useQuery({
+    queryKey: ["admin", "invites"],
+    queryFn: () => apiClient.adminGetAllInvites(),
+    enabled: isAdmin,
+  });
+};
+
+export const useAdminHouseholds = () => {
+  const { isAdmin } = useAuthStore();
+  return useQuery({
+    queryKey: ["admin", "households"],
+    queryFn: () => apiClient.adminGetAllHouseholds(),
+    enabled: isAdmin,
+  });
+};
+
+export const useAdminDeleteUser = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => apiClient.adminDeleteUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useAdminUpdateUser = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, updates }: { userId: string; updates: { display_name?: string; setup_completed?: boolean } }) =>
+      apiClient.adminUpdateUser(userId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useAdminDeleteInvite = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (inviteId: string) => apiClient.adminDeleteInvite(inviteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useAdminRemoveHouseholdMember = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (memberId: string) => apiClient.adminRemoveHouseholdMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useAdminDeleteHousehold = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (householdId: string) => apiClient.adminDeleteHousehold(householdId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
     },
   });
 };

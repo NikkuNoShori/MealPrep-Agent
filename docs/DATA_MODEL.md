@@ -2,8 +2,8 @@
 
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
-**Last reviewed:** 2026-03-12
-**Last updated:** 2026-03-12 (deprecation cleanup: dropped is_public, family_id columns; simplified family_members RLS)
+**Last reviewed:** 2026-03-14
+**Last updated:** 2026-03-14 (username/setup_completed on profiles, recipe_reactions table, inviter_name on invites, profile visibility RLS, 5 data-access RPC functions, migration index 013-025)
 
 ---
 
@@ -30,14 +30,16 @@ User profiles, created automatically via trigger on `auth.users` INSERT.
 | `display_name` | VARCHAR(255) | NOT NULL | |
 | `first_name` | VARCHAR(255) | | |
 | `last_name` | VARCHAR(255) | | |
+| `username` | VARCHAR(30) | UNIQUE | Lowercase alphanumeric + underscores, 3-30 chars (migration 014) |
 | `avatar_url` | TEXT | | Google OAuth avatar |
+| `setup_completed` | BOOLEAN | DEFAULT false | Set true after completing initial profile setup (migration 020) |
 | `timezone` | VARCHAR(50) | DEFAULT 'UTC' | |
 | `household_size` | INT | DEFAULT 1 | |
 | `created_at` | TIMESTAMPTZ | DEFAULT now() | |
 | `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
 
-**Indexes:** email
-**RLS:** Users can only view/update their own profile
+**Indexes:** email, username (unique)
+**RLS:** Users can view/update their own profile. Household members can view each other's profiles (migration 024).
 **Triggers:** `update_profiles_updated_at` (auto-update `updated_at`)
 
 ---
@@ -285,13 +287,14 @@ Pending invitations for authenticated users to join households.
 | `household_id` | UUID | NOT NULL, FK → `households(id)` ON DELETE CASCADE | |
 | `invited_by` | UUID | NOT NULL, FK → `profiles(id)` | |
 | `invited_email` | TEXT | NOT NULL | |
+| `inviter_name` | TEXT | | Display name of the person who sent the invite |
 | `status` | TEXT | NOT NULL, DEFAULT 'pending', CHECK ('pending','accepted','declined','expired') | |
 | `created_at` | TIMESTAMPTZ | DEFAULT now() | |
 | `expires_at` | TIMESTAMPTZ | DEFAULT now() + 7 days | |
 
 **Indexes:** household_id, invited_email
 **RLS:** Household members + invitee can view; owners/admins can create; owners/admins + invitee can update
-**Migration:** 009
+**Migration:** 009, 018 (invite tokens), 023 (trigger fix for email)
 
 ---
 
@@ -331,6 +334,28 @@ Many-to-many join between collections and recipes.
 **Indexes:** recipe_id
 **RLS:** Viewable if parent collection passes SELECT policy; collection owner can INSERT/DELETE
 **Migration:** 011
+
+---
+
+### recipe_reactions
+
+Thumbs up/down reactions on recipes from authenticated users or dependents (family members).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `recipe_id` | UUID | NOT NULL, FK → `recipes(id)` ON DELETE CASCADE | |
+| `user_id` | UUID | FK → `profiles(id)` ON DELETE CASCADE | NULL if reaction is from a dependent |
+| `family_member_id` | UUID | FK → `family_members(id)` ON DELETE CASCADE | NULL if reaction is from an authenticated user |
+| `reaction` | VARCHAR(20) | NOT NULL, CHECK ('thumbs_up','thumbs_down') | |
+| `created_at` | TIMESTAMPTZ | DEFAULT now() | |
+| `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
+
+**Constraints:** CHECK (exactly one of user_id or family_member_id is NOT NULL); UNIQUE (recipe_id, user_id) WHERE user_id IS NOT NULL; UNIQUE (recipe_id, family_member_id) WHERE family_member_id IS NOT NULL
+**Indexes:** recipe_id, user_id, family_member_id
+**RLS:** Authenticated users can view reactions on recipes they can see; users can insert/update/delete their own reactions
+**Triggers:** `update_recipe_reactions_updated_at`
+**Migration:** 017
 
 ---
 
@@ -382,17 +407,27 @@ System roles (`admin`, `user`, `family_member`) with JSONB permissions. Default 
 | `find_similar_recipes` | `recipe_id`, `user_id`, `similarity_threshold`, `max_results` | Finds recipes similar to a given recipe |
 | `get_recipe_recommendations` | `user_id`, `preference_difficulty`, `preference_tags`, `max_prep_time_minutes`, `limit_count` | Scored recommendations based on preferences |
 
+### Data Access Functions (Migration 025)
+
+All use `SECURITY DEFINER` to bypass RLS for cross-user profile reads, validate `auth.uid()` internally, and `RETURNS JSON`. Called via `supabase.rpc()` from the frontend. Replaces multi-query API methods with single database round trips.
+
+| Function | Parameters | Returns | Replaces |
+|----------|-----------|---------|----------|
+| `get_my_household()` | (none — uses `auth.uid()`) | `{ household, my_role, members, dependents, pending_invites }` | `getMyHousehold()` (4 queries → 1) |
+| `toggle_recipe_reaction()` | `p_recipe_id UUID, p_reaction VARCHAR(20), p_family_member_id UUID DEFAULT NULL` | `{ action: 'added' \| 'removed' \| 'updated' }` | `toggleRecipeReaction()` (2-3 queries → 1) |
+| `get_household_recipes()` | `p_limit INT DEFAULT 50, p_offset INT DEFAULT 0` | `{ recipes: [...with profiles], total }` | `getHouseholdRecipes()` (3 queries → 1) |
+| `get_recipe_reactions()` | `p_recipe_ids UUID[]` | `[{ id, recipe_id, user_id, family_member_id, reaction, name }]` | `getRecipeReactions()` (2 queries → 1) |
+| `get_my_pending_invites()` | (none — uses `auth.uid()`) | `[{ id, household_id, ..., households: { id, name } }]` | `getMyPendingInvites()` (2 queries → 1) |
+
 ### Helper Functions
 
 | Function | Type | Description |
 |----------|------|-------------|
 | `handle_new_user()` | Trigger on `auth.users` INSERT | Creates profile + assigns default role + creates household + membership + default collections (Favorites, My Recipes) |
-| `sync_recipe_visibility()` | Trigger on recipes INSERT/UPDATE | Syncs `is_public` from `visibility` column |
 | `is_household_member()` | SECURITY DEFINER helper | Checks household membership without RLS recursion |
 | `get_household_role()` | SECURITY DEFINER helper | Returns user's role in a household without RLS recursion |
 | `update_recipe_searchable_text()` | Trigger on recipes INSERT/UPDATE | Builds `searchable_text` from recipe fields |
 | `update_recipe_embedding()` | Trigger on recipes UPDATE | Clears `embedding_vector` when content changes |
-| `validate_family_id()` | Trigger on family_members INSERT/UPDATE | Validates `family_id` exists in profiles |
 
 ---
 
@@ -425,3 +460,16 @@ System roles (`admin`, `user`, `family_member`) with JSONB permissions. Default 
 | `20260312000001_010_fix_household_rls_recursion.sql` | 010 | Fix RLS infinite recursion: SECURITY DEFINER helpers (`is_household_member`, `get_household_role`), updated all household-related policies |
 | `20260312000002_011_recipe_collections.sql` | 011 | recipe_collections + collection_recipes tables, RLS, indexes, updated handle_new_user() with default collections |
 | `20260312000003_012_collection_sharing_inheritance.sql` | 012 | Updated recipes SELECT policy with collection-level sharing inheritance |
+| `20260313000000_013_deprecation_cleanup.sql` | 013 | Dropped `is_public`, `family_id` columns; simplified `family_members` RLS; fixed `handle_new_user()` trigger |
+| `20260313000000_014_add_username_to_profiles.sql` | 014 | Added `username` column (unique, 3-30 chars) to profiles; unique recipe title per user |
+| `20260313000001_015_fix_recipe_rls_auth.sql` | 015 | Fixed recipe RLS auth policies |
+| `20260313000002_016_remove_my_recipes_collection.sql` | 016 | Removed default "My Recipes" collection auto-creation |
+| `20260313000003_017_recipe_reactions.sql` | 017 | `recipe_reactions` table with RLS, indexes, constraints |
+| `20260314000000_018_invite_tokens_and_auto_join.sql` | 018 | Invite token handling and auto-join on signup |
+| `20260314100000_019_drop_token_hash.sql` | 019 | Drop token_hash from household_invites |
+| `20260314200000_020_setup_completed_flag.sql` | 020 | Added `setup_completed` flag to profiles |
+| `20260314300000_021_admin_access_policies.sql` | 021 | RLS policies for admin role access |
+| `20260314400000_022_admin_delete_households.sql` | 022 | Admin household delete policy |
+| `20260314500000_023_fix_trigger_missing_email.sql` | 023 | Fixed `handle_new_user()` trigger missing email field |
+| `20260314600000_024_household_member_profile_visibility.sql` | 024 | RLS policy: household members can view each other's profiles |
+| `20260314700000_025_rpc_functions.sql` | 025 | 5 SECURITY DEFINER RPC functions for data-access optimization |

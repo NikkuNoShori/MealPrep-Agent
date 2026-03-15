@@ -28,6 +28,8 @@ interface CollectionsSidebarProps {
   selectedCollectionId: string | null
   onSelectCollection: (collectionId: string | null) => void
   onCollectionNameChange?: (name: string | null) => void
+  onViewModeChange?: (mode: 'public' | 'mine' | 'household' | 'collection') => void
+  viewMode?: 'public' | 'mine' | 'household' | 'collection'
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -45,6 +47,8 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
   selectedCollectionId,
   onSelectCollection,
   onCollectionNameChange,
+  onViewModeChange,
+  viewMode = 'public',
 }) => {
   const { data: collections, isLoading } = useMyCollections()
   const createCollection = useCreateCollection()
@@ -138,6 +142,27 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
   const handleSelectCollection = (collectionId: string | null, name: string | null) => {
     onSelectCollection(collectionId)
     onCollectionNameChange?.(name)
+    if (collectionId) {
+      onViewModeChange?.('collection')
+    }
+  }
+
+  const handleSelectPublic = () => {
+    onSelectCollection(null)
+    onCollectionNameChange?.(null)
+    onViewModeChange?.('public')
+  }
+
+  const handleSelectMine = () => {
+    onSelectCollection(null)
+    onCollectionNameChange?.('My Recipes')
+    onViewModeChange?.('mine')
+  }
+
+  const handleSelectHousehold = () => {
+    onSelectCollection(null)
+    onCollectionNameChange?.('Household Recipes')
+    onViewModeChange?.('household')
   }
 
   const handleCopyLink = (e: React.MouseEvent, collectionId: string) => {
@@ -204,19 +229,50 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
       )}
 
       <div className="space-y-0.5">
-        {/* All Recipes */}
+        {/* Public Recipes */}
         <button
           type="button"
-          onClick={() => handleSelectCollection(null, null)}
+          onClick={handleSelectPublic}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-            selectedCollectionId === null
+            viewMode === 'public'
+              ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
+              : 'text-foreground hover:bg-accent/50'
+          }`}
+        >
+          <Globe className="h-4 w-4 shrink-0" />
+          <span className="truncate">Public Recipes</span>
+        </button>
+
+        {/* My Recipes */}
+        <button
+          type="button"
+          onClick={handleSelectMine}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+            viewMode === 'mine'
               ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
               : 'text-foreground hover:bg-accent/50'
           }`}
         >
           <FolderOpen className="h-4 w-4 shrink-0" />
-          <span className="truncate">All Recipes</span>
+          <span className="truncate">My Recipes</span>
         </button>
+
+        {/* Household Recipes */}
+        <button
+          type="button"
+          onClick={handleSelectHousehold}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+            viewMode === 'household'
+              ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
+              : 'text-foreground hover:bg-accent/50'
+          }`}
+        >
+          <Home className="h-4 w-4 shrink-0" />
+          <span className="truncate">Household</span>
+        </button>
+
+        {/* Divider */}
+        <div className="border-t border-border/40 my-2" />
 
         {isLoading ? (
           <div className="flex justify-center py-4">
@@ -225,8 +281,8 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
         ) : (
           (collections || []).map((collection: any) => {
             const Icon = iconMap[collection.icon] || FolderOpen
-            const isActive = selectedCollectionId === collection.id
-            const isDefault = collection.name === 'Favorites' || collection.name === 'My Recipes'
+            const isActive = viewMode === 'collection' && selectedCollectionId === collection.id
+            const isDefault = collection.name === 'Favorites'
             const VisIcon = visibilityIcons[collection.visibility || 'private'] || Lock
             const isEditing = editingId === collection.id
 
@@ -264,11 +320,13 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             }
 
             return (
-              <button
+              <div
                 key={collection.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSelectCollection(collection.id, collection.name)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 group ${
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectCollection(collection.id, collection.name) }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 group cursor-pointer ${
                   isActive
                     ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
                     : 'text-foreground hover:bg-accent/50'
@@ -321,7 +379,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                     </button>
                   )}
                 </div>
-              </button>
+              </div>
             )
           })
         )}

@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
-import { useRecipes, useCreateRecipe, useDeleteRecipe, useCollectionRecipes } from '@/services/api'
-import { RecipeCard } from './RecipeCard'
+import { useMemo } from 'react'
+import { useRecipes, useCreateRecipe, useDeleteRecipe, useRemoveRecipeFromCollection, useCollectionRecipes, usePublicRecipes, useHouseholdRecipes, useRecipeReactions, useToggleRecipeReaction, useMyHousehold } from '@/services/api'
+import { RecipeCard, RecipeReaction } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
+import { useAuthStore } from '@/stores/authStore'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,6 +15,7 @@ interface RecipeListProps {
   onEditRecipe?: (recipe: any) => void;
   collectionId?: string | null;
   collectionName?: string | null;
+  feedMode?: 'public' | 'mine' | 'household' | 'collection';
 }
 
 export const RecipeList: React.FC<RecipeListProps> = ({
@@ -21,7 +24,9 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   onEditRecipe,
   collectionId,
   collectionName,
+  feedMode = 'public',
 }) => {
+  const { user } = useAuthStore();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState({
@@ -31,12 +36,25 @@ export const RecipeList: React.FC<RecipeListProps> = ({
     tags: [] as string[],
   });
   const { data: recipes, isLoading, error } = useRecipes({ limit: 50 });
+  const { data: publicRecipesData, isLoading: publicLoading } = usePublicRecipes({ limit: 50 });
+  const { data: householdRecipesData, isLoading: householdLoading } = useHouseholdRecipes({ limit: 50 });
   const { data: collectionRecipes, isLoading: collectionLoading } = useCollectionRecipes(collectionId || '');
   const deleteRecipeMutation = useDeleteRecipe();
+  const removeFromCollectionMutation = useRemoveRecipeFromCollection();
+  const toggleReaction = useToggleRecipeReaction();
+  const { data: householdData } = useMyHousehold();
+  const dependents = useMemo(() => {
+    if (!householdData) return [];
+    return ((householdData as any)?.dependents || []).map((d: any) => ({ id: d.id, name: d.name }));
+  }, [householdData]);
 
-  // When a collection is selected, use its recipes; otherwise use all recipes
-  const baseRecipes = collectionId
+  // Determine which recipes to show based on feed mode
+  const baseRecipes = feedMode === 'collection' && collectionId
     ? (collectionRecipes || []).map((cr: any) => cr.recipes).filter(Boolean)
+    : feedMode === 'household'
+    ? (householdRecipesData as any)?.recipes || []
+    : feedMode === 'public'
+    ? (publicRecipesData as any)?.recipes || []
     : (recipes as any)?.recipes || [];
 
   const filteredRecipes =
@@ -77,23 +95,52 @@ export const RecipeList: React.FC<RecipeListProps> = ({
       return true;
     });
 
+  // Fetch reactions for all visible recipes
+  const recipeIds = useMemo(() => filteredRecipes.map((r: any) => r.id), [filteredRecipes]);
+  const { data: allReactions } = useRecipeReactions(recipeIds);
+
+  const reactionsByRecipe = useMemo(() => {
+    const map: Record<string, RecipeReaction[]> = {};
+    if (allReactions) {
+      for (const r of allReactions as RecipeReaction[]) {
+        if (!map[r.recipeId]) map[r.recipeId] = [];
+        map[r.recipeId].push(r);
+      }
+    }
+    return map;
+  }, [allReactions]);
+
+  const handleReact = (recipeId: string, reaction: "thumbs_up" | "thumbs_down", familyMemberId?: string) => {
+    toggleReaction.mutate({ recipeId, reaction, familyMemberId });
+  };
+
   const handleDeleteRecipe = async (recipeId: string) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this recipe? This action cannot be undone."
-      )
-    ) {
-      try {
-        await deleteRecipeMutation.mutateAsync(recipeId);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        console.error("Failed to delete recipe:", errorMessage);
+    if (feedMode === 'collection' && collectionId) {
+      if (window.confirm("Remove this recipe from the collection?")) {
+        try {
+          await removeFromCollectionMutation.mutateAsync({ collectionId, recipeId });
+        } catch (error) {
+          console.error("Failed to remove from collection:", error);
+        }
+      }
+    } else {
+      if (
+        window.confirm(
+          "Are you sure you want to delete this recipe? This action cannot be undone."
+        )
+      ) {
+        try {
+          await deleteRecipeMutation.mutateAsync(recipeId);
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
+          console.error("Failed to delete recipe:", errorMessage);
+        }
       }
     }
   };
 
-  if (isLoading || (collectionId && collectionLoading)) {
+  if (isLoading || publicLoading || (collectionId && collectionLoading)) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -121,12 +168,12 @@ export const RecipeList: React.FC<RecipeListProps> = ({
           <div className="flex items-center gap-3">
             <div className="w-2 h-8 bg-gradient-to-b from-primary-600 to-secondary-600 rounded-full"></div>
             <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-200 bg-clip-text text-transparent">
-              {collectionName || "Your Recipes"}
+              {feedMode === 'collection' && collectionName ? collectionName : feedMode === 'household' ? 'Household Recipes' : feedMode === 'public' ? 'Public Recipes' : 'My Recipes'}
             </h2>
           </div>
           <p className="text-slate-600 dark:text-slate-400 text-lg">
             {filteredRecipes.length} recipe
-            {filteredRecipes.length !== 1 ? "s" : ""}{collectionName ? ` in ${collectionName}` : " in your collection"}
+            {filteredRecipes.length !== 1 ? "s" : ""}{feedMode === 'collection' && collectionName ? ` in ${collectionName}` : feedMode === 'household' ? ' shared by your household' : feedMode === 'public' ? ' shared by the community' : ' in your collection'}
           </p>
         </div>
 
@@ -243,9 +290,12 @@ export const RecipeList: React.FC<RecipeListProps> = ({
               <RecipeCard
                 recipe={recipe}
                 viewMode={viewMode}
+                reactions={reactionsByRecipe[recipe.id] || []}
+                dependents={dependents}
+                onReact={handleReact}
                 onClick={() => onRecipeSelect?.(recipe)}
-                onEdit={onEditRecipe}
-                onDelete={handleDeleteRecipe}
+                onEdit={recipe.userId === user?.id ? onEditRecipe : undefined}
+                onDelete={recipe.userId === user?.id || (feedMode === 'collection' && collectionId) ? handleDeleteRecipe : undefined}
               />
             </div>
           ))}
