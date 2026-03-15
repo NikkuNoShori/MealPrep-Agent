@@ -107,7 +107,7 @@ export const authService = {
             .from('profiles')
             .select('display_name, first_name, last_name, avatar_url, setup_completed')
             .eq('id', user.id)
-            .single()
+            .maybeSingle()
           if (!error) {
             profile = data
           }
@@ -117,8 +117,8 @@ export const authService = {
         }
 
         // Extract avatar URL - Google OAuth provides 'picture' in user_metadata
-        const avatarUrl = profile?.avatar_url || 
-                         user.user_metadata?.avatar_url || 
+        const avatarUrl = profile?.avatar_url ||
+                         user.user_metadata?.avatar_url ||
                          user.user_metadata?.picture ||
                          user.user_metadata?.avatar_url
 
@@ -172,7 +172,7 @@ export const authService = {
           .from('profiles')
           .select('display_name, first_name, last_name, avatar_url, setup_completed')
           .eq('id', user.id)
-          .single()
+          .maybeSingle()
         if (!error) {
           profile = data
         }

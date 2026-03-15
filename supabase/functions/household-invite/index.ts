@@ -246,6 +246,39 @@ async function handleAccept(req: Request): Promise<Response> {
     );
   }
 
+  // Ensure profile exists (fallback if handle_new_user trigger failed)
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+
+  if (!existingProfile) {
+    // Create profile so household_members FK is satisfied
+    const email = auth.user.email || invitedEmail || "";
+    const displayName =
+      auth.user.user_metadata?.display_name ||
+      auth.user.user_metadata?.full_name ||
+      auth.user.user_metadata?.name ||
+      email.split("@")[0] || "User";
+    const emailPrefix = email.split("@")[0] || "user";
+    const base = emailPrefix.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    const username = `${base.substring(0, 25)}_${crypto.randomUUID().replace(/-/g, "").substring(0, 4)}`;
+
+    const { error: profileError } = await admin.from("profiles").insert({
+      id: auth.user.id,
+      email,
+      display_name: displayName,
+      username,
+      setup_completed: false,
+    });
+
+    if (profileError) {
+      console.error("Profile creation fallback error:", profileError);
+      return corsError("Failed to create user profile. Please complete account setup first.", 500);
+    }
+  }
+
   // Check if already a member
   const { data: existingMembership } = await admin
     .from("household_members")

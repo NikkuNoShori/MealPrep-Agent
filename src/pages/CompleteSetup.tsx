@@ -14,6 +14,8 @@ const CompleteSetup: React.FC = () => {
 
   const [firstName, setFirstName] = useState(user?.first_name || '')
   const [lastName, setLastName] = useState('')
+  const [username, setUsername] = useState('')
+  const [usernameError, setUsernameError] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -22,7 +24,25 @@ const CompleteSetup: React.FC = () => {
 
   const hasPassword = password.length >= 6
   const displayName = `${firstName.trim()} ${lastName.trim()}`.trim()
-  const canSubmit = firstName.trim().length >= 1 && lastName.trim().length >= 1 && (hasPassword || googleLinked)
+  const isValidUsername = /^[a-z0-9_]{3,30}$/.test(username)
+  const canSubmit = firstName.trim().length >= 1 && lastName.trim().length >= 1 && isValidUsername && (hasPassword || googleLinked)
+
+  const handleUsernameChange = (value: string) => {
+    const sanitized = value.toLowerCase().replace(/[^a-z0-9_]/g, '')
+    setUsername(sanitized)
+    if (sanitized.length > 0 && sanitized.length < 3) {
+      setUsernameError('Must be at least 3 characters')
+    } else if (sanitized.length > 30) {
+      setUsernameError('Must be 30 characters or less')
+    } else {
+      setUsernameError('')
+    }
+  }
+
+  const handleCancel = async () => {
+    await supabase.auth.signOut()
+    navigate('/login', { replace: true })
+  }
 
   const handleLinkGoogle = async () => {
     setIsLinkingGoogle(true)
@@ -66,22 +86,37 @@ const CompleteSetup: React.FC = () => {
         if (pwError) throw pwError
       }
 
-      // Update profile: first_name, last_name, display_name + setup_completed
+      // Upsert profile (may not exist if handle_new_user trigger failed)
       const { error: profileError } = await (supabase
         .from('profiles') as any)
-        .update({
+        .upsert({
+          id: user?.id,
+          email: user?.email,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           display_name: displayName,
+          username: username,
           setup_completed: true,
-        })
-        .eq('id', user?.id)
+        }, { onConflict: 'id' })
 
-      if (profileError) throw profileError
+      if (profileError) {
+        if (profileError.code === '23505' && profileError.message?.includes('username')) {
+          throw new Error('Username is already taken. Please choose another.')
+        }
+        throw profileError
+      }
 
       await refreshUser()
       toast.success('Account setup complete!')
-      navigate('/dashboard', { replace: true })
+
+      // If there's a pending invite, redirect back to accept it
+      const pendingInviteId = sessionStorage.getItem('pendingInviteId')
+      if (pendingInviteId) {
+        sessionStorage.removeItem('pendingInviteId')
+        navigate(`/invite/accept?id=${encodeURIComponent(pendingInviteId)}`, { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to complete setup')
     } finally {
@@ -99,8 +134,8 @@ const CompleteSetup: React.FC = () => {
   }, [])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/20 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
-      <div className="w-full max-w-md">
+    <div className="h-full overflow-y-auto bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/20 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
+      <div className="w-full max-w-md mx-auto my-8">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2.5">
@@ -115,15 +150,15 @@ const CompleteSetup: React.FC = () => {
 
         {/* Card */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl shadow-black/[0.06] dark:shadow-black/30 border border-gray-200/60 dark:border-white/[0.06] overflow-hidden">
-          <div className="px-8 py-10">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">
+          <div className="px-8 py-8">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-1.5">
               Complete Your Account
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-8">
+            <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-6">
               Set your name and choose how you'll sign in.
             </p>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {/* First Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
@@ -154,6 +189,33 @@ const CompleteSetup: React.FC = () => {
                   required
                   minLength={1}
                 />
+              </div>
+
+              {/* Username */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Username
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm">@</span>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => handleUsernameChange(e.target.value)}
+                    placeholder="choose_a_username"
+                    className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                    autoComplete="username"
+                    maxLength={30}
+                    required
+                  />
+                </div>
+                {usernameError ? (
+                  <p className="text-xs text-red-500 mt-1">{usernameError}</p>
+                ) : (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    Lowercase letters, numbers, and underscores only.
+                  </p>
+                )}
               </div>
 
               {/* Divider */}
@@ -225,6 +287,7 @@ const CompleteSetup: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 6 characters"
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                    autoComplete="new-password"
                     minLength={6}
                     disabled={googleLinked}
                   />
@@ -240,6 +303,7 @@ const CompleteSetup: React.FC = () => {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm your password"
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                      autoComplete="new-password"
                       minLength={6}
                     />
                   </div>
@@ -264,9 +328,17 @@ const CompleteSetup: React.FC = () => {
 
               {!canSubmit && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-                  Enter your first and last name, and either link Google or set a password to continue.
+                  Fill in your name, choose a username, and either link Google or set a password to continue.
                 </p>
               )}
+
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="w-full text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                Cancel and return to login
+              </button>
             </form>
           </div>
         </div>

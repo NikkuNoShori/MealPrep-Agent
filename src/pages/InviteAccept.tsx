@@ -78,6 +78,13 @@ const InviteAccept: React.FC = () => {
     if (state.status !== 'details') return;
     if (hasAttemptedAccept.current) return;
 
+    // If user hasn't completed setup, redirect there first (they need a profile before joining)
+    if (user.setup_completed === false) {
+      sessionStorage.setItem('pendingInviteId', inviteId);
+      navigate('/complete-setup', { replace: true });
+      return;
+    }
+
     hasAttemptedAccept.current = true;
     setState({ status: 'accepting' });
 
@@ -85,13 +92,6 @@ const InviteAccept: React.FC = () => {
       onSuccess: async (data: any) => {
         // Refresh user state (reloads profile, household, role)
         await refreshUser();
-        const { user: freshUser } = useAuthStore.getState();
-
-        // If user needs to complete setup, redirect there
-        if (freshUser?.setup_completed === false) {
-          navigate('/complete-setup', { replace: true });
-          return;
-        }
 
         setState({
           status: 'accepted',
@@ -110,11 +110,17 @@ const InviteAccept: React.FC = () => {
 
   const handleSignIn = () => {
     if (inviteId) sessionStorage.setItem('pendingInviteId', inviteId);
+    if (state.status === 'details') {
+      sessionStorage.setItem('inviteEmail', state.invitedEmail);
+    }
     navigate('/signin');
   };
 
   const handleSignUp = () => {
     if (inviteId) sessionStorage.setItem('pendingInviteId', inviteId);
+    if (state.status === 'details') {
+      sessionStorage.setItem('inviteEmail', state.invitedEmail);
+    }
     navigate('/signup');
   };
 

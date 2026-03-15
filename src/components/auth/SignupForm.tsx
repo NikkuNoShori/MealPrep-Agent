@@ -16,7 +16,8 @@ interface SignupFormProps {
 }
 
 export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
-  const [email, setEmail] = useState('')
+  const inviteEmail = sessionStorage.getItem('inviteEmail') || ''
+  const [email, setEmail] = useState(inviteEmail)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -28,6 +29,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
   const signupMutation = useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => signUp(email, password),
     onSuccess: () => {
+      sessionStorage.removeItem('inviteEmail')
       onSuccess?.()
       navigate('/dashboard')
       toast.success('Account created')
@@ -93,7 +95,14 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               placeholder="Enter your email"
               autoComplete="email"
               required
+              disabled={!!inviteEmail}
+              className={inviteEmail ? 'bg-muted' : ''}
             />
+            {inviteEmail && (
+              <p className="text-xs text-muted-foreground">
+                This email matches your invite and cannot be changed.
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
