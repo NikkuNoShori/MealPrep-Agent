@@ -530,7 +530,7 @@ const Household = () => {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Heart className="h-5 w-5" />
-                    Family Members
+                    Dietary Profiles
                   </CardTitle>
                   {!isAddingDependent && (
                     <Button
@@ -547,8 +547,7 @@ const Household = () => {
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Non-account family members (children, dependents). Their dietary needs are
-                  considered in meal planning.
+                  Track dietary needs for family members (children, dependents) who don't have their own account.
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">

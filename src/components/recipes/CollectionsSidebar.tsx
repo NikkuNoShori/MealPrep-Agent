@@ -28,8 +28,8 @@ interface CollectionsSidebarProps {
   selectedCollectionId: string | null
   onSelectCollection: (collectionId: string | null) => void
   onCollectionNameChange?: (name: string | null) => void
-  onViewModeChange?: (mode: 'public' | 'mine' | 'collection') => void
-  viewMode?: 'public' | 'mine' | 'collection'
+  onViewModeChange?: (mode: 'public' | 'mine' | 'household' | 'collection') => void
+  viewMode?: 'public' | 'mine' | 'household' | 'collection'
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -159,6 +159,12 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     onViewModeChange?.('mine')
   }
 
+  const handleSelectHousehold = () => {
+    onSelectCollection(null)
+    onCollectionNameChange?.('Household Recipes')
+    onViewModeChange?.('household')
+  }
+
   const handleCopyLink = (e: React.MouseEvent, collectionId: string) => {
     e.stopPropagation()
     const url = `${window.location.origin}/collections/${collectionId}`
@@ -249,6 +255,20 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
         >
           <FolderOpen className="h-4 w-4 shrink-0" />
           <span className="truncate">My Recipes</span>
+        </button>
+
+        {/* Household Recipes */}
+        <button
+          type="button"
+          onClick={handleSelectHousehold}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+            viewMode === 'household'
+              ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
+              : 'text-foreground hover:bg-accent/50'
+          }`}
+        >
+          <Home className="h-4 w-4 shrink-0" />
+          <span className="truncate">Household</span>
         </button>
 
         {/* Divider */}

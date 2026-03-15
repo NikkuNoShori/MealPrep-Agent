@@ -18,7 +18,9 @@
       "Bash(grep -l \"profiles\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
       "Bash(grep -n \"username\\\\|setup_completed\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
       "Bash(find /c/dev/MealPrep-Agent/src -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
-      "Bash(find /c/dev/MealPrep-Agent -path */supabase/functions/household-invite* -type f)"
+      "Bash(find /c/dev/MealPrep-Agent -path */supabase/functions/household-invite* -type f)",
+      "Bash(ls -ltr /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
+      "Bash(grep -l \"accept_invite\\\\|join_household\\\\|create_household\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)"
     ],
     "additionalDirectories": [
       "C:\\Users\\nickn\\.claude"

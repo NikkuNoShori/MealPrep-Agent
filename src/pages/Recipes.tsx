@@ -14,7 +14,7 @@ const Recipes = () => {
   const [editingRecipe, setEditingRecipe] = useState<any>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'public' | 'mine' | 'collection'>('public');
+  const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'collection'>('public');
 
   // Load recipe from URL slug if present
   useEffect(() => {

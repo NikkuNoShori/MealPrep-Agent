@@ -1267,6 +1267,58 @@ class ApiClient {
     if (error) throw error;
   }
 
+  // ── Household Recipes ──
+
+  async getHouseholdRecipes(params?: { limit?: number; offset?: number }) {
+    const limit = params?.limit || 50;
+    const offset = params?.offset || 0;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Get user's household ID
+    const { data: membership } = await (supabase
+      .from("household_members") as any)
+      .select("household_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!membership) return { recipes: [], total: 0 };
+
+    // Get all household member IDs
+    const { data: members } = await (supabase
+      .from("household_members") as any)
+      .select("user_id")
+      .eq("household_id", membership.household_id);
+
+    const memberIds = (members || []).map((m: any) => m.user_id);
+
+    // Fetch recipes from household members shared with the household
+    const { data, error } = await (supabase
+      .from("recipes") as any)
+      .select("*, profiles!recipes_user_id_fkey(display_name, username, avatar_url)")
+      .in("user_id", memberIds)
+      .eq("visibility", "household")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const camelRecipes = (data || []).map((r: any) => {
+      const recipe = snakeToCamel(r);
+      if (r.profiles) {
+        recipe.author = {
+          displayName: r.profiles.display_name,
+          username: r.profiles.username,
+          avatarUrl: r.profiles.avatar_url,
+        };
+      }
+      return recipe;
+    });
+
+    return { recipes: camelRecipes, total: camelRecipes.length };
+  }
+
   // ── Public Recipes ──
 
   async getPublicRecipes(params?: { limit?: number; offset?: number }) {
@@ -1749,6 +1801,15 @@ export const useRemoveRecipeFromCollection = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["collections", variables.collectionId, "recipes"] });
     },
+  });
+};
+
+// ── Household Recipes Hook ──
+
+export const useHouseholdRecipes = (params?: { limit?: number; offset?: number }) => {
+  return useQuery({
+    queryKey: ["household-recipes", params],
+    queryFn: () => apiClient.getHouseholdRecipes(params),
   });
 };
 
