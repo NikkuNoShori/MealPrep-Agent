@@ -5,6 +5,7 @@ import { RecipeDetail } from "@/components/recipes/RecipeDetail";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
 import { CollectionsSidebar } from "@/components/recipes/CollectionsSidebar";
 import { apiClient } from "@/services/api";
+import { Filter, X } from "lucide-react";
 
 const Recipes = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -15,6 +16,7 @@ const Recipes = () => {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'collection'>('public');
+  const [mobileCollectionsOpen, setMobileCollectionsOpen] = useState(false);
 
   // Load recipe from URL slug if present
   useEffect(() => {
@@ -100,7 +102,41 @@ const Recipes = () => {
 
         {showList && (
           <div className="flex gap-6 animate-fade-in">
-            {/* Collections Sidebar */}
+            {/* Mobile Collections Drawer */}
+            {mobileCollectionsOpen && (
+              <div className="fixed inset-0 z-50 lg:hidden">
+                <div
+                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                  onClick={() => setMobileCollectionsOpen(false)}
+                />
+                <div className="absolute inset-y-0 left-0 w-80 max-w-[85vw] bg-white dark:bg-slate-900 shadow-2xl animate-slide-up p-5 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Collections</h3>
+                    <button
+                      onClick={() => setMobileCollectionsOpen(false)}
+                      className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <X className="h-5 w-5 text-slate-500" />
+                    </button>
+                  </div>
+                  <CollectionsSidebar
+                    selectedCollectionId={selectedCollectionId}
+                    onSelectCollection={(id) => {
+                      setSelectedCollectionId(id);
+                      setMobileCollectionsOpen(false);
+                    }}
+                    onCollectionNameChange={setSelectedCollectionName}
+                    viewMode={viewMode}
+                    onViewModeChange={(mode) => {
+                      setViewMode(mode);
+                      setMobileCollectionsOpen(false);
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Desktop Collections Sidebar */}
             <div className="hidden lg:block w-64 shrink-0">
               <div className="sticky top-4 rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-4">
                 <CollectionsSidebar
@@ -115,6 +151,16 @@ const Recipes = () => {
 
             {/* Recipe List */}
             <div className="flex-1 min-w-0">
+              {/* Mobile Collections Toggle */}
+              <div className="lg:hidden mb-4">
+                <button
+                  onClick={() => setMobileCollectionsOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Filter className="h-4 w-4" />
+                  Collections & Filters
+                </button>
+              </div>
               <RecipeList
                 onRecipeSelect={handleRecipeSelect}
                 onAddRecipe={handleAddRecipe}

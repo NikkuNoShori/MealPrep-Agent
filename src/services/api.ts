@@ -450,50 +450,155 @@ class ApiClient {
     );
   }
 
-  // Meal planning endpoints - using Supabase client directly
-  // Note: user_id references profiles(id), which references auth.users(id)
-  async getMealPlans(limit?: number) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  // ── Meal Planning ──
+
+  async getMealPlans(params?: { limit?: number; status?: string }) {
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    let query = supabase
-      .from("meal_plans")
+    let query = (supabase
+      .from("meal_plans") as any)
       .select("*")
-      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
-      .order("created_at", { ascending: false });
+      .eq("user_id", user.id)
+      .order("start_date", { ascending: false });
 
-    if (limit) {
-      query = query.limit(limit);
+    if (params?.status) {
+      query = query.eq("status", params.status);
+    }
+    if (params?.limit) {
+      query = query.limit(params.limit);
     }
 
     const { data, error } = await query;
     if (error) throw error;
-    return { mealPlans: data || [] };
+    return (data || []).map((p: any) => snakeToCamel(p));
+  }
+
+  async getMealPlan(id: string) {
+    const { data, error } = await (supabase
+      .from("meal_plans") as any)
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(data);
   }
 
   async createMealPlan(data: {
+    title?: string;
     startDate: string;
     endDate: string;
-    preferences: any;
+    meals?: any;
+    notes?: string;
+    status?: string;
   }) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
     const { data: mealPlan, error } = await (supabase
       .from("meal_plans") as any)
       .insert({
-        ...data,
-        user_id: user.id, // user_id references profiles(id) = auth.users(id)
+        user_id: user.id,
+        created_by: user.id,
+        last_edited_by: user.id,
+        title: data.title || null,
+        start_date: data.startDate,
+        end_date: data.endDate,
+        meals: data.meals || {},
+        notes: data.notes || null,
+        status: data.status || 'draft',
       })
       .select()
       .single();
 
     if (error) throw error;
-    return mealPlan;
+    return snakeToCamel(mealPlan);
+  }
+
+  async updateMealPlan(id: string, data: {
+    title?: string;
+    startDate?: string;
+    endDate?: string;
+    meals?: any;
+    groceryList?: any;
+    notes?: string;
+    status?: string;
+  }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const payload: any = { last_edited_by: user.id };
+    if (data.title !== undefined) payload.title = data.title;
+    if (data.startDate !== undefined) payload.start_date = data.startDate;
+    if (data.endDate !== undefined) payload.end_date = data.endDate;
+    if (data.meals !== undefined) payload.meals = data.meals;
+    if (data.groceryList !== undefined) payload.grocery_list = data.groceryList;
+    if (data.notes !== undefined) payload.notes = data.notes;
+    if (data.status !== undefined) payload.status = data.status;
+
+    const { data: mealPlan, error } = await (supabase
+      .from("meal_plans") as any)
+      .update(payload)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(mealPlan);
+  }
+
+  async deleteMealPlan(id: string) {
+    const { error } = await (supabase
+      .from("meal_plans") as any)
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+  }
+
+  async copyMealPlan(sourceId: string, newDateRange: { startDate: string; endDate: string }) {
+    // Fetch source plan
+    const source = await this.getMealPlan(sourceId);
+    if (!source) throw new Error("Source meal plan not found");
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Shift meal dates to new range
+    const sourceStart = new Date(source.startDate);
+    const newStart = new Date(newDateRange.startDate);
+    const dayOffset = Math.round((newStart.getTime() - sourceStart.getTime()) / (1000 * 60 * 60 * 24));
+
+    const shiftedMeals: any = {};
+    if (source.meals && typeof source.meals === 'object') {
+      for (const [dateStr, slots] of Object.entries(source.meals)) {
+        const oldDate = new Date(dateStr);
+        oldDate.setDate(oldDate.getDate() + dayOffset);
+        const newDateStr = oldDate.toISOString().split('T')[0];
+        shiftedMeals[newDateStr] = slots;
+      }
+    }
+
+    const { data: mealPlan, error } = await (supabase
+      .from("meal_plans") as any)
+      .insert({
+        user_id: user.id,
+        created_by: user.id,
+        last_edited_by: user.id,
+        copied_from: sourceId,
+        title: source.title ? `${source.title} (copy)` : null,
+        start_date: newDateRange.startDate,
+        end_date: newDateRange.endDate,
+        meals: shiftedMeals,
+        notes: source.notes || null,
+        status: 'draft',
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return snakeToCamel(mealPlan);
   }
 
   async uploadImage(file: File, folder: string = "recipes"): Promise<string> {
@@ -1433,10 +1538,21 @@ export const useSendMessage = () => {
   });
 };
 
-export const useMealPlans = (limit?: number) => {
+export const useMealPlans = (params?: { limit?: number; status?: string }) => {
+  const { user, isLoading: authLoading } = useAuthStore();
+
   return useQuery({
-    queryKey: ["meal-plans", limit],
-    queryFn: () => apiClient.getMealPlans(limit),
+    queryKey: ["meal-plans", params],
+    queryFn: () => apiClient.getMealPlans(params),
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useMealPlan = (id: string) => {
+  return useQuery({
+    queryKey: ["meal-plan", id],
+    queryFn: () => apiClient.getMealPlan(id),
+    enabled: !!id,
   });
 };
 
@@ -1445,10 +1561,49 @@ export const useCreateMealPlan = () => {
 
   return useMutation({
     mutationFn: (data: {
+      title?: string;
       startDate: string;
       endDate: string;
-      preferences: any;
+      meals?: any;
+      notes?: string;
+      status?: string;
     }) => apiClient.createMealPlan(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meal-plans"] });
+    },
+  });
+};
+
+export const useUpdateMealPlan = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiClient.updateMealPlan(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["meal-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["meal-plan", id] });
+    },
+  });
+};
+
+export const useDeleteMealPlan = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteMealPlan(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meal-plans"] });
+    },
+  });
+};
+
+export const useCopyMealPlan = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ sourceId, newDateRange }: { sourceId: string; newDateRange: { startDate: string; endDate: string } }) =>
+      apiClient.copyMealPlan(sourceId, newDateRange),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meal-plans"] });
     },

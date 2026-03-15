@@ -58,10 +58,10 @@ const StatCard = ({ label, value, icon: Icon, color, loading }: {
 
 const Dashboard = () => {
   const { data: recipesData, isLoading: recipesLoading } = useRecipes({ limit: 10 })
-  const { data: mealPlansData, isLoading: mealPlansLoading } = useMealPlans(7)
+  const { data: mealPlansData, isLoading: mealPlansLoading } = useMealPlans({ limit: 7 })
 
   const recipes = recipesData?.recipes || []
-  const mealPlans = mealPlansData?.mealPlans || []
+  const mealPlans = mealPlansData || []
   const thisWeekMeals = mealPlans.length
   const recentRecipes = recipes.slice(0, 3)
 
