@@ -19,6 +19,8 @@ import {
   Edit2,
   Check,
   ArrowUpDown,
+  ChevronRight,
+  ChevronsUpDown,
 } from "lucide-react";
 import { apiClient } from "@/services/api";
 import { useMeasurementUnits } from "@/hooks/useMeasurementUnits";
@@ -52,6 +54,119 @@ interface Ingredient {
   unit: string;
   category?: string;
 }
+
+// Unit Picker with flyout submenu for "Other"
+interface UnitPickerProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  measurementUnits: {
+    weight: string[];
+    volume: string[];
+    countable: string[];
+  };
+}
+
+const UnitPicker: React.FC<UnitPickerProps> = ({
+  value,
+  onValueChange,
+  measurementUnits,
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const [otherOpen, setOtherOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const otherTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
+
+  // Close on outside click
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setOtherOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const select = (unit: string) => {
+    onValueChange(unit);
+    setOpen(false);
+    setOtherOpen(false);
+  };
+
+  const displayValue =
+    value === "__custom__" ? "Custom..." : value || undefined;
+
+  const itemClass =
+    "flex items-center px-3 py-1.5 text-sm rounded-md cursor-pointer transition-colors hover:bg-accent hover:text-accent-foreground";
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen(!open); setOtherOpen(false); }}
+        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+      >
+        <span className={displayValue ? "" : "text-muted-foreground"}>
+          {displayValue || "Unit"}
+        </span>
+        <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 shrink-0 ml-1" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-[calc(100%+4px)] left-0 w-48 rounded-md border bg-popover text-popover-foreground shadow-md p-1 animate-in fade-in-0 zoom-in-95">
+          {/* Measurement units */}
+          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Measurement</div>
+          {[...measurementUnits.weight, ...measurementUnits.volume].map((unit) => (
+            <div key={unit} className={itemClass} onClick={() => select(unit)}>
+              {unit}
+            </div>
+          ))}
+
+          <div className="my-1 h-px bg-border" />
+
+          {/* Other — flyout submenu */}
+          <div
+            className="relative"
+            onMouseEnter={() => {
+              clearTimeout(otherTimeoutRef.current);
+              setOtherOpen(true);
+            }}
+            onMouseLeave={() => {
+              otherTimeoutRef.current = setTimeout(() => setOtherOpen(false), 150);
+            }}
+          >
+            <div
+              className={`${itemClass} justify-between`}
+              onClick={() => setOtherOpen(!otherOpen)}
+            >
+              Other
+              <ChevronRight className="h-3.5 w-3.5 opacity-50" />
+            </div>
+
+            {otherOpen && (
+              <div className="absolute left-full top-0 ml-1 w-36 rounded-md border bg-popover text-popover-foreground shadow-md p-1 animate-in fade-in-0 slide-in-from-left-1">
+                {measurementUnits.countable.map((unit) => (
+                  <div key={unit} className={itemClass} onClick={() => select(unit)}>
+                    {unit}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="my-1 h-px bg-border" />
+
+          {/* Custom */}
+          <div className={itemClass} onClick={() => select("__custom__")}>
+            Custom...
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Sortable Instruction Item Component
 interface SortableInstructionItemProps {
@@ -134,7 +249,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
       >
         <GripVertical className="h-5 w-5" />
       </button>
-      <div className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold">
+      <div className="flex-shrink-0 w-6 h-6 bg-primary-500 text-white rounded-full flex items-center justify-center text-sm font-semibold">
         {index + 1}
       </div>
       {isEditing ? (
@@ -155,7 +270,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
               onClick={handleSave}
               className="h-8 w-8"
             >
-              <Check className="h-4 w-4 text-primary-600" />
+              <Check className="h-4 w-4 text-primary-500" />
             </Button>
             <Button
               type="button"
@@ -171,7 +286,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
       ) : (
         <>
           <p
-            className="flex-1 cursor-pointer hover:bg-muted/50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+            className="flex-1 cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-colors hover:text-primary-500 dark:hover:text-primary-400"
             onClick={() => setIsEditing(true)}
             title="Click to edit"
           >
@@ -211,6 +326,8 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     ingredients: [] as Ingredient[],
     instructions: [] as string[],
     imageUrl: "",
+    sourceUrl: "",
+    sourceName: "",
   });
 
   const [newTag, setNewTag] = useState("");
@@ -218,6 +335,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     name: "",
     amount: "",
     unit: "",
+    customUnit: "",
   });
   const [newInstruction, setNewInstruction] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -275,6 +393,8 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
         ingredients: recipe.ingredients || [],
         instructions: recipe.instructions || [],
         imageUrl: imageUrl,
+        sourceUrl: recipe.sourceUrl || recipe.source_url || "",
+        sourceName: recipe.sourceName || recipe.source_name || "",
       });
       // Set preview if image URL exists
       if (imageUrl) {
@@ -419,24 +539,25 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
   };
 
   const addIngredient = () => {
-    if (
-      newIngredient.name.trim() &&
-      newIngredient.amount &&
-      newIngredient.unit
-    ) {
-      setFormData((prev) => ({
-        ...prev,
-        ingredients: [
-          ...prev.ingredients,
-          {
-            name: newIngredient.name.trim(),
-            amount: parseFloat(newIngredient.amount),
-            unit: newIngredient.unit,
-          },
-        ],
-      }));
-      setNewIngredient({ name: "", amount: "", unit: "" });
-    }
+    const isCustom = newIngredient.unit === "__custom__";
+    const resolvedUnit = isCustom ? newIngredient.customUnit.trim() : newIngredient.unit;
+
+    if (!newIngredient.name.trim()) return;
+    if (!isCustom && (!newIngredient.amount || !newIngredient.unit)) return;
+    if (isCustom && !resolvedUnit) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      ingredients: [
+        ...prev.ingredients,
+        {
+          name: newIngredient.name.trim(),
+          amount: isCustom ? 0 : parseFloat(newIngredient.amount),
+          unit: resolvedUnit,
+        },
+      ],
+    }));
+    setNewIngredient({ name: "", amount: "", unit: "", customUnit: "" });
   };
 
   const removeIngredient = (index: number) => {
@@ -519,6 +640,8 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
         "Serve immediately with extra Parmesan and black pepper.",
       ],
       imageUrl: "none",
+      sourceUrl: "",
+      sourceName: "",
     });
   };
 
@@ -770,6 +893,38 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                   </p>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="sourceName">Source Name</Label>
+                  <Input
+                    id="sourceName"
+                    value={formData.sourceName}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        sourceName: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. AllRecipes, NYT Cooking"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="sourceUrl">Source URL</Label>
+                  <Input
+                    id="sourceUrl"
+                    type="url"
+                    value={formData.sourceUrl}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        sourceUrl: e.target.value,
+                      }))
+                    }
+                    placeholder="https://example.com/recipe"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -803,69 +958,56 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-2">
-                <Input
-                  value={newIngredient.name}
-                  onChange={(e) =>
-                    setNewIngredient((prev) => ({
-                      ...prev,
-                      name: e.target.value,
-                    }))
-                  }
-                  placeholder="Ingredient name"
-                />
-                <Input
-                  type="number"
-                  value={newIngredient.amount}
-                  onChange={(e) =>
-                    setNewIngredient((prev) => ({
-                      ...prev,
-                      amount: e.target.value,
-                    }))
-                  }
-                  placeholder="Amount"
-                />
-                <Select
-                  value={newIngredient.unit}
-                  onValueChange={(value) =>
-                    setNewIngredient((prev) => ({
-                      ...prev,
-                      unit: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* Weight units */}
-                    {measurementUnits.weight.length > 0 && (
-                      <>
-                        {measurementUnits.weight.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {/* Volume units */}
-                    {measurementUnits.volume.length > 0 && (
-                      <>
-                        {measurementUnits.volume.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {/* Countable units */}
-                    {measurementUnits.countable.map((unit) => (
-                      <SelectItem key={unit} value={unit}>
-                        {unit}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    value={newIngredient.name}
+                    onChange={(e) =>
+                      setNewIngredient((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                    placeholder="Ingredient name"
+                  />
+                  <Input
+                    type="number"
+                    value={newIngredient.amount}
+                    onChange={(e) =>
+                      setNewIngredient((prev) => ({
+                        ...prev,
+                        amount: e.target.value,
+                      }))
+                    }
+                    placeholder="Amount"
+                    disabled={newIngredient.unit === "__custom__"}
+                  />
+                  <UnitPicker
+                    value={newIngredient.unit}
+                    onValueChange={(value) =>
+                      setNewIngredient((prev) => ({
+                        ...prev,
+                        unit: value,
+                        amount: value === "__custom__" ? "" : prev.amount,
+                        customUnit: value === "__custom__" ? prev.customUnit : "",
+                      }))
+                    }
+                    measurementUnits={measurementUnits}
+                  />
+                </div>
+                {newIngredient.unit === "__custom__" && (
+                  <Input
+                    value={newIngredient.customUnit}
+                    onChange={(e) =>
+                      setNewIngredient((prev) => ({
+                        ...prev,
+                        customUnit: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. to taste, for garnish, pinch"
+                    autoFocus
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
@@ -885,7 +1027,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                       <span className="font-medium">{ingredient.name}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">
-                          {ingredient.amount} {ingredient.unit}
+                          {ingredient.amount > 0 ? `${ingredient.amount} ${ingredient.unit}` : ingredient.unit}
                         </span>
                         <Button
                           type="button"

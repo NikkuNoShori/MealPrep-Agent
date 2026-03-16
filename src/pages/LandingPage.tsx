@@ -3,14 +3,14 @@ import { useEffect } from 'react'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { useAuthStore } from '@/stores/authStore'
 import {
-  MessageSquare, 
-  ChefHat, 
-  ShoppingCart, 
-  Users, 
-  Sparkles, 
+  MessageSquare,
+  ChefHat,
+  ShoppingCart,
+  Users,
   ArrowRight,
-  Play,
-  Star
+  Zap,
+  Calendar,
+  Heart,
 } from 'lucide-react'
 
 const LandingPage = () => {
@@ -18,256 +18,220 @@ const LandingPage = () => {
   const navigate = useNavigate()
   const { user, isLoading } = useAuthStore()
 
-  // Redirect authenticated users to dashboard
   useEffect(() => {
     if (user && !isLoading) {
       navigate('/dashboard', { replace: true })
     }
   }, [user, isLoading, navigate])
 
-  // Don't block rendering - show landing page content immediately
-  // If user is authenticated, they'll be redirected via useEffect above
-
-  const features = [
-    {
-      icon: MessageSquare,
-      title: 'Conversational AI',
-      description: 'Add and manage recipes through natural conversation with our intelligent chat interface.'
-    },
-    {
-      icon: ChefHat,
-      title: 'Smart Recipe Management',
-      description: 'AI-powered recipe parsing, scaling, and personalized recommendations for your family.'
-    },
-    {
-      icon: ShoppingCart,
-      title: 'Automated Grocery Planning',
-      description: 'Generate shopping lists automatically from your meal plans with smart substitutions.'
-    },
-    {
-      icon: Users,
-      title: 'Family Preference Learning',
-      description: 'Our AI learns your family\'s tastes, allergies, and dietary preferences over time.'
-    }
-  ]
-
-  const testimonials = [
-    {
-      name: 'Sarah Johnson',
-      role: 'Working Mom',
-      content: 'MealPrep Agent has transformed how I plan meals for my family. The AI suggestions are spot-on!',
-      rating: 5
-    },
-    {
-      name: 'Mike Chen',
-      role: 'Home Chef',
-      content: 'The recipe scaling feature is incredible. No more math when cooking for different group sizes.',
-      rating: 5
-    },
-    {
-      name: 'Emily Rodriguez',
-      role: 'Busy Parent',
-      content: 'Finally, a meal planning app that actually learns what my kids will eat. Game changer!',
-      rating: 5
-    }
-  ]
-
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-20">
-        <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-        <div className="relative container mx-auto px-4 text-center">
-          <div className="max-w-4xl mx-auto">
-            <div className="inline-flex items-center px-4 py-2 text-white/90 text-sm font-medium mb-6">
-              <Sparkles className="w-4 h-4 mr-2" />
-              AI-Powered Meal Planning
-            </div>
-            
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6 leading-tight">
-              Your Intelligent
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600">
-                Kitchen Companion
-              </span>
-            </h1>
-            
-            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-              Transform how your family discovers, manages, and plans meals with AI that learns your preferences 
-              and automates grocery planning through intelligent recipe analysis.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link
-                to="/signup"
-                className="btn-primary text-lg px-8 py-4 flex items-center group"
-              >
-                Get Started Free
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              
-              <button 
-                className="btn-secondary text-lg px-8 py-4 flex items-center"
-                onClick={() => {
-                  // Scroll to features section for demo
-                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
-                }}
-              >
-                <Play className="mr-2 w-5 h-5" />
-                Watch Demo
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-white dark:bg-gray-800">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Everything you need for intelligent meal planning
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Our AI-powered platform combines the best of recipe management, family preferences, 
-              and automated grocery planning in one seamless experience.
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <div key={index} className="card hover:shadow-lg transition-shadow duration-300 group">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <feature.icon className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="py-20 bg-gray-50 dark:bg-gray-900">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              How it works
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
-              Get started in minutes with our simple three-step process
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                1
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Add Your Recipes
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Upload recipes through chat, photos, or URLs. Our AI extracts all the details automatically.
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                2
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Set Family Preferences
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Tell us about dietary restrictions, allergies, and what everyone loves or dislikes.
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                3
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Get Smart Suggestions
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Receive personalized meal plans and automated grocery lists that everyone will love.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-20 bg-white dark:bg-gray-800">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Loved by families everywhere
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
-              See what our users are saying about their experience
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="card">
-                <div className="flex items-center mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 mb-4 italic">
-                  "{testimonial.content}"
-                </p>
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {testimonial.name}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {testimonial.role}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-primary-600 to-secondary-600">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">
-            Ready to transform your meal planning?
-          </h2>
-          <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of families who are already enjoying stress-free meal planning 
-            with AI-powered recommendations.
+    <div>
+      {/* ─── Hero ─── */}
+      <section className="relative px-4 pt-20 pb-24 sm:pt-28 sm:pb-32">
+        <div className="max-w-3xl mx-auto text-center">
+          <p
+            className="text-sm font-medium tracking-wide uppercase text-primary-500 dark:text-primary-400 mb-4"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+          >
+            AI-Powered Meal Planning
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+
+          <h1
+            className="text-4xl sm:text-5xl md:text-6xl font-semibold text-stone-900 dark:text-white leading-[1.1] tracking-tight"
+            style={{ fontFamily: "'Fraunces', serif" }}
+          >
+            Plan meals your
+            <br />
+            family will love
+          </h1>
+
+          <p
+            className="mt-6 text-lg text-stone-500 dark:text-stone-400 max-w-xl mx-auto leading-relaxed"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+          >
+            MealPrep uses AI to learn your family's preferences, manage recipes,
+            and build weekly plans — so dinner is never a question.
+          </p>
+
+          <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               to="/signup"
-              className="inline-flex items-center bg-white text-primary-600 font-semibold px-8 py-4 rounded-lg hover:bg-gray-50 transition-colors text-lg"
-            >
-              Start Your Free Trial
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Link>
-            <button 
-              className="inline-flex items-center border-2 border-white text-white font-semibold px-8 py-4 rounded-lg hover:bg-white hover:text-primary-600 transition-colors text-lg"
-              onClick={() => {
-                // Scroll to features section for demo
-                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-white font-medium text-[15px] transition-all duration-200 hover:-translate-y-0.5"
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                backgroundColor: 'var(--rs-accent)',
+                boxShadow: '0 4px 14px rgba(29,158,117,0.25)',
               }}
             >
-              View Demo
-            </button>
+              Get started free
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+
+            <Link
+              to="/signin"
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-stone-600 dark:text-stone-300 font-medium text-[15px] border border-stone-200 dark:border-white/10 bg-white dark:bg-white/[0.03] hover:border-stone-300 dark:hover:border-white/20 transition-all duration-200"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            >
+              Sign in
+            </Link>
           </div>
+        </div>
+      </section>
+
+      {/* ─── Features ─── */}
+      <section className="px-4 py-20 bg-white dark:bg-white/[0.02] border-y border-stone-200/60 dark:border-white/[0.04]">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <h2
+              className="text-2xl sm:text-3xl font-semibold text-stone-900 dark:text-white tracking-tight"
+              style={{ fontFamily: "'Fraunces', serif" }}
+            >
+              A smarter way to feed your family
+            </h2>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-x-12 gap-y-10 max-w-3xl mx-auto">
+            {[
+              {
+                icon: MessageSquare,
+                title: 'Conversational AI',
+                desc: 'Add recipes through natural conversation. Paste a URL, describe a dish, or snap a photo — AI handles the rest.',
+              },
+              {
+                icon: Calendar,
+                title: 'Weekly meal plans',
+                desc: "Drag-and-drop planner that suggests meals based on what you have, what you like, and what's in season.",
+              },
+              {
+                icon: ShoppingCart,
+                title: 'Auto grocery lists',
+                desc: 'One tap to generate a shopping list from your plan. Smart grouping by aisle with quantity merging.',
+              },
+              {
+                icon: Users,
+                title: 'Household sharing',
+                desc: "Invite family members, track everyone's preferences, and let kids vote on what's for dinner.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="flex gap-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary-500/10 dark:bg-primary-400/10 flex items-center justify-center">
+                  <f.icon className="w-5 h-5 text-primary-500 dark:text-primary-400" />
+                </div>
+                <div>
+                  <h3
+                    className="text-[15px] font-semibold text-stone-900 dark:text-white mb-1"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}
+                  >
+                    {f.title}
+                  </h3>
+                  <p
+                    className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}
+                  >
+                    {f.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── How it works ─── */}
+      <section className="px-4 py-20">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-14">
+            <h2
+              className="text-2xl sm:text-3xl font-semibold text-stone-900 dark:text-white tracking-tight"
+              style={{ fontFamily: "'Fraunces', serif" }}
+            >
+              Three steps to stress-free dinners
+            </h2>
+          </div>
+
+          <div className="space-y-8">
+            {[
+              {
+                step: '01',
+                icon: ChefHat,
+                title: 'Build your recipe collection',
+                desc: 'Import from any URL, type it out, or tell our AI what you made. Recipes are parsed, tagged, and searchable instantly.',
+              },
+              {
+                step: '02',
+                icon: Heart,
+                title: "Set your family's preferences",
+                desc: 'Allergies, dietary goals, picky eaters — MealPrep remembers it all and filters suggestions accordingly.',
+              },
+              {
+                step: '03',
+                icon: Zap,
+                title: 'Let AI do the planning',
+                desc: 'Get personalized weekly plans, scaled portions, and grocery lists generated in seconds. Adjust anything with a tap.',
+              },
+            ].map((s) => (
+              <div
+                key={s.step}
+                className="flex gap-5 items-start p-5 rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] transition-all duration-200 hover:border-primary-500/20 dark:hover:border-primary-400/10"
+              >
+                <div className="flex-shrink-0">
+                  <span
+                    className="block text-xs font-bold text-primary-500 dark:text-primary-400 tracking-wider mb-1"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}
+                  >
+                    STEP {s.step}
+                  </span>
+                  <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-white/[0.06] flex items-center justify-center">
+                    <s.icon className="w-5 h-5 text-stone-500 dark:text-stone-400" />
+                  </div>
+                </div>
+                <div>
+                  <h3
+                    className="text-[15px] font-semibold text-stone-900 dark:text-white mb-1"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}
+                  >
+                    {s.title}
+                  </h3>
+                  <p
+                    className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}
+                  >
+                    {s.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── CTA ─── */}
+      <section className="px-4 py-16 border-t border-stone-200/60 dark:border-white/[0.04]">
+        <div className="max-w-xl mx-auto text-center">
+          <h2
+            className="text-2xl font-semibold text-stone-900 dark:text-white tracking-tight mb-3"
+            style={{ fontFamily: "'Fraunces', serif" }}
+          >
+            Ready to simplify dinner?
+          </h2>
+          <p
+            className="text-sm text-stone-500 dark:text-stone-400 mb-8"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+          >
+            Free to start. No credit card required.
+          </p>
+          <Link
+            to="/signup"
+            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-white font-medium text-[15px] transition-all duration-200 hover:-translate-y-0.5"
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              backgroundColor: 'var(--rs-accent)',
+              boxShadow: '0 4px 14px rgba(29,158,117,0.25)',
+            }}
+          >
+            Get started free
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
     </div>

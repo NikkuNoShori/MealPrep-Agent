@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -19,8 +19,10 @@ import {
   Lock,
   Home,
   Globe,
-  Link as LinkIcon,
   Pencil,
+  MoreVertical,
+  Share2,
+  Eye,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -35,6 +37,12 @@ interface CollectionsSidebarProps {
 const iconMap: Record<string, React.ElementType> = {
   heart: Heart,
   book: BookOpen,
+}
+
+const visibilityLabels: Record<string, string> = {
+  private: 'Private',
+  household: 'Household',
+  public: 'Public',
 }
 
 const visibilityIcons: Record<string, React.ElementType> = {
@@ -58,6 +66,19 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!openMenuId) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openMenuId])
 
   const handleCreate = () => {
     if (!newName.trim()) return
@@ -76,9 +97,9 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     )
   }
 
-  const handleDelete = (e: React.MouseEvent, collectionId: string, name: string) => {
-    e.stopPropagation()
+  const handleDelete = (collectionId: string, name: string) => {
     if (!confirm(`Delete "${name}"? Recipes won't be deleted.`)) return
+    setOpenMenuId(null)
     deleteCollection.mutate(collectionId, {
       onSuccess: () => {
         toast.success('Collection deleted')
@@ -92,16 +113,16 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     })
   }
 
-  const handleCycleVisibility = (e: React.MouseEvent, collection: any) => {
-    e.stopPropagation()
+  const handleCycleVisibility = (collection: any) => {
     const order = ['private', 'household', 'public']
     const currentIdx = order.indexOf(collection.visibility || 'private')
     const next = order[(currentIdx + 1) % order.length]
+    setOpenMenuId(null)
     updateCollection.mutate(
       { collectionId: collection.id, updates: { visibility: next } },
       {
         onSuccess: () => {
-          toast.success(`Collection set to ${next}`)
+          toast.success(`Visibility: ${next}`)
         },
         onError: (err: any) => {
           toast.error(err?.message || 'Failed to update visibility')
@@ -110,8 +131,8 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     )
   }
 
-  const handleStartRename = (e: React.MouseEvent, collection: any) => {
-    e.stopPropagation()
+  const handleStartRename = (collection: any) => {
+    setOpenMenuId(null)
     setEditingId(collection.id)
     setEditName(collection.name)
   }
@@ -137,6 +158,16 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
         },
       }
     )
+  }
+
+  const handleCopyLink = (collectionId: string) => {
+    const url = `${window.location.origin}/collections/${collectionId}`
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success('Link copied')
+    }).catch(() => {
+      toast.error('Failed to copy link')
+    })
+    setOpenMenuId(null)
   }
 
   const handleSelectCollection = (collectionId: string | null, name: string | null) => {
@@ -165,118 +196,97 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     onViewModeChange?.('household')
   }
 
-  const handleCopyLink = (e: React.MouseEvent, collectionId: string) => {
-    e.stopPropagation()
-    const url = `${window.location.origin}/collections/${collectionId}`
-    navigator.clipboard.writeText(url).then(() => {
-      toast.success('Link copied to clipboard')
-    }).catch(() => {
-      toast.error('Failed to copy link')
-    })
-  }
+  const feedItems = [
+    { key: 'public' as const, label: 'Public', icon: Globe, handler: handleSelectPublic },
+    { key: 'mine' as const, label: 'My Recipes', icon: FolderOpen, handler: handleSelectMine },
+    { key: 'household' as const, label: 'Household', icon: Home, handler: handleSelectHousehold },
+  ]
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Collections
-        </h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          onClick={() => setIsCreating(!isCreating)}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
+    <div className="w-full space-y-4">
+      {/* Feed Filters */}
+      <div className="space-y-0.5">
+        <p className="text-[11px] font-medium uppercase tracking-widest text-stone-400 dark:text-stone-500 px-2 mb-2">
+          Browse
+        </p>
+        {feedItems.map((item) => {
+          const isActive = viewMode === item.key
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={item.handler}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
+                isActive
+                  ? 'text-primary-500 dark:text-primary-400'
+                  : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
+              }`}
+            >
+              <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
+              <span className="truncate">{item.label}</span>
+              {isActive && (
+                <div className="ml-auto w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400" />
+              )}
+            </button>
+          )
+        })}
       </div>
 
-      {/* New collection input */}
-      {isCreating && (
-        <div className="flex gap-1.5 mb-2">
-          <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Collection name"
-            className="h-8 text-xs"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleCreate()
-              if (e.key === 'Escape') setIsCreating(false)
-            }}
-            autoFocus
-          />
-          <Button
-            size="sm"
-            className="h-8 w-8 p-0 shrink-0"
-            onClick={handleCreate}
-            disabled={createCollection.isPending || !newName.trim()}
-          >
-            {createCollection.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Check className="h-3.5 w-3.5" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 shrink-0"
-            onClick={() => { setIsCreating(false); setNewName('') }}
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
+      {/* Divider */}
+      <div className="border-t border-stone-200/60 dark:border-white/[0.06]" />
 
+      {/* Collections */}
       <div className="space-y-0.5">
-        {/* Public Recipes */}
-        <button
-          type="button"
-          onClick={handleSelectPublic}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-            viewMode === 'public'
-              ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
-              : 'text-foreground hover:bg-accent/50'
-          }`}
-        >
-          <Globe className="h-4 w-4 shrink-0" />
-          <span className="truncate">Public Recipes</span>
-        </button>
+        <div className="flex items-center justify-between px-2 mb-2">
+          <p className="text-[11px] font-medium uppercase tracking-widest text-stone-400 dark:text-stone-500">
+            Collections
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsCreating(!isCreating)}
+            className="text-stone-400 dark:text-stone-500 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
-        {/* My Recipes */}
-        <button
-          type="button"
-          onClick={handleSelectMine}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-            viewMode === 'mine'
-              ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
-              : 'text-foreground hover:bg-accent/50'
-          }`}
-        >
-          <FolderOpen className="h-4 w-4 shrink-0" />
-          <span className="truncate">My Recipes</span>
-        </button>
-
-        {/* Household Recipes */}
-        <button
-          type="button"
-          onClick={handleSelectHousehold}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-            viewMode === 'household'
-              ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
-              : 'text-foreground hover:bg-accent/50'
-          }`}
-        >
-          <Home className="h-4 w-4 shrink-0" />
-          <span className="truncate">Household</span>
-        </button>
-
-        {/* Divider */}
-        <div className="border-t border-border/40 my-2" />
+        {/* New collection input */}
+        {isCreating && (
+          <div className="flex gap-1.5 px-1 mb-1.5">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Name..."
+              className="h-7 text-xs border-stone-200/60 dark:border-white/[0.08] bg-transparent"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreate()
+                if (e.key === 'Escape') setIsCreating(false)
+              }}
+              autoFocus
+            />
+            <button
+              onClick={handleCreate}
+              disabled={createCollection.isPending || !newName.trim()}
+              className="shrink-0 text-primary-500 hover:text-primary-600 disabled:text-stone-300 dark:disabled:text-stone-600 transition-colors"
+            >
+              {createCollection.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}
+            </button>
+            <button
+              onClick={() => { setIsCreating(false); setNewName('') }}
+              className="shrink-0 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <Loader2 className="h-4 w-4 animate-spin text-stone-400" />
           </div>
         ) : (
           (collections || []).map((collection: any) => {
@@ -285,36 +295,34 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             const isDefault = collection.name === 'Favorites'
             const VisIcon = visibilityIcons[collection.visibility || 'private'] || Lock
             const isEditing = editingId === collection.id
+            const isMenuOpen = openMenuId === collection.id
 
             if (isEditing) {
               return (
-                <div key={collection.id} className="flex gap-1 px-1 py-1">
+                <div key={collection.id} className="flex items-center gap-1.5 px-1 py-0.5">
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="h-7 text-xs flex-1"
+                    className="h-7 text-xs flex-1 border-stone-200/60 dark:border-white/[0.08] bg-transparent"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSaveRename(collection.id)
                       if (e.key === 'Escape') setEditingId(null)
                     }}
                     autoFocus
                   />
-                  <Button
-                    size="sm"
-                    className="h-7 w-7 p-0 shrink-0"
+                  <button
                     onClick={() => handleSaveRename(collection.id)}
                     disabled={updateCollection.isPending}
+                    className="shrink-0 text-primary-500 hover:text-primary-600 transition-colors"
                   >
-                    <Check className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 shrink-0"
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                  <button
                     onClick={() => setEditingId(null)}
+                    className="shrink-0 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors"
                   >
-                    <X className="h-3 w-3" />
-                  </Button>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               )
             }
@@ -322,63 +330,76 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             return (
               <div
                 key={collection.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleSelectCollection(collection.id, collection.name)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectCollection(collection.id, collection.name) }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 group cursor-pointer ${
-                  isActive
-                    ? 'bg-primary/15 text-primary dark:bg-primary/25 shadow-sm ring-1 ring-primary/20'
-                    : 'text-foreground hover:bg-accent/50'
-                }`}
+                className="group relative"
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate flex-1 text-left">{collection.name}</span>
-                <div className="flex items-center gap-0.5 shrink-0">
-                  {/* Rename */}
-                  {!isDefault && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectCollection(collection.id, collection.name)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
+                    isActive
+                      ? 'text-primary-500 dark:text-primary-400'
+                      : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
+                  <span className="truncate flex-1 text-left">{collection.name}</span>
+                  <VisIcon className="h-3 w-3 shrink-0 text-stone-300 dark:text-stone-600" />
+                  {isActive && (
+                    <div className="w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400 shrink-0" />
+                  )}
+                </button>
+
+                {/* Ellipsis menu trigger */}
+                {!isDefault && (
+                  <div className="absolute right-1 top-1/2 -translate-y-1/2" ref={isMenuOpen ? menuRef : undefined}>
                     <button
                       type="button"
-                      onClick={(e) => handleStartRename(e, collection)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent transition-all duration-150"
-                      title="Rename collection"
+                      onClick={(e) => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : collection.id) }}
+                      className={`w-5 h-5 flex items-center justify-center rounded transition-colors ${
+                        isMenuOpen
+                          ? 'text-stone-700 dark:text-stone-200'
+                          : 'text-stone-300 dark:text-stone-600 opacity-0 group-hover:opacity-100 hover:text-stone-500 dark:hover:text-stone-400'
+                      }`}
                     >
-                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                      <MoreVertical className="h-3.5 w-3.5" />
                     </button>
-                  )}
-                  {/* Visibility toggle */}
-                  {!isDefault && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleCycleVisibility(e, collection)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent transition-all duration-150"
-                      title={`Visibility: ${collection.visibility || 'private'}`}
-                    >
-                      <VisIcon className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                  )}
-                  {/* Share link (public only) */}
-                  {collection.visibility === 'public' && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleCopyLink(e, collection.id)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent transition-all duration-150"
-                      title="Copy share link"
-                    >
-                      <LinkIcon className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                  )}
-                  {/* Delete */}
-                  {!isDefault && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleDelete(e, collection.id, collection.name)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/10 hover:text-destructive transition-all duration-150"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
+
+                    {isMenuOpen && (
+                      <div className="absolute z-[100] top-full right-0 mt-1 origin-top-right animate-scale-in bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-stone-200/50 dark:border-white/[0.08] py-1 min-w-[150px]">
+                        <button
+                          onClick={() => handleStartRename(collection)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Rename
+                        </button>
+                        <button
+                          onClick={() => handleCycleVisibility(collection)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          {visibilityLabels[collection.visibility || 'private']}
+                        </button>
+                        {collection.visibility === 'public' && (
+                          <button
+                            onClick={() => handleCopyLink(collection.id)}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                          >
+                            <Share2 className="h-3.5 w-3.5" />
+                            Copy link
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(collection.id, collection.name)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })

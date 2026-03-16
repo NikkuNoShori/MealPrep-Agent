@@ -46,9 +46,9 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
           bg-background/80 backdrop-blur-sm shadow-sm
           ${isSmall ? 'h-8 px-2.5 text-xs' : 'h-9 px-3 text-sm'}
           transition-all duration-200 ease-out
-          hover:border-primary/40 hover:shadow-md hover:bg-accent/50
+          hover:border-primary-500/40 hover:text-primary-500 dark:hover:text-primary-400
           active:scale-[0.97]
-          ${isOpen ? 'border-primary/50 shadow-md ring-1 ring-primary/20' : ''}
+          ${isOpen ? 'border-primary-500/50 shadow-md ring-1 ring-primary-500/20' : ''}
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
       >
@@ -61,8 +61,8 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
         <div
           className={`
             absolute right-0 z-50 mt-1.5 w-52
-            rounded-xl border border-border/60 bg-popover/95 backdrop-blur-md
-            shadow-lg shadow-black/10
+            rounded-lg border border-stone-200/50 dark:border-white/[0.08] bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl
+            shadow-lg shadow-black/10 dark:shadow-black/30
             animate-in fade-in-0 zoom-in-95 slide-in-from-top-2
             duration-150
           `}
@@ -84,20 +84,20 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
                     w-full flex items-start gap-2.5 rounded-lg px-2.5 py-2
                     transition-all duration-150 ease-out
                     ${isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-foreground hover:bg-accent/60'
+                      ? 'text-primary-500 dark:text-primary-400'
+                      : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
                     }
                   `}
                 >
                   <div className={`
                     mt-0.5 rounded-md p-1
                     transition-colors duration-150
-                    ${isActive ? 'bg-primary/15' : 'bg-muted/60'}
+                    ${isActive ? 'bg-primary-500/15' : 'bg-muted/60'}
                   `}>
                     <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="text-left">
-                    <div className={`text-sm font-medium leading-tight ${isActive ? 'text-primary' : ''}`}>
+                    <div className={`text-sm font-medium leading-tight ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`}>
                       {option.label}
                     </div>
                     <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">

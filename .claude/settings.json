@@ -20,7 +20,10 @@
       "Bash(find /c/dev/MealPrep-Agent/src -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
       "Bash(find /c/dev/MealPrep-Agent -path */supabase/functions/household-invite* -type f)",
       "Bash(ls -ltr /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
-      "Bash(grep -l \"accept_invite\\\\|join_household\\\\|create_household\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)"
+      "Bash(grep -l \"accept_invite\\\\|join_household\\\\|create_household\" /c/dev/MealPrep-Agent/supabase/migrations/*.sql)",
+      "Bash(node -e \"const lr = require\\(''lucide-react''\\); const rows = Object.keys\\(lr\\).filter\\(k => k.toLowerCase\\(\\).includes\\(''row''\\)\\); console.log\\(rows\\);\")",
+      "Bash(node -e \"var lr = require\\(''lucide-react''\\); var icons = Object.keys\\(lr\\).filter\\(function\\(k\\) { return /^\\(Rows|List|Align|Menu|Grip\\)/.test\\(k\\) && k.indexOf\\(''Icon''\\) === -1; }\\); console.log\\(icons\\);\")",
+      "Bash(npx shadcn@latest add dropdown-menu --yes)"
     ],
     "additionalDirectories": [
       "C:\\Users\\nickn\\.claude"

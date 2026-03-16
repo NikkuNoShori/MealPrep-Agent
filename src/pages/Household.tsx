@@ -330,7 +330,7 @@ const Household = () => {
         {/* Header */}
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-2 h-8 bg-gradient-to-b from-primary-600 to-secondary-600 rounded-full" />
+            <div className="w-2 h-8 bg-primary-500 rounded-full" />
             <h1 className="text-3xl font-bold">Household</h1>
           </div>
           <p className="text-muted-foreground">
@@ -519,7 +519,7 @@ const Household = () => {
                           className={`flex items-center justify-between p-3 rounded-xl border transition-colors duration-150 ${
                             isCurrentUser
                               ? 'border-primary/30 bg-primary/5 dark:bg-primary/10'
-                              : 'border-border/60 hover:bg-accent/30'
+                              : 'border-border/60'
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -564,43 +564,43 @@ const Household = () => {
                                   <ChevronDown className="h-4 w-4" />
                                 </Button>
                                 {memberMenuOpen === member.id && (
-                                  <div className="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border bg-popover p-1 shadow-lg">
+                                  <div className="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border border-stone-200/50 dark:border-white/[0.08] bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl p-1 shadow-lg shadow-black/10 dark:shadow-black/30">
                                     {member.role === 'member' ? (
                                       <button
-                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
                                         onClick={() => handleChangeRole(member.id, 'admin', memberName)}
                                       >
-                                        <Shield className="h-4 w-4" />
+                                        <Shield className="h-3.5 w-3.5" />
                                         Promote to Admin
                                       </button>
                                     ) : (
                                       <button
-                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
                                         onClick={() => handleChangeRole(member.id, 'member', memberName)}
                                       >
-                                        <User className="h-4 w-4" />
+                                        <User className="h-3.5 w-3.5" />
                                         Demote to Member
                                       </button>
                                     )}
                                     <button
-                                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
                                       onClick={() => {
                                         setConfirmAction({ type: 'transfer', memberId: member.id, memberName });
                                         setMemberMenuOpen(null);
                                       }}
                                     >
-                                      <ArrowRightLeft className="h-4 w-4" />
+                                      <ArrowRightLeft className="h-3.5 w-3.5" />
                                       Transfer Ownership
                                     </button>
-                                    <div className="my-1 border-t" />
+                                    <div className="my-1 border-t border-stone-100/60 dark:border-white/[0.06]" />
                                     <button
-                                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
                                       onClick={() => {
                                         setConfirmAction({ type: 'remove', memberId: member.id, memberName });
                                         setMemberMenuOpen(null);
                                       }}
                                     >
-                                      <LogOut className="h-4 w-4" />
+                                      <LogOut className="h-3.5 w-3.5" />
                                       Remove from Household
                                     </button>
                                   </div>
@@ -774,14 +774,14 @@ const Household = () => {
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
                             onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}
                           >
                             Select All
                           </button>
                           <button
                             type="button"
-                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
                             onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [] }))}
                           >
                             Clear
@@ -817,14 +817,14 @@ const Household = () => {
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
                             onClick={() => setDepForm((p) => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}
                           >
                             Select All
                           </button>
                           <button
                             type="button"
-                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
                             onClick={() => setDepForm((p) => ({ ...p, allergies: [] }))}
                           >
                             Clear

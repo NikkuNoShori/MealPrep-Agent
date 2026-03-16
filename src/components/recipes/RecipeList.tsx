@@ -143,7 +143,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   if (isLoading || publicLoading || (collectionId && collectionLoading)) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     );
   }
@@ -161,71 +161,55 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Modern Header with Actions */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-8 bg-gradient-to-b from-primary-600 to-secondary-600 rounded-full"></div>
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-200 bg-clip-text text-transparent">
-              {feedMode === 'collection' && collectionName ? collectionName : feedMode === 'household' ? 'Household Recipes' : feedMode === 'public' ? 'Public Recipes' : 'My Recipes'}
-            </h2>
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 text-lg">
-            {filteredRecipes.length} recipe
-            {filteredRecipes.length !== 1 ? "s" : ""}{feedMode === 'collection' && collectionName ? ` in ${collectionName}` : feedMode === 'household' ? ' shared by your household' : feedMode === 'public' ? ' shared by the community' : ' in your collection'}
-          </p>
+    <div className="space-y-6">
+      {/* Search, Filters & Actions Bar */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <RecipeSearch
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filters={filters}
+            onFiltersChange={setFilters}
+          />
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("grid")}
-              className={`rounded-lg transition-all duration-200 ${
-                viewMode === "grid"
-                  ? "bg-white dark:bg-slate-700 shadow-sm"
-                  : "hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
-            >
-              <Grid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className={`rounded-lg transition-all duration-200 ${
-                viewMode === "list"
-                  ? "bg-white dark:bg-slate-700 shadow-sm"
-                  : "hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {onAddRecipe && (
-            <Button
-              onClick={onAddRecipe}
-              className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Recipe
-            </Button>
-          )}
+        {/* View Toggle */}
+        <div className="flex items-center bg-stone-100 dark:bg-white/[0.04] rounded-xl p-1 shrink-0">
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("grid")}
+            className={`rounded-lg transition-all duration-200 ${
+              viewMode === "grid"
+                ? "bg-white dark:bg-white/[0.08] shadow-sm"
+                : ""
+            }`}
+          >
+            <Grid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className={`rounded-lg transition-all duration-200 ${
+              viewMode === "list"
+                ? "bg-white dark:bg-white/[0.08] shadow-sm"
+                : ""
+            }`}
+          >
+            <List className="h-4 w-4" />
+          </Button>
         </div>
-      </div>
 
-      {/* Compact Search and Filters */}
-      <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-lg border border-slate-200/50 dark:border-slate-700/50 p-3 shadow-sm">
-        <RecipeSearch
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
+        {onAddRecipe && (
+          <Button
+            onClick={onAddRecipe}
+            className="bg-primary-500 hover:bg-primary-600 text-white px-5 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 shrink-0"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Recipe
+          </Button>
+        )}
       </div>
 
       {/* Recipe Grid/List with Enhanced Empty State */}
@@ -233,8 +217,8 @@ export const RecipeList: React.FC<RecipeListProps> = ({
         <div className="text-center py-16">
           <div className="max-w-md mx-auto">
             <div className="relative mb-8">
-              <div className="w-32 h-32 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-2xl flex items-center justify-center">
+              <div className="w-32 h-32 bg-primary-100 dark:bg-primary-900/30 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+                <div className="w-20 h-20 bg-primary-500 rounded-2xl flex items-center justify-center">
                   <span className="text-3xl">📖</span>
                 </div>
               </div>
@@ -243,13 +227,13 @@ export const RecipeList: React.FC<RecipeListProps> = ({
               </div>
             </div>
 
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
+            <h3 className="text-2xl font-bold text-stone-900 dark:text-white mb-3">
               {searchQuery ||
               Object.values(filters).some((f) => f && f.length > 0)
                 ? "No recipes match your search"
                 : "Start building your recipe collection"}
             </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-8 text-lg leading-relaxed">
+            <p className="text-stone-600 dark:text-stone-400 mb-8 text-lg leading-relaxed">
               {searchQuery ||
               Object.values(filters).some((f) => f && f.length > 0)
                 ? "Try adjusting your search terms or filters to find what you're looking for."
@@ -261,7 +245,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                 <Button
                   onClick={onAddRecipe}
                   size="lg"
-                  className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
+                  className="bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
                 >
                   <Plus className="h-5 w-5 mr-2" />
                   {searchQuery ||

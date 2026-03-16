@@ -134,12 +134,12 @@ const CompleteSetup: React.FC = () => {
   }, [])
 
   return (
-    <div className="h-full overflow-y-auto bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/20 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4">
+    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-gray-950 p-4">
       <div className="w-full max-w-md mx-auto my-8">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25">
+            <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25">
               <span className="text-white font-bold text-sm">M</span>
             </div>
             <span className="text-lg font-bold text-stone-900 dark:text-white tracking-tight">
@@ -241,7 +241,7 @@ const CompleteSetup: React.FC = () => {
                 >
                   {googleLinked ? (
                     <>
-                      <Check className="w-4 h-4 mr-2 text-emerald-500" />
+                      <Check className="w-4 h-4 mr-2 text-primary-500" />
                       Google Account Linked
                     </>
                   ) : isLinkingGoogle ? (
@@ -314,7 +314,7 @@ const CompleteSetup: React.FC = () => {
               <Button
                 type="submit"
                 disabled={!canSubmit || isSubmitting}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl h-11"
+                className="w-full bg-primary-500 hover:bg-primary-600 text-white rounded-xl h-11"
               >
                 {isSubmitting ? (
                   <>

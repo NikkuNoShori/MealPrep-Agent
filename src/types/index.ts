@@ -153,6 +153,8 @@ export interface StructuredRecipe {
   ingredients: Ingredient[]
   instructions: string[]
   imageUrl?: string
+  sourceUrl?: string
+  sourceName?: string
 }
 
 export interface ChatMessageResponse {
