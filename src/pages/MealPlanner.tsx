@@ -42,6 +42,8 @@ import type { MealPlanStatus, MealSlot, PlannedMealEntry } from '@/types/mealPla
 import type { SelectedRecipeInfo } from '@/components/meal-planning/recipeTypes';
 import RecipeSelectorModal from '@/components/grocery/RecipeSelectorModal';
 import ServingsModal from '@/components/meal-planning/ServingsModal';
+import DayAssignmentModal from '@/components/meal-planning/DayAssignmentModal';
+import type { RecipeAssignment } from '@/components/meal-planning/DayAssignmentModal';
 import GroceryCart from '@/components/meal-planning/GroceryCart';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -120,6 +122,7 @@ const MealPlanner = () => {
   const [selectorDate, setSelectorDate] = useState('');
   const [pendingMultiRecipes, setPendingMultiRecipes] = useState<SelectedRecipeInfo[]>([]);
   const [showServingsModal, setShowServingsModal] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [planListInputs, setPlanListInputs] = useState<Record<string, string>>({});
   const titleInputRef = useRef<HTMLInputElement>(null);
   const titleEditRef = useRef<HTMLDivElement>(null);
@@ -279,13 +282,18 @@ const MealPlanner = () => {
 
   const handleServingsConfirmed = (recipes: SelectedRecipeInfo[]) => {
     setShowServingsModal(false);
-    if (!weekPlan || recipes.length === 0) return;
+    if (recipes.length === 0) return;
+    setPendingMultiRecipes(recipes);
+    setShowAssignmentModal(true);
+  };
 
-    const targetDate = selectorDate;
-    const targetSlot = selectorSlot;
+  const handleAssignmentConfirmed = (assignments: RecipeAssignment[]) => {
+    setShowAssignmentModal(false);
+    if (!weekPlan || assignments.length === 0) return;
+
     const currentMeals = { ...(weekPlan.meals || {}) };
 
-    for (const recipe of recipes) {
+    for (const { recipe, slot, dates } of assignments) {
       const entry: PlannedMealEntry = {
         id: crypto.randomUUID(),
         recipeId: recipe.recipeId,
@@ -294,23 +302,28 @@ const MealPlanner = () => {
         servings: recipe.servings,
       };
 
-      if (targetDate.startsWith('_')) {
-        const listItems = [...(currentMeals[targetDate] || [])];
+      if (slot === 'snacks') {
+        // Plan-level snacks list
+        const listItems = [...(currentMeals['_snacks'] || [])];
         listItems.push(entry);
-        currentMeals[targetDate] = listItems;
+        currentMeals['_snacks'] = listItems;
       } else {
-        const dayMeals = { ...(currentMeals[targetDate] || {}) };
-        const slotMeals = [...(dayMeals[targetSlot] || [])];
-        slotMeals.push(entry);
-        dayMeals[targetSlot] = slotMeals;
-        currentMeals[targetDate] = dayMeals;
+        // Add to each assigned date
+        for (const dateStr of dates) {
+          const dayMeals = { ...(currentMeals[dateStr] || {}) };
+          const slotMeals = [...(dayMeals[slot] || [])];
+          slotMeals.push({ ...entry, id: crypto.randomUUID() });
+          dayMeals[slot] = slotMeals;
+          currentMeals[dateStr] = dayMeals;
+        }
       }
     }
 
+    const totalAdded = assignments.reduce((sum, a) => sum + Math.max(1, a.dates.length), 0);
     updateMealPlan.mutate(
       { id: weekPlan.id, data: { meals: currentMeals } },
       {
-        onSuccess: () => toast.success(`Added ${recipes.length} ${recipes.length === 1 ? 'recipe' : 'recipes'}`),
+        onSuccess: () => toast.success(`Added ${totalAdded} ${totalAdded === 1 ? 'recipe' : 'recipes'}`),
         onError: (err: any) => toast.error(err?.message || 'Failed to add recipes'),
       }
     );
@@ -481,16 +494,13 @@ const MealPlanner = () => {
                       {weekPlan.title || 'Untitled Plan'}
                     </button>
                   )}
-                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium flex-shrink-0 ${STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.bg} ${STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.color}`}>
-                    {STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.label}
-                  </span>
-                  <span className="text-[10px] text-stone-400 dark:text-gray-500 flex-shrink-0">
-                    {getWeekMealCount(weekPlan.meals, weekDates)} meals
+                  <span className="text-[10px] text-stone-400 dark:text-stone-500 flex-shrink-0">
+                    {STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.label} · {getWeekMealCount(weekPlan.meals, weekDates)} meals
                   </span>
                   {/* Ellipsis menu */}
                   <div className="relative flex-shrink-0" ref={bannerMenuRef}>
                     <button
-                      className="p-1 rounded-md text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+                      className="p-1 rounded-lg text-stone-400 hover:text-stone-700 dark:text-stone-500 dark:hover:text-stone-200 transition-colors"
                       onClick={() => setBannerMenuOpen(!bannerMenuOpen)}
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
@@ -819,10 +829,15 @@ const MealPlanner = () => {
               </div>
             )}
 
-            {/* Plan-level Lists (Snacks, Non-Recipe Items) — days view only */}
-            {!isLoading && weekPlan && calendarView === 'days' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-                {PLAN_LISTS.map((list) => {
+            {/* Plan-level Lists (Snacks, Non-Recipe Items) */}
+            {!isLoading && weekPlan && (() => {
+              const visibleLists = calendarView === 'meals'
+                ? PLAN_LISTS.filter(l => l.key !== '_snacks')
+                : PLAN_LISTS;
+              if (visibleLists.length === 0) return null;
+              return (
+              <div className={`${calendarView === 'meals' ? 'space-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'} mt-2`}>
+                {visibleLists.map((list) => {
                   const items = weekPlan.meals?.[list.key] || [];
                   const inputVal = planListInputs[list.key] || '';
                   return (
@@ -909,7 +924,8 @@ const MealPlanner = () => {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
 
             {/* No Plan CTA */}
             {!isLoading && !weekPlan && (
@@ -1065,6 +1081,17 @@ const MealPlanner = () => {
         recipes={pendingMultiRecipes}
         onConfirm={handleServingsConfirmed}
         onClose={() => setShowServingsModal(false)}
+      />
+
+      {/* Day Assignment Modal (after servings) */}
+      <DayAssignmentModal
+        open={showAssignmentModal}
+        recipes={pendingMultiRecipes}
+        weekDates={weekDates}
+        defaultDate={selectorDate}
+        defaultSlot={selectorSlot}
+        onConfirm={handleAssignmentConfirmed}
+        onClose={() => setShowAssignmentModal(false)}
       />
     </div>
   );

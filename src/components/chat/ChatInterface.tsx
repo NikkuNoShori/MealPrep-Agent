@@ -237,16 +237,21 @@ export const ChatInterface: React.FC = () => {
             (conv) => conv.messages.length > 0
           );
 
-          setConversations(conversationsWithMessages);
-
-          // Set the most recent conversation as current
-          if (conversationsWithMessages.length > 0) {
-            const firstConv = conversationsWithMessages[0];
-            setCurrentConversationId(firstConv.id);
-            Logger.chat.conversationLoaded(firstConv.id, firstConv.messages.length);
-          } else {
-            createDefaultConversation();
-          }
+          // Always start on a fresh new chat, with history available in sidebar
+          const newSessionId = `session-${Date.now()}`;
+          const freshChat: Conversation = {
+            id: Date.now().toString(),
+            title: "New Chat",
+            messages: [],
+            lastMessage: "",
+            timestamp: new Date(),
+            sessionId: newSessionId,
+            isTemporary: true,
+            selectedIntent: null,
+          };
+          setConversations([freshChat, ...conversationsWithMessages]);
+          setCurrentConversationId(freshChat.id);
+          Logger.chat.conversationCreated(freshChat.id, newSessionId, "New Chat", true);
         } else {
           // No conversations in database, create default
           createDefaultConversation();

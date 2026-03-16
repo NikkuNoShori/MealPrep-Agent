@@ -18,7 +18,8 @@ import {
   ThumbsDown,
   X,
   ChevronDown,
-  Trash2
+  Trash2,
+  ExternalLink
 } from 'lucide-react'
 
 interface RecipeDetailProps {
@@ -48,6 +49,8 @@ interface RecipeDetailProps {
       carbs?: number
       fat?: number
     }
+    sourceUrl?: string
+    sourceName?: string
   }
   onEdit?: () => void
   onClose?: () => void
@@ -279,6 +282,22 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
         </div>
       )}
 
+      {/* ── Source Attribution ── */}
+      {recipe.sourceUrl && (
+        <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400 mb-6">
+          <span>Source:</span>
+          <a
+            href={recipe.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+          >
+            {recipe.sourceName || (() => { try { return new URL(recipe.sourceUrl!).hostname.replace('www.', '') } catch { return recipe.sourceUrl } })()}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      )}
+
       {/* ── Two-Column Content Layout ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
         {/* Left Column — Ingredients + Nutrition */}
@@ -303,11 +322,22 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                   <>
                     <div className="space-y-0.5">
                       {visibleIngredients.map((ingredient, index) => {
+                        const rawUnit = (ingredient.unit || '').toLowerCase().trim()
                         const amount = typeof ingredient.amount === 'number' ? ingredient.amount : parseFloat(ingredient.amount) || 0
-                        const unit = (ingredient.unit || 'piece') as Unit
-                        const converted = convertIngredient(amount, unit, system)
-                        const optimized = optimizeUnit(converted.amount, converted.unit)
-                        const displayValue = formatConvertedValue(optimized.value, optimized.unit)
+                        const isQualitative = ['to taste', 'to serve', 'as needed', 'optional', 'pinch', 'dash', 'splash', 'garnish', 'for garnish', 'to garnish'].includes(rawUnit)
+                        const isZeroAmount = amount === 0 || isNaN(amount)
+
+                        let displayValue: string
+                        if (isQualitative) {
+                          displayValue = ingredient.unit
+                        } else if (isZeroAmount) {
+                          displayValue = ingredient.unit || ''
+                        } else {
+                          const unit = (ingredient.unit || 'piece') as Unit
+                          const converted = convertIngredient(amount, unit, system)
+                          const optimized = optimizeUnit(converted.amount, converted.unit)
+                          displayValue = formatConvertedValue(optimized.value, optimized.unit)
+                        }
 
                         return (
                           <div
@@ -317,7 +347,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                             }`}
                           >
                             <span className="font-medium text-sm">{ingredient.name}</span>
-                            <span className="text-sm text-muted-foreground font-mono tabular-nums ml-3 shrink-0">
+                            <span className={`text-sm text-muted-foreground ml-3 shrink-0 ${isQualitative ? 'italic' : 'font-mono tabular-nums'}`}>
                               {displayValue}
                             </span>
                           </div>
@@ -458,6 +488,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

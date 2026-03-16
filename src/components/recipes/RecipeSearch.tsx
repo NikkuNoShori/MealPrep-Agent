@@ -80,12 +80,12 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
       {/* Compact Search Bar */}
       <div className="flex gap-2">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-stone-400 z-10" />
           <Input
             placeholder="Search recipes by name, ingredients, or tags..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 h-9 text-sm border border-stone-200 dark:border-white/[0.08] rounded-lg focus:border-primary-500 dark:focus:border-primary-400 bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-sm hover:shadow transition-all duration-200"
+            className="pl-9 h-9 text-sm border border-stone-200 dark:border-white/[0.08] rounded-lg focus:border-primary-500 dark:focus:border-primary-400 bg-white dark:bg-white/[0.06] shadow-sm hover:shadow transition-all duration-200"
           />
         </div>
         <Button
