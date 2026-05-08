@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SignupForm } from '@/components/auth/SignupForm'
-import { BackButton } from '@/components/common/BackButton'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { useAuthStore } from '@/stores/authStore'
 

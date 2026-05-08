@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase'
 import { Logger } from './logger'
-import { apiClient } from './api'
 
 /**
  * Authentication Service

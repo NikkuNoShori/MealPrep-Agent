@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { authService } from '@/services/supabase'
 import { Loader2 } from 'lucide-react'
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
@@ -137,7 +136,7 @@ const AuthCallback: React.FC = () => {
         if (!session && !resolved) {
           // Try once more after a delay
           await new Promise(resolve => setTimeout(resolve, 2000))
-          const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession()
+          const { data: { session: retrySession } } = await supabase.auth.getSession()
           
           if (retrySession?.user && !resolved) {
             resolved = true

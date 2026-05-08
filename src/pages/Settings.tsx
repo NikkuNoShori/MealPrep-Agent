@@ -3,9 +3,9 @@ import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Button } from '../components/ui/button';
-import { useTheme } from '../providers/ThemeProvider';
+import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '../stores/authStore';
-import { useMeasurementSystem } from "../contexts/MeasurementSystemContext";
+import { useMeasurementSystem } from "@/hooks/useMeasurementSystem";
 import {
   useMyProfile,
   useUpdateUsername,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,33 +15,20 @@ export default function VerifyEmail() {
   const [isVerified, setIsVerified] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const verificationCode = searchParams.get('code')
-    if (verificationCode) {
-      setCode(verificationCode)
-      Logger.info('🔵 VerifyEmail: Verification code found in URL', { code: verificationCode })
-      // Automatically verify when code is found
-      handleVerify(verificationCode)
-    } else {
-      Logger.warn('⚠️ VerifyEmail: No verification code found in URL')
-      setError('Invalid email verification link. Please request a new verification email.')
-    }
-  }, [searchParams])
-
-  const handleVerify = async (verificationCode: string) => {
+  const handleVerify = useCallback(async (verificationCode: string) => {
     setIsVerifying(true)
     setError(null)
-    
+
     try {
       Logger.info('🔵 VerifyEmail: Verifying email with code', { code: verificationCode })
-      
+
       const result = await authService.verifyEmail(verificationCode)
-      
+
       if (result && result.success) {
         Logger.info('✅ VerifyEmail: Email verified successfully')
         setIsVerified(true)
         ToastService.success('Email verified successfully!')
-        
+
         // Redirect to dashboard after a short delay
         setTimeout(() => {
           navigate('/dashboard', { replace: true })
@@ -57,7 +44,20 @@ export default function VerifyEmail() {
     } finally {
       setIsVerifying(false)
     }
-  }
+  }, [navigate])
+
+  useEffect(() => {
+    const verificationCode = searchParams.get('code')
+    if (verificationCode) {
+      setCode(verificationCode)
+      Logger.info('🔵 VerifyEmail: Verification code found in URL', { code: verificationCode })
+      // Automatically verify when code is found
+      handleVerify(verificationCode)
+    } else {
+      Logger.warn('⚠️ VerifyEmail: No verification code found in URL')
+      setError('Invalid email verification link. Please request a new verification email.')
+    }
+  }, [searchParams, handleVerify])
 
   const handleResendVerification = async () => {
     try {

@@ -46,7 +46,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ code, onSu
       
       // Method 1: Verify OTP and update password in one call
       // Supabase's verifyOtp with type='recovery' handles password reset
-      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+      const { error: verifyError } = await supabase.auth.verifyOtp({
         token_hash: code,
         type: 'recovery'
       })

@@ -491,22 +491,6 @@ export const ChatInterface: React.FC = () => {
     setIsMultiSelectMode(false);
   };
 
-  // Check if current conversation is temporary and unused
-  const isCurrentConversationTemporary = () => {
-    const current = getCurrentConversation();
-    return current?.isTemporary && current.messages.length === 0;
-  };
-
-  const updateConversationTitle = (conversationId: string, title: string) => {
-    setConversations((prev) =>
-      prev.map((conv) =>
-        conv.id === conversationId
-          ? { ...conv, title: title || "New Chat" }
-          : conv
-      )
-    );
-  };
-
   // Handle image file selection
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -570,24 +554,19 @@ export const ChatInterface: React.FC = () => {
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Create object URLs when pendingImages change
+  // Create object URLs when pendingImages change. The cleanup function
+  // revokes the URLs from the previous render, so we don't need to read
+  // imagePreviewUrls inside the effect body.
   useEffect(() => {
-    // Revoke old URLs
-    imagePreviewUrls.forEach((url) => {
-      URL.revokeObjectURL(url);
-    });
-    
-    // Create new URLs for current images
     const newUrls = pendingImages.map((file) => URL.createObjectURL(file));
     setImagePreviewUrls(newUrls);
-    
-    // Cleanup function to revoke URLs on unmount or when images change
+
     return () => {
       newUrls.forEach((url) => {
         URL.revokeObjectURL(url);
       });
     };
-  }, [pendingImages]); // Only recreate when pendingImages changes
+  }, [pendingImages]);
 
   // Save sidebar width to localStorage
   useEffect(() => {

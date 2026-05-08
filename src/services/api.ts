@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from './supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { Logger } from './logger';
+import { snakeToCamel, camelToSnake } from '@/utils/case';
 
 // Supabase configuration - reuse from supabase.ts
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
@@ -14,83 +15,6 @@ const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 // For local development, use local server for RAG endpoints
 const LOCAL_API_URL = "http://localhost:3000";
 const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-
-// Transformation utilities: Convert between camelCase (frontend) and snake_case (database)
-// Field mapping for recipe-specific transformations
-const RECIPE_FIELD_MAP: Record<string, string> = {
-  // camelCase -> snake_case
-  prepTime: 'prep_time',
-  cookTime: 'cook_time',
-  totalTime: 'total_time',
-  imageUrl: 'image_url',
-  nutritionInfo: 'nutrition_info',
-  sourceUrl: 'source_url',
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
-  userId: 'user_id',
-  // snake_case -> camelCase (reverse mapping)
-  prep_time: 'prepTime',
-  cook_time: 'cookTime',
-  total_time: 'totalTime',
-  image_url: 'imageUrl',
-  nutrition_info: 'nutritionInfo',
-  source_url: 'sourceUrl',
-  created_at: 'createdAt',
-  updated_at: 'updatedAt',
-  user_id: 'userId',
-};
-
-const toSnakeCase = (key: string): string => {
-  // Use mapping if available
-  if (RECIPE_FIELD_MAP[key]) {
-    const mapped = RECIPE_FIELD_MAP[key];
-    // Only return if it's a snake_case mapping (contains underscore)
-    if (mapped.includes('_')) return mapped;
-  }
-  // Fallback to regex transformation
-  return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-};
-
-const toCamelCase = (key: string): string => {
-  // Use mapping if available
-  if (RECIPE_FIELD_MAP[key]) {
-    const mapped = RECIPE_FIELD_MAP[key];
-    // Only return if it's a camelCase mapping (no underscore)
-    if (!mapped.includes('_')) return mapped;
-  }
-  // Fallback to regex transformation
-  return key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-};
-
-// Transform object keys from snake_case to camelCase
-const snakeToCamel = (obj: any): any => {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map(snakeToCamel);
-  if (typeof obj !== 'object') return obj;
-  
-  const camelObj: any = {};
-  for (const [key, value] of Object.entries(obj)) {
-    const camelKey = toCamelCase(key);
-    camelObj[camelKey] = snakeToCamel(value);
-  }
-  return camelObj;
-};
-
-// Transform object keys from camelCase to snake_case
-const camelToSnake = (obj: any): any => {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map(camelToSnake);
-  if (typeof obj !== 'object') return obj;
-  
-  const snakeObj: any = {};
-  for (const [key, value] of Object.entries(obj)) {
-    // Skip userId as it's handled separately in createRecipe
-    if (key === 'userId') continue;
-    const snakeKey = toSnakeCase(key);
-    snakeObj[snakeKey] = camelToSnake(value);
-  }
-  return snakeObj;
-};
 
 // API client
 class ApiClient {
@@ -625,7 +549,7 @@ class ApiClient {
       .substring(2)}.${fileExt}`;
 
     // Upload file to Supabase storage
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from("recipe-images")
       .upload(fileName, file, {
         cacheControl: "3600",
@@ -669,7 +593,7 @@ class ApiClient {
       }
 
       // Try to get preferences - handle case where measurement_system column might not exist yet
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from("user_preferences")
         .select("*")
         .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
@@ -749,7 +673,7 @@ class ApiClient {
           error.message?.includes("does not exist") ||
           error.message?.includes("Not Acceptable"))
       ) {
-        const { measurement_system, ...dataWithoutMeasurement } = updateData;
+        const { measurement_system: _measurement_system, ...dataWithoutMeasurement } = updateData;
         const { data: updatedFallback, error: fallbackError } = await (supabase
           .from("user_preferences") as any)
           .update(dataWithoutMeasurement)
@@ -792,7 +716,7 @@ class ApiClient {
           error.message?.includes("does not exist") ||
           error.message?.includes("Not Acceptable"))
       ) {
-        const { measurement_system, ...dataWithoutMeasurement } = updateData;
+        const { measurement_system: _measurement_system, ...dataWithoutMeasurement } = updateData;
         const { data: createdFallback, error: fallbackError } = await supabase
           .from("user_preferences")
           .insert({ ...dataWithoutMeasurement, user_id: user.id })

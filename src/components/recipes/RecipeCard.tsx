@@ -232,7 +232,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     );
   };
 
-  const OverflowMenu = ({ position = "bottom-right" }: { position?: "bottom-right" | "bottom-left" }) => {
+  const OverflowMenu = () => {
     const hasActions = onEdit || onDelete;
     if (!hasActions) {
       // Still show share-only button

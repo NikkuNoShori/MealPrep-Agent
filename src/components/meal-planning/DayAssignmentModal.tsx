@@ -58,7 +58,7 @@ const DayAssignmentModal = ({
   recipes,
   weekDates,
   defaultDate,
-  defaultSlot,
+  defaultSlot: _defaultSlot,
   onConfirm,
   onClose,
 }: DayAssignmentModalProps) => {

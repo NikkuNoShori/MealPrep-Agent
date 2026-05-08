@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { useAuthStore } from '@/stores/authStore';
 import {
   useMealPlans,
   useCreateMealPlan,
@@ -107,7 +106,6 @@ function getWeekMealCount(meals: any, weekDates: Date[]): number {
 }
 
 const MealPlanner = () => {
-  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('calendar');
   const [calendarView, setCalendarView] = useState<'days' | 'meals'>('days');
   const [currentWeek, setCurrentWeek] = useState(() => getWeekStart(new Date()));

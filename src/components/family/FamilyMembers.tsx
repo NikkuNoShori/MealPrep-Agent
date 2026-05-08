@@ -5,7 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { X, Plus, User, Edit, Trash2 } from 'lucide-react';
+import { Plus, User, Edit, Trash2 } from 'lucide-react';
 
 interface FamilyMember {
   id: string;

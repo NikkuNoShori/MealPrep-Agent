@@ -1,20 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { usePreferences, useUpdatePreferences } from '@/services/api';
 import { MeasurementSystem } from '@/utils/unitConverter';
-
-interface MeasurementSystemContextType {
-  system: MeasurementSystem;
-  setSystem: (system: MeasurementSystem) => void;
-  isLoading: boolean;
-}
-
-const MeasurementSystemContext = createContext<MeasurementSystemContextType | undefined>(undefined);
+import { MeasurementSystemContext } from '@/hooks/useMeasurementSystem';
 
 export const MeasurementSystemProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { data: preferences, isLoading } = usePreferences();
   const updatePreferences = useUpdatePreferences();
   const [system, setSystemState] = useState<MeasurementSystem>('metric');
-  const [hasUserOverride, setHasUserOverride] = useState(false);
 
   // Load preference from database — only when we actually get data back
   useEffect(() => {
@@ -26,10 +18,8 @@ export const MeasurementSystemProvider: React.FC<{ children: ReactNode }> = ({ c
     // overwrite an in-memory selection the user just made
   }, [preferences]);
 
-  // Update system and save to database
   const setSystem = async (newSystem: MeasurementSystem) => {
     setSystemState(newSystem);
-    setHasUserOverride(true);
     try {
       await updatePreferences.mutateAsync({
         measurement_system: newSystem,
@@ -45,12 +35,3 @@ export const MeasurementSystemProvider: React.FC<{ children: ReactNode }> = ({ c
     </MeasurementSystemContext.Provider>
   );
 };
-
-export const useMeasurementSystem = () => {
-  const context = useContext(MeasurementSystemContext);
-  if (context === undefined) {
-    throw new Error('useMeasurementSystem must be used within a MeasurementSystemProvider');
-  }
-  return context;
-};
-

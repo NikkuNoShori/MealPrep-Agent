@@ -367,7 +367,7 @@ export const useThemeStore = create<ThemeState>()(
 
       removeColorScheme: (name: string) => {
         set((state) => {
-          const { [name]: removed, ...remaining } = state.availableColorSchemes;
+          const { [name]: _removed, ...remaining } = state.availableColorSchemes;
           return {
             availableColorSchemes: remaining,
             // Reset to default if current scheme is removed

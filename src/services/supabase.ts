@@ -35,7 +35,7 @@ const supabase = getSupabaseClient();
 // Handle invalid refresh token errors gracefully
 if (typeof window !== 'undefined') {
   // Listen for auth errors and clear invalid sessions
-  supabase.auth.onAuthStateChange((event, session) => {
+  supabase.auth.onAuthStateChange((event, _session) => {
     if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
       // Session is valid
       return;
@@ -64,25 +64,25 @@ export const recipeService = {
   },
 
   // Get a single recipe by ID
-  async getRecipe(id: string) {
+  async getRecipe(_id: string) {
     // This should use the API endpoint
     return null
   },
 
   // Create a new recipe
-  async createRecipe(recipeData: any) {
+  async createRecipe(_recipeData: any) {
     // This should use the API endpoint
     throw new Error('Recipe creation not implemented yet')
   },
 
   // Update an existing recipe
-  async updateRecipe(id: string, recipeData: any) {
+  async updateRecipe(_id: string, _recipeData: any) {
     // This should use the API endpoint
     throw new Error('Recipe update not implemented yet')
   },
 
   // Delete a recipe
-  async deleteRecipe(id: string) {
+  async deleteRecipe(_id: string) {
     // This should use the API endpoint
     throw new Error('Recipe deletion not implemented yet')
   }
@@ -94,7 +94,7 @@ export const authService = {
   async getUser() {
     try {
       // First check if we have a session - this is more reliable than getUser() immediately after OAuth
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
       
       // If we have a session with a user, use that directly
       if (currentSession?.user) {

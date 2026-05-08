@@ -16,7 +16,6 @@ import {
   Upload,
   Image as ImageIcon,
   GripVertical,
-  Edit2,
   Check,
   ArrowUpDown,
   ChevronRight,
@@ -821,7 +820,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                           src={imagePreview}
                           alt="Recipe preview"
                           className="w-full h-full object-contain"
-                          onError={(e) => {
+                          onError={() => {
                             console.error(
                               "Image failed to load:",
                               imagePreview

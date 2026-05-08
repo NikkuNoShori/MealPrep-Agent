@@ -2,8 +2,8 @@
 
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
-**Last reviewed:** 2026-03-14
-**Last updated:** 2026-03-14 (MOP-0002 complete; MOP-0005 drafted)
+**Last reviewed:** 2026-05-08
+**Last updated:** 2026-05-08 (MOP-0006 drafted — Generated Supabase Types & API Typing)
 
 ---
 
@@ -26,7 +26,8 @@
 | [MOP-0002](MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | complete | 2026-03-11 | 2026-03-14 | 2026-03-14 | Nick Neal |
 | [MOP-0003](MOP-0003.md) | Dietary Profiles & Allergen Detection | draft | 2026-03-12 | 2026-03-12 | — | Nick Neal |
 | [MOP-0004](MOP-0004.md) | Meal Planner & Grocery Cart | draft | 2026-03-12 | 2026-03-12 | — | Nick Neal |
-| [MOP-0005](MOP-0005.md) | Test Coverage & Testing Infrastructure | draft | 2026-03-14 | 2026-03-14 | — | Nick Neal |
+| [MOP-0005](MOP-0005.md) | Test Coverage & Testing Infrastructure | draft | 2026-03-14 | 2026-05-08 | — | Nick Neal |
+| [MOP-0006](MOP-0006.md) | Generated Supabase Types & API Typing | draft | 2026-05-08 | 2026-05-08 | — | Nick Neal |
 
 ---
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button } from './button'
 import { Sun, Moon } from "lucide-react";
-import { useTheme } from "../../providers/ThemeProvider";
+import { useTheme } from "@/hooks/useTheme";
 
 interface ThemeToggleProps {
   variant?: "button" | "select";

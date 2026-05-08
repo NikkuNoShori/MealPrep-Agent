@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useMemo } from 'react'
-import { useRecipes, useCreateRecipe, useDeleteRecipe, useRemoveRecipeFromCollection, useCollectionRecipes, usePublicRecipes, useHouseholdRecipes, useRecipeReactions, useToggleRecipeReaction, useMyHousehold } from '@/services/api'
+import { useRecipes, useDeleteRecipe, useRemoveRecipeFromCollection, useCollectionRecipes, usePublicRecipes, useHouseholdRecipes, useRecipeReactions, useToggleRecipeReaction, useMyHousehold } from '@/services/api'
 import { RecipeCard, RecipeReaction } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
 import { useAuthStore } from '@/stores/authStore'
@@ -23,7 +23,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   onAddRecipe,
   onEditRecipe,
   collectionId,
-  collectionName,
+  collectionName: _collectionName,
   feedMode = 'public',
 }) => {
   const { user } = useAuthStore();
@@ -37,7 +37,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   });
   const { data: recipes, isLoading, error } = useRecipes({ limit: 50 });
   const { data: publicRecipesData, isLoading: publicLoading } = usePublicRecipes({ limit: 50 });
-  const { data: householdRecipesData, isLoading: householdLoading } = useHouseholdRecipes({ limit: 50 });
+  const { data: householdRecipesData } = useHouseholdRecipes({ limit: 50 });
   const { data: collectionRecipes, isLoading: collectionLoading } = useCollectionRecipes(collectionId || '');
   const deleteRecipeMutation = useDeleteRecipe();
   const removeFromCollectionMutation = useRemoveRecipeFromCollection();

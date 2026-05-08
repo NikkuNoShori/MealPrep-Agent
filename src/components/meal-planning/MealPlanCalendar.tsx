@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Calendar, Plus, ChefHat, Clock, Users, Utensils } from 'lucide-react';
+import { Plus, ChefHat, Clock, Utensils } from 'lucide-react';
 
 interface MealPlan {
   id: string;

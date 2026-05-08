@@ -70,32 +70,3 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   return <>{children}</>
 }
-
-// Hook for easy theme access
-export const useTheme = () => {
-  const {
-    theme,
-    currentTheme,
-    isDark,
-    isLight,
-    colorScheme,
-    availableColorSchemes,
-    setTheme,
-    setColorScheme,
-    addColorScheme,
-    removeColorScheme,
-  } = useThemeStore()
-
-  return {
-    theme,
-    currentTheme,
-    isDark,
-    isLight,
-    colorScheme,
-    availableColorSchemes,
-    setTheme,
-    setColorScheme,
-    addColorScheme,
-    removeColorScheme,
-  }
-}

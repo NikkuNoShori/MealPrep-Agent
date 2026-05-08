@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { authService } from '@/services/authService';
-import { useAuthStore } from '@/stores/authStore';
 import { ToastService } from '@/services/toast';
 import { Logger } from '@/services/logger';
 import { Loader2 } from 'lucide-react';
@@ -10,7 +8,6 @@ import { Card, CardContent } from '@/components/ui/card';
 export default function OAuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { signIn } = useAuthStore();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [error, setError] = useState<string>('');
 
