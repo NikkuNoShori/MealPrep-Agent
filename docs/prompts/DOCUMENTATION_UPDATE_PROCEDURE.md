@@ -2,12 +2,18 @@
 
 **Purpose:** Self-contained instructions for performing a canonical documentation update after code changes are merged. This document contains all context needed — point an AI assistant here and say "follow these instructions" to execute a full documentation audit and update.
 
-**Last updated:** 2026-03-10
+**Last updated:** 2026-06-01 (added references to MOP_STATUS_LIFECYCLE, ADR_AUTHORING_GUIDE, DECISIONS directory; integrated lockticket Verification flow)
 
 ### Key references
+- **MOPs:** `docs/MOPs/` — operational change plans with status tracking
+- **MOP registry:** `docs/MOPs/REGISTRY.md` — current MOP inventory
+- **MOP status lifecycle:** `docs/prompts/MOP_STATUS_LIFECYCLE.md` — valid statuses and transitions
+- **ADRs:** `docs/DECISIONS/` — rationale behind architectural decisions
+- **ADR authoring guide:** `docs/prompts/ADR_AUTHORING_GUIDE.md` — format, numbering, lifecycle
 - **Architecture docs:** `docs/Architecture/` — detailed design documents (PRD, SDD, RAG design)
 - **Development docs:** `docs/Development/` — setup guides, edge function docs, local dev
 - **Feature docs:** `docs/Features/` — feature-specific implementation details
+- **AI Integration Audit:** `docs/AI_INTEGRATION_AUDIT.md` — strategic AI surface review
 
 ---
 
@@ -73,7 +79,24 @@ These are the documents that must be checked and potentially updated. Each has a
 |----------|------|----------------|
 | **MOP Registry** | `docs/MOPs/REGISTRY.md` | Any code change completes or advances a MOP phase |
 
-Review all `planned` MOPs in the registry. If the merged code completes any phase or acceptance criterion, update that MOP's status, `Date Updated`, and check off the relevant criteria. If a MOP is fully complete, set status to `completed` and fill in `Date Completed`.
+Review all `planned` and `in_progress` MOPs in the registry. If the merged code completes any phase or acceptance criterion, update that MOP's status, `Date Updated`, and check off the relevant criteria.
+
+**Status transitions:**
+- If implementation is done but Verification block hasn't passed → `verifying`
+- If all `## Verification` items pass → `complete` (run `/verify-mop` per MOP-0010 to gate this transition once the skill ships)
+- Fill in `Date Completed` when status becomes `complete`
+
+See `docs/prompts/MOP_STATUS_LIFECYCLE.md` for valid statuses.
+
+### ADR Directory (review for new decisions):
+
+| Document | Path | Update when... |
+|----------|------|----------------|
+| **DECISIONS/** | `docs/DECISIONS/ADR-*.md` | A merged change reflects a decision worth recording (see ADR_AUTHORING_GUIDE.md for criteria) |
+
+- New non-trivial decisions → create ADR via `/new-adr` skill
+- ADRs in scope of the merge → update `Last reviewed` to today's date
+- `proposed` ADRs whose decisions were implemented this round → flip to `accepted`
 
 ### Secondary documents (update if directly impacted):
 
