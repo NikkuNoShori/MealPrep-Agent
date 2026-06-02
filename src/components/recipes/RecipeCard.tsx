@@ -87,7 +87,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   const hasReactions = thumbsUp.length > 0 || thumbsDown.length > 0;
 
   const [showReactionTooltip, setShowReactionTooltip] = useState<"up" | "down" | null>(null);
-  const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reactionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showReactionPopover, setShowReactionPopover] = useState(false);
   const reactionPopoverRef = useRef<HTMLDivElement>(null);
 

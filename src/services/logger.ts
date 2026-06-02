@@ -27,14 +27,8 @@ const getLogLevel = (): number => {
       return LOG_LEVELS.debug;
     }
   } else {
-    // In Node.js, use process.env (only if process is available)
-    try {
-      const env = (typeof process !== 'undefined' && process.env?.NODE_ENV) || 'development';
-      return env === 'production' ? LOG_LEVELS.warn : LOG_LEVELS.debug;
-    } catch {
-      // Fallback to debug if process is not available
-      return LOG_LEVELS.debug;
-    }
+    // Non-browser environment (tests, SSR): default to debug
+    return LOG_LEVELS.debug;
   }
 };
 

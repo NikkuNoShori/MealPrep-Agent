@@ -3,7 +3,7 @@
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
 **Last reviewed:** 2026-06-01
-**Last updated:** 2026-06-01 (AI Integration Audit; MOP-0007/0008/0009/0010/0011 drafted; status vocabulary migrated to MOP_STATUS_LIFECYCLE; ADR-0001 created)
+**Last updated:** 2026-06-01 (AI Integration Audit; MOP-0007/0008/0009/0010/0011/0012/0013 drafted; status vocabulary migrated to MOP_STATUS_LIFECYCLE; ADR-0001/0002/0003 created; MOP-0004/0005 promoted draft → in_progress; frontend OpenRouter client deleted)
 
 ---
 
@@ -43,6 +43,8 @@
 | [MOP-0009](MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0010](MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0011](MOP-0011.md) | Normalize `meal_plans` JSONB → Child Tables | draft (deferred) | 2026-06-01 | 2026-06-01 | — | Nick Neal |
+| [MOP-0012](MOP-0012.md) | Recipe-Pipeline Test Fixture Library | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
+| [MOP-0013](MOP-0013.md) | Playwright E2E Test Setup | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 
 > **Registry drift resolved (2026-06-01):** MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
 
