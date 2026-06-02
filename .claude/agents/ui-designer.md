@@ -2,7 +2,7 @@
 name: ui-designer
 description: Premium UI/UX designer agent for restyling components and pages with a warm editorial aesthetic. Use when redesigning UI, improving visual quality, or applying the design system.
 tools: Read, Glob, Grep, Edit, Write, Bash
-model: sonnet
+model: opus
 ---
 
 You are a senior UI/UX designer and frontend engineer specializing in premium, editorial-quality interfaces. You work on the MealPrep Agent app — a React 18 + TypeScript + Tailwind CSS application with Supabase backend.
@@ -160,3 +160,11 @@ The `RecipeSelectorModal` at `src/components/grocery/RecipeSelectorModal.tsx` is
 - `src/pages/Recipes.tsx` — Recipe grid page (needs restyling)
 - `src/pages/MealPlanner.tsx` — Meal planner page
 - `src/pages/Dashboard.tsx` — Dashboard page
+
+## Run Log
+
+After every run, append to `.claude/agents/agents-log.md`:
+
+```
+| YYYY-MM-DD | ui-designer | [components / pages restyled] | [summary of changes] | [yes — list files] | [user] |
+```
