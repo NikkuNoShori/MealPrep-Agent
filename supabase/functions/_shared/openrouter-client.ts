@@ -2,6 +2,47 @@
  * Shared OpenRouter client for Supabase Edge Functions (Deno runtime).
  * Extracted from chat-api/index.ts for reuse across pipeline and chat.
  */
+
+// ─────────────────────────────────────────────────────────────────────
+// Types for tool-using chat (OpenAI-compatible tool format)
+// ─────────────────────────────────────────────────────────────────────
+
+export type ChatMessageRole = "system" | "user" | "assistant" | "tool";
+
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string; // JSON string per OpenAI spec
+  };
+}
+
+export interface ChatMessage {
+  role: ChatMessageRole;
+  content: string | null;
+  // assistant-only:
+  tool_calls?: ToolCall[];
+  // tool-only:
+  tool_call_id?: string;
+  name?: string;
+}
+
+export interface ToolSpec {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>; // JSON Schema
+  };
+}
+
+export interface ChatWithToolsResult {
+  content: string | null;
+  tool_calls: ToolCall[];
+  finish_reason: string | null;
+}
+
 export class OpenRouterClient {
   private defaultApiKey: string;
   private vlApiKey?: string;
@@ -173,6 +214,72 @@ export class OpenRouterClient {
       throw new Error(`OpenRouter returned no choices (${errorDetail})`);
     }
     return data.choices[0].message.content;
+  }
+
+  /**
+   * Tool-using chat completion (OpenAI-compatible tools/tool_choice).
+   * The model may return either a plain text response or a list of tool calls
+   * the runtime must execute and feed back as `role:"tool"` messages.
+   */
+  async chatWithTools(
+    systemPrompt: string,
+    messages: ChatMessage[],
+    tools: ToolSpec[],
+    model = "qwen/qwen-2.5-7b-instruct",
+    options?: {
+      temperature?: number;
+      max_tokens?: number;
+      tool_choice?: "auto" | "none" | "required";
+    }
+  ): Promise<ChatWithToolsResult> {
+    const apiKey = this.getApiKeyForModel(model);
+
+    const fullMessages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      ...messages,
+    ];
+
+    const body: Record<string, unknown> = {
+      model,
+      messages: fullMessages,
+      tools,
+      tool_choice: options?.tool_choice ?? "auto",
+      temperature: options?.temperature ?? 0.2,
+      max_tokens: options?.max_tokens ?? 1024,
+    };
+
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": Deno.env.get("FRONTEND_URL") || "",
+        "X-Title": "MealPrep Agent",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter chatWithTools error:", response.status, errorText);
+      throw new Error(`OpenRouter API failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    if (!choice?.message) {
+      const bodyStr = JSON.stringify(data).substring(0, 500);
+      const errorDetail = data.error?.message
+        ? `error: ${data.error.message}`
+        : `body: ${bodyStr.substring(0, 200)}`;
+      throw new Error(`OpenRouter returned no choices (${errorDetail})`);
+    }
+
+    return {
+      content: choice.message.content ?? null,
+      tool_calls: choice.message.tool_calls ?? [],
+      finish_reason: choice.finish_reason ?? null,
+    };
   }
 
   async generateEmbedding(text: string): Promise<number[]> {

@@ -154,6 +154,10 @@ export const ChatInterface: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Tracks whether the initial conversation load has completed. Subsequent
+  // refetches of chat history (e.g. after sending a message) must not reset
+  // local state — local handlers already keep conversations in sync.
+  const hasInitializedRef = useRef(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState(false);
@@ -177,6 +181,8 @@ export const ChatInterface: React.FC = () => {
   // Load conversations from database on component mount
   useEffect(() => {
     if (!user || isLoadingHistory) return; // Wait for user to be loaded and data to be fetched
+    if (hasInitializedRef.current) return; // Already initialized; refetches must not reset state
+    hasInitializedRef.current = true;
 
     const loadConversations = async () => {
       try {
@@ -880,11 +886,17 @@ export const ChatInterface: React.FC = () => {
         );
       }
 
-      // Update conversation with AI response and title if returned
+      // Update conversation with AI response and title if returned.
+      // When the conversation was just persisted, its local id was swapped
+      // from the temp value to the server-issued UUID — use that resolved id
+      // here so the AI message attaches to the correct conversation.
+      const resolvedConversationId =
+        ((response as any).conversationId as string | undefined) ||
+        currentConversationId;
       const serverTitle = (response as any).title;
       setConversations((prev) =>
         prev.map((conv) =>
-          conv.id === currentConversationId
+          conv.id === resolvedConversationId
             ? {
                 ...conv,
                 messages: [...conv.messages, aiMessage],

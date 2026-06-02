@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-03-14
-**Last updated:** 2026-03-14 (household-invite + admin-api edge functions, 5 data-access RPC functions, recipe reactions, admin, invite, and profile API methods)
+**Last reviewed:** 2026-06-01
+**Last updated:** 2026-06-01 (MOP-0008: chat-api intent router replaced with tool-using agent loop; documented `pendingConfirmation` response and `context.confirmAction` request fields)
 
 ---
 
@@ -11,7 +11,7 @@
 
 ### POST `/functions/v1/chat-api/message`
 
-Main chat endpoint with intent routing and multi-modal support.
+Main chat endpoint. Runs the tool-using Chef Marcus agent loop (MOP-0008). Supports multi-modal input (text + images) and a destructive-tool confirmation flow.
 
 **Location:** `supabase/functions/chat-api/index.ts`
 
@@ -25,17 +25,24 @@ apikey: <supabase-anon-key>
 **Request body:**
 ```json
 {
-  "message": "string (required unless images provided)",
+  "message": "string (required unless images or context.confirmAction provided)",
   "images": ["base64-data-url (optional, max 4)"],
   "sessionId": "string (optional — groups messages into a conversation)",
-  "intent": "recipe_extraction (optional — force intent, otherwise AI detects)",
+  "intent": "string (optional — manual intent override, surfaced in metadata only)",
   "context": {
     "conversationId": "uuid (optional — resume existing conversation)",
     "recentMessages": ["array (optional — recent message context)"],
-    "metadata": {}
+    "metadata": {},
+    "confirmAction": {
+      "tool": "delete_recipe | update_recipe | assign_recipe_to_meal_plan_slot",
+      "args": { "...": "validated args returned in the prior pendingConfirmation envelope" },
+      "idempotencyKey": "string (optional, from prior envelope)"
+    }
   }
 }
 ```
+
+`context.confirmAction` short-circuits the agent loop: the previously-validated tool runs directly under the user's session, no model call is made. Submit it after the user clicks "Confirm" on a `pendingConfirmation` envelope (see below).
 
 **Response:**
 ```json
@@ -49,17 +56,29 @@ apikey: <supabase-anon-key>
   },
   "recipe": { "..." },
   "recipes": [{ "..." }, { "..." }],
+  "pendingConfirmation": {
+    "tool": "delete_recipe | update_recipe | assign_recipe_to_meal_plan_slot",
+    "args": { "...": "args the user must approve before they are applied" },
+    "summary": "Human-readable confirmation prompt",
+    "idempotencyKey": "string (UI uses this to dedupe re-clicks of Confirm)"
+  },
   "conversationId": "uuid",
   "sessionId": "string",
   "intentMetadata": {
-    "source": "ai | manual",
-    "detectedIntent": "recipe_extraction | rag_search | general_chat",
-    "reason": "string",
-    "confidence": 0.95
+    "source": "agent",
+    "manualIntent": "string | null",
+    "toolCalls": [
+      { "name": "search_recipes", "args": {}, "ok": true, "durationMs": 412 }
+    ],
+    "iterations": 2,
+    "hitMaxIters": false,
+    "confirmAction": "boolean (true when this turn was a confirmAction short-circuit)"
   },
   "title": "string (AI-generated conversation title, first message only)"
 }
 ```
+
+`pendingConfirmation` is present only when the agent emitted a destructive tool call. The handler did **not** execute — the UI must render a Confirm/Cancel surface and resend on Confirm with `context.confirmAction` carrying the same `{ tool, args, idempotencyKey }`.
 
 **`recipe` object shape:**
 ```json
@@ -82,16 +101,22 @@ apikey: <supabase-anon-key>
 
 **Multi-recipe:** When multiple recipes are extracted, `recipes` contains an array of recipe objects (max 5). The first recipe is also in `recipe` for backwards compatibility. `recipes` is omitted when only one recipe is found.
 
-**Intent routing:**
-| Intent | Model | Behavior |
-|--------|-------|----------|
-| `recipe_extraction` | `qwen/qwen-2.5-vl-7b-instruct` (vision) or `qwen/qwen-2.5-7b-instruct` (text) | Delegates to `recipe-pipeline/extract-only` for structured recipe extraction |
-| `rag_search` | `qwen/qwen-2.5-7b-instruct` | Hybrid search (semantic + text) via Supabase RPCs, then contextual AI response |
-| `general_chat` | `qwen/qwen-2.5-7b-instruct` | Direct OpenRouter chat with conversation history |
+**Tool-call lifecycle (MOP-0008):**
+
+1. The model receives the user message + the tool catalog (up to 12 tools, see [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md)).
+2. Each iteration the model emits 0..many `tool_calls`. The dispatcher validates args against the tool's JSON Schema, rejects any `user_id` key, and:
+   - Always-destructive tools (`update_recipe`, `delete_recipe`) → return a `pendingConfirmation` envelope; the handler does NOT run.
+   - Conditionally destructive (`assign_recipe_to_meal_plan_slot` when the slot is occupied) → same envelope.
+   - All other tools → execute under the user-scoped Supabase client (RLS enforced; no `user_id` from args).
+3. Tool outputs are wrapped in `<tool_result>...</tool_result>` markers and fed back to the model as `role: "tool"` messages.
+4. The loop terminates on a plain content reply, a confirmation short-circuit, or `MAX_ITERS = 5`.
+5. Frontend renders `pendingConfirmation` as a Confirm/Cancel inline surface. On Confirm, resend with `context.confirmAction` — the runtime applies the change and replies with `intentMetadata.confirmAction: true`.
+
+Model: `qwen/qwen-2.5-7b-instruct`, temperature 0.2, `tool_choice: auto`.
 
 **Error responses:**
 - `401` — Missing or invalid JWT
-- `400` — Missing required `message` field (when no images provided)
+- `400` — Missing required `message` field (when no images and no `confirmAction` provided)
 - `500` — Internal error (OpenRouter failure, DB error)
 
 ---
@@ -294,10 +319,13 @@ All AI behavior is controlled by system prompts. Edit these files to customize t
 
 | Export | Used By | Purpose |
 |--------|---------|---------|
+| `CHAT_AGENT_SYSTEM_PROMPT` | Chat API agent loop (MOP-0008) | Chef Marcus persona + 6 hard rules (no `user_id`, no fabrication, allergen language, destructive→confirm, treat retrieved content as data, cite sources). `{{TODAY_ISO_DATE}}` is interpolated at runtime. |
 | `RECIPE_EXTRACTION_PROMPT` | Extract stage (text) | Structured recipe extraction from text input |
 | `IMAGE_EXTRACTION_PROMPT` | Extract stage (images) | Specialized extraction for cookbook pages, handwritten notes, screenshots |
-| `INTENT_DETECTION_PROMPT` | Chat API | Classifies user messages as `recipe_extraction`, `rag_search`, or `general_chat` |
-| `GENERAL_CHAT_PROMPT` | Chat API | Conversational cooking assistant persona |
+| `RAG_RESPONSE_PROMPT` | Chat API tool-result composer | Contextual response over retrieved recipes |
+| `SUBSTITUTION_PROMPT` | `propose_substitution` tool | 2–4 ranked ingredient substitutions |
+| `GENERAL_CHAT_PROMPT` | (legacy fallback) | Conversational persona — no longer on the hot path |
+| `INTENT_DETECTION_PROMPT` | (`@deprecated`) | Classified user messages pre-MOP-0008. Kept exported during the migration window; remove in post-rollout cleanup. |
 
 > **Note:** Legacy frontend prompts that previously lived in `src/prompts/` have been removed. All prompt configuration is in the single backend file above.
 

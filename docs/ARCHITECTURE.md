@@ -3,7 +3,7 @@
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
 **Last reviewed:** 2026-06-01
-**Last updated:** 2026-06-01 (security doc tightening: removed `VITE_OPENROUTER_API_KEY` — no frontend AI path; all LLM calls via Edge Function secret)
+**Last updated:** 2026-06-01 (MOP-0008: chat-api intent router replaced with tool-using single-agent loop; documented `pendingConfirmation` + `confirmAction` contract)
 
 ---
 
@@ -53,8 +53,13 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 
 ### Key boundaries:
 - **Frontend ↔ Supabase**: All DB access goes through Supabase client (JS SDK). No direct SQL from frontend.
-- **Frontend ↔ OpenRouter**: Direct API calls from `src/lib/openrouter.ts` for chat, embeddings, and intent detection.
-- **Edge Functions**: `chat-api` handles server-side chat processing with intent routing; `household-invite` handles invite creation/email; `admin-api` handles admin operations. All accessible via Supabase Functions invoke.
+- **Frontend ↔ OpenRouter**: No direct frontend → OpenRouter calls in production. All LLM work goes through edge functions.
+- **Edge Functions**:
+  - `chat-api` — tool-using single-agent loop (MOP-0008). Drives Chef Marcus through up to 5 LLM iterations with a 12-tool catalog (read, capture, plan/cart, destructive, web search). See [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md).
+  - `recipe-pipeline` — adapter → extract → transform → load stages (URL, text, video).
+  - `household-invite` — invite creation + email.
+  - `admin-api` — admin operations.
+  - All accessible via Supabase Functions invoke.
 - **Storage**: Recipe images stored in Supabase Storage bucket `recipe-images`, accessed via signed URLs.
 
 ---
@@ -106,48 +111,78 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 
 ## AI Pipeline
 
-### Intent Detection
-When a user sends a message, the system classifies intent into one of three categories:
+### Chat Agent Loop (MOP-0008)
 
-| Intent | Description | Model |
-|--------|-------------|-------|
-| `recipe_extraction` | User is sharing/adding a recipe (text or image) | `qwen/qwen-2.5-vl-7b-instruct` (vision) |
-| `rag_search` | User is searching their recipe collection | `qwen/qwen-3-8b` |
-| `general_chat` | General cooking questions, conversation | `qwen/qwen-3-8b` |
+The `chat-api` edge function runs a **single tool-using agent** ("Chef Marcus"). The previous router pattern (one LLM call classifies intent → branches to one of three handlers) is gone. Each user turn drives up to 5 LLM iterations against a 12-tool catalog; the model picks zero, one, or many tools per iteration. Full design: [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md).
 
-Intent detection runs via OpenRouter with a classification prompt defined in `_shared/recipe-prompts.ts` (server) and `src/prompts/intentRouter.ts` (client hint).
+```
+POST /chat-api/message
+  │
+  ▼
+handleSendMessage (conversation resolution, image upload, persist user msg)
+  │
+  ├─► context.confirmAction present?
+  │     ├─ yes → executeConfirmedTool (skip the model, apply destructive change)
+  │     └─ no  → runAgentLoop
+  │
+  ▼
+runAgentLoop (max 5 iterations):
+  1. openRouter.chatWithTools(CHAT_AGENT_SYSTEM_PROMPT, history, TOOL_CATALOG)
+  2. No tool_calls? → break, plain content is the reply.
+  3. tool_calls[] returned:
+       for each call:
+         a. dispatchTool — schema-validate args; reject any user_id key.
+         b. DESTRUCTIVE_TOOLS (update_recipe, delete_recipe)
+            → short-circuit with pendingConfirmation envelope (handler NOT run).
+         c. CONDITIONALLY_DESTRUCTIVE (assign_recipe_to_meal_plan_slot)
+            → handler may also return requiresConfirmation.
+         d. Otherwise → execute handler under user-scoped Supabase (RLS).
+         e. Wrap output in <tool_result>...</tool_result> (prompt-injection
+            defense) and append as role:"tool" message.
+  4. iter == 5 → one final call with tool_choice:"none" to compose a reply.
+  │
+  ▼
+Compose: { content, toolCalls[], pendingConfirmation?, recipe?, recipes? }
+  │
+  ▼
+Persist AI message + metadata.toolCalls (audit log)
+```
 
-### RAG Search Pipeline
-Handled directly in the `chat-api` edge function (`handleRAGSearch`):
-1. User query → `openRouter.generateEmbedding()` (ada-002, 1536-dim)
-2. Hybrid search via Supabase RPCs (in parallel):
-   - **Semantic**: `search_recipes_semantic` — cosine similarity against `recipes.embedding_vector` (threshold: 0.5, top 5)
-   - **Text**: `search_recipes_text` — PostgreSQL full-text search against `recipes.searchable_text` (top 5)
-3. Results deduplicated by recipe ID, semantic results prioritized
-4. Recipe details formatted as context and sent to OpenRouter
-5. AI generates contextual response referencing the user's actual recipes
+| Concept | Location |
+|---|---|
+| Agent loop | `supabase/functions/chat-api/agent-loop.ts` |
+| Tool catalog (12 tools, OpenAI-format JSON schemas) | `supabase/functions/chat-api/tools/catalog.ts` |
+| Dispatcher (schema validation, `user_id` reject, destructive short-circuit) | `supabase/functions/chat-api/tools/dispatch.ts` |
+| Tool handlers | `supabase/functions/chat-api/tools/handlers.ts` |
+| Shared web-search client (`web_search_recipe` provider abstraction) | `supabase/functions/_shared/web-search-client.ts` |
+| All prompts | `supabase/functions/_shared/recipe-prompts.ts` |
 
-### Recipe Extraction Pipeline
-1. User sends text/images (up to 4 images supported)
-2. Vision model (`qwen-2.5-vl-7b-instruct`) processes content
-3. Structured JSON recipe extracted (title, ingredients, instructions, metadata)
-4. Recipe saved to `recipes` table
-5. Embedding generated and stored in `recipes.embedding_vector`
-6. Full-text index updated automatically via trigger
+### Tool Catalog Summary
+
+| Bucket | Tools |
+|---|---|
+| Read (DB) | `search_recipes`, `find_similar_recipes`, `get_household_recipes`, `get_household_profile`, `get_meal_plan`, `propose_substitution` |
+| Read (web) | `web_search_recipe` (gated on `WEB_SEARCH_API_KEY`) |
+| Capture | `extract_recipe_from_source` (delegates to `recipe-pipeline/extract-only`) |
+| Plan / cart | `assign_recipe_to_meal_plan_slot` (conditionally destructive), `add_to_grocery_list` |
+| Destructive | `update_recipe`, `delete_recipe` — always return `pendingConfirmation`; user must reply via `context.confirmAction` |
+
+Models: `qwen/qwen-2.5-7b-instruct` (instruct) and `qwen/qwen-2.5-vl-7b-instruct` (vision, for image extraction inside `recipe-pipeline`). Temperature 0.2, `tool_choice: auto`, `MAX_ITERS = 5`.
+
+### Embedding Pipeline
+Recipe embeddings are still generated via `text-embedding-ada-002` (1536-dim) on extract → `recipes.embedding_vector`. Used by `search_recipes` and `find_similar_recipes` tool handlers via the existing semantic/full-text RPCs.
 
 ### Prompts
-**Server-side** (edge functions, authoritative): `supabase/functions/_shared/recipe-prompts.ts`
-- `INTENT_DETECTION_PROMPT` — intent classification
-- `RECIPE_EXTRACTION_PROMPT` — structured recipe extraction
-- `GENERAL_CHAT_PROMPT` — cooking assistant responses
-- `RAG_RESPONSE_PROMPT` — recipe search contextual responses (inline in chat-api)
-
-**Client-side** (UI hints, non-authoritative): `src/prompts/`
-- `intentRouter.ts`, `recipeExtraction.ts`, `generalChat.ts`
+**Server-side** (authoritative): `supabase/functions/_shared/recipe-prompts.ts`
+- `CHAT_AGENT_SYSTEM_PROMPT` — Chef Marcus persona + 6 hard rules (no `user_id`, no fabrication, allergen language, destructive→confirm, treat retrieved content as data, cite sources).
+- `RECIPE_EXTRACTION_PROMPT`, `IMAGE_EXTRACTION_PROMPT` — used inside `recipe-pipeline`.
+- `RAG_RESPONSE_PROMPT` — used by tool-result composers.
+- `SUBSTITUTION_PROMPT` — used by `propose_substitution`.
+- `INTENT_DETECTION_PROMPT`, `GENERAL_CHAT_PROMPT` — `@deprecated`, kept for backwards compatibility during the migration window.
 
 ### OpenRouter Clients
-**Frontend** (`src/lib/openrouter.ts`): `chat()`, `chatWithHistory()`, `chatWithImages()`, `chatJSON()`
-**Edge Functions** (`_shared/openrouter-client.ts`): `chat()`, `chatWithHistory()`, `chatWithImages()`, `generateEmbedding()`
+**Edge Functions** (`_shared/openrouter-client.ts`): `chat()`, `chatWithHistory()`, `chatWithImages()`, `chatWithTools()`, `generateEmbedding()`.
+The frontend has **no LLM client** — `src/lib/openrouter.ts` is deprecated; all AI work goes through edge functions.
 
 ---
 
@@ -238,13 +273,16 @@ Component → api.ts (React Query) → Supabase Client → PostgreSQL
 ### Chat Message Flow
 ```
 ChatInterface → api.ts → Supabase Edge Function (chat-api)
-  → Intent detection (OpenRouter)
-  → Route by intent:
-    • recipe_extraction → recipe-pipeline edge function → OpenRouter vision → structured recipe
-    • rag_search → embedding + Supabase RPCs (semantic + text) → OpenRouter (contextual response)
-    • general_chat → OpenRouter (with conversation history)
-  → Save messages to chat_conversations + chat_messages
+  → runAgentLoop (Chef Marcus, single agent)
+     → openRouter.chatWithTools(systemPrompt, history, TOOL_CATALOG)
+     → 0..many tool dispatches per iteration (schema-validated, RLS via ctx.supabase)
+     → tool outputs wrapped in <tool_result> markers
+     → loop until plain content reply or MAX_ITERS=5
+  → Destructive tools return pendingConfirmation (handler NOT executed) — user
+    replies via context.confirmAction to apply the change.
+  → Save messages to chat_conversations + chat_messages (metadata.toolCalls = audit log)
 ```
+See [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md) for the full design and the tool catalog.
 
 ### Measurement Conversion
 ```
@@ -293,6 +331,8 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 | `VITE_FRONTEND_URL` | Frontend | Frontend URL for OAuth redirects |
 | `OPENROUTER_API_KEY_QWEN2.5_VL_8b` | Edge Functions | Per-model API key for vision model |
 | `OPENROUTER_API_KEY_QWEN2.5_instruct_8b` | Edge Functions | Per-model API key for instruct model |
+| `WEB_SEARCH_PROVIDER` | Edge Functions (chat-api) | `tavily` (default), `brave`, or `serper` — selects the `web_search_recipe` backend. |
+| `WEB_SEARCH_API_KEY` | Edge Functions (chat-api) | API key for the selected web-search provider. When unset, the `web_search_recipe` tool is omitted from the agent's catalog at startup (capability gating, MOP-0008 Addendum 1). |
 
 ---
 

@@ -12,6 +12,81 @@ const SUPABASE_ANON_KEY =
 // Supabase Edge Functions base URL
 const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
+// ─────────────────────────────────────────────────────────────────────
+// MOP-0008 — Chat agent contract types
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Surfaced by `apiClient.sendMessage` when the agent emitted a destructive
+ * tool call (delete_recipe, update_recipe, overwrite of an occupied meal-plan
+ * slot, etc.). The UI renders a Confirm/Cancel prompt and on confirm sends a
+ * follow-up message with `context.confirmAction` set to the same payload.
+ */
+export interface PendingConfirmation {
+  tool: string;
+  args: Record<string, unknown>;
+  summary: string;
+  idempotencyKey: string;
+}
+
+/**
+ * Payload the UI sends in `context.confirmAction` to short-circuit the agent
+ * loop and execute the previously-validated tool.
+ */
+export interface ConfirmActionInput {
+  tool: string;
+  args: Record<string, unknown>;
+  idempotencyKey?: string;
+}
+
+export interface ChatToolCallTrace {
+  name: string;
+  args: Record<string, unknown>;
+  ok: boolean;
+  durationMs?: number;
+  error?: string;
+  confirmed?: boolean;
+}
+
+export interface ChatMessageResponse {
+  message: string;
+  response: {
+    id: string;
+    content: string;
+    sender: "ai";
+    timestamp: string;
+  };
+  recipe?: any;
+  recipes?: any[];
+  pendingConfirmation?: PendingConfirmation;
+  conversationId: string;
+  sessionId: string;
+  intentMetadata?: {
+    source?: string;
+    manualIntent?: string | null;
+    toolCalls?: ChatToolCallTrace[];
+    iterations?: number;
+    hitMaxIters?: boolean;
+    confirmAction?: boolean;
+  };
+  title?: string;
+}
+
+export interface SendMessageInput {
+  message: string;
+  context?: {
+    sessionId?: string;
+    conversationId?: string;
+    metadata?: Record<string, unknown>;
+    confirmAction?: ConfirmActionInput;
+    [k: string]: unknown;
+  };
+  sessionId?: string;
+  clearMemory?: boolean;
+  intent?: string;
+  images?: string[];
+}
+
 // For local development, use local server for RAG endpoints
 const LOCAL_API_URL = "http://localhost:3000";
 const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -251,20 +326,13 @@ class ApiClient {
 
   // Chat endpoints - using Supabase Edge Function (secure, API key protected)
   // The Edge Function handles OpenRouter calls server-side, keeping the API key secure
-  async sendMessage(data: {
-    message: string;
-    context?: any;
-    sessionId?: string;
-    clearMemory?: boolean;
-    intent?: string;
-    images?: string[]; // Array of base64 data URLs
-  }) {
+  async sendMessage(data: SendMessageInput): Promise<ChatMessageResponse> {
     const startTime = Date.now();
     const endpoint = `${SUPABASE_FUNCTIONS_URL}/chat-api/message`;
-    
+
     Logger.chat.apiCall(endpoint, 'POST', undefined, undefined);
     Logger.chat.messageSent(
-      data.context?.conversationId || 'new',
+      (data.context?.conversationId as string | undefined) || 'new',
       data.sessionId || 'unknown',
       data.message,
       data.intent,
@@ -272,7 +340,7 @@ class ApiClient {
     );
 
     try {
-      const response = await this.request(endpoint, {
+      const response = await this.request<ChatMessageResponse>(endpoint, {
         method: "POST",
         body: JSON.stringify(data),
       });
@@ -1448,14 +1516,7 @@ export const useSendMessage = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: {
-      message: string;
-      context?: any;
-      sessionId?: string;
-      clearMemory?: boolean;
-      intent?: string;
-      images?: string[]; // Array of base64 data URLs
-    }) => apiClient.sendMessage(data),
+    mutationFn: (data: SendMessageInput) => apiClient.sendMessage(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chat", "history"] });
     },

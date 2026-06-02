@@ -11,6 +11,12 @@ export interface ChatMessage {
 
 export interface SendMessageRequest {
   message: string;
+  /**
+   * Legacy free-form context. The new agent loop (MOP-0008) consumes
+   * structured context via apiClient.sendMessage; this wrapper passes the
+   * string through unchanged for back-compat with older callers that may
+   * still exist.
+   */
   context?: string;
 }
 
@@ -51,7 +57,16 @@ export interface AddRecipeResponse {
 export const chatApi = {
   // Send a chat message
   async sendMessage(data: SendMessageRequest): Promise<SendMessageResponse> {
-    return apiClient.sendMessage(data) as Promise<SendMessageResponse>;
+    // Bridge: the legacy wrapper exposes a string `context`; the new agent
+    // contract expects a structured object. We tunnel it via `metadata.legacy`
+    // so the edge function can still see it if needed, but otherwise drop it.
+    const payload = {
+      message: data.message,
+      context: data.context
+        ? { metadata: { legacyContext: data.context } }
+        : undefined,
+    };
+    return apiClient.sendMessage(payload) as unknown as Promise<SendMessageResponse>;
   },
 
   // Get chat history

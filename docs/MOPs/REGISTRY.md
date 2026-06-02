@@ -2,8 +2,8 @@
 
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
-**Last reviewed:** 2026-06-01
-**Last updated:** 2026-06-01 (MOP-0014 drafted by surface-reviewer from MOP-0005 Phase 1 round-1 findings; AI Integration Audit; MOP-0007/0008/0009/0010/0011/0012/0013 drafted; status vocabulary migrated to MOP_STATUS_LIFECYCLE; ADR-0001/0002/0003 created; MOP-0004/0005 promoted draft → in_progress; frontend OpenRouter client deleted)
+**Last reviewed:** 2026-06-02
+**Last updated:** 2026-06-02 (MOP-0008 backend + Step 10 docs shipped, promoted draft → in_progress; MOP-0005 Phase 1 tests round 1+2 landed at 155 passing; ADR-0004 executed)
 
 ---
 
@@ -39,7 +39,7 @@
 | [MOP-0005](MOP-0005.md) | Test Coverage & Testing Infrastructure | in_progress | 2026-03-14 | 2026-06-01 | — | Nick Neal |
 | [MOP-0006](MOP-0006.md) | Generated Supabase Types & API Typing | draft | 2026-05-08 | 2026-05-08 | — | Nick Neal |
 | [MOP-0007](MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
-| [MOP-0008](MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | draft | 2026-06-01 | 2026-06-01 (Addendum 1) | — | Nick Neal |
+| [MOP-0008](MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | in_progress | 2026-06-01 | 2026-06-02 | — | Nick Neal |
 | [MOP-0009](MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0010](MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0011](MOP-0011.md) | Normalize `meal_plans` JSONB → Child Tables | draft (deferred) | 2026-06-01 | 2026-06-01 | — | Nick Neal |
