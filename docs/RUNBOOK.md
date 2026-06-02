@@ -88,23 +88,26 @@ WHERE id NOT IN (SELECT id FROM profiles);
 - "Failed to get AI response" error in UI
 
 ### Likely causes
-- `VITE_OPENROUTER_API_KEY` expired, invalid, or missing
+- `OPENROUTER_API_KEY` Supabase Edge Function secret expired, invalid, or missing
 - OpenRouter rate limit exceeded
 - Model ID changed or deprecated
 - Network/CORS issues
 
 ### Verification steps
 ```bash
-# Check env var is set
-grep OPENROUTER_API_KEY .env
+# Verify the Supabase secret is set (server-side, not in .env)
+supabase secrets list | grep OPENROUTER_API_KEY
 
-# Test API key directly
+# Test the key directly using the value from your Supabase secrets
+# (replace <key> with the value from `supabase secrets list` or your secrets vault)
 curl -s https://openrouter.ai/api/v1/models \
-  -H "Authorization: Bearer $VITE_OPENROUTER_API_KEY" | head -20
+  -H "Authorization: Bearer <key>" | head -20
 
 # Check if specific model is available
-curl -s https://openrouter.ai/api/v1/models | grep "qwen/qwen-3-8b"
+curl -s https://openrouter.ai/api/v1/models | grep "qwen/qwen-2.5-7b-instruct"
 ```
+
+> **Note:** Do not look for `VITE_OPENROUTER_API_KEY` in `.env` — the frontend has no LLM path. All AI calls go through Supabase Edge Functions using the server-side `OPENROUTER_API_KEY` secret.
 
 ### Fix steps
 1. Verify API key at https://openrouter.ai/keys
@@ -486,7 +489,10 @@ ls -la .env
 
 # Check required vars
 grep VITE_SUPABASE_URL .env
-grep VITE_OPENROUTER_API_KEY .env
+grep VITE_SUPABASE_ANON_KEY .env
+
+# OpenRouter key is a Supabase Edge Function secret, NOT a frontend env var
+supabase secrets list | grep OPENROUTER_API_KEY
 
 # Check node_modules
 ls node_modules/.package-lock.json 2>/dev/null

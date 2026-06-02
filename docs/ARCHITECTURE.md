@@ -274,7 +274,7 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 ### API Security
 - Supabase anon key used for client-side requests (RLS enforces access)
 - Edge functions validate JWT and extract user ID
-- OpenRouter API key stored as `VITE_OPENROUTER_API_KEY` (frontend) and `OPENROUTER_API_KEY` (edge functions)
+- OpenRouter API key stored only as `OPENROUTER_API_KEY` server-side (Supabase Edge Function secret). All LLM calls go through edge functions — no frontend AI key required (per `src/vite-env.d.ts`)
 
 ---
 
@@ -285,8 +285,7 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 |----------|---------|---------|
 | `VITE_SUPABASE_URL` | Frontend | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Frontend | Supabase anonymous key |
-| `VITE_OPENROUTER_API_KEY` | Frontend | OpenRouter API key for client-side AI calls |
-| `OPENROUTER_API_KEY` | Edge Functions | OpenRouter API key for server-side AI calls |
+| `OPENROUTER_API_KEY` | Edge Functions (Supabase secret) | OpenRouter API key for server-side AI calls. **Do NOT set `VITE_OPENROUTER_API_KEY`** — there is no frontend AI path. See `src/vite-env.d.ts` and `docs/Development/CHAT_SECURITY.md`. |
 
 ### Optional
 | Variable | Context | Purpose |
