@@ -2,10 +2,56 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-06-01
-**Last updated:** 2026-06-01 (dev tooling: test harness, agent system, MOP/ADR governance, AI Integration Audit, doc tightening)
+**Last reviewed:** 2026-06-02
+**Last updated:** 2026-06-02 (MOP-0008 tool-using chat agent backend + Step 10 docs; MOP-0005 Phase 1 tests to 155; ADR-0004 execution; surface-reviewer pattern; MOP-0014 drafted)
 
 ---
+
+## 2026-06-02 (MOP-0008 chat agent backend, MOP-0005 test coverage, ADR-0004 execution, surface-reviewer) `main`
+
+Developer-facing only — no user-visible application behavior changed yet (frontend confirmation UI for destructive tools is pending Step 8 of MOP-0008).
+
+**Chat agent migration (MOP-0008 — backend complete, status `in_progress`)**
+- Replaced `chat-api`'s single-shot intent router with a **tool-using single agent**. One LLM call now receives the user message + a 12-tool catalog and decides which tools to call (zero, one, many, or chained). Multi-step queries like *"find my chicken recipes safe for the kids and add two to next week"* are now possible in one user turn.
+- New: `supabase/functions/chat-api/tools/{catalog,dispatch,handlers}.ts` (12 tools, all schemas `additionalProperties:false`, recursive `user_id` rejection, capability-gated `web_search_recipe`), `supabase/functions/chat-api/agent-loop.ts` (`MAX_ITERS=5`, `<tool_result>` wrapping for tool-output prompt-injection defense, destructive-tool short-circuit).
+- New shared client: `supabase/functions/_shared/web-search-client.ts` (Tavily default, Brave/Serper drop-in, API-key access isolated, `isConfigured()` gate).
+- `_shared/openrouter-client.ts` — added `chatWithTools` method (OpenAI-compatible tools + tool_choice).
+- `_shared/recipe-prompts.ts` — added `CHAT_AGENT_SYSTEM_PROMPT` + `SUBSTITUTION_PROMPT`; moved `RAG_RESPONSE_PROMPT` from inline to registry; marked `INTENT_DETECTION_PROMPT` `@deprecated`.
+- `chat-api/index.ts` — old `detectIntent`/`handleRAG`/`handleGeneral` paths removed (-430 lines); `context.confirmAction` short-circuit added.
+- `src/services/api.ts` — added `pendingConfirmation` types + `confirmAction` request field.
+- Tests: `chat-api/__tests__/agent-loop.test.ts` (Deno, scripted-tool-call assertions including web_search dispatch, catalog gating, NO_RESULTS), `src/services/__tests__/chat-agent.test.ts` (Vitest+MSW contract tests), `__tests__/fixtures/golden.json` (30-prompt evaluation set: 10 single-intent / 10 multi-intent / 10 destructive-confirm).
+- Docs: `docs/ARCHITECTURE.md` (agent-loop diagram + tool-catalog table + `WEB_SEARCH_*` env vars), `docs/API.md` (`pendingConfirmation` + `confirmAction` documented, prompt registry refreshed).
+- **Outstanding (Step 8 UI):** No component in `src/components/chat/` renders the `pendingConfirmation` envelope as a Confirm/Cancel surface yet. The destructive_confirm golden bucket cannot be exercised end-to-end until this lands.
+
+**Test coverage expansion (MOP-0005 Phase 1 — rounds 1 + 2)**
+- `npm run test:run` now passes **155 tests** across 4 files (up from 84 after Phase 0). `apiClient` public-surface coverage rose from ~6% to ~42-45%.
+- New tests covering: `transferOwnership`, `getHouseholdRecipes`, `getPublicRecipes`, `getRecipeReactions`, `toggleRecipeReaction`, `createHouseholdInvite`, `getMyPendingInvites`, `respondToInvite`, all six collection methods, `checkDuplicateRecipe`, `checkDuplicateTitle`, `updateHousehold`, `getInviteDetails`, `acceptInviteById`, `resendHouseholdInvite`, `getCollection`, `getCollectionRecipes`.
+- New file: `src/stores/__tests__/authStore.test.ts` — covers `initialize` / `loadHousehold` / `signOut`.
+- MSW helpers added to `src/test/msw/handlers.ts`: `supabaseInsert`, `supabaseEdgePost`, `supabaseEdgeGet`.
+
+**ADR-0004 execution (Vercel `api/` retirement)**
+- Deleted the dead Vercel serverless tree (`api/chat.js`, `api/rag/auth.js`, `api/rag/search.js`) — no live callers post-Supabase Edge Functions migration; `DATABASE_URL` (Neon) wasn't even set.
+- Deleted `src/services/recipeService.ts` (frontend wrapper for the deleted endpoints) and the duplicate `recipeService` stub at `src/services/supabase.ts`.
+- Dropped `@neondatabase/serverless` from `package.json` (no remaining consumers).
+- Cleaned `vercel.json` (`/api/*` CORS headers block removed).
+
+**surface-reviewer pattern**
+- New subagent: `.claude/agents/surface-reviewer.md` (opus). When a finding emerges mid-task (latent bug, drift, architectural concern), classifies it (trivial-fix / ADR / MOP / MOP+ADR / already-covered / defer-with-trigger) → assigns priority (P0–P3 or defer) with specific rationale → drafts the artifact → presents recommendation. Audit-first; never auto-commits.
+- New skill: `.claude/commands/surface.md` (`/surface` slash command).
+- `CLAUDE.md` — added "Surface-review reflex" section that auto-invokes `surface-reviewer` when assistant output uses trigger phrases ("worth surfacing", "should flag", etc.). Added full agent + skill inventory table.
+
+**MOP-0014 (drafted from surface-reviewer demo)**
+- New MOP: `docs/MOPs/MOP-0014-household-write-atomicity-rpcs.md` (P1, status `draft`, deployment + verification deferred).
+- Surfaces two non-atomic write paths in `src/services/api.ts` flagged by the MOP-0005 round-1 agent: `transferOwnership` (dual-owner window between two PATCHes) and `respondToInvite` (invite-without-membership drift between PATCH + INSERT).
+- Both extend MOP-0002 / migration 025's established `SECURITY DEFINER` RPC pattern. Includes suggested SQL with explicit `auth.uid()` + role / invitee checks (since SECURITY DEFINER bypasses RLS); invitee match by lowercased email per user directive; lockticket Verification block with hard-gate on authz review.
+
+**Recipe-pipeline bug fix**
+- `supabase/functions/recipe-pipeline/stages/extract.ts` — the multi-recipe-detection branch only fired when `recipes[].length > 1`. Models sometimes wrap a single recipe in `recipes[]` anyway (with degraded duplicate fields at top level). Now unwraps on any non-empty `recipes[]` — `length === 1` returns the wrapped recipe; `length > 1` keeps the existing multi-recipe path.
+
+**Pre-existing api.ts findings (not fixed, captured)**
+- Finding 1: `transferOwnership` non-atomic → MOP-0014 Phase 1+2.
+- Finding 2: `respondToInvite` non-atomic → MOP-0014 Phase 1+2 (same fix shape, folded).
+- Finding 3: `getRecipeReactions` returns `"Unknown"` while `RecipeReaction.name` type is declared `string` — kicked to follow-up commit (one-line widening to `string | null` + UI null tolerance).
 
 ## 2026-06-01 (Dev tooling: test harness, agent + governance system, security doc tightening) `main`
 
