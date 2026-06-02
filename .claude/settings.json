@@ -27,7 +27,8 @@
       "Read(//c/Users/nickn/OneDrive/Documents/Nick/Nicks ADHD/**)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\nickn\\.claude"
+      "C:\\Users\\nickn\\.claude",
+      "c:\\dev\\MealPrep-Agent\\.claude"
     ]
   }
 }
