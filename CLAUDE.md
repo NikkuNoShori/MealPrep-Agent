@@ -54,3 +54,38 @@ Supabase Edge Functions are deployed separately and run on Deno (not Node).
 - `docs/API.md` — REST API endpoints
 - `docs/RUNBOOK.md` — Operational debugging checklists
 - `docs/MOPs/` — Method of Procedures for planned features (see `REGISTRY.md`)
+- `docs/DECISIONS/` — Architecture Decision Records (ADRs)
+- `docs/prompts/` — Authoritative procedure docs (`DOCUMENTATION_UPDATE_PROCEDURE.md`, `MOP_STATUS_LIFECYCLE.md`, `ADR_AUTHORING_GUIDE.md`)
+
+## Surface-review reflex
+
+When you (the assistant) use phrases like **"worth surfacing"**, "worth recording", "worth noting", "should flag", "deserves attention", "latent bug", "architectural concern", or otherwise indicate a non-trivial finding that warrants capture, **invoke the `surface-reviewer` subagent** with the finding(s) as context. Do not let findings die in chat history.
+
+The `surface-reviewer` agent will:
+1. Classify each finding (trivial-fix / ADR / MOP / MOP+ADR / already-covered / defer-with-trigger)
+2. Assign priority (P0–P3 or defer) with specific rationale
+3. Draft any warranted MOP/ADR files
+4. Present a priority-ranked recommendation
+
+Tone: document, respond, react. Measured, not reactive. Security/safety findings default to P0/P1 with specific risk language.
+
+Equivalent user-invoked path: `/surface` slash command.
+
+## Agent + skill inventory
+
+| Agent | Purpose |
+|---|---|
+| `doc-adherence` | Documentation compliance audit; supersedes `doc-keeper` |
+| `qa-auditor` | Architectural rule audit |
+| `data-integrity` | Vitest + RLS integration verification |
+| `ui-designer` | Premium UI restyling |
+| `cooking-bot-architect` | In-product AI agent design + implementation |
+| `surface-reviewer` | Mid-session finding triage → MOP/ADR/inline disposition |
+
+| Skill | Purpose |
+|---|---|
+| `/update-docs` | Run the doc update procedure after a MOP completes |
+| `/new-mop` | Scaffold next sequential MOP from template |
+| `/new-adr` | Scaffold next sequential ADR from authoring guide |
+| `/update-registry` | Reconcile `REGISTRY.md` against on-disk MOP headers |
+| `/surface` | User-invoked surface review |
