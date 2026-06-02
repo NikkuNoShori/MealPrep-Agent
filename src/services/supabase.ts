@@ -54,40 +54,6 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Recipe service - using API endpoints (not direct database access)
-export const recipeService = {
-  // Get all recipes for the current user
-  async getRecipes() {
-    // This should use the API endpoint, not direct database access
-    // For now, return empty data until we implement the proper API
-    return { recipes: [], total: 0 }
-  },
-
-  // Get a single recipe by ID
-  async getRecipe(_id: string) {
-    // This should use the API endpoint
-    return null
-  },
-
-  // Create a new recipe
-  async createRecipe(_recipeData: any) {
-    // This should use the API endpoint
-    throw new Error('Recipe creation not implemented yet')
-  },
-
-  // Update an existing recipe
-  async updateRecipe(_id: string, _recipeData: any) {
-    // This should use the API endpoint
-    throw new Error('Recipe update not implemented yet')
-  },
-
-  // Delete a recipe
-  async deleteRecipe(_id: string) {
-    // This should use the API endpoint
-    throw new Error('Recipe deletion not implemented yet')
-  }
-}
-
 // Auth service using Supabase Auth
 export const authService = {
   // Get current user with profile data
