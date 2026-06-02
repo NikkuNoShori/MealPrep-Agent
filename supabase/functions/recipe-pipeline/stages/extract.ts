@@ -129,12 +129,21 @@ function parseRecipeResponse(response: string): ExtractedRecipe | ExtractedRecip
     }
   }
 
-  // ── Multi-recipe detection ──
-  // Check if the response contains a "recipes" array
+  // ── Recipes array handling ──
+  // Check if the response contains a "recipes" array. Models sometimes wrap
+  // a single recipe inside this array even when only one was requested, and
+  // may duplicate (incomplete) fields at the top level — so unwrap whenever
+  // the array is present rather than only on length > 1.
   const recipesArray = parsed.recipes || parsed.data?.recipes || parsed.result?.recipes;
-  if (Array.isArray(recipesArray) && recipesArray.length > 1) {
-    console.log(`Multi-recipe detected: ${recipesArray.length} recipes`);
+  if (Array.isArray(recipesArray) && recipesArray.length > 0) {
     const capped = recipesArray.slice(0, MAX_RECIPES_PER_REQUEST);
+
+    if (capped.length === 1) {
+      console.log("Single recipe wrapped in 'recipes' array — unwrapping");
+      return normalizeExtractedRecipe(capped[0]);
+    }
+
+    console.log(`Multi-recipe detected: ${recipesArray.length} recipes`);
     const results: ExtractedRecipe[] = [];
     for (const rawRecipe of capped) {
       try {
