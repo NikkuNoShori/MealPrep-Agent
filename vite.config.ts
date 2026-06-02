@@ -29,6 +29,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Exclude Deno-runtime tests (Supabase edge functions). Those run under
+    // `deno test`, not Vitest, and import from https:// URLs that the bundler
+    // cannot resolve.
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      'supabase/functions/**',
+    ],
     env: {
       // Stable test-only Supabase config so the MSW handlers can match
       // a known URL. The values are not real credentials — they exist so

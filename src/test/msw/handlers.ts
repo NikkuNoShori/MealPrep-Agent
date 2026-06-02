@@ -141,6 +141,89 @@ export function supabaseDelete(
 }
 
 /**
+ * Handler factory for `supabase.from('<table>').insert(...)` calls.
+ * Supabase JS v2 issues `POST {url}/rest/v1/{table}` with row(s) as JSON body.
+ * Without `.select()`, PostgREST returns 201 with no body (handlers may
+ * still return JSON when `.select()` is chained).
+ */
+export function supabaseInsert(
+  table: string,
+  resolver: HttpResponseResolver
+): HttpHandler;
+export function supabaseInsert(
+  table: string,
+  body: unknown,
+  status?: number
+): HttpHandler;
+export function supabaseInsert(
+  table: string,
+  bodyOrResolver: unknown | HttpResponseResolver,
+  status = 201
+): HttpHandler {
+  return buildHandler(
+    'post',
+    `${SUPABASE_URL}/rest/v1/${table}`,
+    bodyOrResolver,
+    status
+  );
+}
+
+/**
+ * Handler factory for Supabase Edge Function POST calls
+ * (`{url}/functions/v1/{path}`).
+ */
+export function supabaseEdgePost(
+  path: string,
+  resolver: HttpResponseResolver
+): HttpHandler;
+export function supabaseEdgePost(
+  path: string,
+  body: unknown,
+  status?: number
+): HttpHandler;
+export function supabaseEdgePost(
+  path: string,
+  bodyOrResolver: unknown | HttpResponseResolver,
+  status = 200
+): HttpHandler {
+  return buildHandler(
+    'post',
+    `${SUPABASE_URL}/functions/v1/${path}`,
+    bodyOrResolver,
+    status
+  );
+}
+
+/**
+ * Handler factory for Supabase Edge Function GET calls
+ * (`{url}/functions/v1/{path}`).
+ *
+ * Note: `path` here is the literal route prefix — query strings are matched
+ * by MSW's pathname matcher and don't need to be included.
+ */
+export function supabaseEdgeGet(
+  path: string,
+  resolver: HttpResponseResolver
+): HttpHandler;
+export function supabaseEdgeGet(
+  path: string,
+  body: unknown,
+  status?: number
+): HttpHandler;
+export function supabaseEdgeGet(
+  path: string,
+  bodyOrResolver: unknown | HttpResponseResolver,
+  status = 200
+): HttpHandler {
+  return buildHandler(
+    'get',
+    `${SUPABASE_URL}/functions/v1/${path}`,
+    bodyOrResolver,
+    status
+  );
+}
+
+/**
  * Catch-all for the auth endpoints supabase-js may call at module-load time.
  * Returns a "no session" response so test files can import api.ts without
  * tripping unhandled-request errors.

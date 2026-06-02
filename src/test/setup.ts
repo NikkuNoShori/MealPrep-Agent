@@ -1,8 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterAll, afterEach } from 'vitest';
 import { server } from './msw/server';
 import { supabaseAuthDefaults } from './msw/handlers';
+
+// Vitest 4 exposes lifecycle hooks as globals when `globals: true` is set in
+// vite.config.ts. Importing them from "vitest" at the top of a setupFile
+// caused "Vitest failed to find the runner" — referencing the globals from
+// `globalThis` here avoids touching the import-time eager defaults inside
+// @vitest/runner.
 
 // supabase-js v2 calls storage.getItem at module-load time when
 // persistSession is enabled. jsdom provides a localStorage but supabase-js
@@ -34,20 +39,29 @@ Object.defineProperty(window, 'localStorage', {
   configurable: true,
 });
 
-// Start MSW at module-load time (not in beforeAll) so the fetch interceptor
-// is installed BEFORE test files import api.ts → supabase.ts. supabase-js
-// captures globalThis.fetch when the client is constructed; if MSW patches
-// fetch later, the captured reference points to the original un-patched
-// fetch and requests bypass MSW.
+// Start MSW at module-load time (NOT inside beforeAll). supabase-js captures
+// `globalThis.fetch` eagerly inside `SupabaseClient`'s constructor when
+// `apiClient` imports `./supabase`. If we waited for beforeAll, the supabase
+// client would have already captured the un-patched fetch and every PostgREST
+// call would bypass MSW with "fetch failed". setupFiles' module bodies run
+// before test files' imports, so calling listen() here guarantees MSW patches
+// `fetch` first.
 server.listen({ onUnhandledRequest: 'error' });
 server.use(...supabaseAuthDefaults);
 
-afterEach(() => {
+// Type-only handles for the Vitest hook globals injected by `globals: true`.
+type Hook = (fn: () => void | Promise<void>) => void;
+const g = globalThis as unknown as {
+  afterEach: Hook;
+  afterAll: Hook;
+};
+
+g.afterEach(() => {
   cleanup();
   // Reset handlers between tests but keep the auth defaults installed.
   server.resetHandlers(...supabaseAuthDefaults);
 });
 
-afterAll(() => {
+g.afterAll(() => {
   server.close();
 });
