@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-03-14
-**Last updated:** 2026-03-14 (invite flow, admin panel, complete-setup, recipe reactions, RPC optimization, profile visibility)
+**Last reviewed:** 2026-06-01
+**Last updated:** 2026-06-01 (security doc tightening: removed `VITE_OPENROUTER_API_KEY` — no frontend AI path; all LLM calls via Edge Function secret)
 
 ---
 

@@ -2,8 +2,8 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-03-14
-**Last updated:** 2026-03-14 (reviewed — no structural changes needed)
+**Last reviewed:** 2026-06-01
+**Last updated:** 2026-06-01 (added Architecture Decisions index, AI Integration Audit, MOP status lifecycle / ADR authoring guide / slash command references; expanded MOP table through 0011)
 
 ---
 
@@ -72,8 +72,37 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 | [MOP-0001](MOPs/MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | complete |
 | [MOP-0002](MOPs/MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | complete |
 | [MOP-0003](MOPs/MOP-0003.md) | Dietary Profiles & Allergen Detection | draft |
-| [MOP-0004](MOPs/MOP-0004.md) | Meal Planner & Grocery Cart | draft |
-| [MOP-0005](MOPs/MOP-0005.md) | Test Coverage & Testing Infrastructure | draft |
+| [MOP-0004](MOPs/MOP-0004.md) | Meal Planner & Grocery Cart | in_progress |
+| [MOP-0005](MOPs/MOP-0005.md) | Test Coverage & Testing Infrastructure | in_progress |
+| [MOP-0006](MOPs/MOP-0006.md) | Generated Supabase Types & API Typing | draft |
+| [MOP-0007](MOPs/MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | draft |
+| [MOP-0008](MOPs/MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | draft |
+| [MOP-0009](MOPs/MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | draft |
+| [MOP-0010](MOPs/MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | draft |
+| [MOP-0011](MOPs/MOP-0011.md) | Normalize `meal_plans` JSONB → Child Tables | draft (deferred) |
+
+> Status vocabulary is defined in [prompts/MOP_STATUS_LIFECYCLE.md](prompts/MOP_STATUS_LIFECYCLE.md).
+
+---
+
+## Architecture Decisions
+
+Durable rationale for non-trivial architectural choices. ADRs are enumerated by directory glob (no registry file).
+
+| Document | Description |
+|----------|-------------|
+| [DECISIONS/](DECISIONS/) | ADR directory (`ADR-XXXX-*.md`) — see [DECISIONS/README.md](DECISIONS/README.md) for the index protocol |
+| [ADR-0001](DECISIONS/ADR-0001-meal-plans-jsonb-shape.md) | `meal_plans.meals` + `grocery_list` as JSONB columns (not normalized child tables) |
+| [ADR-0002](DECISIONS/ADR-0002-legacy-express-dev-server.md) | Keep the legacy Express dev server alongside Supabase Edge Functions |
+| [ADR-0003](DECISIONS/ADR-0003-documentation-and-agent-pattern-adoption.md) | Documentation and agent pattern adoption |
+
+---
+
+## Strategic Audits
+
+| Document | Description |
+|----------|-------------|
+| [AI_INTEGRATION_AUDIT.md](AI_INTEGRATION_AUDIT.md) | Strategic review of MealPrep's AI surface (chat-api, recipe-pipeline, RAG, embeddings). Source for MOP-0007 through MOP-0011. |
 
 ---
 
@@ -81,7 +110,18 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 
 | Document | Description |
 |----------|-------------|
-| [DOCUMENTATION_UPDATE_PROCEDURE.md](prompts/DOCUMENTATION_UPDATE_PROCEDURE.md) | Instructions for performing a canonical documentation update after code changes |
+| [DOCUMENTATION_UPDATE_PROCEDURE.md](prompts/DOCUMENTATION_UPDATE_PROCEDURE.md) | Canonical documentation update procedure (invoked by `/update-docs`) |
+| [MOP_STATUS_LIFECYCLE.md](prompts/MOP_STATUS_LIFECYCLE.md) | MOP status vocabulary and allowed transitions |
+| [ADR_AUTHORING_GUIDE.md](prompts/ADR_AUTHORING_GUIDE.md) | ADR format, numbering, lifecycle, and authoring criteria |
+
+### Slash commands
+
+| Command | Purpose |
+|---------|---------|
+| `/new-mop` | Scaffold a new MOP from `MOPs/MOP_TEMPLATE.md` and register it |
+| `/new-adr` | Scaffold a new ADR in `DECISIONS/` |
+| `/update-registry` | Recompute `MOPs/REGISTRY.md` from the filesystem to catch manual drift |
+| `/update-docs` | Run the documentation update procedure after a MOP is marked complete |
 
 ---
 

@@ -2,8 +2,8 @@
 
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
-**Last reviewed:** 2026-03-14
-**Last updated:** 2026-03-14 (added household member names, invite email, setup flow, RPC function entries)
+**Last reviewed:** 2026-06-01
+**Last updated:** 2026-06-01 (AI failure playbook now checks `supabase secrets list` for `OPENROUTER_API_KEY`; removed `VITE_OPENROUTER_API_KEY` from setup checklist; model id updated to `qwen-2.5-7b-instruct`)
 
 ---
 

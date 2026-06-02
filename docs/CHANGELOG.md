@@ -2,10 +2,43 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-03-14
-**Last updated:** 2026-03-14 (feature release: invites, reactions, admin, setup, RPC optimization)
+**Last reviewed:** 2026-06-01
+**Last updated:** 2026-06-01 (dev tooling: test harness, agent system, MOP/ADR governance, AI Integration Audit, doc tightening)
 
 ---
+
+## 2026-06-01 (Dev tooling: test harness, agent + governance system, security doc tightening) `main`
+
+Developer-facing only — no user-visible application behavior changed.
+
+**Testing infrastructure**
+- Wired up the Vitest + MSW integration shim: `src/test/msw/{server,handlers}.ts`, `src/test/setup.ts` installs MSW at module-load time before `api.ts` captures fetch and shims `localStorage` with a self-bound in-memory store so supabase-js `persistSession` works in jsdom. `vite.config.ts` + `.env.test` pin stable test-only `VITE_SUPABASE_URL` / `ANON_KEY`. First test using the harness: `src/services/__tests__/api.test.ts` (household method shape + camelCase mapping).
+
+**Claude Code agent system**
+- New `cooking-bot-architect` agent with persistent knowledge base under `.claude/agents/cooking-bot-knowledge/` (architecture patterns, cooking UX, recipe extraction, safety/guardrails, MealPrep context, lessons learned).
+- New `.claude/agents/agents-log.md` append-only run log; `data-integrity`, `qa-auditor`, `ui-designer` agents now require an entry per invocation and were bumped from sonnet → opus.
+- Retired `doc-keeper` agent (superseded by `doc-adherence`).
+- Scrubbed external-project references from agent configs (commit `72895a7`).
+
+**MOP governance**
+- Expanded MOP status vocabulary from 4 values to 10 (`draft` / `evaluation` / `approved` / `planned` / `in_progress` / `verifying` / `complete` / `blocked` / `cancelled` / `deferred`) — `docs/prompts/MOP_STATUS_LIFECYCLE.md` is the source of truth.
+- Added a lockticket `## Verification` block to `MOPs/MOP_TEMPLATE.md` (file-exists / grep / command / test-passes / human assertions) plus `Scope Map` and `Related` sections.
+- Audited MOP-0004 (Meal Planner & Grocery Cart) and MOP-0005 (Test Coverage): both promoted `draft` → `in_progress` with explicit "Shipped as of 2026-06-01" / "Outstanding" callouts.
+
+**ADR system**
+- Introduced `docs/DECISIONS/` Architecture Decision Records with `docs/prompts/ADR_AUTHORING_GUIDE.md`. First three ADRs: `meal_plans` JSONB shape (ADR-0001), legacy Express dev server (ADR-0002), documentation/agent pattern adoption (ADR-0003).
+
+**New MOPs**
+- MOP-0007 (RAG wired into recipe pages / meal planner / reactions ranking), MOP-0008 (intent router → tool-using agent, with companion `-design.md`), MOP-0009 (dev automation expansion — already in place), MOP-0010 (lockticket /verify-mop + /post-change-check skills), MOP-0011 (normalize meal_plans JSONB → child tables, deferred-with-trigger).
+
+**AI Integration Audit**
+- `docs/AI_INTEGRATION_AUDIT.md` — strategic review of the AI surface; source document for MOP-0007 through MOP-0011.
+
+**Slash commands**
+- `.claude/commands/{new-mop,new-adr,update-registry,update-docs}.md` — scaffold/maintain the MOP/ADR/registry/doc workflows.
+
+**Security doc tightening**
+- `docs/ARCHITECTURE.md` and `docs/RUNBOOK.md`: removed all `VITE_OPENROUTER_API_KEY` references. There is no frontend AI path — all LLM calls go through Supabase Edge Functions using the server-side `OPENROUTER_API_KEY` secret. RUNBOOK now checks `supabase secrets list` instead of grepping `.env`; model id check updated to `qwen-2.5-7b-instruct`.
 
 ## 2026-03-14 (RPC optimization — migration 025) `enhancement/feature-release`
 
