@@ -8,7 +8,12 @@ export interface RecipeReaction {
   userId?: string;
   familyMemberId?: string;
   reaction: "thumbs_up" | "thumbs_down";
-  name: string;
+  /**
+   * Display name of the reactor. Null when the source RPC could not
+   * resolve a name (deleted profile, anonymous family-member row, etc.).
+   * UI must handle null — render `"Someone"` or skip.
+   */
+  name: string | null;
 }
 
 interface RecipeCardProps {
@@ -143,7 +148,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             <span className={`${textSize} font-semibold text-primary-600 dark:text-primary-300`}>{thumbsUp.length}</span>
             {showReactionTooltip === "up" && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
-                {thumbsUp.map((r) => r.name).join(", ")}
+                {thumbsUp.map((r) => r.name ?? "Someone").join(", ")}
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-stone-900 dark:bg-stone-100 rotate-45" />
               </div>
             )}
@@ -159,7 +164,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             <span className={`${textSize} font-semibold text-rose-600 dark:text-rose-300`}>{thumbsDown.length}</span>
             {showReactionTooltip === "down" && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
-                {thumbsDown.map((r) => r.name).join(", ")}
+                {thumbsDown.map((r) => r.name ?? "Someone").join(", ")}
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-stone-900 dark:bg-stone-100 rotate-45" />
               </div>
             )}

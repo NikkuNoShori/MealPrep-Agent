@@ -417,8 +417,10 @@ describe('apiClient.getRecipeReactions', () => {
         userId: 'u-2',
         familyMemberId: 'fm-1',
         reaction: 'thumbs_down',
-        // api.ts falls back to "Unknown" when name is missing/null
-        name: 'Unknown',
+        // api.ts returns null when the RPC row has no name; UI consumers
+        // (RecipeCard) render "Someone" in that case. Type widened to
+        // `string | null` so consumers must handle null explicitly.
+        name: null,
       },
     ]);
   });

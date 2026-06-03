@@ -1165,7 +1165,7 @@ class ApiClient {
       userId: r.user_id,
       familyMemberId: r.family_member_id,
       reaction: r.reaction,
-      name: r.name || "Unknown",
+      name: r.name ?? null,
     }));
   }
 
