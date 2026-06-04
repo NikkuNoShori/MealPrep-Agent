@@ -2,8 +2,8 @@
 
 > **Discovery index** for the Claude Code agent system in this repo. If someone asks "what agents do we have?" or "is there a subagent for X?", this is the file to read first.
 
-**Last reviewed:** 2026-06-03
-**Last updated:** 2026-06-03 (initial registry — cataloging 6 subagents, 5 slash commands, 1 knowledge base, 1 run log)
+**Last reviewed:** 2026-06-04
+**Last updated:** 2026-06-04 (added `chat-rag-sme` subagent + KB; revised audience distinction to call out designer-vs-diagnostician split)
 
 ---
 
@@ -44,6 +44,7 @@ This registry tracks all four. Per-agent details live in each agent's own `.md` 
 | [qa-auditor](qa-auditor.md) | subagent | Audits code changes against architectural rules in `CLAUDE.md` (sealed height chain, api.ts routing, RLS, edge functions); report-only | opus | active | `.claude/agents/qa-auditor.md` |
 | [surface-reviewer](surface-reviewer.md) | subagent | Classifies mid-session findings (trivial / ADR / MOP / defer), drafts the artifact, ranks by priority | opus | active | `.claude/agents/surface-reviewer.md` |
 | [ui-designer](ui-designer.md) | subagent | Restyles components/pages to the "Warm Editorial" design language (Fraunces + DM Sans, `--rs-*` palette, lift-on-hover cards) | opus | active | `.claude/agents/ui-designer.md` |
+| [chat-rag-sme](chat-rag-sme.md) | subagent | Subject-matter expert + diagnostician for chat + RAG (agent loop, 12-tool catalog, embeddings, semantic + text search, similarity rails). Audit-only — explains, doesn't fix or design | opus | active | `.claude/agents/chat-rag-sme.md` |
 
 ### Slash commands (`.claude/commands/`)
 
@@ -60,6 +61,7 @@ This registry tracks all four. Per-agent details live in each agent's own `.md` 
 | Name | Type | Purpose (one line) | Status | Source |
 |------|------|--------------------|--------|--------|
 | [cooking-bot-knowledge](cooking-bot-knowledge/README.md) | knowledge-base | Persistent reference library for `cooking-bot-architect` (patterns, UX, extraction, safety, lessons) | active | `.claude/agents/cooking-bot-knowledge/` |
+| [chat-rag-sme-knowledge](chat-rag-sme-knowledge/README.md) | knowledge-base | Persistent reference for `chat-rag-sme`: RAG pipeline (incl. no-backfill issue), agent architecture, search-mechanism decision matrix, troubleshooting playbook, configuration reference | active | `.claude/agents/chat-rag-sme-knowledge/` |
 
 ### Logs (`.claude/agents/`)
 
@@ -86,6 +88,7 @@ Quick rule of thumb:
 | To verify numeric correctness of an aggregation or RLS isolation | `data-integrity` |
 | To restyle a page to the design system | `ui-designer` |
 | To add or refactor in-product AI behavior (chat, extraction, prompts) | `cooking-bot-architect` |
+| To diagnose chat / RAG behavior, look up a config value, or understand existing pipeline | `chat-rag-sme` |
 | To sync `docs/MOPs/REGISTRY.md` with the MOP files on disk | `/update-registry` |
 | To run the doc-update procedure after a MOP completes | `/update-docs` |
 | A new ADR scaffolded | `/new-adr` |
@@ -94,11 +97,20 @@ Quick rule of thumb:
 
 ## Audience distinction: dev-side vs. in-product agents
 
-Five of the six subagents (`data-integrity`, `doc-adherence`, `qa-auditor`, `surface-reviewer`, `ui-designer`) are **dev-side helpers** — they work *on* the MealPrep codebase. Their audience is the developer (Nick).
+Six of the seven subagents (`data-integrity`, `doc-adherence`, `qa-auditor`, `surface-reviewer`, `ui-designer`, `chat-rag-sme`) are **dev-side helpers** — they work *on* the MealPrep codebase. Their audience is the developer (Nick).
 
 `cooking-bot-architect` is the **in-product AI designer** — it designs and implements the AI the *end user* talks to inside the shipped MealPrep app (the chat-api edge function, recipe-pipeline prompts, tool schemas the chat agent calls). Its audience is the end user of MealPrep, via the developer.
 
-Both groups happen to run as Claude Code subagents on the same machine, but the artifacts they produce land in different layers of the system. **`cooking-bot-architect` is not a duplicate of any other agent** — it operates on a different layer with a different audience.
+### Within the AI-focused agents: designer vs. diagnostician
+
+Two agents touch the AI surface but at different time horizons:
+
+| Agent | Time horizon | Output | When to invoke |
+|---|---|---|---|
+| `cooking-bot-architect` | **Forward-looking** | Architecture proposals, prompt drafts, tool schemas, file-level implementation plans | Adding new AI capabilities, refactoring chat/recipe-pipeline, deciding patterns |
+| `chat-rag-sme` | **Backward-looking** | Diagnoses, explanations, configuration lookups, drift surfacing — read-only | Something is wrong with chat/RAG; you need to understand existing behavior; you're tuning a knob |
+
+These are complementary, not duplicates. The architect designs new behavior; the SME explains and troubleshoots existing behavior.
 
 ---
 
