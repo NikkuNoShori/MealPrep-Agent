@@ -2463,3 +2463,97 @@ describe('apiClient.getCollectionRecipes', () => {
     await expect(apiClient.getCollectionRecipes('c-1')).rejects.toThrow();
   });
 });
+
+describe('apiClient.searchRecipesText', () => {
+  // MOP-0007 Phase 1 — server-side full-text search over the user's recipes.
+
+  it('returns [] when query is empty (no network call)', async () => {
+    const result = await apiClient.searchRecipesText('');
+    expect(result).toEqual([]);
+  });
+
+  it('returns [] when query is whitespace-only (no network call)', async () => {
+    const result = await apiClient.searchRecipesText('   ');
+    expect(result).toEqual([]);
+  });
+
+  it('returns [] when unauthenticated', async () => {
+    mockCurrentUser({ id: '' });
+    // The helper above mocks `auth.getUser()` to return a user with no id —
+    // the implementation treats falsy user as unauthenticated and short-circuits.
+    // To exercise the truly-no-user path, spy on getUser to return { user: null }.
+    vi.spyOn(supabase.auth, 'getUser').mockResolvedValue({
+      data: { user: null },
+      error: null,
+    } as any);
+
+    const result = await apiClient.searchRecipesText('chicken');
+    expect(result).toEqual([]);
+  });
+
+  it('converts snake_case RPC payload to camelCase', async () => {
+    mockCurrentUser({ id: 'u-current' });
+    const snakePayload = [
+      {
+        recipe_id: 'r-1',
+        title: 'Chicken Tikka Masala',
+        description: 'Creamy and rich',
+        ingredients: [{ name: 'chicken', amount: 500, unit: 'g' }],
+        instructions: ['Marinate', 'Cook'],
+        rank_score: 0.84,
+      },
+      {
+        recipe_id: 'r-2',
+        title: 'Chicken Soup',
+        description: null,
+        ingredients: [],
+        instructions: [],
+        rank_score: 0.42,
+      },
+    ];
+    server.use(supabaseRpc('search_recipes_text', snakePayload));
+
+    const result = await apiClient.searchRecipesText('chicken');
+
+    expect(result).toEqual([
+      {
+        recipeId: 'r-1',
+        title: 'Chicken Tikka Masala',
+        description: 'Creamy and rich',
+        ingredients: [{ name: 'chicken', amount: 500, unit: 'g' }],
+        instructions: ['Marinate', 'Cook'],
+        rankScore: 0.84,
+      },
+      {
+        recipeId: 'r-2',
+        title: 'Chicken Soup',
+        description: null,
+        ingredients: [],
+        instructions: [],
+        rankScore: 0.42,
+      },
+    ]);
+  });
+
+  it('returns [] when the RPC returns null (no matches)', async () => {
+    mockCurrentUser({ id: 'u-current' });
+    server.use(supabaseRpc('search_recipes_text', null));
+
+    const result = await apiClient.searchRecipesText('zzz');
+    expect(result).toEqual([]);
+  });
+
+  it('throws when the RPC errors', async () => {
+    mockCurrentUser({ id: 'u-current' });
+    server.use(
+      supabaseRpc('search_recipes_text', () =>
+        HttpResponse.json(
+          { message: 'not authenticated', code: '42501' },
+          { status: 401 }
+        )
+      )
+    );
+
+    await expect(apiClient.searchRecipesText('chicken')).rejects.toThrow();
+  });
+});

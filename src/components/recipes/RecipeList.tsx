@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useMemo } from 'react'
-import { useRecipes, useDeleteRecipe, useRemoveRecipeFromCollection, useCollectionRecipes, usePublicRecipes, useHouseholdRecipes, useRecipeReactions, useToggleRecipeReaction, useMyHousehold } from '@/services/api'
+import { useRecipes, useDeleteRecipe, useRemoveRecipeFromCollection, useCollectionRecipes, usePublicRecipes, useHouseholdRecipes, useRecipeReactions, useToggleRecipeReaction, useMyHousehold, useRecipeTextSearch } from '@/services/api'
 import { RecipeCard, RecipeReaction } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
 import { useAuthStore } from '@/stores/authStore'
@@ -29,6 +29,14 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   const { user } = useAuthStore();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
+  // MOP-0007 Phase 1: debounce the search query so each keystroke doesn't
+  // trigger a network call. ~200ms is the standard sweet spot for search-as-
+  // you-type — fast enough to feel live, slow enough to coalesce rapid input.
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 200);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [filters, setFilters] = useState({
     dietaryRestrictions: [] as string[],
     prepTime: "" as string,
@@ -57,16 +65,25 @@ export const RecipeList: React.FC<RecipeListProps> = ({
     ? (publicRecipesData as any)?.recipes || []
     : (recipes as any)?.recipes || [];
 
-  const filteredRecipes =
-    baseRecipes.filter((recipe: any) => {
-      // Search filter
-      if (
-        searchQuery &&
-        !recipe.title.toLowerCase().includes(searchQuery.toLowerCase())
-      ) {
-        return false;
-      }
+  // MOP-0007 Phase 1: server-side full-text search over the user's OWN recipes
+  // (feedMode = "mine" default). The RPC matches title + description + tags +
+  // ingredients + instructions via PostgreSQL ts_vector — strictly richer than
+  // the old client-side `title.includes()`. ~30-80ms per query.
+  // For household / public / collection modes we keep client-side title match
+  // because the RPC scopes to the caller's recipes only. Those modes can get
+  // their own server-side search in a follow-up MOP if needed.
+  const useServerSearch = !!debouncedQuery.trim() && feedMode !== 'collection' && feedMode !== 'household' && feedMode !== 'public';
+  const { data: serverSearchResults } = useRecipeTextSearch(useServerSearch ? debouncedQuery : "");
+  const recipesAfterSearch = useServerSearch
+    ? (serverSearchResults || [])
+    : searchQuery
+      ? baseRecipes.filter((recipe: any) =>
+          recipe.title.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : baseRecipes;
 
+  const filteredRecipes =
+    recipesAfterSearch.filter((recipe: any) => {
       // Dietary restrictions filter
       if (filters.dietaryRestrictions.length > 0) {
         const recipeTags = recipe.tags || [];

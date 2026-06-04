@@ -323,6 +323,41 @@ class ApiClient {
     });
   }
 
+  /**
+   * MOP-0007 Phase 1 — Full-text search over the caller's own recipes.
+   *
+   * Calls the `search_recipes_text` PostgreSQL RPC (migration 004; user_id
+   * argument made vestigial by migration 028, replaced internally by
+   * `auth.uid()`). The RPC matches on `recipes.searchable_text`, which the
+   * `update_recipe_searchable_text` trigger keeps populated with title +
+   * description + difficulty + tags + ingredients + instructions — so this
+   * catches ingredient and instruction matches that the old client-side
+   * `title.includes()` filter missed.
+   *
+   * Latency target: ~30-80ms (vs ~250-500ms for semantic RAG; see
+   * docs/RAG_AUDIT.md and chat-rag-sme-knowledge/search-mechanism-decision.md
+   * for the per-surface mechanism rationale).
+   *
+   * Returns an empty array on empty/whitespace query or unauthenticated state.
+   */
+  async searchRecipesText(query: string, limit: number = 20) {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase.rpc('search_recipes_text', {
+      search_query: trimmed,
+      user_uuid: user.id, // vestigial post-migration 028; auth.uid() is authoritative
+      max_results: limit,
+    });
+    if (error) throw error;
+
+    // RPC returns Json; map snake_case → camelCase for frontend consumption.
+    return ((data as any[]) || []).map((r: any) => snakeToCamel(r));
+  }
+
   // Chat endpoints - using Supabase Edge Function (secure, API key protected)
   // The Edge Function handles OpenRouter calls server-side, keeping the API key secure
   async sendMessage(data: SendMessageInput): Promise<ChatMessageResponse> {
@@ -1480,6 +1515,20 @@ export const useSearchRecipes = (query: string, limit?: number) => {
     queryKey: ["recipes", "search", query, limit],
     queryFn: () => apiClient.searchRecipes(query, limit),
     enabled: !!query,
+  });
+};
+
+/**
+ * MOP-0007 Phase 1 — React Query hook for full-text search over the caller's
+ * own recipes. Pass the debounced query string; the hook is disabled on
+ * empty/whitespace input. Results are camelCased recipe rows.
+ */
+export const useRecipeTextSearch = (query: string, limit?: number) => {
+  return useQuery({
+    queryKey: ["recipes", "text-search", query, limit],
+    queryFn: () => apiClient.searchRecipesText(query, limit),
+    enabled: !!query.trim(),
+    staleTime: 30_000,
   });
 };
 
