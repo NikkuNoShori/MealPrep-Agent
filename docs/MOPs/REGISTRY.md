@@ -2,8 +2,8 @@
 
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
-**Last reviewed:** 2026-06-02
-**Last updated:** 2026-06-02 (MOP-0008 backend + Step 10 docs shipped, promoted draft → in_progress; MOP-0005 Phase 1 tests round 1+2 landed at 155 passing; ADR-0004 executed)
+**Last reviewed:** 2026-06-04
+**Last updated:** 2026-06-04 (RAG audit produced; MOP-0007 scope revised to "Smart Discovery"; MOP-0015 drafted for embedding refresh lifecycle; chat-rag-sme subagent + KB shipped)
 
 ---
 
@@ -46,6 +46,7 @@
 | [MOP-0012](MOP-0012.md) | Recipe-Pipeline Test Fixture Library | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0013](MOP-0013.md) | Playwright E2E Test Setup | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0014](MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | draft | 2026-06-01 | 2026-06-01 | — | surface-reviewer |
+| [MOP-0015](MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle — fix stale embeddings from edited recipes | draft | 2026-06-04 | 2026-06-04 | — | chat-rag-sme audit |
 
 > **Registry drift resolved (2026-06-01):** MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
 
