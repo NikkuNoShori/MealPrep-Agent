@@ -41,32 +41,57 @@ export const toCamelCase = (key: string): string => {
   return key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 };
 
-export const snakeToCamel = (obj: any): any => {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map(snakeToCamel);
-  if (typeof obj !== 'object') return obj;
+/**
+ * Recursive snake → camel key conversion. The runtime drops nothing —
+ * only the keys are renamed; values pass through unchanged (including
+ * nested objects + arrays).
+ *
+ * Type parameter `T` is the **caller-asserted** output shape. The
+ * transformation cannot be expressed at the type level without a
+ * template-literal mapped type that also accounts for `RECIPE_FIELD_MAP`
+ * special-cases — so we let the call site declare what it expects to
+ * receive. Default `T = unknown` forces explicit narrowing; pass a known
+ * shape (e.g. `snakeToCamel<RecipeRow>(row)`) for type-safe access.
+ *
+ * Existing call sites that pre-date this generic continue to work
+ * because TypeScript will infer `T = unknown` and the caller will
+ * either narrow at access or use `as` casts (same as before).
+ */
+export const snakeToCamel = <T = any>(obj: unknown): T => {
+  if (obj === null || obj === undefined) return obj as T;
+  if (Array.isArray(obj)) return obj.map((item) => snakeToCamel<unknown>(item)) as T;
+  if (typeof obj !== 'object') return obj as T;
 
-  const camelObj: any = {};
-  for (const [key, value] of Object.entries(obj)) {
+  const camelObj: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     const camelKey = toCamelCase(key);
-    camelObj[camelKey] = snakeToCamel(value);
+    camelObj[camelKey] = snakeToCamel<unknown>(value);
   }
-  return camelObj;
+  return camelObj as T;
 };
 
-// Note: `userId` is intentionally dropped during camelToSnake because
-// the API client sets `user_id` separately (e.g. in createRecipe). This
-// is documented behavior — round-trip tests should not expect it back.
-export const camelToSnake = (obj: any): any => {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map(camelToSnake);
-  if (typeof obj !== 'object') return obj;
+/**
+ * Recursive camel → snake key conversion.
+ *
+ * **Runtime asymmetry:** the `userId` key is intentionally dropped at
+ * every nesting level. The API client sets `user_id` separately (e.g.
+ * in `createRecipe`) so frontend code can pass `{ userId, ... }`
+ * without the round-trip re-introducing a stale id. Tests document this
+ * behavior — round-trips should NOT expect `userId` to come back.
+ *
+ * Type parameter `T` is the caller-asserted output shape — see the
+ * docstring on `snakeToCamel` for the rationale.
+ */
+export const camelToSnake = <T = any>(obj: unknown): T => {
+  if (obj === null || obj === undefined) return obj as T;
+  if (Array.isArray(obj)) return obj.map((item) => camelToSnake<unknown>(item)) as T;
+  if (typeof obj !== 'object') return obj as T;
 
-  const snakeObj: any = {};
-  for (const [key, value] of Object.entries(obj)) {
+  const snakeObj: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     if (key === 'userId') continue;
     const snakeKey = toSnakeCase(key);
-    snakeObj[snakeKey] = camelToSnake(value);
+    snakeObj[snakeKey] = camelToSnake<unknown>(value);
   }
-  return snakeObj;
+  return snakeObj as T;
 };

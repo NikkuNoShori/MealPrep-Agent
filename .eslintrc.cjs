@@ -28,10 +28,12 @@ module.exports = {
     // component-only modules stay HMR-friendly.
     'react-refresh/only-export-components': 'warn',
 
-    // Tracked separately by MOP-0006 (Generated Supabase Types & API Typing).
-    // Until that lands, the data layer uses `any` for snake/camel mapping and
-    // RPC response shapes. Re-enable as `warn` once MOP-0006 is in flight.
-    '@typescript-eslint/no-explicit-any': 'off',
+    // MOP-0006 Phase 3 (2026-06-03): rule enabled as `warn` — the data layer
+    // has been substantially typed (client + 35 supabase casts removed), but
+    // ~250 `any` usages remain in components/hooks/stores that need per-call-
+    // site cleanup. Warnings are tracked; address incrementally. Promote to
+    // `error` once the warning count is in the low double digits.
+    '@typescript-eslint/no-explicit-any': 'warn',
 
     // Allow `_`-prefixed unused vars (common pattern for intentionally ignored args)
     '@typescript-eslint/no-unused-vars': [
@@ -56,6 +58,9 @@ module.exports = {
       files: ['**/*.test.ts', '**/*.test.tsx', 'src/test/**/*'],
       rules: {
         '@typescript-eslint/no-non-null-assertion': 'off',
+        // Test fixtures and mock payloads use `any` heavily — that's not
+        // the structural debt MOP-0006 is targeting. Keep this off for tests.
+        '@typescript-eslint/no-explicit-any': 'off',
       },
     },
   ],

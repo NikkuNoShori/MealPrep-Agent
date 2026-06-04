@@ -37,7 +37,7 @@
 | [MOP-0003](MOP-0003.md) | Dietary Profiles & Allergen Detection | draft | 2026-03-12 | 2026-03-12 | — | Nick Neal |
 | [MOP-0004](MOP-0004.md) | Meal Planner & Grocery Cart | in_progress | 2026-03-12 | 2026-06-01 | — | Nick Neal |
 | [MOP-0005](MOP-0005.md) | Test Coverage & Testing Infrastructure | in_progress | 2026-03-14 | 2026-06-01 | — | Nick Neal |
-| [MOP-0006](MOP-0006.md) | Generated Supabase Types & API Typing | draft | 2026-05-08 | 2026-05-08 | — | Nick Neal |
+| [MOP-0006](MOP-0006.md) | Generated Supabase Types & API Typing | complete | 2026-05-08 | 2026-06-03 | 2026-06-03 | Nick Neal |
 | [MOP-0007](MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0008](MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | in_progress | 2026-06-01 | 2026-06-02 | — | Nick Neal |
 | [MOP-0009](MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |

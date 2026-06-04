@@ -5,9 +5,9 @@ import { Logger } from './logger';
 import { snakeToCamel, camelToSnake } from '@/utils/case';
 
 // Supabase configuration - reuse from supabase.ts
-const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
-const SUPABASE_ANON_KEY =
-  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
+// `import.meta.env` is typed in src/vite-env.d.ts — no cast needed.
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
 
 // Supabase Edge Functions base URL
 const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
@@ -274,8 +274,7 @@ class ApiClient {
     // Transform camelCase to snake_case for database
     const dbData = camelToSnake(data);
 
-    const { data: recipe, error } = await (supabase
-      .from("recipes") as any)
+    const { data: recipe, error } = await supabase.from("recipes")
       .update(dbData)
       .eq("id", id)
       .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
@@ -382,11 +381,12 @@ class ApiClient {
       }
 
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
-      const statusCode = error?.status || error?.response?.status || 500;
-      Logger.chat.apiCall(endpoint, 'POST', statusCode, duration, error?.message);
-      Logger.chat.error('sendMessage', error, {
+      const err = error as { status?: number; response?: { status?: number }; message?: string };
+      const statusCode = err?.status || err?.response?.status || 500;
+      Logger.chat.apiCall(endpoint, 'POST', statusCode, duration, err?.message);
+      Logger.chat.error('sendMessage', error as Error, {
         sessionId: data.sessionId,
         intent: data.intent,
         messageLength: data.message.length,
@@ -448,8 +448,7 @@ class ApiClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    let query = (supabase
-      .from("meal_plans") as any)
+    let query = supabase.from("meal_plans")
       .select("*")
       .eq("user_id", user.id)
       .order("start_date", { ascending: false });
@@ -467,8 +466,7 @@ class ApiClient {
   }
 
   async getMealPlan(id: string) {
-    const { data, error } = await (supabase
-      .from("meal_plans") as any)
+    const { data, error } = await supabase.from("meal_plans")
       .select("*")
       .eq("id", id)
       .single();
@@ -488,8 +486,7 @@ class ApiClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data: mealPlan, error } = await (supabase
-      .from("meal_plans") as any)
+    const { data: mealPlan, error } = await supabase.from("meal_plans")
       .insert({
         user_id: user.id,
         created_by: user.id,
@@ -529,8 +526,7 @@ class ApiClient {
     if (data.notes !== undefined) payload.notes = data.notes;
     if (data.status !== undefined) payload.status = data.status;
 
-    const { data: mealPlan, error } = await (supabase
-      .from("meal_plans") as any)
+    const { data: mealPlan, error } = await supabase.from("meal_plans")
       .update(payload)
       .eq("id", id)
       .select()
@@ -541,8 +537,7 @@ class ApiClient {
   }
 
   async deleteMealPlan(id: string) {
-    const { error } = await (supabase
-      .from("meal_plans") as any)
+    const { error } = await supabase.from("meal_plans")
       .delete()
       .eq("id", id);
 
@@ -562,7 +557,10 @@ class ApiClient {
     const newStart = new Date(newDateRange.startDate);
     const dayOffset = Math.round((newStart.getTime() - sourceStart.getTime()) / (1000 * 60 * 60 * 24));
 
-    const shiftedMeals: any = {};
+    // Typed as `Json`-compatible because it's destined for the
+    // meal_plans.meals JSONB column (per ADR-0001).
+    const shiftedMeals: Record<string, unknown> = {};
+    // Cast to Json at insert site (line below) — see line ~571.
     if (source.meals && typeof source.meals === 'object') {
       for (const [dateStr, slots] of Object.entries(source.meals)) {
         const oldDate = new Date(dateStr);
@@ -572,8 +570,7 @@ class ApiClient {
       }
     }
 
-    const { data: mealPlan, error } = await (supabase
-      .from("meal_plans") as any)
+    const { data: mealPlan, error } = await supabase.from("meal_plans")
       .insert({
         user_id: user.id,
         created_by: user.id,
@@ -582,7 +579,7 @@ class ApiClient {
         title: source.title ? `${source.title} (copy)` : null,
         start_date: newDateRange.startDate,
         end_date: newDateRange.endDate,
-        meals: shiftedMeals,
+        meals: shiftedMeals as any, // Json column; runtime shape matches MealPlanMeals
         notes: source.notes || null,
         status: 'draft',
       })
@@ -696,9 +693,10 @@ class ApiClient {
       return null;
     }
     return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle any unexpected errors (like network issues) gracefully
-      console.warn("Error in getPreferences:", error.message);
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn("Error in getPreferences:", msg);
       return null;
     }
   }
@@ -724,8 +722,7 @@ class ApiClient {
     }
 
     if (existing) {
-      const { data: updated, error } = await (supabase
-        .from("user_preferences") as any)
+      const { data: updated, error } = await supabase.from("user_preferences")
         .update(updateData)
         .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
         .select()
@@ -742,8 +739,7 @@ class ApiClient {
           error.message?.includes("Not Acceptable"))
       ) {
         const { measurement_system: _measurement_system, ...dataWithoutMeasurement } = updateData;
-        const { data: updatedFallback, error: fallbackError } = await (supabase
-          .from("user_preferences") as any)
+        const { data: updatedFallback, error: fallbackError } = await supabase.from("user_preferences")
           .update(dataWithoutMeasurement)
           .eq("user_id", user.id)
           .select()
@@ -954,15 +950,14 @@ class ApiClient {
   // ── Household endpoints ──
 
   async getMyHousehold() {
-    const { data, error } = await (supabase.rpc as any)('get_my_household');
+    const { data, error } = await supabase.rpc('get_my_household');
     if (error) throw error;
     if (!data) return null;
     return snakeToCamel(data);
   }
 
   async updateHousehold(householdId: string, data: { name: string }) {
-    const { data: household, error } = await (supabase
-      .from("households") as any)
+    const { data: household, error } = await supabase.from("households")
       .update({ name: data.name })
       .eq("id", householdId)
       .select()
@@ -1000,9 +995,10 @@ class ApiClient {
   }
 
   async getMyPendingInvites() {
-    const { data, error } = await (supabase.rpc as any)('get_my_pending_invites');
+    const { data, error } = await supabase.rpc('get_my_pending_invites');
     if (error) throw error;
-    return (data || []).map((i: any) => snakeToCamel(i));
+    // RPC return type is Json (unknown shape) per generated types — narrow at access.
+    return ((data as any[]) || []).map((i: any) => snakeToCamel(i));
   }
 
   async respondToInvite(inviteId: string, accept: boolean) {
@@ -1010,8 +1006,7 @@ class ApiClient {
     if (!user) throw new Error("User not authenticated");
 
     // Update invite status
-    const { data: invite, error: updateError } = await (supabase
-      .from("household_invites") as any)
+    const { data: invite, error: updateError } = await supabase.from("household_invites")
       .update({ status: accept ? "accepted" : "declined" })
       .eq("id", inviteId)
       .select("*, households(id, name)")
@@ -1021,8 +1016,7 @@ class ApiClient {
 
     // If accepted, add user to household
     if (accept && invite) {
-      const { error: joinError } = await (supabase
-        .from("household_members") as any)
+      const { error: joinError } = await supabase.from("household_members")
         .insert({
           household_id: invite.household_id,
           user_id: user.id,
@@ -1038,8 +1032,7 @@ class ApiClient {
   // ── Household Member Management ──
 
   async updateMemberRole(memberId: string, role: 'admin' | 'member') {
-    const { data, error } = await (supabase
-      .from("household_members") as any)
+    const { data, error } = await supabase.from("household_members")
       .update({ role })
       .eq("id", memberId)
       .select()
@@ -1050,8 +1043,7 @@ class ApiClient {
   }
 
   async removeHouseholdMember(memberId: string) {
-    const { error } = await (supabase
-      .from("household_members") as any)
+    const { error } = await supabase.from("household_members")
       .delete()
       .eq("id", memberId);
 
@@ -1063,16 +1055,14 @@ class ApiClient {
     if (!user) throw new Error("User not authenticated");
 
     // Promote target to owner
-    const { error: promoteError } = await (supabase
-      .from("household_members") as any)
+    const { error: promoteError } = await supabase.from("household_members")
       .update({ role: 'owner' })
       .eq("id", memberId);
 
     if (promoteError) throw promoteError;
 
     // Demote self to admin
-    const { error: demoteError } = await (supabase
-      .from("household_members") as any)
+    const { error: demoteError } = await supabase.from("household_members")
       .update({ role: 'admin' })
       .eq("household_id", householdId)
       .eq("user_id", user.id);
@@ -1094,8 +1084,7 @@ class ApiClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data: member, error } = await (supabase
-      .from("family_members") as any)
+    const { data: member, error } = await supabase.from("family_members")
       .insert({
         household_id: data.householdId,
         managed_by: user.id,
@@ -1121,7 +1110,7 @@ class ApiClient {
     allergies?: string[];
     preferences?: Record<string, any>;
   }) {
-    const payload: any = {};
+    const payload: Record<string, unknown> = {};
     if (updates.name !== undefined) payload.name = updates.name;
     if (updates.relationship !== undefined) payload.relationship = updates.relationship;
     if (updates.age !== undefined) payload.age = updates.age;
@@ -1129,8 +1118,7 @@ class ApiClient {
     if (updates.allergies !== undefined) payload.allergies = updates.allergies;
     if (updates.preferences !== undefined) payload.preferences = updates.preferences;
 
-    const { data: member, error } = await (supabase
-      .from("family_members") as any)
+    const { data: member, error } = await supabase.from("family_members")
       .update(payload)
       .eq("id", memberId)
       .select()
@@ -1141,8 +1129,7 @@ class ApiClient {
   }
 
   async deleteFamilyMember(memberId: string) {
-    const { error } = await (supabase
-      .from("family_members") as any)
+    const { error } = await supabase.from("family_members")
       .update({ is_active: false })
       .eq("id", memberId);
 
@@ -1154,12 +1141,12 @@ class ApiClient {
   async getRecipeReactions(recipeIds: string[]) {
     if (recipeIds.length === 0) return [];
 
-    const { data, error } = await (supabase.rpc as any)('get_recipe_reactions', {
+    const { data, error } = await supabase.rpc('get_recipe_reactions', {
       p_recipe_ids: recipeIds,
     });
     if (error) throw error;
 
-    return (data || []).map((r: any) => ({
+    return ((data as any[]) || []).map((r: any) => ({
       id: r.id,
       recipeId: r.recipe_id,
       userId: r.user_id,
@@ -1174,18 +1161,19 @@ class ApiClient {
     reaction: 'thumbs_up' | 'thumbs_down';
     familyMemberId?: string;
   }) {
-    const { data: result, error } = await (supabase.rpc as any)('toggle_recipe_reaction', {
+    const { data: result, error } = await supabase.rpc('toggle_recipe_reaction', {
       p_recipe_id: data.recipeId,
       p_reaction: data.reaction,
-      p_family_member_id: data.familyMemberId || null,
+      // Generated typegen marks this nullable param as `string | undefined` but the
+      // SQL function accepts NULL — pass null at runtime, cast for the type checker.
+      p_family_member_id: (data.familyMemberId || null) as any,
     });
     if (error) throw error;
     return result;
   }
 
   async updateRecipeVisibility(recipeId: string, visibility: 'private' | 'household' | 'public') {
-    const { error } = await (supabase
-      .from("recipes") as any)
+    const { error } = await supabase.from("recipes")
       .update({ visibility })
       .eq("id", recipeId);
 
@@ -1199,8 +1187,7 @@ class ApiClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data, error } = await (supabase
-      .from("recipe_collections") as any)
+    const { data, error } = await supabase.from("recipe_collections")
       .select("*")
       .eq("user_id", user.id)
       .order("sort_order", { ascending: true });
@@ -1210,8 +1197,7 @@ class ApiClient {
   }
 
   async getCollection(collectionId: string) {
-    const { data, error } = await (supabase
-      .from("recipe_collections") as any)
+    const { data, error } = await supabase.from("recipe_collections")
       .select("*")
       .eq("id", collectionId)
       .single();
@@ -1221,8 +1207,7 @@ class ApiClient {
   }
 
   async getCollectionRecipes(collectionId: string) {
-    const { data, error } = await (supabase
-      .from("collection_recipes") as any)
+    const { data, error } = await supabase.from("collection_recipes")
       .select("recipe_id, sort_order, added_at, recipes(*)")
       .eq("collection_id", collectionId)
       .order("sort_order", { ascending: true });
@@ -1235,8 +1220,7 @@ class ApiClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data, error } = await (supabase
-      .from("recipe_collections") as any)
+    const { data, error } = await supabase.from("recipe_collections")
       .insert({
         user_id: user.id,
         name,
@@ -1251,8 +1235,7 @@ class ApiClient {
   }
 
   async updateCollection(collectionId: string, updates: { name?: string; description?: string; icon?: string; visibility?: string }) {
-    const { data, error } = await (supabase
-      .from("recipe_collections") as any)
+    const { data, error } = await supabase.from("recipe_collections")
       .update(updates)
       .eq("id", collectionId)
       .select()
@@ -1263,8 +1246,7 @@ class ApiClient {
   }
 
   async deleteCollection(collectionId: string) {
-    const { error } = await (supabase
-      .from("recipe_collections") as any)
+    const { error } = await supabase.from("recipe_collections")
       .delete()
       .eq("id", collectionId);
 
@@ -1272,16 +1254,14 @@ class ApiClient {
   }
 
   async addRecipeToCollection(collectionId: string, recipeId: string) {
-    const { error } = await (supabase
-      .from("collection_recipes") as any)
+    const { error } = await supabase.from("collection_recipes")
       .insert({ collection_id: collectionId, recipe_id: recipeId });
 
     if (error) throw error;
   }
 
   async removeRecipeFromCollection(collectionId: string, recipeId: string) {
-    const { error } = await (supabase
-      .from("collection_recipes") as any)
+    const { error } = await supabase.from("collection_recipes")
       .delete()
       .eq("collection_id", collectionId)
       .eq("recipe_id", recipeId);
@@ -1292,14 +1272,16 @@ class ApiClient {
   // ── Household Recipes ──
 
   async getHouseholdRecipes(params?: { limit?: number; offset?: number }) {
-    const { data, error } = await (supabase.rpc as any)('get_household_recipes', {
+    const { data, error } = await supabase.rpc('get_household_recipes', {
       p_limit: params?.limit || 50,
       p_offset: params?.offset || 0,
     });
     if (error) throw error;
     if (!data) return { recipes: [], total: 0 };
 
-    const camelRecipes = (data.recipes || []).map((r: any) => {
+    // RPC return type is Json — narrow to the known { recipes, total } shape.
+    const rpcResult = data as { recipes?: any[]; total?: number };
+    const camelRecipes = (rpcResult.recipes || []).map((r: any) => {
       const recipe = snakeToCamel(r);
       if (r.profiles) {
         recipe.author = {
@@ -1311,7 +1293,7 @@ class ApiClient {
       return recipe;
     });
 
-    return { recipes: camelRecipes, total: data.total };
+    return { recipes: camelRecipes, total: rpcResult.total ?? 0 };
   }
 
   // ── Public Recipes ──
@@ -1320,8 +1302,7 @@ class ApiClient {
     const limit = params?.limit || 50;
     const offset = params?.offset || 0;
 
-    const { data, error } = await (supabase
-      .from("recipes") as any)
+    const { data, error } = await supabase.from("recipes")
       .select("*, profiles!recipes_user_id_fkey(display_name, username, avatar_url)")
       .eq("visibility", "public")
       .order("created_at", { ascending: false })
@@ -1351,8 +1332,7 @@ class ApiClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data, error } = await (supabase
-      .from("profiles") as any)
+    const { data, error } = await supabase.from("profiles")
       .select("*")
       .eq("id", user.id)
       .single();
@@ -1400,8 +1380,7 @@ class ApiClient {
 
   async adminRemoveHouseholdMember(memberId: string) {
     // Keep using direct Supabase for member removal (RLS handles it)
-    const { error } = await (supabase
-      .from("household_members") as any)
+    const { error } = await supabase.from("household_members")
       .delete()
       .eq("id", memberId);
 
@@ -1424,8 +1403,7 @@ class ApiClient {
       throw new Error("Username must be 3-30 characters, lowercase letters, numbers, and underscores only");
     }
 
-    const { data, error } = await (supabase
-      .from("profiles") as any)
+    const { data, error } = await supabase.from("profiles")
       .update({ username })
       .eq("id", user.id)
       .select()

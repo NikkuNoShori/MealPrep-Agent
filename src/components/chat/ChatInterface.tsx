@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, createRef } from 'react'
 import { useSendMessage, useChatHistory } from "../../services/api";
+import type { PendingConfirmation, ConfirmActionInput } from "../../services/api";
+import { ConfirmationPrompt } from "./ConfirmationPrompt";
 import { apiClient } from "../../services/api";
 import { detectIntent } from "../../services/ragService";
 import { Logger } from "../../services/logger";
@@ -113,6 +115,13 @@ interface Message {
   images?: string[]; // Array of image URLs or base64 data URLs
   recipe?: StructuredRecipe; // Optional structured recipe data
   recipes?: StructuredRecipe[]; // Optional multiple recipes
+  /**
+   * Set when the agent emitted a destructive tool call that the user
+   * must confirm before the backend will execute it. Rendered inline
+   * via <ConfirmationPrompt/>. Cleared after Confirm or Cancel — see
+   * handleConfirmAction / handleCancelConfirmation in ChatInterface.
+   */
+  pendingConfirmation?: PendingConfirmation;
 }
 
 interface Conversation {
@@ -161,6 +170,9 @@ export const ChatInterface: React.FC = () => {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState(false);
+  // Tracks the message id whose pendingConfirmation is currently being
+  // dispatched, so the Confirm/Cancel buttons can show a busy state.
+  const [confirmingMessageId, setConfirmingMessageId] = useState<string | null>(null);
 
   const sendMessageMutation = useSendMessage();
   const { user } = useAuthStore();
@@ -867,6 +879,8 @@ export const ChatInterface: React.FC = () => {
         timestamp: new Date(response.response.timestamp),
         recipe: response.recipe, // Include structured recipe if present (backwards compat)
         recipes: responseRecipes && responseRecipes.length > 1 ? responseRecipes : undefined,
+        // MOP-0008 Step 8 — surfaced when the agent proposed a destructive tool
+        pendingConfirmation: (response as any).pendingConfirmation,
       };
 
       // Log successful response
@@ -985,6 +999,118 @@ export const ChatInterface: React.FC = () => {
       setCopiedMessageId(messageId);
       setTimeout(() => setCopiedMessageId(null), 2000);
     }
+  };
+
+  /**
+   * MOP-0008 Step 8 — Confirm a pending destructive tool call.
+   *
+   * Dispatches a follow-up sendMessage with `context.confirmAction` set,
+   * which the chat-api edge function short-circuits to executeConfirmedTool
+   * (bypassing the agent loop so the model can't drift the args). Appends
+   * the result as a new AI message and clears the originating message's
+   * pendingConfirmation so the buttons disappear.
+   */
+  const handleConfirmAction = async (
+    messageId: string,
+    pc: PendingConfirmation,
+  ) => {
+    const conv = conversations.find((c) => c.id === currentConversationId);
+    if (!conv) return;
+
+    setConfirmingMessageId(messageId);
+    // Optimistically clear the prompt so the buttons disappear immediately.
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conv.id
+          ? {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId
+                  ? { ...m, pendingConfirmation: undefined }
+                  : m,
+              ),
+            }
+          : c,
+      ),
+    );
+
+    try {
+      const confirmInput: ConfirmActionInput = {
+        tool: pc.tool,
+        args: pc.args,
+        idempotencyKey: pc.idempotencyKey,
+      };
+
+      const response = await sendMessageMutation.mutateAsync({
+        message: "",
+        sessionId: conv.sessionId,
+        context: {
+          sessionId: conv.sessionId,
+          conversationId: conv.id,
+          confirmAction: confirmInput,
+        },
+      });
+
+      const responseRecipes = (response as any).recipes as
+        | StructuredRecipe[]
+        | undefined;
+      const aiMessage: Message = {
+        id: response.response.id,
+        content: response.response.content,
+        sender: "ai",
+        timestamp: new Date(response.response.timestamp),
+        recipe: response.recipe,
+        recipes:
+          responseRecipes && responseRecipes.length > 1
+            ? responseRecipes
+            : undefined,
+        pendingConfirmation: (response as any).pendingConfirmation,
+      };
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conv.id
+            ? {
+                ...c,
+                messages: [...c.messages, aiMessage],
+                lastMessage: response.response.content,
+              }
+            : c,
+        ),
+      );
+    } catch (err) {
+      Logger.chat.error("confirmAction", err as Error, {
+        messageId,
+        tool: pc.tool,
+      });
+      toast.error("Sorry, that action failed. Please try again.");
+    } finally {
+      setConfirmingMessageId(null);
+    }
+  };
+
+  /**
+   * MOP-0008 Step 8 — Cancel a pending destructive tool call.
+   * No backend call is needed because nothing was executed. Just dismiss
+   * the prompt locally; the message itself remains as conversation history.
+   */
+  const handleCancelConfirmation = (messageId: string) => {
+    const conv = conversations.find((c) => c.id === currentConversationId);
+    if (!conv) return;
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conv.id
+          ? {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId
+                  ? { ...m, pendingConfirmation: undefined }
+                  : m,
+              ),
+            }
+          : c,
+      ),
+    );
   };
 
   const currentConversation = getCurrentConversation();
@@ -1328,6 +1454,19 @@ export const ChatInterface: React.FC = () => {
                         </>
                       );
                     })()}
+                    {message.pendingConfirmation && message.sender === "ai" && (
+                      <ConfirmationPrompt
+                        pendingConfirmation={message.pendingConfirmation}
+                        isConfirming={confirmingMessageId === message.id}
+                        onConfirm={() =>
+                          handleConfirmAction(
+                            message.id,
+                            message.pendingConfirmation!,
+                          )
+                        }
+                        onCancel={() => handleCancelConfirmation(message.id)}
+                      />
+                    )}
                   </div>
                 ) : (
                   // Regular message display
@@ -1379,6 +1518,19 @@ export const ChatInterface: React.FC = () => {
                         {message.timestamp.toLocaleTimeString()}
                       </p>
                     </div>
+                    {message.pendingConfirmation && message.sender === "ai" && (
+                      <ConfirmationPrompt
+                        pendingConfirmation={message.pendingConfirmation}
+                        isConfirming={confirmingMessageId === message.id}
+                        onConfirm={() =>
+                          handleConfirmAction(
+                            message.id,
+                            message.pendingConfirmation!,
+                          )
+                        }
+                        onCancel={() => handleCancelConfirmation(message.id)}
+                      />
+                    )}
                     <button
                       onClick={() => copyMessage(message.id, message.content)}
                       className={`absolute -top-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 ${

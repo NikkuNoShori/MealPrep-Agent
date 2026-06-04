@@ -4,7 +4,7 @@ Invoke the `surface-reviewer` subagent to classify findings, draft any warranted
 
 This skill is the user-facing path for surface review. Invoke when:
 - The assistant has surfaced findings during a session (bugs, drift, decisions, audit warnings) and you want them classified + recorded
-- An auditor run (`qa-auditor`, `doc-adherence`, `security-auditor`, `data-integrity`) returned findings that need disposition
+- An auditor run (`qa-auditor`, `doc-adherence`, `data-integrity` — also `security-auditor` once it ships per MOP-0009 Phase 6) returned findings that need disposition
 - You want a fresh review of "what should I do with all these things I noticed?"
 
 The assistant should also invoke the surface-reviewer **automatically** when its own output uses phrases like "worth surfacing", "worth recording", "should flag", "deserves attention" — per the rule in `CLAUDE.md`.

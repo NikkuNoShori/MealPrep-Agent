@@ -137,7 +137,7 @@ This is enforced in each subagent's system prompt under a `## Run Log` section. 
 
 ## Known gaps + drift (audit 2026-06-03)
 
-- **`security-auditor` ghost references.** Three files reference a `security-auditor` agent that does not exist: `.claude/agents/doc-adherence.md`, `.claude/agents/surface-reviewer.md`, `.claude/commands/surface.md`. The agent is planned as **MOP-0009 Phase 6**. Until it's built, the references read as if it exists. Action: either build the agent or rewrite references to "planned (MOP-0009)".
+- **`security-auditor` planned but not built (MOP-0009 Phase 6).** References in `surface-reviewer.md` + `surface.md` now explicitly say "once it ships per MOP-0009 Phase 6" so the aspirational mention is clearly labeled. Build the agent when MOP-0009 Phase 6 is picked up — the existing references will then match reality without further edits.
 - **`agents-log.md` has a duplicated header table** (cosmetic). The `## Format` section and `## Entries` section both render an identical header row. Drop one.
 - **All six subagents use `model: opus`.** Worth a deliberate policy decision: structured-output agents like `qa-auditor` and the surface-review classifier could run on `sonnet` to save cost. Default opus today because user explicitly asked for it earlier; revisit when usage patterns are clearer.
 - **`ui-designer.md` references `src/components/recipes/RecipeCard.tsx` as "needs restyling"** — verify currency periodically as that file evolves.

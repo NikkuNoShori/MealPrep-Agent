@@ -1,10 +1,13 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '../types/database'
 
 // Supabase client for authentication
-// Use singleton pattern to prevent multiple instances
-let supabaseInstance: ReturnType<typeof createClient> | null = null;
+// MOP-0006 Phase 1: typed via the generated Database type so PostgREST
+// query builder chains (.from / .select / .insert / .update / .rpc) carry
+// their row/insert/update shapes through to call sites in api.ts.
+let supabaseInstance: SupabaseClient<Database> | null = null;
 
-function getSupabaseClient() {
+function getSupabaseClient(): SupabaseClient<Database> {
   if (supabaseInstance) {
     return supabaseInstance;
   }
@@ -17,7 +20,7 @@ function getSupabaseClient() {
     console.warn('⚠️  Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables');
   }
 
-  supabaseInstance = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
+  supabaseInstance = createClient<Database>(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
