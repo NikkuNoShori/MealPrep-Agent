@@ -118,7 +118,7 @@ oEmbed and link HTTP fetches use **no** LLM.
 
 `OPENROUTER_API_KEY` alone still works as a fallback for **both** (single-key dev setup).
 
-Legacy aliases (migration): `OPENROUTER_API_KEY_TEXT`, `OPENROUTER_API_KEY_VISION`, `OPENROUTER_API_KEY_QWEN2.5_*`, `OPENROUTER_API_KEY_QWEN2_5_*`.
+Legacy aliases still read at runtime: `OPENROUTER_API_KEY_TEXT`, `OPENROUTER_API_KEY_VISION`. If you previously used `OPENROUTER_API_KEY_QWEN2.5_*` / `OPENROUTER_API_KEY_QWEN2_5_*` in Supabase secrets, rename them to `OPENROUTER_API_KEY_CHAT` and `OPENROUTER_API_KEY_MEDIA`.
 
 **Set in Supabase:**
 

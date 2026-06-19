@@ -15,15 +15,11 @@ export interface OpenRouterKeyPair {
 const CHAT_ENV_NAMES = [
   "OPENROUTER_API_KEY_CHAT",
   "OPENROUTER_API_KEY_TEXT",
-  "OPENROUTER_API_KEY_QWEN2.5_instruct_8b",
-  "OPENROUTER_API_KEY_QWEN2_5_instruct_8b",
 ] as const;
 
 const MEDIA_ENV_NAMES = [
   "OPENROUTER_API_KEY_MEDIA",
   "OPENROUTER_API_KEY_VISION",
-  "OPENROUTER_API_KEY_QWEN2.5_VL_8b",
-  "OPENROUTER_API_KEY_QWEN2_5_VL_8b",
 ] as const;
 
 function firstSet(names: readonly string[]): string | undefined {
