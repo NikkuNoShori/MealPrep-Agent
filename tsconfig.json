@@ -36,5 +36,6 @@
     }
   },
   "include": ["src"],
+  "exclude": ["src/integration"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

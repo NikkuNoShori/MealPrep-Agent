@@ -14,6 +14,7 @@ import type {
 import { textAdapter } from "./adapters/text-adapter.ts";
 import { urlAdapter } from "./adapters/url-adapter.ts";
 import { videoAdapter } from "./adapters/video-adapter.ts";
+import { isShortFormVideoUrl } from "../_shared/video-url-utils.ts";
 import { extract } from "./stages/extract.ts";
 import { transform } from "./stages/transform.ts";
 import { load } from "./stages/load.ts";
@@ -167,6 +168,19 @@ async function runAdapter(
 
     case "url":
       if (!request.url) throw new Error("URL is required for url source_type");
+      // Short-form video URLs → oEmbed path (not HTML scrape)
+      if (isShortFormVideoUrl(request.url)) {
+        return videoAdapter(openRouter, {
+          video_url: request.url,
+          pinned_comment_text: request.pinned_comment_text,
+          supplementary_text: request.supplementary_text,
+          frame_urls: request.frame_urls,
+          transcript: request.transcript,
+          media_url: request.media_url,
+          media_base64: request.media_base64,
+          auto_transcribe: request.auto_transcribe,
+        });
+      }
       return urlAdapter(request.url);
 
     case "video":
@@ -174,6 +188,11 @@ async function runAdapter(
         video_url: request.video_url,
         frame_urls: request.frame_urls,
         transcript: request.transcript,
+        pinned_comment_text: request.pinned_comment_text,
+        supplementary_text: request.supplementary_text,
+        media_url: request.media_url,
+        media_base64: request.media_base64,
+        auto_transcribe: request.auto_transcribe,
       });
 
     default:

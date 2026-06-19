@@ -208,7 +208,7 @@ async function extractRecipeFromSource(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolHandlerResult> {
-  const sourceType = args.source_type as "url" | "text" | "images";
+  const sourceType = args.source_type as "url" | "text" | "images" | "video";
 
   const body: Record<string, unknown> = { auto_save: false };
 
@@ -222,6 +222,12 @@ async function extractRecipeFromSource(
     }
     body.source_type = "url";
     body.url = args.url;
+    if (args.pinned_comment_text) {
+      body.pinned_comment_text = args.pinned_comment_text;
+    }
+    if (args.supplementary_text) {
+      body.supplementary_text = args.supplementary_text;
+    }
   } else if (sourceType === "text") {
     if (!args.text) {
       return {
@@ -243,6 +249,36 @@ async function extractRecipeFromSource(
     body.source_type = "text";
     body.text = "";
     body.images = ctx.attachedImages;
+  } else if (sourceType === "video") {
+    body.source_type = "video";
+    if (args.video_url) body.video_url = args.video_url;
+    if (args.url) body.video_url = args.url;
+    if (args.pinned_comment_text) {
+      body.pinned_comment_text = args.pinned_comment_text;
+    }
+    if (args.supplementary_text) {
+      body.supplementary_text = args.supplementary_text;
+    }
+    if (args.transcript) body.transcript = args.transcript;
+    if (ctx.attachedVideoMediaUrl) {
+      body.media_url = ctx.attachedVideoMediaUrl;
+    }
+    if (ctx.attachedVideoFrameUrls?.length) {
+      body.frame_urls = ctx.attachedVideoFrameUrls;
+    }
+    if (
+      !body.video_url &&
+      !body.media_url &&
+      !body.frame_urls &&
+      !body.transcript
+    ) {
+      return {
+        ok: false,
+        error:
+          "video source requires video_url, media_url, frame_urls, or transcript",
+        retryable: false,
+      };
+    }
   } else {
     return {
       ok: false,
@@ -307,11 +343,39 @@ async function extractRecipeFromSource(
     ok: true,
     data: {
       saved: false,
-      recipe: result.recipe,
+      recipe: enrichExtractedRecipe(result.recipe, result.source_metadata),
       recipes:
-        result.recipes && result.recipes.length > 1 ? result.recipes : undefined,
-      source_url: sourceType === "url" ? (args.url as string) : undefined,
+        result.recipes && result.recipes.length > 1
+          ? result.recipes.map((r: Record<string, unknown>) =>
+              enrichExtractedRecipe(r, result.source_metadata)
+            )
+          : undefined,
+      source_metadata: result.source_metadata ?? null,
     },
+  };
+}
+
+function enrichExtractedRecipe(
+  recipe: Record<string, unknown> | undefined,
+  sourceMetadata?: {
+    source_url?: string;
+    source_name?: string;
+    extra?: { thumbnail_url?: string | null };
+  }
+): Record<string, unknown> | undefined {
+  if (!recipe) return undefined;
+
+  const thumbnailUrl =
+    sourceMetadata?.extra?.thumbnail_url &&
+    typeof sourceMetadata.extra.thumbnail_url === "string"
+      ? sourceMetadata.extra.thumbnail_url
+      : undefined;
+
+  return {
+    ...recipe,
+    source_url: recipe.source_url ?? sourceMetadata?.source_url ?? null,
+    source_name: recipe.source_name ?? sourceMetadata?.source_name ?? null,
+    image_url: recipe.image_url ?? thumbnailUrl ?? null,
   };
 }
 
@@ -688,6 +752,7 @@ async function proposeSubstitution(
         temperature: 0.3,
         max_tokens: 500,
         response_format: { type: "json_object" },
+        billing: "chat",
       }
     );
   } catch (e) {

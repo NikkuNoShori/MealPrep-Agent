@@ -2557,3 +2557,118 @@ describe('apiClient.searchRecipesText', () => {
     await expect(apiClient.searchRecipesText('chicken')).rejects.toThrow();
   });
 });
+
+describe('apiClient.getMyProfile', () => {
+  it('throws when user is not authenticated', async () => {
+    vi.spyOn(supabase.auth, 'getUser').mockResolvedValue({
+      data: { user: null },
+      error: null,
+    } as any);
+
+    await expect(apiClient.getMyProfile()).rejects.toThrow('User not authenticated');
+  });
+
+  it('returns camelCase profile for the current user', async () => {
+    mockCurrentUser({ id: 'u-1', email: 'alice@example.com' });
+    server.use(
+      supabaseSelect('profiles', {
+        id: 'u-1',
+        username: 'alice_cooks',
+        display_name: 'Alice',
+        setup_completed: true,
+      })
+    );
+
+    const result = await apiClient.getMyProfile();
+
+    expect(result).toMatchObject({
+      id: 'u-1',
+      username: 'alice_cooks',
+      displayName: 'Alice',
+      setupCompleted: true,
+    });
+  });
+});
+
+describe('apiClient.updateUsername', () => {
+  it('rejects invalid username format before hitting the database', async () => {
+    mockCurrentUser({ id: 'u-1' });
+
+    await expect(apiClient.updateUsername('Bad Username!')).rejects.toThrow(
+      'Username must be 3-30 characters'
+    );
+  });
+
+  it('maps duplicate username errors to a friendly message', async () => {
+    mockCurrentUser({ id: 'u-1' });
+    server.use(
+      supabasePatch('profiles', () =>
+        HttpResponse.json(
+          { code: '23505', message: 'duplicate key value' },
+          { status: 409 }
+        )
+      )
+    );
+
+    await expect(apiClient.updateUsername('taken_name')).rejects.toThrow(
+      'Username already taken'
+    );
+  });
+
+  it('updates and returns the profile on success', async () => {
+    mockCurrentUser({ id: 'u-1' });
+    server.use(
+      supabasePatch('profiles', {
+        id: 'u-1',
+        username: 'new_handle',
+        display_name: 'Alice',
+      })
+    );
+
+    const result = await apiClient.updateUsername('new_handle');
+
+    expect(result.username).toBe('new_handle');
+  });
+});
+
+describe('apiClient.sendMessage', () => {
+  it('posts to chat-api and returns the agent response envelope', async () => {
+    const payload = {
+      message: 'Find my chicken recipes',
+      sessionId: 'sess-1',
+      context: { conversationId: 'conv-1' },
+    };
+
+    server.use(
+      supabaseEdgePost('chat-api/message', {
+        message: 'Here are your chicken recipes.',
+        response: {
+          id: 'msg-1',
+          content: 'Here are your chicken recipes.',
+          sender: 'ai',
+          timestamp: '2026-06-14T12:00:00Z',
+        },
+        intentMetadata: { source: 'tool_agent', toolCalls: [{ name: 'search_recipes', args: {}, ok: true }] },
+        conversationId: 'conv-1',
+        sessionId: 'sess-1',
+      })
+    );
+
+    const result = await apiClient.sendMessage(payload);
+
+    expect(result.response.content).toContain('chicken recipes');
+    expect(result.intentMetadata?.source).toBe('tool_agent');
+  });
+
+  it('propagates edge function errors', async () => {
+    server.use(
+      supabaseEdgePost('chat-api/message', () =>
+        HttpResponse.json({ error: 'upstream failure' }, { status: 502 })
+      )
+    );
+
+    await expect(
+      apiClient.sendMessage({ message: 'hello', sessionId: 's-1' })
+    ).rejects.toThrow();
+  });
+});

@@ -16,14 +16,37 @@ const VISION_MODELS = [
   "google/gemini-2.0-flash-001",
 ];
 
+/** Minimum caption/OCR text before we skip vision re-processing in extract. */
+const VIDEO_TEXT_EXTRACT_THRESHOLD = 80;
+
+/**
+ * Vision extract is for user-uploaded images (data URLs). Video/URL adapters may
+ * attach platform thumbnails (http URLs) after oEmbed/OCR — those should not force
+ * a second vision pass when we already have caption text.
+ */
+export function shouldUseVisionExtract(content: IntermediateContent): boolean {
+  if (content.images.length === 0) return false;
+
+  const sourceType = content.source_metadata.source_type;
+
+  if (sourceType === "url") return false;
+
+  if (sourceType === "video") {
+    return content.raw_text.trim().length < VIDEO_TEXT_EXTRACT_THRESHOLD;
+  }
+
+  return true;
+}
+
 export async function extract(
   content: IntermediateContent,
   openRouter: OpenRouterClient
 ): Promise<ExtractedRecipe | ExtractedRecipe[]> {
-  // For URL sources, prefer text-only extraction (JSON-LD/HTML text is sufficient,
-  // no need to send external image URLs to vision model)
-  const isUrlSource = content.source_metadata.source_type === "url";
-  const hasUserImages = !isUrlSource && content.images.length > 0;
+  const hasUserImages = shouldUseVisionExtract(content);
+
+  console.log(
+    `Extract path: ${hasUserImages ? "vision" : "text"} (source=${content.source_metadata.source_type}, images=${content.images.length}, textLen=${content.raw_text.trim().length})`
+  );
 
   // Truncate very long text to stay within context window (~6k chars ≈ 2k tokens)
   const rawText = content.raw_text.length > 6000

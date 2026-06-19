@@ -2,7 +2,7 @@
   "_meta": {
     "version": 1,
     "mop": "MOP-0008",
-    "description": "30-prompt golden set for the tool-using chat agent. Three buckets, 10 prompts each. Each prompt declares the expected tool sequence and whether destructive confirmation is expected. Not an automated runner — hand-evaluate the model output against `expected_tool_sequence` and `expected_destructive`.",
+    "description": "30-prompt golden set for the tool-using chat agent. Three buckets, 10 prompts each. Tier 1 automated routing tests in golden-routing.test.ts (scripted LLM). Tier 2 live-model eval is manual follow-up in MOP-0008.",
     "evaluation_targets": {
       "single_intent_search": "≥ 9/10 produce the exact expected_tool_sequence",
       "multi_intent": "≥ 7/10 produce the exact expected_tool_sequence (order matters)",

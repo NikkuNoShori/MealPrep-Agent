@@ -12,6 +12,9 @@ pnpm-debug.log*
 .env.test.local
 .env.production.local
 
+# Root deno.lock — edge tests use supabase/functions/deno.lock only
+/deno.lock
+
 # Build outputs
 dist/
 build/

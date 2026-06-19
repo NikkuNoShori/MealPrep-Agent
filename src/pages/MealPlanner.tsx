@@ -22,8 +22,6 @@ import {
   ChefHat,
   Loader2,
   MoreHorizontal,
-  Copy,
-  Trash2,
   Archive,
   CheckCircle2,
   Sun,
@@ -44,6 +42,7 @@ import ServingsModal from '@/components/meal-planning/ServingsModal';
 import DayAssignmentModal from '@/components/meal-planning/DayAssignmentModal';
 import type { RecipeAssignment } from '@/components/meal-planning/DayAssignmentModal';
 import GroceryCart from '@/components/meal-planning/GroceryCart';
+import MealPlanHistory from '@/components/meal-planning/MealPlanHistory';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -956,111 +955,17 @@ const MealPlanner = () => {
           </TabsContent>
 
           {/* ── History Tab ── */}
-          <TabsContent value="history" className="mt-6 space-y-3">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500/50" />
-              </div>
-            ) : historyPlans.length === 0 ? (
-              <div className="text-center py-12">
-                <Clock className="h-10 w-10 text-stone-300 dark:text-gray-600 mx-auto mb-3" />
-                <h3 className="text-lg font-semibold text-stone-800 dark:text-gray-200 mb-1">
-                  No history yet
-                </h3>
-                <p className="text-sm text-stone-500 dark:text-gray-400">
-                  Completed and archived plans will appear here.
-                </p>
-              </div>
-            ) : (
-              historyPlans.map((plan: any) => {
-                const statusCfg = STATUS_CONFIG[plan.status as MealPlanStatus] || STATUS_CONFIG.completed;
-                const mealCount = plan.meals ? Object.values(plan.meals).reduce((sum: number, day: any) => {
-                  if (!day || typeof day !== 'object') return sum;
-                  return sum + (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0) + (day.snacks?.length || 0);
-                }, 0) : 0;
-
-                return (
-                  <div
-                    key={plan.id}
-                    className="group flex items-center justify-between p-4 rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] hover:shadow-md hover:-translate-y-px transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2.5 rounded-xl ${statusCfg.bg} transition-colors`}>
-                        {plan.status === 'completed' ? (
-                          <CheckCircle2 className={`h-5 w-5 ${statusCfg.color}`} />
-                        ) : (
-                          <Archive className={`h-5 w-5 ${statusCfg.color}`} />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-stone-800 dark:text-gray-200">
-                          {plan.title || 'Untitled Plan'}
-                        </p>
-                        <p className="text-xs text-stone-500 dark:text-gray-400 mt-0.5">
-                          {new Date(plan.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          {' – '}
-                          {new Date(plan.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          <span className="mx-1.5 text-stone-300 dark:text-gray-600">|</span>
-                          {mealCount} meals
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 rounded-xl text-xs hover:shadow-md transition-all duration-200"
-                        onClick={() => handleCopyPlan(plan.id)}
-                        disabled={copyMealPlan.isPending}
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                        Copy
-                      </Button>
-                      <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 rounded-xl"
-                          onClick={() => setPlanMenuOpen(planMenuOpen === plan.id ? null : plan.id)}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                        {planMenuOpen === plan.id && (
-                          <div className="absolute right-0 top-9 z-50 min-w-[160px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] p-1.5 shadow-xl animate-scale-in">
-                            {plan.status === 'archived' && (
-                              <button
-                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
-                                onClick={() => handleStatusChange(plan.id, 'completed')}
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                                Restore
-                              </button>
-                            )}
-                            {plan.status !== 'archived' && (
-                              <button
-                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
-                                onClick={() => handleStatusChange(plan.id, 'archived')}
-                              >
-                                <Archive className="h-4 w-4" />
-                                Archive
-                              </button>
-                            )}
-                            <div className="my-1 border-t border-stone-100 dark:border-white/[0.06]" />
-                            <button
-                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
-                              onClick={() => handleDeletePlan(plan.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          <TabsContent value="history" className="mt-6">
+            <MealPlanHistory
+              plans={historyPlans}
+              isLoading={isLoading}
+              planMenuOpen={planMenuOpen}
+              onPlanMenuToggle={setPlanMenuOpen}
+              onCopy={handleCopyPlan}
+              onStatusChange={handleStatusChange}
+              onDelete={handleDeletePlan}
+              copyPending={copyMealPlan.isPending}
+            />
           </TabsContent>
         </Tabs>
       </div>

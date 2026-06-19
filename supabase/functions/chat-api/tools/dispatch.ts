@@ -23,6 +23,10 @@ export interface ToolContext {
   userToken: string;
   /** Base64 data URLs attached to the current user turn (for extract_recipe_from_source). */
   attachedImages?: string[];
+  /** User-uploaded video public URL for transcription (recipe intake). */
+  attachedVideoMediaUrl?: string;
+  /** Keyframe data URLs from client-side video extraction. */
+  attachedVideoFrameUrls?: string[];
 }
 
 export type ToolResult =

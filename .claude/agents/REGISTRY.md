@@ -2,8 +2,8 @@
 
 > **Discovery index** for the Claude Code agent system in this repo. If someone asks "what agents do we have?" or "is there a subagent for X?", this is the file to read first.
 
-**Last reviewed:** 2026-06-04
-**Last updated:** 2026-06-04 (added `chat-rag-sme` subagent + KB; revised audience distinction to call out designer-vs-diagnostician split)
+**Last reviewed:** 2026-06-14
+**Last updated:** 2026-06-14 (integrity-orchestrator + domain SMEs; /integrity-check + /verify-mop skills; MOP verification policy)
 
 ---
 
@@ -45,6 +45,11 @@ This registry tracks all four. Per-agent details live in each agent's own `.md` 
 | [surface-reviewer](surface-reviewer.md) | subagent | Classifies mid-session findings (trivial / ADR / MOP / defer), drafts the artifact, ranks by priority | opus | active | `.claude/agents/surface-reviewer.md` |
 | [ui-designer](ui-designer.md) | subagent | Restyles components/pages to the "Warm Editorial" design language (Fraunces + DM Sans, `--rs-*` palette, lift-on-hover cards) | opus | active | `.claude/agents/ui-designer.md` |
 | [chat-rag-sme](chat-rag-sme.md) | subagent | Subject-matter expert + diagnostician for chat + RAG (agent loop, 12-tool catalog, embeddings, semantic + text search, similarity rails). Audit-only — explains, doesn't fix or design | opus | active | `.claude/agents/chat-rag-sme.md` |
+| [integrity-orchestrator](integrity-orchestrator.md) | subagent | Routes lint/build/domain tests from DOMAIN_TEST_MATRIX; produces integrity report before MOP verify | opus | active | `.claude/agents/integrity-orchestrator.md` |
+| [meal-planning-sme](meal-planning-sme.md) | subagent | SME for meal planner + grocery cart (JSONB plans, aggregation, shopping mode) | opus | active | `.claude/agents/meal-planning-sme.md` |
+| [household-sme](household-sme.md) | subagent | SME for households, invites, roles, dependents, recipe visibility + RLS | opus | active | `.claude/agents/household-sme.md` |
+| [platform-auth-sme](platform-auth-sme.md) | subagent | SME for Supabase Auth, OAuth, session, profiles, username, ProtectedRoute | opus | active | `.claude/agents/platform-auth-sme.md` |
+| [recipe-pipeline-sme](recipe-pipeline-sme.md) | subagent | SME for recipe-pipeline extraction/load + recipes library | opus | active | `.claude/agents/recipe-pipeline-sme.md` |
 
 ### Slash commands (`.claude/commands/`)
 
@@ -55,6 +60,8 @@ This registry tracks all four. Per-agent details live in each agent's own `.md` 
 | `/surface` | skill | Invokes the `surface-reviewer` subagent with current session findings | active | `.claude/commands/surface.md` |
 | `/update-docs` | skill | Runs the full `DOCUMENTATION_UPDATE_PROCEDURE.md` after a MOP completes | active | `.claude/commands/update-docs.md` |
 | `/update-registry` | skill | Recomputes `docs/MOPs/REGISTRY.md` from MOP file headers to catch drift | active | `.claude/commands/update-registry.md` |
+| `/integrity-check` | skill | Domain-routed integrity tests via `integrity-orchestrator` | active | `.claude/commands/integrity-check.md` |
+| `/verify-mop` | skill | Mechanical MOP verification block runner; rejects `type: human` gates | active | `.claude/commands/verify-mop.md` |
 
 ### Knowledge bases (`.claude/agents/<name>/`)
 
@@ -62,6 +69,10 @@ This registry tracks all four. Per-agent details live in each agent's own `.md` 
 |------|------|--------------------|--------|--------|
 | [cooking-bot-knowledge](cooking-bot-knowledge/README.md) | knowledge-base | Persistent reference library for `cooking-bot-architect` (patterns, UX, extraction, safety, lessons) | active | `.claude/agents/cooking-bot-knowledge/` |
 | [chat-rag-sme-knowledge](chat-rag-sme-knowledge/README.md) | knowledge-base | Persistent reference for `chat-rag-sme`: RAG pipeline (incl. no-backfill issue), agent architecture, search-mechanism decision matrix, troubleshooting playbook, configuration reference | active | `.claude/agents/chat-rag-sme-knowledge/` |
+| [meal-planning-sme-knowledge](meal-planning-sme-knowledge/README.md) | knowledge-base | Meal planner + grocery cart paths, failure modes, tests | active | `.claude/agents/meal-planning-sme-knowledge/` |
+| [household-sme-knowledge](household-sme-knowledge/README.md) | knowledge-base | Household sharing, invites, visibility, RLS troubleshooting | active | `.claude/agents/household-sme-knowledge/` |
+| [platform-auth-sme-knowledge](platform-auth-sme-knowledge/README.md) | knowledge-base | Auth session lifecycle, OAuth, setup gate, profile/username troubleshooting | active | `.claude/agents/platform-auth-sme-knowledge/` |
+| [recipe-pipeline-sme-knowledge](recipe-pipeline-sme-knowledge/README.md) | knowledge-base | Pipeline stages, adapters, recipes library, future video OCR notes | active | `.claude/agents/recipe-pipeline-sme-knowledge/` |
 
 ### Logs (`.claude/agents/`)
 
@@ -85,7 +96,13 @@ Quick rule of thumb:
 | Findings from a session sorted into MOPs/ADRs/inline fixes | `surface-reviewer` (or `/surface`) |
 | To know whether the current branch violates project rules | `qa-auditor` |
 | To know whether the docs are stale or contradict the code | `doc-adherence` |
-| To verify numeric correctness of an aggregation or RLS isolation | `data-integrity` |
+| To verify numeric correctness of an aggregation or RLS isolation | `data-integrity` (after `integrity-orchestrator` routes domain) |
+| To run domain-appropriate tests after a change or before MOP verify | `integrity-orchestrator` or `/integrity-check` |
+| To mechanically verify a MOP's acceptance block | `/verify-mop MOP-NNNN` |
+| To diagnose meal planner / grocery issues | `meal-planning-sme` |
+| To diagnose household / invite / visibility issues | `household-sme` |
+| To diagnose login / OAuth / session / username issues | `platform-auth-sme` |
+| To diagnose recipe extraction / pipeline issues | `recipe-pipeline-sme` |
 | To restyle a page to the design system | `ui-designer` |
 | To add or refactor in-product AI behavior (chat, extraction, prompts) | `cooking-bot-architect` |
 | To diagnose chat / RAG behavior, look up a config value, or understand existing pipeline | `chat-rag-sme` |
@@ -97,7 +114,7 @@ Quick rule of thumb:
 
 ## Audience distinction: dev-side vs. in-product agents
 
-Six of the seven subagents (`data-integrity`, `doc-adherence`, `qa-auditor`, `surface-reviewer`, `ui-designer`, `chat-rag-sme`) are **dev-side helpers** — they work *on* the MealPrep codebase. Their audience is the developer (Nick).
+Dev-side helpers (`data-integrity`, `doc-adherence`, `integrity-orchestrator`, `qa-auditor`, `surface-reviewer`, `ui-designer`, domain SMEs, `chat-rag-sme`) work *on* the MealPrep codebase. Their audience is the developer (Nick).
 
 `cooking-bot-architect` is the **in-product AI designer** — it designs and implements the AI the *end user* talks to inside the shipped MealPrep app (the chat-api edge function, recipe-pipeline prompts, tool schemas the chat agent calls). Its audience is the end user of MealPrep, via the developer.
 
@@ -111,6 +128,18 @@ Two agents touch the AI surface but at different time horizons:
 | `chat-rag-sme` | **Backward-looking** | Diagnoses, explanations, configuration lookups, drift surfacing — read-only | Something is wrong with chat/RAG; you need to understand existing behavior; you're tuning a knob |
 
 These are complementary, not duplicates. The architect designs new behavior; the SME explains and troubleshoots existing behavior.
+
+### Domain SMEs (product surfaces)
+
+| Domain | SME | Integrity domain key |
+|--------|-----|---------------------|
+| Chat + RAG + search | `chat-rag-sme` | `chat-rag` |
+| Recipe extraction + recipes library | `recipe-pipeline-sme` | `recipe-pipeline`, `recipes-library` |
+| Meal planner + grocery | `meal-planning-sme` | `meal-planning` |
+| Household + sharing | `household-sme` | `household-sharing` |
+| Auth + profiles + session | `platform-auth-sme` | `platform-auth` |
+
+Routing table: [`docs/prompts/DOMAIN_TEST_MATRIX.md`](../../docs/prompts/DOMAIN_TEST_MATRIX.md). Orchestrator: `integrity-orchestrator`.
 
 ---
 

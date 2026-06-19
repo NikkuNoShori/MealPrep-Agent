@@ -9,12 +9,13 @@ Single-shot procedure. Do not split into multiple commands.
 1. Read `docs/MOPs/REGISTRY.md` and determine the next sequential MOP number (highest existing + 1, zero-padded to 4 digits, e.g. `MOP-0012`).
 2. Read `docs/MOPs/MOP_TEMPLATE.md` — this is the structural source of truth, including the `## Verification` and `## Scope Map` blocks.
 3. Read `docs/prompts/MOP_STATUS_LIFECYCLE.md` for the valid status vocabulary. Use only statuses defined there.
-4. Prompt the user for:
+4. Read `docs/prompts/MOP_VERIFICATION_POLICY.md` — verification blocks must be fully automated (no `type: human` gates on `complete`).
+5. Prompt the user for:
    - **Title** (short descriptive phrase)
    - **Summary** (1-3 sentences — goes in the `## Summary` section)
    - **Submitter name** (default: `Nick Neal`)
    - **Initial status** (default: `draft`)
-5. Create `docs/MOPs/MOP-NNNN-<kebab-title>.md` from the template with:
+6. Create `docs/MOPs/MOP-NNNN-<kebab-title>.md` from the template with:
    - Header table filled in (MOP number, title, dates = today, submitter, status)
    - `## Summary` populated with the provided summary
    - All other sections left as template placeholders

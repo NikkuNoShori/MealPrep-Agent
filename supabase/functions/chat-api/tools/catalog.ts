@@ -99,23 +99,44 @@ export const TOOL_CATALOG: CatalogEntry[] = [
       function: {
         name: "extract_recipe_from_source",
         description:
-          "Extract a structured recipe from a URL, pasted text, or attached images by invoking the recipe-pipeline edge function. Does NOT save — returns a preview the user must confirm via UI. Use when the user pastes a URL or recipe text or attaches images of a recipe.",
+          "Extract a structured recipe from a URL, pasted text, attached images, or a short-form video (TikTok/YouTube/Reels) by invoking the recipe-pipeline edge function. Does NOT save — returns a preview the user must confirm via UI. For TikTok/YouTube URLs use source_type=url or video. For uploaded video files the client supplies frame_urls and media_url.",
         parameters: {
           type: "object",
           properties: {
             source_type: {
               type: "string",
-              enum: ["url", "text", "images"],
+              enum: ["url", "text", "images", "video"],
             },
             url: {
               type: "string",
               format: "uri",
-              description: "Required when source_type=url",
+              description:
+                "Required when source_type=url. TikTok/YouTube/Reels URLs use oEmbed (caption + link mining), not HTML scrape.",
+            },
+            pinned_comment_text: {
+              type: "string",
+              description:
+                "Optional creator pinned comment when source_type is url or video",
+            },
+            supplementary_text: {
+              type: "string",
+              description: "Optional extra caption/comment text from the creator",
             },
             text: {
               type: "string",
               minLength: 1,
               description: "Required when source_type=text",
+            },
+            video_url: {
+              type: "string",
+              format: "uri",
+              description:
+                "Short-form video URL when source_type=video (TikTok, YouTube, Instagram Reel)",
+            },
+            transcript: {
+              type: "string",
+              description:
+                "Optional pre-computed transcript (usually supplied by client after upload)",
             },
             use_attached_images: {
               type: "boolean",

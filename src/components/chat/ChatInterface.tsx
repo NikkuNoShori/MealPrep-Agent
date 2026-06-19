@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, createRef } from 'react'
+import { useQueryClient } from "@tanstack/react-query";
 import { useSendMessage, useChatHistory } from "../../services/api";
 import type { PendingConfirmation, ConfirmActionInput } from "../../services/api";
 import { ConfirmationPrompt } from "./ConfirmationPrompt";
@@ -18,6 +19,7 @@ import {
   Square,
   X,
   Image as ImageIcon,
+  Film,
   Copy,
   Check,
   PanelLeftClose,
@@ -26,8 +28,17 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { ChatMessageResponse, StructuredRecipe } from "../../types";
+import {
+  mapPipelineToChatResponse,
+  processVideoIntake,
+} from "../../services/videoIntake";
+import { validateIntakeVideoFile } from "../../utils/videoFrameExtractor";
 import { useAuthStore } from "../../stores/authStore";
 import { StructuredRecipeDisplay, StructuredRecipeDisplayHandle } from "./StructuredRecipeDisplay";
+import {
+  buildDraftRecipeKey,
+  useDraftRecipeStore,
+} from "@/stores/draftRecipeStore";
 
 /** Maximum image file size in bytes (5MB) */
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -35,6 +46,11 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 1200;
 /** JPEG compression quality */
 const COMPRESSION_QUALITY = 0.8;
+
+/** Client-side temp conversation ids are numeric timestamps. */
+function isLocalTempConversationId(id: string): boolean {
+  return /^\d+$/.test(id);
+}
 
 /**
  * Validate and compress an image file.
@@ -113,8 +129,12 @@ interface Message {
   sender: "user" | "ai";
   timestamp: Date;
   images?: string[]; // Array of image URLs or base64 data URLs
+  /** Set when user attached a recipe video for intake. */
+  videoFileName?: string;
   recipe?: StructuredRecipe; // Optional structured recipe data
   recipes?: StructuredRecipe[]; // Optional multiple recipes
+  previewImageDataUrl?: string;
+  thumbnailUrl?: string;
   /**
    * Set when the agent emitted a destructive tool call that the user
    * must confirm before the backend will execute it. Rendered inline
@@ -122,6 +142,41 @@ interface Message {
    * handleConfirmAction / handleCancelConfirmation in ChatInterface.
    */
   pendingConfirmation?: PendingConfirmation;
+}
+
+function mapDbMessagesToLocal(messages: Array<Record<string, unknown>>): Message[] {
+  return messages.map((msg) => ({
+    id: String(msg.id),
+    content: String(msg.content ?? ""),
+    sender: msg.sender as "user" | "ai",
+    timestamp: new Date(String(msg.timestamp)),
+    images: (msg.metadata as { imageUrls?: string[] } | undefined)?.imageUrls,
+    recipe: (msg.metadata as { recipe?: StructuredRecipe } | undefined)?.recipe,
+    recipes: (msg.metadata as { recipes?: StructuredRecipe[] } | undefined)?.recipes,
+    thumbnailUrl:
+      (msg.metadata as { thumbnail_url?: string } | undefined)?.thumbnail_url ||
+      (msg.metadata as { recipe?: { image_url?: string; imageUrl?: string } } | undefined)
+        ?.recipe?.image_url ||
+      (msg.metadata as { recipe?: { imageUrl?: string } } | undefined)?.recipe?.imageUrl,
+    videoFileName: (msg.metadata as { videoFileName?: string } | undefined)?.videoFileName,
+  }));
+}
+
+function collectRecipeDraftSlots(messages: Message[]): Array<{
+  messageId: string;
+  recipeIndex: number;
+}> {
+  const slots: Array<{ messageId: string; recipeIndex: number }> = [];
+  for (const msg of messages) {
+    if (msg.recipes && msg.recipes.length > 1) {
+      msg.recipes.forEach((_, recipeIndex) => {
+        slots.push({ messageId: msg.id, recipeIndex });
+      });
+    } else if (msg.recipe) {
+      slots.push({ messageId: msg.id, recipeIndex: 0 });
+    }
+  }
+  return slots;
 }
 
 interface Conversation {
@@ -142,6 +197,8 @@ export const ChatInterface: React.FC = () => {
   >(null);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState("Thinking...");
+  const [hasQueuedMessage, setHasQueuedMessage] = useState(false);
   const [messageHistory, setMessageHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [tempInput, setTempInput] = useState("");
@@ -150,6 +207,8 @@ export const ChatInterface: React.FC = () => {
   >(new Set());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [pendingImages, setPendingImages] = useState<File[]>([]); // Images to be sent with next message
+  const [pendingVideo, setPendingVideo] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]); // Object URLs for image previews
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     // Load saved width from localStorage or default to 320px (w-80)
@@ -163,6 +222,9 @@ export const ChatInterface: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const queuedMessageRef = useRef<string | null>(null);
+  const loadingConversationIdRef = useRef<string | null>(null);
   // Tracks whether the initial conversation load has completed. Subsequent
   // refetches of chat history (e.g. after sending a message) must not reset
   // local state — local handlers already keep conversations in sync.
@@ -175,6 +237,7 @@ export const ChatInterface: React.FC = () => {
   const [confirmingMessageId, setConfirmingMessageId] = useState<string | null>(null);
 
   const sendMessageMutation = useSendMessage();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const {
     data: chatHistoryData,
@@ -218,15 +281,9 @@ export const ChatInterface: React.FC = () => {
                   messagesResponse?.messages &&
                   Array.isArray(messagesResponse.messages)
                 ) {
-                  messages = messagesResponse.messages.map((msg: any) => ({
-                    id: msg.id,
-                    content: msg.content,
-                    sender: msg.sender as "user" | "ai",
-                    timestamp: new Date(msg.timestamp),
-                    images: msg.metadata?.imageUrls || undefined,
-                    recipe: msg.metadata?.recipe || undefined,
-                    recipes: msg.metadata?.recipes || undefined,
-                  }));
+                  messages = mapDbMessagesToLocal(
+                    messagesResponse.messages as Array<Record<string, unknown>>
+                  );
                 }
               } catch (error) {
                 Logger.chat.error('loadMessages', error as Error, {
@@ -338,6 +395,68 @@ export const ChatInterface: React.FC = () => {
     return conversations.find((conv) => conv.id === currentConversationId);
   };
 
+  const refreshConversationMessages = async (conversationId: string) => {
+    if (isLocalTempConversationId(conversationId)) return;
+    try {
+      const messagesData = await apiClient.getConversationMessages(conversationId);
+      const messagesResponse = messagesData as { messages?: Array<Record<string, unknown>> };
+      if (!messagesResponse?.messages) return;
+
+      const messages = mapDbMessagesToLocal(messagesResponse.messages);
+      useDraftRecipeStore
+        .getState()
+        .remapConversationDrafts(conversationId, collectRecipeDraftSlots(messages));
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversationId
+            ? {
+                ...conv,
+                messages,
+                lastMessage:
+                  messages.length > 0
+                    ? messages[messages.length - 1].content
+                    : conv.lastMessage,
+              }
+            : conv
+        )
+      );
+    } catch (error) {
+      Logger.chat.error("refreshConversationMessages", error as Error, {
+        conversationId,
+      });
+    }
+  };
+
+  const handleCancelGeneration = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsLoading(false);
+    setLoadingLabel("Thinking...");
+
+    const convId = loadingConversationIdRef.current;
+    if (!convId) return;
+
+    const cancelledMessage: Message = {
+      id: `cancelled-${Date.now()}`,
+      content: "Generation stopped.",
+      sender: "ai",
+      timestamp: new Date(),
+    };
+
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === convId
+          ? {
+              ...conv,
+              messages: [...conv.messages, cancelledMessage],
+              lastMessage: cancelledMessage.content,
+            }
+          : conv
+      )
+    );
+    loadingConversationIdRef.current = null;
+  };
+
   const createNewConversation = () => {
     // Remove any temporary conversations with no messages
     setConversations((prev) =>
@@ -407,6 +526,7 @@ export const ChatInterface: React.FC = () => {
     // If it's in the database (has messages), delete it via API
     try {
       await apiClient.deleteConversation(conversationId);
+      useDraftRecipeStore.getState().clearConversationDrafts(conversationId);
       Logger.chat.conversationDeleted(conversationId);
 
       // Remove from state after successful API call
@@ -509,10 +629,26 @@ export const ChatInterface: React.FC = () => {
     setIsMultiSelectMode(false);
   };
 
-  // Handle image file selection
+  // Handle image / video file selection
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const videoFiles = files.filter((file) => file.type.startsWith("video/"));
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+
+    if (videoFiles.length > 0) {
+      try {
+        validateIntakeVideoFile(videoFiles[0]);
+        if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+        setPendingVideo(videoFiles[0]);
+        setVideoPreviewUrl(URL.createObjectURL(videoFiles[0]));
+        toast.success(
+          "Video attached — we'll transcribe voiceover and read on-screen text when you send."
+        );
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : "Invalid video file";
+        toast.error(msg);
+      }
+    }
 
     // Limit to 4 images total
     const remainingSlots = 4 - pendingImages.length;
@@ -560,6 +696,12 @@ export const ChatInterface: React.FC = () => {
         }
       }
     }
+  };
+
+  const removeVideo = () => {
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoPreviewUrl(null);
+    setPendingVideo(null);
   };
 
   // Remove image from pending list
@@ -632,13 +774,26 @@ export const ChatInterface: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
-    // Allow sending if there's text OR images
+    const messageText = inputMessage.trim();
+
     if (
-      (!inputMessage.trim() && pendingImages.length === 0) ||
-      isLoading ||
+      (!messageText && pendingImages.length === 0 && !pendingVideo) ||
       !currentConversationId
-    )
+    ) {
       return;
+    }
+
+    // Queue a follow-up text message while a response is in flight.
+    if (isLoading) {
+      if (messageText && pendingImages.length === 0 && !pendingVideo) {
+        queuedMessageRef.current = messageText;
+        setHasQueuedMessage(true);
+        setInputMessage("");
+        if (textareaRef.current) textareaRef.current.style.height = "auto";
+        toast.success("Message queued — will send when the current response finishes");
+      }
+      return;
+    }
 
     const currentConversation = getCurrentConversation();
     if (!currentConversation) {
@@ -646,19 +801,30 @@ export const ChatInterface: React.FC = () => {
       return;
     }
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const signal = abortController.signal;
+    loadingConversationIdRef.current = currentConversationId;
+
     // Use manually selected intent (or null for RAG queries)
     const intent = currentConversation.selectedIntent || null;
     Logger.chat.stateChange('message_sending', {
       conversationId: currentConversationId,
       intent,
       hasImages: pendingImages.length > 0,
-      messageLength: inputMessage.length,
+      messageLength: messageText.length,
     });
+
+    // Capture outbound content before clearing composer state.
+    const videoForIntake = pendingVideo;
+    const displayContent =
+      messageText ||
+      (videoForIntake ? `Recipe video: ${videoForIntake.name}` : "");
 
     // Add message to history
     setMessageHistory((prev) => [
-      inputMessage,
-      ...prev.filter((msg) => msg !== inputMessage),
+      messageText || displayContent,
+      ...prev.filter((msg) => msg !== messageText && msg !== displayContent),
     ]);
     setHistoryIndex(-1);
     setTempInput("");
@@ -670,10 +836,11 @@ export const ChatInterface: React.FC = () => {
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputMessage,
+      content: displayContent,
       sender: "user",
       timestamp: new Date(),
       images: imageDataUrls.length > 0 ? imageDataUrls : undefined,
+      videoFileName: videoForIntake?.name,
     };
 
     // Update conversation with user message and persist if temporary
@@ -683,16 +850,17 @@ export const ChatInterface: React.FC = () => {
           ? {
               ...conv,
               messages: [...conv.messages, userMessage],
-              lastMessage: inputMessage,
+              lastMessage: displayContent,
               timestamp: new Date(),
               title:
                 conv.messages.length === 0
                   ? (() => {
-                      const trimmedMessage = inputMessage.trim();
-                      if (trimmedMessage) {
-                        return trimmedMessage.slice(0, 30) + (trimmedMessage.length > 30 ? "..." : "");
+                      if (messageText) {
+                        return messageText.slice(0, 30) + (messageText.length > 30 ? "..." : "");
                       } else if (pendingImages.length > 0) {
                         return `${pendingImages.length} image${pendingImages.length > 1 ? 's' : ''}`;
+                      } else if (videoForIntake) {
+                        return `Video: ${videoForIntake.name.slice(0, 24)}`;
                       } else {
                         return "New conversation";
                       }
@@ -712,12 +880,119 @@ export const ChatInterface: React.FC = () => {
     });
     setImagePreviewUrls([]);
     setPendingImages([]); // Clear images after adding to message
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+      setVideoPreviewUrl(null);
+    }
+    setPendingVideo(null);
     setIsLoading(true);
+    setLoadingLabel(
+      videoForIntake
+        ? "Transcribing video and extracting recipe..."
+        : "Thinking..."
+    );
 
     try {
       let response: ChatMessageResponse;
+      let videoMessagesSynced = false;
 
-      if (intent === "recipe_extraction") {
+      if (videoForIntake) {
+        toast.loading("Extracting recipe from video (transcription + frames)...", {
+          id: "video-intake",
+        });
+        try {
+          const intakeOutcome = await processVideoIntake({
+            message: messageText,
+            videoFile: videoForIntake,
+            autoSave: false,
+            signal,
+          });
+          if (signal.aborted) return;
+          response = mapPipelineToChatResponse(intakeOutcome);
+
+          // Persist to chat_messages so follow-ups include structured recipe context
+          try {
+            const persisted = await apiClient.persistChatExtraction({
+              sessionId: currentConversation.sessionId,
+              conversationId: isLocalTempConversationId(currentConversationId)
+                ? undefined
+                : currentConversationId,
+              userMessage: displayContent,
+              assistantContent: response.response.content,
+              recipe: response.recipe as Record<string, unknown> | undefined,
+              recipes: response.recipes as Record<string, unknown>[] | undefined,
+              userMetadata: { videoFileName: videoForIntake.name },
+              thumbnailUrl: response.thumbnailUrl,
+              signal,
+            });
+            if (signal.aborted) return;
+
+            if (persisted.response?.id) {
+              response.response.id = persisted.response.id;
+              response.response.timestamp = persisted.response.timestamp;
+            }
+
+            const resolvedId = persisted.conversationId || currentConversationId;
+            if (
+              persisted.conversationId &&
+              persisted.conversationId !== currentConversationId
+            ) {
+              setConversations((prev) =>
+                prev.map((conv) =>
+                  conv.id === currentConversationId
+                    ? {
+                        ...conv,
+                        id: persisted.conversationId!,
+                        isTemporary: false,
+                      }
+                    : conv
+                )
+              );
+              setCurrentConversationId(persisted.conversationId);
+              loadingConversationIdRef.current = persisted.conversationId;
+            }
+
+            await refreshConversationMessages(resolvedId);
+            videoMessagesSynced = true;
+            await queryClient.invalidateQueries({ queryKey: ["chat", "history"] });
+          } catch (persistErr) {
+            if (!signal.aborted) {
+              console.warn("Failed to persist video extraction to chat:", persistErr);
+            }
+          }
+
+          if (!videoMessagesSynced && !signal.aborted) {
+            const responseRecipes = response.recipes;
+            const aiMessage: Message = {
+              id: response.response.id,
+              content: response.response.content,
+              sender: "ai",
+              timestamp: new Date(response.response.timestamp),
+              recipe: response.recipe,
+              recipes:
+                responseRecipes && responseRecipes.length > 1
+                  ? responseRecipes
+                  : undefined,
+              previewImageDataUrl: response.previewImageDataUrl,
+              thumbnailUrl: response.thumbnailUrl,
+            };
+            setConversations((prev) =>
+              prev.map((conv) =>
+                conv.id === currentConversationId
+                  ? {
+                      ...conv,
+                      messages: [...conv.messages, aiMessage],
+                      lastMessage: response.response.content,
+                    }
+                  : conv
+              )
+            );
+          }
+        } finally {
+          toast.dismiss("video-intake");
+        }
+        return;
+      } else if (intent === "recipe_extraction") {
         // Handle recipe extraction
         Logger.chat.stateChange('recipe_extraction_started', {
           conversationId: currentConversationId,
@@ -729,14 +1004,16 @@ export const ChatInterface: React.FC = () => {
           intent: string;
           images?: string[];
           context: any;
+          signal?: AbortSignal;
         } = {
-          message: inputMessage,
+          message: messageText,
           sessionId: currentConversation.sessionId,
           intent: "recipe_extraction",
           context: {
             recentMessages: currentConversation.messages.slice(-5),
             conversationId: currentConversationId,
           },
+          signal,
         };
         if (imageDataUrls.length > 0) {
           messageData.images = imageDataUrls;
@@ -747,6 +1024,7 @@ export const ChatInterface: React.FC = () => {
           conversationId?: string;
           sessionId?: string;
         };
+        if (signal.aborted) return;
 
         // Update conversation ID if this is a new conversation (from database)
         if (sendResponse.conversationId && currentConversation.isTemporary) {
@@ -808,8 +1086,9 @@ export const ChatInterface: React.FC = () => {
           intent?: string;
           images?: string[];
           context: any;
+          signal?: AbortSignal;
         } = {
-          message: inputMessage,
+          message: messageText,
           sessionId: currentConversation.sessionId,
           intent: intentToSend, // Only set if recipe_extraction, otherwise undefined for server to detect
           context: {
@@ -817,6 +1096,7 @@ export const ChatInterface: React.FC = () => {
             conversationId: currentConversationId,
             clientDetectedIntent: detectedIntent, // Pass as hint for logging/debugging
           },
+          signal,
         };
         if (imageDataUrls.length > 0) {
           messageData.images = imageDataUrls;
@@ -827,6 +1107,7 @@ export const ChatInterface: React.FC = () => {
           conversationId?: string;
           sessionId?: string;
         };
+        if (signal.aborted) return;
 
         // Update conversation ID if this is a new conversation (from database)
         if (sendResponse.conversationId && currentConversation.isTemporary) {
@@ -870,6 +1151,8 @@ export const ChatInterface: React.FC = () => {
         response = sendResponse;
       }
 
+      if (signal.aborted) return;
+
       // Handle multi-recipe or single recipe response
       const responseRecipes = (response as any).recipes as StructuredRecipe[] | undefined;
       const aiMessage: Message = {
@@ -879,6 +1162,8 @@ export const ChatInterface: React.FC = () => {
         timestamp: new Date(response.response.timestamp),
         recipe: response.recipe, // Include structured recipe if present (backwards compat)
         recipes: responseRecipes && responseRecipes.length > 1 ? responseRecipes : undefined,
+        previewImageDataUrl: (response as ChatMessageResponse).previewImageDataUrl,
+        thumbnailUrl: (response as ChatMessageResponse).thumbnailUrl,
         // MOP-0008 Step 8 — surfaced when the agent proposed a destructive tool
         pendingConfirmation: (response as any).pendingConfirmation,
       };
@@ -927,15 +1212,22 @@ export const ChatInterface: React.FC = () => {
         recipeCount: responseRecipes?.length || (response.recipe ? 1 : 0),
       });
     } catch (error) {
+      if (signal.aborted) return;
+
       Logger.chat.error('sendMessage', error as Error, {
         conversationId: currentConversationId,
         sessionId: currentConversation?.sessionId,
-        messageLength: inputMessage.length,
-        imageCount: pendingImages.length,
+        messageLength: messageText.length,
+        imageCount: imageDataUrls.length,
+        hadVideo: !!videoForIntake,
       });
+      const errText =
+        error instanceof Error ? error.message : "Unknown error";
       const errorMessage: Message = {
         id: Date.now().toString(),
-        content: "Sorry, I encountered an error. Please try again.",
+        content: videoForIntake
+          ? `Video extraction failed: ${errText}`
+          : "Sorry, I encountered an error. Please try again.",
         sender: "ai",
         timestamp: new Date(),
       };
@@ -952,7 +1244,20 @@ export const ChatInterface: React.FC = () => {
         )
       );
     } finally {
+      abortControllerRef.current = null;
+      loadingConversationIdRef.current = null;
       setIsLoading(false);
+      setLoadingLabel("Thinking...");
+
+      const queued = queuedMessageRef.current;
+      if (queued) {
+        queuedMessageRef.current = null;
+        setHasQueuedMessage(false);
+        setInputMessage(queued);
+        setTimeout(() => {
+          void handleSendMessage();
+        }, 0);
+      }
     }
   };
 
@@ -1229,6 +1534,9 @@ export const ChatInterface: React.FC = () => {
                       })
                     );
                     setCurrentConversationId(conversation.id);
+                    if (!isLocalTempConversationId(conversation.id)) {
+                      void refreshConversationMessages(conversation.id);
+                    }
                   }
                 }}
               >
@@ -1404,12 +1712,27 @@ export const ChatInterface: React.FC = () => {
                               Save All ({recipeList.length})
                             </Button>
                           )}
-                          {recipeList.map((recipeItem, recipeIdx) => (
+                          {recipeList.map((recipeItem, recipeIdx) => {
+                            const draftKey =
+                              currentConversationId
+                                ? buildDraftRecipeKey(
+                                    currentConversationId,
+                                    message.id,
+                                    recipeIdx
+                                  )
+                                : undefined;
+                            return (
                             <StructuredRecipeDisplay
                               key={`${message.id}-recipe-${recipeIdx}`}
                               ref={isMulti ? cardRefs[recipeIdx] : undefined}
                               recipe={recipeItem}
+                              conversationId={currentConversationId ?? undefined}
+                              messageId={message.id}
+                              recipeIndex={recipeIdx}
+                              draftKey={draftKey}
                               userImageDataUrl={userImage}
+                              previewImageDataUrl={message.previewImageDataUrl}
+                              thumbnailUrl={message.thumbnailUrl}
                               onSave={(result) => {
                                 if (!currentConversationId) return;
                                 const now = new Date();
@@ -1450,7 +1773,8 @@ export const ChatInterface: React.FC = () => {
                                 }
                               }}
                             />
-                          ))}
+                            );
+                          })}
                         </>
                       );
                     })()}
@@ -1479,6 +1803,12 @@ export const ChatInterface: React.FC = () => {
                       }`}
                     >
                       {/* Display images as thumbnails — click to expand */}
+                      {message.videoFileName && (
+                        <div className="mb-2 flex items-center gap-2 rounded-md bg-white/15 px-2 py-1.5 text-xs">
+                          <Film className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{message.videoFileName}</span>
+                        </div>
+                      )}
                       {message.images && message.images.length > 0 && (
                         <div className={`mb-2 flex flex-wrap gap-1.5 ${message.images.length === 1 ? "" : ""}`}>
                           {message.images.map((imgUrl, idx) => (
@@ -1576,8 +1906,17 @@ export const ChatInterface: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-sm text-gray-900 dark:text-gray-100">
-                    Thinking...
+                    {loadingLabel}
                   </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={handleCancelGeneration}
+                  >
+                    Stop
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1617,32 +1956,46 @@ export const ChatInterface: React.FC = () => {
                 </div>
               )}
 
+              {pendingVideo && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40 px-3 py-2 text-sm">
+                  <Film className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                  <span className="truncate flex-1">{pendingVideo.name}</span>
+                  <button
+                    type="button"
+                    onClick={removeVideo}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Remove video"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               {/* Input and Buttons */}
+              {hasQueuedMessage && (
+                <p className="text-xs text-muted-foreground">
+                  1 message queued — will send when the current response finishes
+                </p>
+              )}
               <div className="flex gap-2">
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,video/webm,video/quicktime"
                   multiple
                   onChange={handleImageSelect}
                   className="hidden"
-                  disabled={
-                    isLoading ||
-                    pendingImages.length >= 4
-                  }
+                  disabled={pendingImages.length >= 4}
                 />
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                   variant="outline"
                   size="icon"
-                  disabled={
-                    isLoading ||
-                    pendingImages.length >= 4
-                  }
+                  disabled={pendingImages.length >= 4}
                   title={
                     pendingImages.length >= 4
                       ? "Maximum 4 images allowed"
-                      : "Upload images"
+                      : "Upload images or a saved recipe video"
                   }
                 >
                   <ImageIcon className="h-4 w-4" />
@@ -1659,27 +2012,40 @@ export const ChatInterface: React.FC = () => {
                   onKeyDown={handleKeyPress}
                   onPaste={handlePaste}
                   placeholder={
-                    currentConversation?.selectedIntent === "recipe_extraction"
+                    isLoading
+                      ? "Draft your next message, or press Enter to queue it..."
+                      : currentConversation?.selectedIntent === "recipe_extraction"
                       ? "Paste or type your recipe here, or upload images..."
                       : currentConversation?.selectedIntent === null
                       ? "Ask me about your recipes..."
                       : "Type your message... (Shift+Enter for new line)"
                   }
-                  disabled={isLoading}
                   rows={2}
                   className="flex-1 resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ minHeight: '60px', maxHeight: '300px' }}
                 />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={
-                    (!inputMessage.trim() && pendingImages.length === 0) ||
-                    isLoading
-                  }
-                  size="icon"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+                {isLoading ? (
+                  <Button
+                    onClick={handleCancelGeneration}
+                    variant="destructive"
+                    size="icon"
+                    title="Stop generation"
+                  >
+                    <Square className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={
+                      !inputMessage.trim() &&
+                      pendingImages.length === 0 &&
+                      !pendingVideo
+                    }
+                    size="icon"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
           </div>
         </div>

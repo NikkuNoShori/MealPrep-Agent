@@ -17,7 +17,7 @@ const Recipes = () => {
   const [editingRecipe, setEditingRecipe] = useState<any>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'collection'>('public');
+  const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'collection'>('mine');
   const [mobileCollectionsOpen, setMobileCollectionsOpen] = useState(false);
   const { user } = useAuthStore();
   const deleteRecipeMutation = useDeleteRecipe();
@@ -95,7 +95,7 @@ const Recipes = () => {
 
   return (
     <div className="bg-stone-50 dark:bg-[#0e0f13]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
         {(showAddForm || editingRecipe) && (
           <div className="animate-fade-in">
             <RecipeForm
@@ -119,14 +119,7 @@ const Recipes = () => {
 
         {showList && (
           <div className="animate-fade-in">
-            {/* Page Title */}
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
-                {viewMode === 'collection' && selectedCollectionName ? selectedCollectionName : viewMode === 'household' ? 'Household Recipes' : viewMode === 'public' ? 'Public Recipes' : 'My Recipes'}
-              </h1>
-            </div>
-
-            <div className="flex gap-6">
+            <div className="flex gap-6 items-start">
             {/* Mobile Collections Drawer */}
             {mobileCollectionsOpen && (
               <div className="fixed inset-0 z-50 lg:hidden">
@@ -175,9 +168,12 @@ const Recipes = () => {
             </div>
 
             {/* Recipe List */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 space-y-4">
+              <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
+                {viewMode === 'collection' && selectedCollectionName ? selectedCollectionName : viewMode === 'household' ? 'Household Recipes' : viewMode === 'public' ? 'Public Recipes' : 'My Recipes'}
+              </h1>
               {/* Mobile Collections Toggle */}
-              <div className="lg:hidden mb-4">
+              <div className="lg:hidden">
                 <button
                   onClick={() => setMobileCollectionsOpen(true)}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm text-sm font-medium text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"

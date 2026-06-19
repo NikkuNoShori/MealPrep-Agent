@@ -104,6 +104,15 @@ export interface PipelineRequest {
   video_url?: string;
   frame_urls?: string[];
   transcript?: string;
+  /** User-pasted pinned comment or creator supplement (TikTok etc.). */
+  pinned_comment_text?: string;
+  supplementary_text?: string;
+  /** User-uploaded video/audio — public storage URL for STT. */
+  media_url?: string;
+  /** User-uploaded video/audio as data URL (smaller files). */
+  media_base64?: string;
+  /** Run STT when media_url/media_base64 present (default true). */
+  auto_transcribe?: boolean;
   auto_save?: boolean;
 }
 

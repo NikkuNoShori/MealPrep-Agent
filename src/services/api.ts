@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { Logger } from './logger';
 import { snakeToCamel, camelToSnake } from '@/utils/case';
+import { QUERY_STALE_TIME } from '@/config/queryCache';
 
 // Supabase configuration - reuse from supabase.ts
 // `import.meta.env` is typed in src/vite-env.d.ts — no cast needed.
@@ -85,6 +86,8 @@ export interface SendMessageInput {
   clearMemory?: boolean;
   intent?: string;
   images?: string[];
+  /** Optional abort signal (stripped before JSON body). */
+  signal?: AbortSignal;
 }
 
 // For local development, use local server for RAG endpoints
@@ -374,9 +377,11 @@ class ApiClient {
     );
 
     try {
+      const { signal, ...payload } = data;
       const response = await this.request<ChatMessageResponse>(endpoint, {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
+        signal,
       });
 
       const duration = Date.now() - startTime;
@@ -475,6 +480,34 @@ class ApiClient {
         method: "DELETE",
       }
     );
+  }
+
+  /**
+   * Persist a client-side extraction (video upload) into chat_messages so the
+   * agent loop can reference structured recipe data on follow-up turns.
+   */
+  async persistChatExtraction(data: {
+    sessionId: string;
+    conversationId?: string;
+    userMessage: string;
+    assistantContent: string;
+    recipe?: Record<string, unknown>;
+    recipes?: Record<string, unknown>[];
+    userMetadata?: Record<string, unknown>;
+    thumbnailUrl?: string;
+    signal?: AbortSignal;
+  }) {
+    const { signal, ...body } = data;
+    return this.request<{
+      conversationId: string;
+      response: { id: string; content: string; sender: string; timestamp: string };
+      recipe?: Record<string, unknown>;
+      recipes?: Record<string, unknown>[];
+    }>(`${SUPABASE_FUNCTIONS_URL}/chat-api/persist-extraction`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal,
+    });
   }
 
   // ── Meal Planning ──
@@ -670,6 +703,42 @@ class ApiClient {
     }
 
     // Get public URL
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("recipe-images").getPublicUrl(fileName);
+
+    return publicUrl;
+  }
+
+  /** Upload user-saved video for recipe intake (STT). Stored in recipe-images/intake/. */
+  async uploadIntakeMedia(file: File): Promise<string> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    if (!file.type.startsWith("video/") && !file.type.startsWith("audio/")) {
+      throw new Error("File must be a video or audio recording");
+    }
+
+    const maxSize = 24 * 1024 * 1024;
+    if (file.size > maxSize) {
+      throw new Error(`Media must be less than ${maxSize / 1024 / 1024}MB`);
+    }
+
+    const fileExt = file.name.split(".").pop() || "mp4";
+    const fileName = `${user.id}/intake/${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2)}.${fileExt}`;
+
+    const { error } = await supabase.storage
+      .from("recipe-images")
+      .upload(fileName, file, { cacheControl: "3600", upsert: false });
+
+    if (error) {
+      throw new Error(`Failed to upload media: ${error.message}`);
+    }
+
     const {
       data: { publicUrl },
     } = supabase.storage.from("recipe-images").getPublicUrl(fileName);
@@ -948,10 +1017,26 @@ class ApiClient {
 
   // ── Recipe Pipeline endpoints ──
 
-  async ingestRecipeFromUrl(url: string, autoSave = true) {
+  async ingestRecipeFromUrl(
+    url: string,
+    autoSave = true,
+    extra?: {
+      pinned_comment_text?: string;
+      supplementary_text?: string;
+      frame_urls?: string[];
+      media_url?: string;
+      transcript?: string;
+      auto_transcribe?: boolean;
+    }
+  ) {
     return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/ingest`, {
       method: "POST",
-      body: JSON.stringify({ source_type: "url", url, auto_save: autoSave }),
+      body: JSON.stringify({
+        source_type: "url",
+        url,
+        auto_save: autoSave,
+        ...extra,
+      }),
     });
   }
 
@@ -963,7 +1048,16 @@ class ApiClient {
   }
 
   async ingestRecipeFromVideo(
-    data: { video_url?: string; frame_urls?: string[]; transcript?: string },
+    data: {
+      video_url?: string;
+      frame_urls?: string[];
+      transcript?: string;
+      pinned_comment_text?: string;
+      supplementary_text?: string;
+      media_url?: string;
+      media_base64?: string;
+      auto_transcribe?: boolean;
+    },
     autoSave = true
   ) {
     return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/ingest`, {
@@ -974,12 +1068,24 @@ class ApiClient {
 
   async extractRecipeOnly(
     sourceType: "url" | "text" | "video",
-    data: Record<string, any>
+    data: Record<string, any>,
+    options?: { timeoutMs?: number; signal?: AbortSignal }
   ) {
-    return this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/extract-only`, {
-      method: "POST",
-      body: JSON.stringify({ source_type: sourceType, ...data }),
-    });
+    const timeoutMs = options?.timeoutMs ?? (sourceType === "video" ? 180_000 : 60_000);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const onExternalAbort = () => controller.abort();
+    options?.signal?.addEventListener("abort", onExternalAbort);
+    try {
+      return await this.request(`${SUPABASE_FUNCTIONS_URL}/recipe-pipeline/extract-only`, {
+        method: "POST",
+        body: JSON.stringify({ source_type: sourceType, ...data }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+      options?.signal?.removeEventListener("abort", onExternalAbort);
+    }
   }
 
   // ── Household endpoints ──
@@ -1154,7 +1260,7 @@ class ApiClient {
     if (updates.preferences !== undefined) payload.preferences = updates.preferences;
 
     const { data: member, error } = await supabase.from("family_members")
-      .update(payload)
+      .update(payload as never)
       .eq("id", memberId)
       .select()
       .single();
@@ -1460,6 +1566,7 @@ export const useRecipes = (params?: { limit?: number; offset?: number }) => {
   return useQuery({
     queryKey: ["recipes", params],
     queryFn: () => apiClient.getRecipes(params),
+    staleTime: QUERY_STALE_TIME.domain,
   });
 };
 
@@ -1471,6 +1578,7 @@ export const useRecipe = (id: string) => {
     queryKey: ["recipe", id],
     queryFn: () => apiClient.getRecipe(id),
     enabled: !!id,
+    staleTime: QUERY_STALE_TIME.domain,
   });
 };
 
@@ -1528,7 +1636,7 @@ export const useRecipeTextSearch = (query: string, limit?: number) => {
     queryKey: ["recipes", "text-search", query, limit],
     queryFn: () => apiClient.searchRecipesText(query, limit),
     enabled: !!query.trim(),
-    staleTime: 30_000,
+    staleTime: QUERY_STALE_TIME.search,
   });
 };
 
@@ -1536,6 +1644,7 @@ export const useChatHistory = (limit?: number) => {
   return useQuery({
     queryKey: ["chat", "history", limit],
     queryFn: () => apiClient.getChatHistory(limit),
+    staleTime: QUERY_STALE_TIME.chatHistory,
   });
 };
 
@@ -1557,6 +1666,7 @@ export const useMealPlans = (params?: { limit?: number; status?: string }) => {
     queryKey: ["meal-plans", params],
     queryFn: () => apiClient.getMealPlans(params),
     enabled: !authLoading && !!user,
+    staleTime: QUERY_STALE_TIME.domain,
   });
 };
 
@@ -1565,6 +1675,7 @@ export const useMealPlan = (id: string) => {
     queryKey: ["meal-plan", id],
     queryFn: () => apiClient.getMealPlan(id),
     enabled: !!id,
+    staleTime: QUERY_STALE_TIME.domain,
   });
 };
 
@@ -1631,6 +1742,7 @@ export const usePreferences = () => {
     queryFn: () => apiClient.getPreferences(),
     enabled: !authLoading && !!user, // Only run when auth is loaded and user exists
     retry: false, // Don't retry on auth errors
+    staleTime: QUERY_STALE_TIME.domain,
   });
 };
 

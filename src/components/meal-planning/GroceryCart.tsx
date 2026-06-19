@@ -20,9 +20,14 @@ import {
   Package,
   Loader2,
   X,
+  Store,
+  List,
+  Undo2,
+  Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { GroceryItem, MealPlanMeals } from '@/types/mealPlan';
+import ShoppingMode from '@/components/meal-planning/ShoppingMode';
 
 interface GroceryCartProps {
   plan: any; // The current week's meal plan
@@ -34,6 +39,10 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
   const [manualName, setManualName] = useState('');
   const [manualAmount, setManualAmount] = useState('');
   const [manualUnit, setManualUnit] = useState('');
+  const [shoppingMode, setShoppingMode] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editUnit, setEditUnit] = useState('');
 
   const { data: recipesData } = useRecipes({ limit: 200 });
   const updateMealPlan = useUpdateMealPlan();
@@ -108,12 +117,61 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
     saveGroceryList(updated);
   };
 
-  // Remove an item
+  // Remove an item (soft delete with undo toast)
   const handleRemoveItem = (itemId: string) => {
+    const item = groceryItems.find((i) => i.id === itemId);
     const updated = groceryItems.map((i) =>
       i.id === itemId ? { ...i, isRemoved: true } : i
     );
     saveGroceryList(updated);
+    if (item) {
+      toast(
+        (t) => (
+          <span className="flex items-center gap-2 text-sm">
+            Removed {item.name}
+            <button
+              className="font-medium text-primary-600 dark:text-primary-400 underline"
+              onClick={() => {
+                handleRestoreItem(itemId);
+                toast.dismiss(t.id);
+              }}
+            >
+              Undo
+            </button>
+          </span>
+        ),
+        { duration: 5000 }
+      );
+    }
+  };
+
+  const handleRestoreItem = (itemId: string) => {
+    const updated = groceryItems.map((i) =>
+      i.id === itemId ? { ...i, isRemoved: false } : i
+    );
+    saveGroceryList(updated);
+  };
+
+  const startEditingItem = (item: GroceryItem) => {
+    setEditingItemId(item.id);
+    setEditAmount(item.amount !== null ? String(item.amount) : '');
+    setEditUnit(item.unit || '');
+  };
+
+  const handleSaveQuantity = (itemId: string) => {
+    const updated = groceryItems.map((i) => {
+      if (i.id !== itemId) return i;
+      const parsed = editAmount.trim() ? parseFloat(editAmount) : null;
+      return {
+        ...i,
+        amount: parsed !== null && !isNaN(parsed) ? parsed : null,
+        unit: editUnit.trim(),
+      };
+    });
+    saveGroceryList(updated);
+    setEditingItemId(null);
+    setEditAmount('');
+    setEditUnit('');
   };
 
   // Add manual item
@@ -165,6 +223,7 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
   };
 
   const activeItems = groceryItems.filter((i) => !i.isRemoved);
+  const removedItems = groceryItems.filter((i) => i.isRemoved);
   const checkedCount = activeItems.filter((i) => i.isChecked).length;
   const grouped = useMemo(() => groupByCategory(activeItems), [activeItems]);
   const hasMeals = plan?.meals && Object.keys(plan.meals).length > 0;
@@ -214,28 +273,52 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 rounded-xl text-xs"
-            onClick={() => setAddingManual(true)}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Item
-          </Button>
-          <Button
-            size="sm"
-            className="gap-1.5 rounded-xl text-xs shadow-lg shadow-primary-500/20"
-            onClick={handleGenerate}
-            disabled={!hasMeals || updateMealPlan.isPending}
-          >
-            {updateMealPlan.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
-            {activeItems.length > 0 ? 'Regenerate' : 'Generate'}
-          </Button>
+          {activeItems.length > 0 && (
+            <Button
+              variant={shoppingMode ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1.5 rounded-xl text-xs"
+              onClick={() => setShoppingMode((v) => !v)}
+            >
+              {shoppingMode ? (
+                <>
+                  <List className="h-3.5 w-3.5" />
+                  List View
+                </>
+              ) : (
+                <>
+                  <Store className="h-3.5 w-3.5" />
+                  Shopping Mode
+                </>
+              )}
+            </Button>
+          )}
+          {!shoppingMode && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 rounded-xl text-xs"
+              onClick={() => setAddingManual(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Item
+            </Button>
+          )}
+          {!shoppingMode && (
+            <Button
+              size="sm"
+              className="gap-1.5 rounded-xl text-xs shadow-lg shadow-primary-500/20"
+              onClick={handleGenerate}
+              disabled={!hasMeals || updateMealPlan.isPending}
+            >
+              {updateMealPlan.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              {activeItems.length > 0 ? 'Regenerate' : 'Generate'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -284,8 +367,10 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
         </Card>
       )}
 
-      {/* Grocery items by category */}
-      {activeItems.length === 0 ? (
+      {/* Shopping mode or standard list */}
+      {shoppingMode && activeItems.length > 0 ? (
+        <ShoppingMode grouped={grouped} onToggleCheck={handleToggleCheck} />
+      ) : activeItems.length === 0 ? (
         <Card className="border-stone-200/60 dark:border-white/[0.06]">
           <CardContent className="p-8">
             <div className="text-center py-4">
@@ -349,38 +434,89 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm ${
-                            item.isChecked
-                              ? 'line-through text-stone-400 dark:text-gray-500'
-                              : 'text-stone-700 dark:text-gray-300'
-                          }`}>
-                            {item.amount !== null && (
-                              <span className="font-medium">{item.amount} </span>
-                            )}
-                            {item.unit && (
-                              <span className="text-stone-500 dark:text-gray-400">{item.unit} </span>
-                            )}
-                            {item.name}
-                          </p>
-                          {item.sourceRecipes.length > 0 && (
-                            <p className="text-[10px] text-stone-400 dark:text-gray-500 mt-0.5 truncate">
-                              From: {item.sourceRecipes.join(', ')}
-                            </p>
-                          )}
-                          {item.isManual && (
-                            <Badge variant="outline" className="text-[9px] h-4 mt-0.5">
-                              manual
-                            </Badge>
+                          {editingItemId === item.id ? (
+                            <div className="flex items-center gap-1.5">
+                              <Input
+                                value={editAmount}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                  setEditAmount(e.target.value)
+                                }
+                                placeholder="Qty"
+                                className="h-7 w-16 text-xs"
+                                onKeyDown={(e: React.KeyboardEvent) =>
+                                  e.key === 'Enter' && handleSaveQuantity(item.id)
+                                }
+                              />
+                              <Input
+                                value={editUnit}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                  setEditUnit(e.target.value)
+                                }
+                                placeholder="Unit"
+                                className="h-7 w-16 text-xs"
+                                onKeyDown={(e: React.KeyboardEvent) =>
+                                  e.key === 'Enter' && handleSaveQuantity(item.id)
+                                }
+                              />
+                              <span className="text-xs text-stone-600 dark:text-gray-400 truncate">
+                                {item.name}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => handleSaveQuantity(item.id)}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <p className={`text-sm ${
+                                item.isChecked
+                                  ? 'line-through text-stone-400 dark:text-gray-500'
+                                  : 'text-stone-700 dark:text-gray-300'
+                              }`}>
+                                {item.amount !== null && (
+                                  <span className="font-medium">{item.amount} </span>
+                                )}
+                                {item.unit && (
+                                  <span className="text-stone-500 dark:text-gray-400">{item.unit} </span>
+                                )}
+                                {item.name}
+                              </p>
+                              {item.sourceRecipes.length > 0 && (
+                                <p className="text-[10px] text-stone-400 dark:text-gray-500 mt-0.5 truncate">
+                                  From: {item.sourceRecipes.join(', ')}
+                                </p>
+                              )}
+                              {item.isManual && (
+                                <Badge variant="outline" className="text-[9px] h-4 mt-0.5">
+                                  manual
+                                </Badge>
+                              )}
+                            </>
                           )}
                         </div>
 
-                        <button
-                          className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-stone-400 hover:text-destructive transition-all"
-                          onClick={() => handleRemoveItem(item.id)}
-                          title="Remove"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {editingItemId !== item.id && (
+                          <>
+                            <button
+                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-stone-400 hover:text-primary-500 transition-all"
+                              onClick={() => startEditingItem(item)}
+                              title="Adjust quantity"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                              onClick={() => handleRemoveItem(item.id)}
+                              title="Remove"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -402,6 +538,30 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
                 : `${activeItems.length - checkedCount} items remaining`}
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Removed items — restore panel */}
+      {!shoppingMode && removedItems.length > 0 && (
+        <div className="rounded-xl border border-dashed border-stone-200 dark:border-white/[0.08] p-3 space-y-1">
+          <p className="text-xs font-medium text-stone-500 dark:text-gray-400 mb-2">
+            Removed items
+          </p>
+          {removedItems.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between px-2 py-1 text-xs text-stone-500 dark:text-gray-400"
+            >
+              <span className="line-through">{item.name}</span>
+              <button
+                className="flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
+                onClick={() => handleRestoreItem(item.id)}
+              >
+                <Undo2 className="h-3 w-3" />
+                Restore
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

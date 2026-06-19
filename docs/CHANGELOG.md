@@ -2,8 +2,33 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-06-02
-**Last updated:** 2026-06-02 (MOP-0008 tool-using chat agent backend + Step 10 docs; MOP-0005 Phase 1 tests to 155; ADR-0004 execution; surface-reviewer pattern; MOP-0014 drafted)
+**Last reviewed:** 2026-06-16
+**Last updated:** 2026-06-16 (video intake + draft store + chat UX on branch `cursor/mop-0008-golden-routing-video-intake`)
+
+---
+
+## 2026-06-16 (Video intake, chat UX, draft recipe cache) `cursor/mop-0008-golden-routing-video-intake`
+
+**Chat**
+- Fixed agent tool-use failures: default model `qwen/qwen3-8b`, OpenRouter `require_parameters` for tool-capable routing.
+- **Stop generation** — abort in-flight chat/video requests; **draft while loading** — composer stays enabled; Enter queues one follow-up text message.
+- **Video upload path** persists extractions to `chat_messages` via `POST /chat-api/persist-extraction`; sidebar refetches messages from DB on conversation select.
+- Agent follow-ups read structured recipe from `chat_messages.metadata` via `conversation-context.ts`.
+
+**Video recipe intake (MOP-0016 extension)**
+- Client keyframe picker (`recipeImagePicker.ts`) chooses sharpest frame for preview; oEmbed `thumbnail_url` as fallback.
+- **Save** uploads best keyframe or thumbnail to `recipe-images`; stores **source URL + name** on the recipe.
+- Pipeline fix: video sources with substantive text use JSON extract path (not vision-on-thumbnail-only).
+- Inline edit on chat preview card (ingredients + instructions); compact single-line ingredient edit in RecipeForm.
+
+**Caching / session state**
+- New `draftRecipeStore` (Zustand): unsaved preview edits keyed by conversation/message; `sessionStorage` for recipe JSON + thumbnail only (**no base64**).
+- React Query `staleTime` tuning via `src/config/queryCache.ts` (5 min domain data, 2 min chat history list).
+
+**Recipes page**
+- Default feed tab: **My Recipes** (was Public).
+
+**Deploy notes:** Requires `chat-api` + `recipe-pipeline` edge deploys. Pre-deploy video chats are not backfilled.
 
 ---
 

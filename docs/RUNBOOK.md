@@ -2,8 +2,8 @@
 
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
-**Last reviewed:** 2026-06-01
-**Last updated:** 2026-06-01 (AI failure playbook now checks `supabase secrets list` for `OPENROUTER_API_KEY`; removed `VITE_OPENROUTER_API_KEY` from setup checklist; model id updated to `qwen-2.5-7b-instruct`)
+**Last reviewed:** 2026-06-16
+**Last updated:** 2026-06-16 (video intake history, persist-extraction deploy, thumbnail CORS, chat stop/queue troubleshooting)
 
 ---
 
@@ -663,3 +663,118 @@ WHERE proname IN (
 3. Verify grants: `SELECT * FROM information_schema.routine_privileges WHERE routine_name = 'get_my_household';`
 
 **Added:** 2026-03-14
+
+---
+
+## Chat: Video extraction missing from history after refresh
+
+### Symptom
+- User uploaded a video in chat, saw a recipe preview card, but after switching chats or refreshing the page the conversation is empty or lacks the recipe card
+
+### Likely causes
+- `chat-api` not deployed with `POST /chat-api/persist-extraction` (older function version)
+- `persist-extraction` failed silently (check browser console for `Failed to persist video extraction`)
+- Conversation never received a DB `conversationId` (temp numeric id only)
+- User is viewing a conversation loaded before persist completed (stale sidebar cache)
+
+### Verification steps
+```sql
+-- Replace with your user id
+SELECT c.id, c.title, m.sender, m.message_type, m.content,
+       m.metadata->>'source' AS source,
+       m.metadata->'recipe'->>'title' AS recipe_title
+FROM chat_conversations c
+JOIN chat_messages m ON m.conversation_id = c.id
+WHERE c.user_id = '<user-uuid>'
+ORDER BY m.created_at DESC
+LIMIT 20;
+```
+
+```bash
+# Confirm persist-extraction route exists in deployed function
+curl -s -o /dev/null -w "%{http_code}" \
+  -X POST "$SUPABASE_URL/functions/v1/chat-api/persist-extraction" \
+  -H "Authorization: Bearer $JWT" -H "apikey: $ANON" \
+  -H "Content-Type: application/json" \
+  -d '{"sessionId":"test","assistantContent":"hi"}'
+# Expect 400 (missing fields) — NOT 404
+```
+
+### Fix steps
+1. Deploy latest: `npx supabase functions deploy chat-api`
+2. Re-run video extraction (pre-deploy sessions are not backfilled)
+3. Click the conversation in the sidebar (triggers `GET /chat-api/history?conversationId=…` refetch)
+
+**Added:** 2026-06-16
+
+---
+
+## Chat: Agent returns 404 or "tool use" errors (OpenRouter)
+
+### Symptom
+- Chat replies with "Sorry, I encountered an error"
+- Edge logs show OpenRouter 404 or no tool-capable endpoint for the model
+
+### Likely causes
+- Agent model set to `qwen/qwen-2.5-7b-instruct` (no tool-use endpoints on OpenRouter)
+- `OPENROUTER_AGENT_MODEL` secret points at a non-tool model
+- Missing `require_parameters` on OpenRouter provider routing
+
+### Verification steps
+```bash
+supabase functions logs chat-api --project-ref <project-ref>
+# Look for OpenRouter 404 or "No endpoints found"
+```
+
+Check `supabase/functions/chat-api/agent-loop.ts` — default should be `qwen/qwen3-8b`.
+
+### Fix steps
+1. Deploy latest `chat-api`
+2. Optional override: `npx supabase secrets set OPENROUTER_AGENT_MODEL=qwen/qwen3-8b`
+3. Confirm `_shared/openrouter-client.ts` `chatWithTools` sends `provider: { require_parameters: true }`
+
+**Added:** 2026-06-16
+
+---
+
+## Recipe save: Thumbnail image missing or external URL only
+
+### Symptom
+- Saved recipe has no image, or `image_url` points to TikTok/YouTube CDN instead of Supabase Storage
+
+### Likely causes
+- Client-side fetch of platform thumbnail blocked by CORS (TikTok)
+- User refreshed before save (in-memory keyframe `previewImageDataUrl` lost)
+- Only `thumbnail_url` in metadata — fetch/upload failed on save
+
+### Verification steps
+- Browser Network tab during Save: look for failed `fetch` to `*.tiktokcdn.com` or similar
+- Check `recipes.image_url` — should contain `/storage/v1/object/` and `recipe-images` when upload succeeded
+
+### Fix steps
+1. Expected fallback: external platform URL stored when CORS blocks client fetch
+2. For reliable hosted images: ensure video upload path ran (client keyframe upload on save)
+3. Future: server-side thumbnail mirror in `recipe-pipeline` (not yet shipped)
+
+**Added:** 2026-06-16
+
+---
+
+## Chat: Cannot type or stop during long extraction
+
+### Symptom
+- Composer disabled while "Transcribing video…" or "Thinking…"
+- No way to cancel a long-running request
+
+### Likely causes
+- Running an older `ChatInterface` build (pre-2026-06-16 UX)
+
+### Expected behavior (current)
+- Textarea stays enabled for drafting; Enter queues one text message while loading
+- Stop button on loading bubble and red square replaces Send — aborts in-flight `fetch` via `AbortSignal`
+
+### Fix steps
+1. Hard-refresh the SPA after merging latest frontend
+2. If Stop does not abort video pipeline, deploy latest `chat-api` + `recipe-pipeline` and confirm `extractRecipeOnly` receives client abort signal
+
+**Added:** 2026-06-16

@@ -36,9 +36,8 @@ VITE_FRONTEND_URL=http://localhost:5173
 
 ### Supabase Edge Function Secrets (Set in Supabase Dashboard)
 ```env
-OPENROUTER_API_KEY=sk-or-v1-...          # Main API key
-OPENROUTER_API_KEY_QWEN2.5_VL_8b=...     # Optional: Vision model key
-OPENROUTER_API_KEY_QWEN2.5_instruct_8b=... # Optional: Instruction model key
+OPENROUTER_API_KEY_CHAT=sk-or-v1-...   # Chat agent + light conversational calls
+OPENROUTER_API_KEY_MEDIA=sk-or-v1-... # Pipeline, vision, Whisper, embeddings
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_anon_key
 FRONTEND_URL=http://localhost:5173
@@ -50,7 +49,8 @@ N8N_RAG_WEBHOOK_URL=...                  # Optional: For RAG search
 ### Using Supabase CLI
 ```bash
 # Set secrets for Edge Functions
-supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-key-here
+supabase secrets set OPENROUTER_API_KEY_CHAT=sk-or-v1-your-chat-key
+supabase secrets set OPENROUTER_API_KEY_MEDIA=sk-or-v1-your-media-key
 supabase secrets set SUPABASE_URL=your-url
 supabase secrets set SUPABASE_ANON_KEY=your-key
 ```
@@ -59,7 +59,8 @@ supabase secrets set SUPABASE_ANON_KEY=your-key
 1. Go to your Supabase project
 2. Navigate to **Settings** → **Edge Functions** → **Secrets**
 3. Add each secret:
-   - `OPENROUTER_API_KEY`
+   - `OPENROUTER_API_KEY_CHAT`
+   - `OPENROUTER_API_KEY_MEDIA`
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `FRONTEND_URL`

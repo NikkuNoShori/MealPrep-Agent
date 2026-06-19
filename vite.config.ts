@@ -27,23 +27,38 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
     css: false,
-    // Exclude Deno-runtime tests (Supabase edge functions). Those run under
-    // `deno test`, not Vitest, and import from https:// URLs that the bundler
-    // cannot resolve.
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       'supabase/functions/**',
     ],
-    env: {
-      // Stable test-only Supabase config so the MSW handlers can match
-      // a known URL. The values are not real credentials — they exist so
-      // the supabase-js client constructs valid request URLs.
-      VITE_SUPABASE_URL: 'http://localhost:54321',
-      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
-    },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['src/**/*.test.{ts,tsx}'],
+          exclude: ['src/integration/**'],
+          setupFiles: ['./src/test/setup.ts'],
+          environment: 'jsdom',
+          env: {
+            VITE_SUPABASE_URL: 'http://localhost:54321',
+            VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          include: ['src/integration/**/*.test.ts'],
+          setupFiles: ['./src/integration/setup.ts'],
+          environment: 'node',
+          testTimeout: 60_000,
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

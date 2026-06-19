@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-06-01
-**Last updated:** 2026-06-01 (MOP-0008: chat-api intent router replaced with tool-using single-agent loop; documented `pendingConfirmation` + `confirmAction` contract)
+**Last reviewed:** 2026-06-16
+**Last updated:** 2026-06-16 (video intake UX + `draftRecipeStore` session cache, `persist-extraction`, React Query `staleTime`, agent model `qwen/qwen3-8b`)
 
 ---
 
@@ -17,7 +17,7 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 |-------|-----------|
 | Frontend | React 18 + TypeScript + Vite |
 | Styling | Tailwind CSS (glassmorphism design system, dark/light theme) |
-| State | Zustand (auth, theme) + React Query (server state) |
+| State | Zustand (auth, theme, **draft recipes**) + React Query (server state) |
 | Routing | React Router v6 |
 | Database | PostgreSQL via Supabase |
 | Vector Search | pgvector extension (1536-dim) |
@@ -154,6 +154,8 @@ Persist AI message + metadata.toolCalls (audit log)
 | Tool catalog (12 tools, OpenAI-format JSON schemas) | `supabase/functions/chat-api/tools/catalog.ts` |
 | Dispatcher (schema validation, `user_id` reject, destructive short-circuit) | `supabase/functions/chat-api/tools/dispatch.ts` |
 | Tool handlers | `supabase/functions/chat-api/tools/handlers.ts` |
+| Recipe context injection for agent history | `supabase/functions/chat-api/conversation-context.ts` |
+| Client video extraction persist | `POST /chat-api/persist-extraction` in `supabase/functions/chat-api/index.ts` |
 | Shared web-search client (`web_search_recipe` provider abstraction) | `supabase/functions/_shared/web-search-client.ts` |
 | All prompts | `supabase/functions/_shared/recipe-prompts.ts` |
 
@@ -167,7 +169,30 @@ Persist AI message + metadata.toolCalls (audit log)
 | Plan / cart | `assign_recipe_to_meal_plan_slot` (conditionally destructive), `add_to_grocery_list` |
 | Destructive | `update_recipe`, `delete_recipe` — always return `pendingConfirmation`; user must reply via `context.confirmAction` |
 
-Models: `qwen/qwen-2.5-7b-instruct` (instruct) and `qwen/qwen-2.5-vl-7b-instruct` (vision, for image extraction inside `recipe-pipeline`). Temperature 0.2, `tool_choice: auto`, `MAX_ITERS = 5`.
+Models: **`qwen/qwen3-8b`** default for the agent loop (`OPENROUTER_AGENT_MODEL` override; `supabase/functions/chat-api/agent-loop.ts`). OpenRouter `chatWithTools` uses `provider.require_parameters: true` so only tool-capable endpoints are selected. Vision/text inside `recipe-pipeline` still uses `qwen/qwen-2.5-vl-7b-instruct` / `qwen/qwen-2.5-7b-instruct` as appropriate. Temperature 0.2, `tool_choice: auto`, `MAX_ITERS = 5`.
+
+### Short-Form Video Intake (MOP-0016)
+
+Two client paths feed `recipe-pipeline/extract-only` (preview) or full ingest (auto-save):
+
+```
+Paste TikTok/YouTube URL in chat
+  → processVideoUrl (src/services/videoIntake.ts)
+  → recipe-pipeline url/video adapter (oEmbed caption + link mining)
+  → mapPipelineToChatResponse → StructuredRecipeDisplay preview card
+
+Attach saved MP4/WebM in chat
+  → extractVideoFrames (src/utils/videoFrameExtractor.ts, up to 8 frames)
+  → pickBestFrameDataUrl (src/utils/recipeImagePicker.ts — scores sharp/text-heavy frames)
+  → uploadIntakeMedia → recipe-pipeline video adapter (Whisper STT + vision OCR)
+  → persist-extraction → chat_messages (user + AI rows with metadata.recipe)
+```
+
+**Image on save:** preview keyframe (`previewImageDataUrl`, in-memory only) or oEmbed `source_metadata.extra.thumbnail_url` is uploaded to `recipe-images` on Save — not stored as base64 in DB metadata.
+
+**Source credit:** `source_url` / `source_name` flow from pipeline `source_metadata` → preview card → `recipes` row on save.
+
+Implementation: [MOPs/MOP-0016-short-form-video-intake.md](MOPs/MOP-0016-short-form-video-intake.md).
 
 ### Embedding Pipeline
 Recipe embeddings are still generated via `text-embedding-ada-002` (1536-dim) on extract → `recipes.embedding_vector`. Used by `search_recipes` and `find_similar_recipes` tool handlers via the existing semantic/full-text RPCs.
@@ -207,9 +232,17 @@ The frontend has **no LLM client** — `src/lib/openrouter.ts` is deprecated; al
 | `/admin` | Admin | Protected (admin role only, via AdminRoute) |
 
 ### State Management
-- **Zustand stores** (`src/stores/`): Auth state (incl. household membership), theme state — client-side, persistent
-- **React Query** (`src/services/api.ts`): Server state for recipes, chat, meal plans, preferences — cached, auto-refetched
+- **Zustand stores** (`src/stores/`):
+  - `authStore` — session, household membership
+  - `themeStore` — dark/light
+  - **`draftRecipeStore`** — unsaved recipe preview edits keyed by `conversationId:messageId:recipeIndex`. Recipe JSON + `thumbnailUrl` persist to `sessionStorage` (24h TTL). **`previewImageDataUrl` is memory-only** (never written to sessionStorage or `chat_messages` metadata).
+- **React Query** (`src/services/api.ts` + `src/config/queryCache.ts`):
+  - Server state for recipes, chat history, meal plans, preferences
+  - Default `staleTime`: 5 min for domain queries; 30s for recipe text search; 2 min for chat history list
+  - `refetchOnWindowFocus: false` (set in `src/main.tsx`)
+  - Chat history invalidated on send / `persist-extraction` success
 - **React Context** (`src/contexts/`): MeasurementSystemContext (metric/imperial preference)
+- **Chat local state** (`ChatInterface`): `conversations[]` mirrors `chat_messages` for the active session; sidebar selection refetches messages from `GET /chat-api/history?conversationId=…`
 
 ### Layout Architecture
 
@@ -273,14 +306,23 @@ Component → api.ts (React Query) → Supabase Client → PostgreSQL
 ### Chat Message Flow
 ```
 ChatInterface → api.ts → Supabase Edge Function (chat-api)
-  → runAgentLoop (Chef Marcus, single agent)
-     → openRouter.chatWithTools(systemPrompt, history, TOOL_CATALOG)
-     → 0..many tool dispatches per iteration (schema-validated, RLS via ctx.supabase)
-     → tool outputs wrapped in <tool_result> markers
-     → loop until plain content reply or MAX_ITERS=5
-  → Destructive tools return pendingConfirmation (handler NOT executed) — user
-    replies via context.confirmAction to apply the change.
-  → Save messages to chat_conversations + chat_messages (metadata.toolCalls = audit log)
+  │
+  ├─ Video file attached (client intake path)
+  │    → processVideoIntake → recipe-pipeline/extract-only
+  │    → persist-extraction (writes user + AI chat_messages with metadata.recipe)
+  │    → refreshConversationMessages (reload from DB)
+  │
+  └─ Text / images / agent turn
+       → POST /chat-api/message
+       → runAgentLoop (Chef Marcus, single agent)
+          → openRouter.chatWithTools(systemPrompt, history enriched via conversation-context.ts, TOOL_CATALOG)
+          → 0..many tool dispatches per iteration (schema-validated, RLS via ctx.supabase)
+          → extract_recipe_from_source delegates to recipe-pipeline/extract-only
+          → tool outputs wrapped in <tool_result> markers
+          → loop until plain content reply or MAX_ITERS=5
+       → Destructive tools return pendingConfirmation (handler NOT executed) — user
+         replies via context.confirmAction to apply the change.
+       → Save messages to chat_conversations + chat_messages (metadata.recipe + metadata.toolCalls)
 ```
 See [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md) for the full design and the tool catalog.
 
@@ -323,14 +365,14 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 |----------|---------|---------|
 | `VITE_SUPABASE_URL` | Frontend | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Frontend | Supabase anonymous key |
-| `OPENROUTER_API_KEY` | Edge Functions (Supabase secret) | OpenRouter API key for server-side AI calls. **Do NOT set `VITE_OPENROUTER_API_KEY`** — there is no frontend AI path. See `src/vite-env.d.ts` and `docs/Development/CHAT_SECURITY.md`. |
+| `OPENROUTER_API_KEY_CHAT` | Edge Functions (Supabase secret) | Chat agent, titles, substitutions |
+| `OPENROUTER_API_KEY_MEDIA` | Edge Functions (Supabase secret) | Pipeline, vision, Whisper, embeddings |
+| `OPENROUTER_API_KEY` | Edge Functions (Supabase secret) | Optional fallback for both. **Do NOT set `VITE_OPENROUTER_API_KEY`** |
 
 ### Optional
 | Variable | Context | Purpose |
 |----------|---------|---------|
 | `VITE_FRONTEND_URL` | Frontend | Frontend URL for OAuth redirects |
-| `OPENROUTER_API_KEY_QWEN2.5_VL_8b` | Edge Functions | Per-model API key for vision model |
-| `OPENROUTER_API_KEY_QWEN2.5_instruct_8b` | Edge Functions | Per-model API key for instruct model |
 | `WEB_SEARCH_PROVIDER` | Edge Functions (chat-api) | `tavily` (default), `brave`, or `serper` — selects the `web_search_recipe` backend. |
 | `WEB_SEARCH_API_KEY` | Edge Functions (chat-api) | API key for the selected web-search provider. When unset, the `web_search_recipe` tool is omitted from the agent's catalog at startup (capability gating, MOP-0008 Addendum 1). |
 

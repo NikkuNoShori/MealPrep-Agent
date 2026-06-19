@@ -19,7 +19,9 @@ import { dispatchTool, type ToolContext, type ToolResult } from "./tools/dispatc
 import { getToolSpecs } from "./tools/catalog.ts";
 
 export const MAX_ITERS = 5;
-export const AGENT_MODEL = "qwen/qwen-2.5-7b-instruct";
+/** Tool-use requires a model with function-calling on OpenRouter (2.5-7b has none). */
+export const AGENT_MODEL =
+  Deno.env.get("OPENROUTER_AGENT_MODEL")?.trim() || "qwen/qwen3-8b";
 
 export interface PendingConfirmation {
   tool: string;

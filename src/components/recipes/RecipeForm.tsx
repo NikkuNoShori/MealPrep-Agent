@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   GripVertical,
   Check,
+  Pencil,
   ArrowUpDown,
   ChevronRight,
   ChevronsUpDown,
@@ -63,12 +64,14 @@ interface UnitPickerProps {
     volume: string[];
     countable: string[];
   };
+  compact?: boolean;
 }
 
 const UnitPicker: React.FC<UnitPickerProps> = ({
   value,
   onValueChange,
   measurementUnits,
+  compact = false,
 }) => {
   const [open, setOpen] = React.useState(false);
   const [otherOpen, setOtherOpen] = React.useState(false);
@@ -105,7 +108,11 @@ const UnitPicker: React.FC<UnitPickerProps> = ({
       <button
         type="button"
         onClick={() => { setOpen(!open); setOtherOpen(false); }}
-        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        className={
+          compact
+            ? "flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            : "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        }
       >
         <span className={displayValue ? "" : "text-muted-foreground"}>
           {displayValue || "Unit"}
@@ -302,6 +309,143 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
           </Button>
         </>
       )}
+    </div>
+  );
+};
+
+interface EditableIngredientItemProps {
+  ingredient: Ingredient;
+  measurementUnits: {
+    weight: string[];
+    volume: string[];
+    countable: string[];
+  };
+  onRemove: () => void;
+  onEdit: (updated: Ingredient) => void;
+}
+
+const EditableIngredientItem: React.FC<EditableIngredientItemProps> = ({
+  ingredient,
+  measurementUnits,
+  onRemove,
+  onEdit,
+}) => {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editName, setEditName] = React.useState(ingredient.name);
+  const [editAmount, setEditAmount] = React.useState(
+    ingredient.amount > 0 ? String(ingredient.amount) : ""
+  );
+  const [editUnit, setEditUnit] = React.useState(ingredient.unit);
+  const [editCustomUnit, setEditCustomUnit] = React.useState("");
+
+  React.useEffect(() => {
+    setEditName(ingredient.name);
+    setEditAmount(ingredient.amount > 0 ? String(ingredient.amount) : "");
+    setEditUnit(ingredient.unit);
+    setEditCustomUnit("");
+  }, [ingredient]);
+
+  const handleSave = () => {
+    const name = editName.trim();
+    if (!name) return;
+    const isCustom = editUnit === "__custom__";
+    const resolvedUnit = isCustom ? editCustomUnit.trim() : editUnit;
+    if (!isCustom && !resolvedUnit) return;
+    if (isCustom && !resolvedUnit) return;
+
+    onEdit({
+      ...ingredient,
+      name,
+      amount: isCustom ? 0 : parseFloat(editAmount) || 0,
+      unit: resolvedUnit,
+    });
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditName(ingredient.name);
+    setEditAmount(ingredient.amount > 0 ? String(ingredient.amount) : "");
+    setEditUnit(ingredient.unit);
+    setEditCustomUnit("");
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex flex-wrap items-center gap-1.5 rounded border border-primary/30 bg-muted px-2 py-1.5">
+        <Input
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          placeholder="Name"
+          autoFocus
+          className="h-8 flex-1 min-w-[8rem] text-sm"
+        />
+        <Input
+          type="number"
+          step="any"
+          value={editAmount}
+          onChange={(e) => setEditAmount(e.target.value)}
+          placeholder="Qty"
+          disabled={editUnit === "__custom__"}
+          className="h-8 w-16 text-sm text-center px-1"
+        />
+        <div className="w-24 shrink-0">
+          <UnitPicker
+            value={editUnit}
+            onValueChange={(value) => {
+              setEditUnit(value);
+              if (value === "__custom__") setEditAmount("");
+            }}
+            measurementUnits={measurementUnits}
+            compact
+          />
+        </div>
+        {editUnit === "__custom__" && (
+          <Input
+            value={editCustomUnit}
+            onChange={(e) => setEditCustomUnit(e.target.value)}
+            placeholder="e.g. pinch"
+            className="h-8 w-24 text-sm"
+          />
+        )}
+        <Button type="button" variant="ghost" size="icon" onClick={handleSave} className="h-7 w-7 shrink-0">
+          <Check className="h-3.5 w-3.5" />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" onClick={handleCancel} className="h-7 w-7 shrink-0">
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between rounded bg-muted p-2">
+      <span className="font-medium">{ingredient.name}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground">
+          {ingredient.amount > 0
+            ? `${ingredient.amount} ${ingredient.unit}`
+            : ingredient.unit}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsEditing(true)}
+          aria-label={`Edit ${ingredient.name}`}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          aria-label={`Remove ${ingredient.name}`}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 };
@@ -566,6 +710,15 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     }));
   };
 
+  const editIngredient = (index: number, updated: Ingredient) => {
+    setFormData((prev) => ({
+      ...prev,
+      ingredients: prev.ingredients.map((ing, i) =>
+        i === index ? updated : ing
+      ),
+    }));
+  };
+
   const addInstruction = () => {
     if (newInstruction.trim()) {
       setFormData((prev) => ({
@@ -592,21 +745,35 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     }));
   };
 
-  // Get sorted ingredients based on selected sort option
-  const getSortedIngredients = (): Ingredient[] => {
-    const ingredients = [...formData.ingredients];
+  // Get sorted ingredients (preserve original index for edit/remove)
+  const getSortedIngredientEntries = (): {
+    ingredient: Ingredient;
+    originalIndex: number;
+  }[] => {
+    const entries = formData.ingredients.map((ingredient, originalIndex) => ({
+      ingredient,
+      originalIndex,
+    }));
 
     switch (ingredientSort) {
       case "name-asc":
-        return ingredients.sort((a, b) => a.name.localeCompare(b.name));
+        return [...entries].sort((a, b) =>
+          a.ingredient.name.localeCompare(b.ingredient.name)
+        );
       case "name-desc":
-        return ingredients.sort((a, b) => b.name.localeCompare(a.name));
+        return [...entries].sort((a, b) =>
+          b.ingredient.name.localeCompare(a.ingredient.name)
+        );
       case "amount-asc":
-        return ingredients.sort((a, b) => a.amount - b.amount);
+        return [...entries].sort(
+          (a, b) => a.ingredient.amount - b.ingredient.amount
+        );
       case "amount-desc":
-        return ingredients.sort((a, b) => b.amount - a.amount);
+        return [...entries].sort(
+          (a, b) => b.ingredient.amount - a.ingredient.amount
+        );
       default:
-        return ingredients;
+        return entries;
     }
   };
 
@@ -1010,36 +1177,19 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
               </div>
 
               <div className="space-y-2">
-                {getSortedIngredients().map((ingredient: Ingredient) => {
-                  // Find the original index for removal
-                  const actualIndex = formData.ingredients.findIndex(
-                    (ing) =>
-                      ing.name === ingredient.name &&
-                      ing.amount === ingredient.amount &&
-                      ing.unit === ingredient.unit
-                  );
-                  return (
-                    <div
-                      key={`${actualIndex}-${ingredient.name}`}
-                      className="flex items-center justify-between p-2 bg-muted rounded"
-                    >
-                      <span className="font-medium">{ingredient.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">
-                          {ingredient.amount > 0 ? `${ingredient.amount} ${ingredient.unit}` : ingredient.unit}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeIngredient(actualIndex)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+                {getSortedIngredientEntries().map(
+                  ({ ingredient, originalIndex }) => (
+                    <EditableIngredientItem
+                      key={`ingredient-${originalIndex}`}
+                      ingredient={ingredient}
+                      measurementUnits={measurementUnits}
+                      onRemove={() => removeIngredient(originalIndex)}
+                      onEdit={(updated) =>
+                        editIngredient(originalIndex, updated)
+                      }
+                    />
+                  )
+                )}
               </div>
             </CardContent>
           </Card>
