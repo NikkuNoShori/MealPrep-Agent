@@ -91,7 +91,12 @@ function normalizeRecipeForDraft(recipe: StructuredRecipe): StructuredRecipeType
     servings: recipe.servings,
     difficulty: recipe.difficulty,
     tags: recipe.tags ?? [],
-    ingredients: recipe.ingredients,
+    ingredients: recipe.ingredients.map((ing) => ({
+      name: ing.name,
+      amount: ing.amount ?? 0,
+      unit: ing.unit,
+      category: (ing.category ?? "other") as StructuredRecipeType["ingredients"][number]["category"],
+    })),
     instructions: recipe.instructions,
     imageUrl: (recipe.imageUrl ?? recipe.image_url ?? undefined) as string | undefined,
     sourceUrl: (recipe.sourceUrl ?? recipe.source_url ?? undefined) as string | undefined,
@@ -371,7 +376,12 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
     patchDraft(draftKey, {
       recipe: {
         title: saveTitle,
-        ingredients: ingredients as StructuredRecipeType["ingredients"],
+        ingredients: ingredients.map((ing) => ({
+          name: ing.name,
+          amount: ing.amount ?? 0,
+          unit: ing.unit,
+          category: (ing.category ?? "other") as StructuredRecipeType["ingredients"][number]["category"],
+        })),
         instructions,
       },
     });

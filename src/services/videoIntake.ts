@@ -168,9 +168,13 @@ export function mapPipelineToChatResponse(
       ? outcome.pipeline
       : (outcome as Record<string, unknown>);
   const previewImageDataUrl =
-    "previewImageDataUrl" in outcome ? outcome.previewImageDataUrl : undefined;
+    "previewImageDataUrl" in outcome
+      ? (outcome.previewImageDataUrl as string | undefined)
+      : undefined;
   const thumbnailUrl =
-    "thumbnailUrl" in outcome ? outcome.thumbnailUrl : readThumbnailUrl(pipeline);
+    "thumbnailUrl" in outcome
+      ? (outcome.thumbnailUrl as string | undefined)
+      : readThumbnailUrl(pipeline);
 
   const result = pipeline as {
     success?: boolean;
