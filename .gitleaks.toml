@@ -1,0 +1,15 @@
+title = "MealPrep Agent gitleaks config"
+
+[allowlist]
+description = "Known safe test placeholders and docs examples"
+paths = [
+  '''^docs/.*$''',
+]
+regexes = [
+  '''test-anon-key''',
+  '''fake-token''',
+  '''sk-or-v1-(YOUR_KEY_HERE|your-key-here)''',
+  # Public Supabase CLI local demo keys (supabase start) — not production secrets
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1v''',
+]
+

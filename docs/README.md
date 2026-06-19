@@ -2,8 +2,8 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-06-01
-**Last updated:** 2026-06-01 (added Architecture Decisions index, AI Integration Audit, MOP status lifecycle / ADR authoring guide / slash command references; expanded MOP table through 0011)
+**Last reviewed:** 2026-06-16
+**Last updated:** 2026-06-16 (added `draftRecipeStore`, `queryCache.ts` references; video intake docs in ARCHITECTURE/API/RUNBOOK)
 
 ---
 
@@ -47,6 +47,9 @@ Setup guides, tooling, and operational procedures.
 | [EDGE_FUNCTION_README.md](Development/EDGE_FUNCTION_README.md) | Edge function documentation |
 | [VECTOR_VS_TEXT_SEARCH.md](Development/VECTOR_VS_TEXT_SEARCH.md) | Vector vs text search comparison |
 | [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md) | Google OAuth configuration |
+| [SESSION_HANDOFF.md](SESSION_HANDOFF.md) | Latest session status and merge checklist (ephemeral — refresh each session) |
+
+**Client config (code):** `src/config/queryCache.ts` (React Query stale times), `src/stores/draftRecipeStore.ts` (unsaved recipe preview cache).
 
 ---
 
@@ -112,6 +115,9 @@ Durable rationale for non-trivial architectural choices. ADRs are enumerated by 
 |----------|-------------|
 | [DOCUMENTATION_UPDATE_PROCEDURE.md](prompts/DOCUMENTATION_UPDATE_PROCEDURE.md) | Canonical documentation update procedure (invoked by `/update-docs`) |
 | [MOP_STATUS_LIFECYCLE.md](prompts/MOP_STATUS_LIFECYCLE.md) | MOP status vocabulary and allowed transitions |
+| [MOP_VERIFICATION_POLICY.md](prompts/MOP_VERIFICATION_POLICY.md) | Hard gate for MOP `complete` — no manual verification steps |
+| [DOMAIN_TEST_MATRIX.md](prompts/DOMAIN_TEST_MATRIX.md) | Domain → test suite routing for integrity-orchestrator |
+| [MOP_COMPLIANCE_AUDIT.md](prompts/MOP_COMPLIANCE_AUDIT.md) | Audit of which MOPs have verification blocks / human gates |
 | [ADR_AUTHORING_GUIDE.md](prompts/ADR_AUTHORING_GUIDE.md) | ADR format, numbering, lifecycle, and authoring criteria |
 
 ### Slash commands
@@ -122,6 +128,24 @@ Durable rationale for non-trivial architectural choices. ADRs are enumerated by 
 | `/new-adr` | Scaffold a new ADR in `DECISIONS/` |
 | `/update-registry` | Recompute `MOPs/REGISTRY.md` from the filesystem to catch manual drift |
 | `/update-docs` | Run the documentation update procedure after a MOP is marked complete |
+| `/integrity-check` | Run domain-routed integrity tests (`integrity-orchestrator`) |
+| `/verify-mop` | Verify a MOP's automated acceptance block (rejects human gates) |
+
+### Secret scanning (gitleaks)
+
+- Config lives at `.gitleaks.toml`.
+- Pre-commit hook lives at `.githooks/pre-commit` and scans staged changes.
+- One-time setup:
+  - PowerShell: `./scripts/install-git-hooks.ps1`
+  - Bash: `./scripts/install-git-hooks.sh`
+- Install gitleaks (no Docker):
+  - Windows: `winget install Gitleaks.Gitleaks` or `scoop install gitleaks`
+  - macOS: `brew install gitleaks`
+  - Linux: see [gitleaks releases](https://github.com/gitleaks/gitleaks/releases)
+
+### Development without Docker
+
+Normal dev uses your **hosted** Supabase project via `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`). Local Supabase (`supabase start`) is optional and not required.
 
 ---
 

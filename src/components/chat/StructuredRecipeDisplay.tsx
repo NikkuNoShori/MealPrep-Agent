@@ -1,10 +1,15 @@
-import React, { useState, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useImperativeHandle, forwardRef, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Save, Clock, Users, ChefHat, Loader2, CheckCircle2, ChevronDown, ChevronRight, AlertTriangle, Copy, X, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Save, Clock, Users, ChefHat, Loader2, CheckCircle2, ChevronDown, ChevronRight, AlertTriangle, Copy, X, RefreshCw, Pencil, Check } from "lucide-react";
 import { useCreateRecipe, useUpdateRecipe, apiClient } from "@/services/api";
+import { fetchImageAsFile } from "@/utils/recipeImagePicker";
 import { VisibilityPicker, type RecipeVisibility } from "@/components/recipes/VisibilityPicker";
+import { useDraftRecipeStore } from "@/stores/draftRecipeStore";
+import type { StructuredRecipe as StructuredRecipeType } from "@/types";
 
 interface Ingredient {
   name: string;
@@ -34,6 +39,8 @@ interface StructuredRecipe {
   nutrition_info?: Record<string, unknown> | null;
   source_url?: string | null;
   source_name?: string | null;
+  sourceUrl?: string | null;
+  sourceName?: string | null;
 }
 
 interface SimilarRecipeMatch {
@@ -62,9 +69,39 @@ export interface StructuredRecipeDisplayHandle {
 
 interface StructuredRecipeDisplayProps {
   recipe: StructuredRecipe;
+  conversationId?: string;
+  messageId?: string;
+  recipeIndex?: number;
+  draftKey?: string;
   /** Base64 data URL of user-uploaded image to save as recipe image */
   userImageDataUrl?: string;
+  /** Best video keyframe selected client-side for upload on save */
+  previewImageDataUrl?: string;
+  /** Platform oEmbed thumbnail (fallback if keyframe upload fails) */
+  thumbnailUrl?: string;
   onSave?: (result: { success: boolean; error?: string }) => void;
+}
+
+function normalizeRecipeForDraft(recipe: StructuredRecipe): StructuredRecipeType {
+  return {
+    title: recipe.title,
+    description: recipe.description,
+    prepTime: (recipe.prepTime ?? recipe.prep_time ?? undefined) as number | undefined,
+    cookTime: (recipe.cookTime ?? recipe.cook_time ?? undefined) as number | undefined,
+    servings: recipe.servings,
+    difficulty: recipe.difficulty,
+    tags: recipe.tags ?? [],
+    ingredients: recipe.ingredients.map((ing) => ({
+      name: ing.name,
+      amount: ing.amount ?? 0,
+      unit: ing.unit,
+      category: (ing.category ?? "other") as StructuredRecipeType["ingredients"][number]["category"],
+    })),
+    instructions: recipe.instructions,
+    imageUrl: (recipe.imageUrl ?? recipe.image_url ?? undefined) as string | undefined,
+    sourceUrl: (recipe.sourceUrl ?? recipe.source_url ?? undefined) as string | undefined,
+    sourceName: (recipe.sourceName ?? recipe.source_name ?? undefined) as string | undefined,
+  };
 }
 
 /**
@@ -81,30 +118,301 @@ function dataUrlToFile(dataUrl: string, filename: string): File {
   return new File([bytes], filename, { type: mime });
 }
 
+function CompactIngredientRow({
+  ingredient,
+  onChange,
+}: {
+  ingredient: Ingredient;
+  onChange: (updated: Ingredient) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(ingredient.name);
+  const [amount, setAmount] = useState(
+    ingredient.amount != null && ingredient.amount > 0 ? String(ingredient.amount) : ""
+  );
+  const [unit, setUnit] = useState(ingredient.unit);
+
+  useEffect(() => {
+    setName(ingredient.name);
+    setAmount(
+      ingredient.amount != null && ingredient.amount > 0 ? String(ingredient.amount) : ""
+    );
+    setUnit(ingredient.unit);
+  }, [ingredient]);
+
+  const qtyLabel = [ingredient.amount, ingredient.unit].filter(Boolean).join(" ");
+
+  const save = () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    onChange({
+      ...ingredient,
+      name: trimmedName,
+      amount: amount ? parseFloat(amount) || null : null,
+      unit: unit.trim(),
+    });
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setName(ingredient.name);
+    setAmount(
+      ingredient.amount != null && ingredient.amount > 0 ? String(ingredient.amount) : ""
+    );
+    setUnit(ingredient.unit);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 py-1">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name"
+          autoFocus
+          className="h-7 flex-1 min-w-0 text-xs"
+        />
+        <Input
+          type="number"
+          step="any"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Qty"
+          className="h-7 w-12 text-xs text-center px-1"
+        />
+        <Input
+          value={unit}
+          onChange={(e) => setUnit(e.target.value)}
+          placeholder="Unit"
+          className="h-7 w-14 text-xs px-1"
+        />
+        <Button type="button" variant="ghost" size="icon" onClick={save} className="h-6 w-6 shrink-0">
+          <Check className="h-3 w-3" />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" onClick={cancel} className="h-6 w-6 shrink-0">
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0 text-sm gap-2">
+      <span className="font-medium flex-1 min-w-0 truncate">{ingredient.name}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        {qtyLabel && (
+          <span className="text-muted-foreground text-xs whitespace-nowrap">{qtyLabel}</span>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => setEditing(true)}
+          className="h-6 w-6"
+          aria-label={`Edit ${ingredient.name}`}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CompactInstructionRow({
+  instruction,
+  index,
+  onChange,
+}: {
+  instruction: string;
+  index: number;
+  onChange: (updated: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(instruction);
+
+  useEffect(() => {
+    setValue(instruction);
+  }, [instruction]);
+
+  const save = () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onChange(trimmed);
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setValue(instruction);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <li className="flex gap-2 py-1">
+        <div className="flex-shrink-0 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold mt-0.5">
+          {index + 1}
+        </div>
+        <div className="flex-1 flex gap-1 min-w-0">
+          <Textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="min-h-[52px] text-xs resize-none flex-1"
+            rows={2}
+          />
+          <div className="flex flex-col gap-0.5">
+            <Button type="button" variant="ghost" size="icon" onClick={save} className="h-6 w-6">
+              <Check className="h-3 w-3" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" onClick={cancel} className="h-6 w-6">
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex gap-2.5 group">
+      <div className="flex-shrink-0 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold mt-0.5">
+        {index + 1}
+      </div>
+      <p
+        className="flex-1 text-sm leading-relaxed cursor-pointer rounded px-1 -mx-1 hover:bg-muted/60"
+        onClick={() => setEditing(true)}
+        title="Click to edit"
+      >
+        {instruction}
+      </p>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => setEditing(true)}
+        className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
+        aria-label={`Edit step ${index + 1}`}
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+    </li>
+  );
+}
+
 export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle, StructuredRecipeDisplayProps>(({
   recipe,
+  conversationId,
+  messageId,
+  recipeIndex = 0,
+  draftKey,
   userImageDataUrl,
+  previewImageDataUrl,
+  thumbnailUrl,
   onSave,
 }, ref) => {
+  const upsertDraft = useDraftRecipeStore((s) => s.upsertDraft);
+  const patchDraft = useDraftRecipeStore((s) => s.patchDraft);
+  const clearDraft = useDraftRecipeStore((s) => s.clearDraft);
+  const draftEntry = useDraftRecipeStore((s) =>
+    draftKey ? s.drafts[draftKey] : undefined
+  );
+
   const [savePhase, setSavePhase] = useState<SavePhase>("idle");
   const [similarRecipes, setSimilarRecipes] = useState<SimilarRecipeMatch[]>([]);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [saveTitle, setSaveTitle] = useState(recipe.title);
+  const [ingredients, setIngredients] = useState<Ingredient[]>(recipe.ingredients ?? []);
+  const [instructions, setInstructions] = useState<string[]>(recipe.instructions ?? []);
   const [showIngredients, setShowIngredients] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [visibility, setVisibility] = useState<RecipeVisibility>("private");
   const createRecipeMutation = useCreateRecipe();
   const updateRecipeMutation = useUpdateRecipe();
+  const draftInitializedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!draftKey || !conversationId || !messageId) {
+      setSaveTitle(recipe.title);
+      setIngredients(recipe.ingredients ?? []);
+      setInstructions(recipe.instructions ?? []);
+      return;
+    }
+
+    if (draftInitializedRef.current === draftKey) return;
+    draftInitializedRef.current = draftKey;
+
+    const existing = useDraftRecipeStore.getState().getDraft(draftKey);
+    if (existing) {
+      setSaveTitle(existing.recipe.title);
+      setIngredients(existing.recipe.ingredients as Ingredient[]);
+      setInstructions(existing.recipe.instructions);
+      return;
+    }
+
+    upsertDraft(draftKey, {
+      conversationId,
+      messageId,
+      recipeIndex,
+      recipe: normalizeRecipeForDraft(recipe),
+      previewImageDataUrl,
+      thumbnailUrl,
+    });
+    setSaveTitle(recipe.title);
+    setIngredients(recipe.ingredients ?? []);
+    setInstructions(recipe.instructions ?? []);
+  }, [
+    draftKey,
+    conversationId,
+    messageId,
+    recipeIndex,
+    recipe,
+    previewImageDataUrl,
+    thumbnailUrl,
+    upsertDraft,
+  ]);
+
+  useEffect(() => {
+    if (!draftKey || draftInitializedRef.current !== draftKey) return;
+    patchDraft(draftKey, {
+      recipe: {
+        title: saveTitle,
+        ingredients: ingredients.map((ing) => ({
+          name: ing.name,
+          amount: ing.amount ?? 0,
+          unit: ing.unit,
+          category: (ing.category ?? "other") as StructuredRecipeType["ingredients"][number]["category"],
+        })),
+        instructions,
+      },
+    });
+  }, [draftKey, saveTitle, ingredients, instructions, patchDraft]);
+
+  const effectivePreviewImage =
+    draftEntry?.previewImageDataUrl ?? previewImageDataUrl;
+  const effectiveThumbnail = draftEntry?.thumbnailUrl ?? thumbnailUrl;
 
   // Normalize snake_case/camelCase fields from pipeline
   const prepTime = recipe.prepTime ?? recipe.prep_time ?? null;
   const cookTime = recipe.cookTime ?? recipe.cook_time ?? null;
   const totalTime = recipe.totalTime ?? recipe.total_time ?? (prepTime || cookTime ? (prepTime || 0) + (cookTime || 0) : null);
   const imageUrl = recipe.imageUrl ?? recipe.image_url ?? null;
+  const sourceUrl = recipe.sourceUrl ?? recipe.source_url ?? null;
+  const sourceName = recipe.sourceName ?? recipe.source_name ?? null;
+  const displayImageUrl =
+    imageUrl ||
+    effectivePreviewImage ||
+    effectiveThumbnail ||
+    null;
 
   const isBusy = savePhase === "checking_title" || savePhase === "uploading_image" || savePhase === "checking_similarity" || savePhase === "saving";
   const isPrompting = savePhase === "duplicate_found" || savePhase === "confirm_overwrite" || savePhase === "similar_found";
   const isSaved = savePhase === "saved";
+
+  const finishSave = () => {
+    if (draftKey) clearDraft(draftKey);
+    setSavePhase("saved");
+    onSave?.({ success: true });
+  };
 
   // Expose imperative handle for "Save All" button
   useImperativeHandle(ref, () => ({
@@ -125,28 +433,47 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
     }
   };
 
-  const formatIngredient = (ing: Ingredient): string => {
-    const parts: string[] = [];
-    if (ing.amount != null) parts.push(String(ing.amount));
-    if (ing.unit) parts.push(ing.unit);
-    return parts.join(" ") || "";
-  };
-
-  /** Upload user image if available. Returns the image URL or empty string. */
+  /** Upload best available preview image on save. */
   const uploadImage = async (): Promise<string> => {
-    let finalImageUrl = imageUrl || "";
-    if (!finalImageUrl && userImageDataUrl) {
+    const slug = saveTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
+
+    const isHostedRecipeImage = (url: string) =>
+      url.includes("/storage/v1/object/") && url.includes("recipe-images");
+
+    if (imageUrl && isHostedRecipeImage(imageUrl)) {
+      return imageUrl;
+    }
+
+    const dataUrl = effectivePreviewImage || userImageDataUrl;
+    if (dataUrl) {
       try {
         setSavePhase("uploading_image");
-        const slug = saveTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
-        const imageFile = dataUrlToFile(userImageDataUrl, `${slug}.jpg`);
-        finalImageUrl = await apiClient.uploadImage(imageFile, "recipes");
-        console.log("Uploaded recipe image:", finalImageUrl);
-      } catch (uploadErr: any) {
-        console.warn("Image upload failed (non-fatal):", uploadErr.message);
+        const imageFile = dataUrlToFile(dataUrl, `${slug}.jpg`);
+        const uploaded = await apiClient.uploadImage(imageFile, "recipes");
+        console.log("Uploaded recipe preview image:", uploaded);
+        return uploaded;
+      } catch (uploadErr: unknown) {
+        const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+        console.warn("Preview image upload failed (non-fatal):", msg);
       }
     }
-    return finalImageUrl;
+
+    const remoteThumb = effectiveThumbnail || (imageUrl?.startsWith("http") ? imageUrl : null);
+    if (remoteThumb) {
+      try {
+        setSavePhase("uploading_image");
+        const imageFile = await fetchImageAsFile(remoteThumb, slug);
+        const uploaded = await apiClient.uploadImage(imageFile, "recipes");
+        console.log("Uploaded recipe thumbnail:", uploaded);
+        return uploaded;
+      } catch (uploadErr: unknown) {
+        const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+        console.warn("Thumbnail upload failed, storing external URL:", msg);
+        return remoteThumb;
+      }
+    }
+
+    return imageUrl || "";
   };
 
   /** Build the recipe data object for save. */
@@ -158,9 +485,11 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
     servings: recipe.servings || 4,
     difficulty: recipe.difficulty || "medium",
     tags: recipe.tags || [],
-    ingredients: recipe.ingredients,
-    instructions: recipe.instructions,
+    ingredients,
+    instructions,
     imageUrl: finalImageUrl,
+    sourceUrl: sourceUrl || undefined,
+    sourceName: sourceName || undefined,
     visibility,
   });
 
@@ -199,8 +528,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
       // Proceed with actual save
       setSavePhase("saving");
       await createRecipeMutation.mutateAsync({ data: recipeData, options: { skipDuplicateCheck: true } });
-      setSavePhase("saved");
-      onSave?.({ success: true });
+      finishSave();
     } catch (error: any) {
       setSavePhase("idle");
       onSave?.({ success: false, error: error?.message || "Failed to save recipe. Please try again." });
@@ -211,7 +539,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
   const handleSave = async () => {
     if (isSaved || isBusy) return;
 
-    if (!recipe.title || !recipe.ingredients?.length || !recipe.instructions?.length) {
+    if (!saveTitle || !ingredients.length || !instructions.length) {
       onSave?.({ success: false, error: "Recipe is missing required fields (title, ingredients, or instructions)" });
       return;
     }
@@ -246,8 +574,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
       const finalImageUrl = await uploadImage();
       const recipeData = buildRecipeData(saveTitle, finalImageUrl);
       await updateRecipeMutation.mutateAsync({ id: duplicateId, data: recipeData });
-      setSavePhase("saved");
-      onSave?.({ success: true });
+      finishSave();
     } catch (error: any) {
       setSavePhase("idle");
       onSave?.({ success: false, error: error?.message || "Failed to overwrite recipe." });
@@ -333,10 +660,16 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
             ))}
           </div>
         )}
-        {recipe.source_url && (
+        {sourceUrl && (
           <p className="text-xs text-muted-foreground mt-2">
-            Source: <a href={recipe.source_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
-              {recipe.source_name || recipe.source_url}
+            Source:{" "}
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-primary"
+            >
+              {sourceName || sourceUrl}
             </a>
           </p>
         )}
@@ -344,10 +677,10 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
 
       <CardContent className="space-y-2 pt-0">
         {/* Recipe Image */}
-        {imageUrl && (
+        {displayImageUrl && (
           <div className="rounded-lg overflow-hidden">
             <img
-              src={imageUrl}
+              src={displayImageUrl}
               alt={recipe.title}
               className="w-full h-auto max-h-48 object-cover"
             />
@@ -355,14 +688,14 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
         )}
 
         {/* Ingredients — Collapsed by default */}
-        {recipe.ingredients && recipe.ingredients.length > 0 && (
+        {ingredients.length > 0 && (
           <div className="border border-border/40 rounded-lg">
             <button
               onClick={() => setShowIngredients(!showIngredients)}
               className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-stone-900 dark:hover:text-white"
             >
               <h4 className="font-semibold text-sm">
-                Ingredients ({recipe.ingredients.length})
+                Ingredients ({ingredients.length})
               </h4>
               {showIngredients ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -371,37 +704,32 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
               )}
             </button>
             {showIngredients && (
-              <div className="px-4 pb-3 space-y-1">
-                {recipe.ingredients.map((ingredient, index) => {
-                  const qty = formatIngredient(ingredient);
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0 text-sm"
-                    >
-                      <span className="font-medium">{ingredient.name}</span>
-                      {qty && (
-                        <span className="text-muted-foreground ml-2 text-right whitespace-nowrap">
-                          {qty}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="px-4 pb-3">
+                {ingredients.map((ingredient, index) => (
+                  <CompactIngredientRow
+                    key={index}
+                    ingredient={ingredient}
+                    onChange={(updated) =>
+                      setIngredients((prev) =>
+                        prev.map((item, i) => (i === index ? updated : item))
+                      )
+                    }
+                  />
+                ))}
               </div>
             )}
           </div>
         )}
 
         {/* Instructions — Collapsed by default */}
-        {recipe.instructions && recipe.instructions.length > 0 && (
+        {instructions.length > 0 && (
           <div className="border border-border/40 rounded-lg">
             <button
               onClick={() => setShowInstructions(!showInstructions)}
               className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-stone-900 dark:hover:text-white"
             >
               <h4 className="font-semibold text-sm">
-                Instructions ({recipe.instructions.length} steps)
+                Instructions ({instructions.length} steps)
               </h4>
               {showInstructions ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -411,13 +739,17 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
             </button>
             {showInstructions && (
               <ol className="px-4 pb-3 space-y-2 list-none">
-                {recipe.instructions.map((instruction, index) => (
-                  <li key={index} className="flex gap-2.5">
-                    <div className="flex-shrink-0 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold mt-0.5">
-                      {index + 1}
-                    </div>
-                    <p className="flex-1 text-sm leading-relaxed">{instruction}</p>
-                  </li>
+                {instructions.map((instruction, index) => (
+                  <CompactInstructionRow
+                    key={index}
+                    instruction={instruction}
+                    index={index}
+                    onChange={(updated) =>
+                      setInstructions((prev) =>
+                        prev.map((item, i) => (i === index ? updated : item))
+                      )
+                    }
+                  />
                 ))}
               </ol>
             )}

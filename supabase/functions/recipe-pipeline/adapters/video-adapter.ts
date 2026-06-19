@@ -1,28 +1,73 @@
 import type { IntermediateContent } from "./types.ts";
 import type { OpenRouterClient } from "../../_shared/openrouter-client.ts";
+import { fetchOEmbedMetadata } from "../../_shared/platform-oembed.ts";
+import { bestRecipeUrl } from "../../_shared/link-extractor.ts";
+import {
+  isShortFormVideoUrl,
+  platformNameForUrl,
+} from "../../_shared/video-url-utils.ts";
+import {
+  transcribeMediaBytes,
+  transcribeMediaFromUrl,
+} from "../../_shared/transcribe-media.ts";
+import { resolveMediaApiKey } from "../../_shared/openrouter-keys.ts";
+import { urlAdapter } from "./url-adapter.ts";
 
-const ADAPTER_VERSION = "1.0.0";
+const ADAPTER_VERSION = "1.1.0";
+const MAX_OCR_FRAMES = 8;
+
+export interface VideoAdapterOptions {
+  video_url?: string;
+  frame_urls?: string[];
+  transcript?: string;
+  /** User-pasted pinned comment or extra caption (ToS-safe manual supplement). */
+  pinned_comment_text?: string;
+  /** Alias for supplementary pasted text from creator. */
+  supplementary_text?: string;
+  /** Public URL of user-uploaded video/audio in Supabase storage. */
+  media_url?: string;
+  /** Base64 data URL of user-uploaded video/audio (smaller clips). */
+  media_base64?: string;
+  /** When true (default if media present), run STT on uploaded media. */
+  auto_transcribe?: boolean;
+}
 
 /**
- * Video adapter — handles YouTube URLs (transcript/description) and
- * pre-extracted video frames (vision OCR via OpenRouter).
- *
- * For uploaded videos, the frontend should extract 3-5 keyframes and pass
- * them as frame_urls (Supabase Storage URLs) or base64 images.
+ * Video adapter — ToS-compliant intake:
+ * - oEmbed for TikTok / YouTube URLs (caption, author, thumbnail)
+ * - Link mining on caption + user-pasted comments
+ * - Optional URL-adapter follow-up when a recipe link is found
+ * - Vision OCR on client-supplied frames (+ oEmbed thumbnail)
+ * - STT on user-uploaded media (never TikTok CDN download)
  */
 export async function videoAdapter(
   openRouter: OpenRouterClient,
-  options: {
-    video_url?: string;
-    frame_urls?: string[];
-    transcript?: string;
-  }
+  options: VideoAdapterOptions
 ): Promise<IntermediateContent> {
-  const { video_url, frame_urls, transcript } = options;
+  const {
+    video_url,
+    frame_urls,
+    transcript,
+    pinned_comment_text,
+    supplementary_text,
+    media_url,
+    media_base64,
+    auto_transcribe,
+  } = options;
 
-  if (!video_url && !frame_urls?.length && !transcript) {
+  const hasMedia = !!(media_url || media_base64);
+  const shouldTranscribe = auto_transcribe !== false && hasMedia && !transcript;
+
+  if (
+    !video_url &&
+    !frame_urls?.length &&
+    !transcript &&
+    !hasMedia &&
+    !pinned_comment_text &&
+    !supplementary_text
+  ) {
     throw new Error(
-      "Video adapter requires a video_url, frame_urls, or transcript"
+      "Video adapter requires video_url, frame_urls, transcript, media upload, or supplementary text"
     );
   }
 
@@ -31,31 +76,78 @@ export async function videoAdapter(
   let sourceName = "video";
   let sourceUrl = video_url;
 
-  // 1. If YouTube URL, try to get transcript/description
-  if (video_url && isYouTubeUrl(video_url)) {
-    sourceName = "youtube.com";
-    const ytData = await fetchYouTubeData(video_url);
-    if (ytData.description) {
-      textParts.push(`Video Description:\n${ytData.description}`);
+  // ── 1. oEmbed for short-form video URLs ──
+  if (video_url && isShortFormVideoUrl(video_url)) {
+    sourceName = platformNameForUrl(video_url);
+    const oembed = await fetchOEmbedMetadata(video_url);
+    if (oembed.title) {
+      textParts.push(`Video Caption:\n${oembed.title}`);
     }
-    if (ytData.title) {
-      textParts.push(`Video Title: ${ytData.title}`);
+    if (oembed.authorName) {
+      textParts.push(`Creator: ${oembed.authorName}`);
+    }
+    if (oembed.thumbnailUrl) {
+      images.push(oembed.thumbnailUrl);
+    }
+  } else if (video_url) {
+    sourceUrl = video_url;
+  }
+
+  // ── 2. User-pasted supplementary text (pinned comment, etc.) ──
+  const extraText = [supplementary_text, pinned_comment_text]
+    .filter(Boolean)
+    .join("\n\n");
+  if (extraText) {
+    textParts.push(`Creator Comment / Supplement:\n${extraText}`);
+  }
+
+  // ── 3. Transcript: provided or auto-transcribe uploaded media ──
+  let resolvedTranscript = transcript;
+  if (!resolvedTranscript && shouldTranscribe) {
+    resolvedTranscript = await transcribeUploadedMedia(media_url, media_base64);
+  }
+  if (resolvedTranscript) {
+    textParts.push(`Transcript:\n${resolvedTranscript}`);
+  }
+
+  // ── 4. Link mining on all text gathered so far ──
+  const combinedText = textParts.join("\n\n");
+  const recipeLink = bestRecipeUrl(combinedText);
+  if (recipeLink) {
+    try {
+      const linked = await urlAdapter(recipeLink);
+      if (linked.raw_text?.trim()) {
+        textParts.push(`Linked Recipe Page:\n${linked.raw_text}`);
+        if (linked.images?.length) {
+          images.push(...linked.images.slice(0, 2));
+        }
+      }
+    } catch (error) {
+      console.warn(`Could not fetch linked recipe URL ${recipeLink}:`, error);
+      textParts.push(`Recipe link found (not fetched): ${recipeLink}`);
     }
   }
 
-  // 2. If transcript provided, use it directly
-  if (transcript) {
-    textParts.push(`Transcript:\n${transcript}`);
-  }
+  // ── 5. Vision OCR on frames (+ oEmbed thumbnail already in images) ──
+  const ocrTargets = [
+    ...(frame_urls ?? []),
+    ...images.filter((u) => u.startsWith("http")),
+  ];
+  const uniqueOcr = [...new Set(ocrTargets)].slice(0, MAX_OCR_FRAMES);
 
-  // 3. If frames provided, run vision OCR on each
-  if (frame_urls?.length) {
-    console.log(`Running vision OCR on ${frame_urls.length} frames`);
-    const ocrText = await extractTextFromFrames(openRouter, frame_urls);
+  if (uniqueOcr.length > 0) {
+    console.log(`Running vision OCR on ${uniqueOcr.length} frame(s)`);
+    const ocrText = await extractTextFromFrames(openRouter, uniqueOcr);
     if (ocrText) {
       textParts.push(`Extracted from video frames:\n${ocrText}`);
     }
-    images.push(...frame_urls.slice(0, 4));
+  }
+
+  // Keep client frame data URLs for downstream image handling
+  if (frame_urls?.length) {
+    for (const f of frame_urls) {
+      if (!images.includes(f)) images.push(f);
+    }
   }
 
   const rawText = textParts.join("\n\n");
@@ -65,7 +157,7 @@ export async function videoAdapter(
 
   return {
     raw_text: rawText,
-    images,
+    images: images.slice(0, MAX_OCR_FRAMES),
     source_metadata: {
       source_type: "video",
       source_url: sourceUrl,
@@ -73,42 +165,53 @@ export async function videoAdapter(
       extracted_at: new Date().toISOString(),
       adapter_version: ADAPTER_VERSION,
       extra: {
-        has_transcript: !!transcript,
+        has_transcript: !!resolvedTranscript,
         frame_count: frame_urls?.length ?? 0,
+        recipe_link_found: recipeLink ?? null,
+        oembed_used: !!(video_url && isShortFormVideoUrl(video_url)),
+        thumbnail_url: images.find((u) => u.startsWith("http")) ?? null,
       },
     },
   };
 }
 
-function isYouTubeUrl(url: string): boolean {
-  return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(url);
-}
+async function transcribeUploadedMedia(
+  mediaUrl?: string,
+  mediaBase64?: string
+): Promise<string> {
+  const apiKey = resolveMediaApiKey();
 
-/**
- * Fetch basic YouTube metadata via oembed (no API key needed).
- */
-async function fetchYouTubeData(
-  url: string
-): Promise<{ title?: string; description?: string }> {
-  try {
-    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-    const response = await fetch(oembedUrl, {
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!response.ok) return {};
-
-    const data = await response.json();
-    return { title: data.title };
-  } catch {
-    console.warn("Could not fetch YouTube metadata");
-    return {};
+  if (mediaUrl) {
+    return transcribeMediaFromUrl(apiKey, mediaUrl);
   }
+
+  if (mediaBase64) {
+    const { bytes, mimeType, filename } = parseDataUrl(mediaBase64);
+    return transcribeMediaBytes(apiKey, bytes, mimeType, filename);
+  }
+
+  throw new Error("No media_url or media_base64 for transcription");
 }
 
-/**
- * Send video frames to the vision model for text/recipe extraction.
- */
+function parseDataUrl(dataUrl: string): {
+  bytes: Uint8Array;
+  mimeType: string;
+  filename: string;
+} {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) throw new Error("Invalid media_base64 data URL");
+  const mimeType = match[1];
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const ext = mimeType.includes("webm")
+    ? "webm"
+    : mimeType.includes("quicktime")
+    ? "mov"
+    : "mp4";
+  return { bytes, mimeType, filename: `upload.${ext}` };
+}
+
 async function extractTextFromFrames(
   openRouter: OpenRouterClient,
   frameUrls: string[]
@@ -117,7 +220,7 @@ async function extractTextFromFrames(
     const response = await openRouter.chatWithImages(
       "You are an OCR system. Extract ALL visible text from these video frames. Include recipe titles, ingredients, instructions, and any other text. Return only the extracted text, no commentary.",
       "Extract all visible text from these video frames. Focus on recipe content: titles, ingredient lists, cooking instructions, measurements, and cooking times.",
-      frameUrls.slice(0, 4),
+      frameUrls.slice(0, MAX_OCR_FRAMES),
       "qwen/qwen-2.5-vl-7b-instruct",
       { temperature: 0.1, max_tokens: 3000 }
     );

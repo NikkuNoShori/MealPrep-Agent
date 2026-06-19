@@ -3,6 +3,8 @@
  * Extracted from chat-api/index.ts for reuse across pipeline and chat.
  */
 
+import { resolveOpenRouterKeys } from "./openrouter-keys.ts";
+
 // ─────────────────────────────────────────────────────────────────────
 // Types for tool-using chat (OpenAI-compatible tool format)
 // ─────────────────────────────────────────────────────────────────────
@@ -44,29 +46,17 @@ export interface ChatWithToolsResult {
 }
 
 export class OpenRouterClient {
-  private defaultApiKey: string;
-  private vlApiKey?: string;
-  private instructApiKey?: string;
+  private mediaApiKey: string;
+  private chatApiKey: string;
   private baseUrl = "https://openrouter.ai/api/v1";
 
-  constructor(
-    defaultApiKey: string,
-    vlApiKey?: string,
-    instructApiKey?: string
-  ) {
-    this.defaultApiKey = defaultApiKey;
-    this.vlApiKey = vlApiKey;
-    this.instructApiKey = instructApiKey;
+  constructor(mediaApiKey: string, chatApiKey?: string) {
+    this.mediaApiKey = mediaApiKey;
+    this.chatApiKey = chatApiKey ?? mediaApiKey;
   }
 
-  private getApiKeyForModel(model: string): string {
-    if (model.includes("vl") || model.includes("vision")) {
-      return this.vlApiKey || this.defaultApiKey;
-    }
-    if (model.includes("instruct") || model.includes("qwen")) {
-      return this.instructApiKey || this.defaultApiKey;
-    }
-    return this.defaultApiKey;
+  private resolveBillingKey(billing: "chat" | "media"): string {
+    return billing === "chat" ? this.chatApiKey : this.mediaApiKey;
   }
 
   async chat(
@@ -77,9 +67,11 @@ export class OpenRouterClient {
       temperature?: number;
       max_tokens?: number;
       response_format?: { type: string };
+      /** Default `media` (pipeline). Use `chat` for conversational chat-api calls. */
+      billing?: "chat" | "media";
     }
   ): Promise<string> {
-    const apiKey = this.getApiKeyForModel(model);
+    const apiKey = this.resolveBillingKey(options?.billing ?? "media");
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -129,7 +121,7 @@ export class OpenRouterClient {
       { role: "user", content: userMessage },
     ];
 
-    const apiKey = this.getApiKeyForModel(model);
+    const apiKey = this.mediaApiKey;
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -179,7 +171,7 @@ export class OpenRouterClient {
       })),
     ];
 
-    const apiKey = this.getApiKeyForModel(model);
+    const apiKey = this.mediaApiKey;
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -225,14 +217,14 @@ export class OpenRouterClient {
     systemPrompt: string,
     messages: ChatMessage[],
     tools: ToolSpec[],
-    model = "qwen/qwen-2.5-7b-instruct",
+    model = "qwen/qwen3-8b",
     options?: {
       temperature?: number;
       max_tokens?: number;
       tool_choice?: "auto" | "none" | "required";
     }
   ): Promise<ChatWithToolsResult> {
-    const apiKey = this.getApiKeyForModel(model);
+    const apiKey = this.chatApiKey;
 
     const fullMessages: ChatMessage[] = [
       { role: "system", content: systemPrompt },
@@ -246,6 +238,8 @@ export class OpenRouterClient {
       tool_choice: options?.tool_choice ?? "auto",
       temperature: options?.temperature ?? 0.2,
       max_tokens: options?.max_tokens ?? 1024,
+      // Only route to providers that advertise tool/function-calling support.
+      provider: { require_parameters: true },
     };
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -283,7 +277,7 @@ export class OpenRouterClient {
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
-    const apiKey = this.defaultApiKey;
+    const apiKey = this.mediaApiKey;
     const response = await fetch(`${this.baseUrl}/embeddings`, {
       method: "POST",
       headers: {
@@ -311,18 +305,6 @@ export class OpenRouterClient {
 
 /** Create an OpenRouterClient from environment variables. */
 export function createOpenRouterClient(): OpenRouterClient {
-  const defaultKey =
-    Deno.env.get("OPENROUTER_API_KEY") ||
-    Deno.env.get("OPENROUTER_API_KEY_QWEN2.5_instruct_8b") ||
-    Deno.env.get("OPENROUTER_API_KEY_QWEN2.5_VL_8b");
-
-  if (!defaultKey) {
-    throw new Error("OPENROUTER_API_KEY not configured");
-  }
-
-  return new OpenRouterClient(
-    defaultKey,
-    Deno.env.get("OPENROUTER_API_KEY_QWEN2.5_VL_8b"),
-    Deno.env.get("OPENROUTER_API_KEY_QWEN2.5_instruct_8b")
-  );
+  const { chat, media } = resolveOpenRouterKeys();
+  return new OpenRouterClient(media, chat);
 }

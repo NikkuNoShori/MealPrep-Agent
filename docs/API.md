@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-06-01
-**Last updated:** 2026-06-01 (MOP-0008: chat-api intent router replaced with tool-using agent loop; documented `pendingConfirmation` response and `context.confirmAction` request fields)
+**Last reviewed:** 2026-06-16
+**Last updated:** 2026-06-16 (`POST /chat-api/persist-extraction`, video `source_metadata.extra.thumbnail_url`, agent model `qwen/qwen3-8b`, abortable send)
 
 ---
 
@@ -95,9 +95,13 @@ apikey: <supabase-anon-key>
   "cuisine": "string | null",
   "tags": ["string"],
   "nutrition": {"calories": 350, "protein": 12, "carbs": 45, "fat": 10},
-  "imageUrl": "string | null"
+  "imageUrl": "string | null",
+  "sourceUrl": "string | null",
+  "sourceName": "string | null"
 }
 ```
+
+`sourceUrl` / `sourceName` are populated from pipeline `source_metadata` (TikTok/YouTube URL, hostname, etc.) when extraction includes a platform source.
 
 **Multi-recipe:** When multiple recipes are extracted, `recipes` contains an array of recipe objects (max 5). The first recipe is also in `recipe` for backwards compatibility. `recipes` is omitted when only one recipe is found.
 
@@ -112,7 +116,7 @@ apikey: <supabase-anon-key>
 4. The loop terminates on a plain content reply, a confirmation short-circuit, or `MAX_ITERS = 5`.
 5. Frontend renders `pendingConfirmation` as a Confirm/Cancel inline surface. On Confirm, resend with `context.confirmAction` — the runtime applies the change and replies with `intentMetadata.confirmAction: true`.
 
-Model: `qwen/qwen-2.5-7b-instruct`, temperature 0.2, `tool_choice: auto`.
+Model: `qwen/qwen3-8b` (override via `OPENROUTER_AGENT_MODEL` on the edge function), temperature 0.2, `tool_choice: auto`. OpenRouter requests include `provider: { require_parameters: true }` for tool-capable routing.
 
 **Error responses:**
 - `401` — Missing or invalid JWT
@@ -144,6 +148,49 @@ Delete a conversation or all history.
 
 ---
 
+### POST `/functions/v1/chat-api/persist-extraction`
+
+Persist a **client-side** video extraction into `chat_messages` so follow-up agent turns see structured recipe context in history. Used when the user uploads a saved video file in chat (bypasses the normal `/message` agent loop for the extraction itself).
+
+**Location:** `supabase/functions/chat-api/index.ts` (`handlePersistExtraction`)
+
+**Headers:** Same as `/chat-api/message`
+
+**Request body:**
+```json
+{
+  "sessionId": "string (required)",
+  "conversationId": "uuid (optional — omit for new/temp conversations)",
+  "userMessage": "string (display text, e.g. Recipe video: clip.mp4)",
+  "assistantContent": "string (required — AI preview intro text)",
+  "recipe": { "ValidatedRecipe / StructuredRecipe object" },
+  "recipes": [{ "..." }],
+  "thumbnailUrl": "string (optional — oEmbed thumbnail HTTP URL)",
+  "userMetadata": { "videoFileName": "clip.mp4" }
+}
+```
+
+**Response:**
+```json
+{
+  "conversationId": "uuid",
+  "response": {
+    "id": "uuid",
+    "content": "string",
+    "sender": "ai",
+    "timestamp": "ISO 8601"
+  }
+}
+```
+
+**Persisted rows:**
+- User message: `message_type: text`, `metadata.source: video_intake`, optional `metadata.videoFileName`
+- AI message: `message_type: recipe`, `metadata.recipe`, `metadata.recipes`, `metadata.thumbnail_url` (HTTP URL only — **no base64 keyframes**)
+
+**Client:** `apiClient.persistChatExtraction()` in `src/services/api.ts`; called from `ChatInterface` after `processVideoIntake`.
+
+---
+
 ### POST `/functions/v1/recipe-pipeline/ingest`
 
 Full pipeline: adapter → extract → transform → load.
@@ -160,9 +207,18 @@ Full pipeline: adapter → extract → transform → load.
   "video_url": "string (for video source_type)",
   "frame_urls": ["string (for video source_type)"],
   "transcript": "string (for video source_type)",
+  "pinned_comment_text": "string (optional — creator pinned comment, ToS-safe user paste)",
+  "supplementary_text": "string (optional — extra caption/comment from creator)",
+  "media_url": "string (public URL of user-uploaded video/audio in Supabase storage)",
+  "media_base64": "string (data URL of uploaded media, ≤24MB)",
+  "auto_transcribe": "boolean (default true when media_url/media_base64 present)",
   "auto_save": true
 }
 ```
+
+**Short-form video URLs:** `source_type: "url"` with a TikTok/YouTube/Reels URL auto-routes to the video adapter (oEmbed + link mining), not HTML scrape. See [MOP-0016](MOPs/MOP-0016-short-form-video-intake.md).
+
+**Models (OpenRouter, server-side):** Whisper `openai/whisper-large-v3` (uploaded audio) → Qwen VL `qwen/qwen-2.5-vl-7b-instruct` (frame OCR) → Qwen `qwen/qwen-2.5-7b-instruct` or VL (recipe JSON extract). Requires `OPENROUTER_API_KEY` Supabase secret.
 
 **Response (`PipelineResult`):**
 ```json
@@ -175,8 +231,12 @@ Full pipeline: adapter → extract → transform → load.
   "source_metadata": {
     "source_type": "text | url | video",
     "source_url": "string | undefined",
+    "source_name": "string | undefined",
     "extracted_at": "ISO 8601",
-    "adapter_version": "1.0.0"
+    "adapter_version": "1.0.0",
+    "extra": {
+      "thumbnail_url": "string | null (oEmbed platform thumbnail — HTTP URL only)"
+    }
   },
   "errors": [{"stage": "extract", "code": "EXTRACTION_FAILED", "message": "..."}]
 }
@@ -187,6 +247,10 @@ Full pipeline: adapter → extract → transform → load.
 ### POST `/functions/v1/recipe-pipeline/extract-only`
 
 Same as `/ingest` but with `auto_save: false` — extract and validate without saving to DB.
+
+**Client timeout:** video extractions use a 180s abort window in `apiClient.extractRecipeOnly()`; URL/text use 60s. `ChatInterface` passes `AbortSignal` for user-initiated Stop.
+
+**Extract stage routing:** `supabase/functions/recipe-pipeline/stages/extract.ts` — video sources with substantive caption/OCR text (≥80 chars) use the text JSON path even when oEmbed thumbnails are present; thumbnail-only sources use vision.
 
 ---
 

@@ -24,7 +24,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   onEditRecipe,
   collectionId,
   collectionName: _collectionName,
-  feedMode = 'public',
+  feedMode = 'mine',
 }) => {
   const { user } = useAuthStore();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -178,7 +178,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Search, Filters & Actions Bar */}
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
@@ -231,7 +231,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 
       {/* Recipe Grid/List with Enhanced Empty State */}
       {filteredRecipes.length === 0 ? (
-        <div className="text-center py-16">
+        <div className="text-center py-10">
           <div className="max-w-md mx-auto">
             <div className="relative mb-8">
               <div className="w-32 h-32 bg-primary-100 dark:bg-primary-900/30 rounded-3xl flex items-center justify-center mx-auto shadow-lg">

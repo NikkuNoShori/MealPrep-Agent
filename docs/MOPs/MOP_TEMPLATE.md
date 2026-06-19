@@ -57,49 +57,46 @@ docs/<relevant>
 
 ## Verification
 
-> **Lockticket-format acceptance criteria.** Each assertion is machine-checkable except where marked `type: human`. `/verify-mop` (MOP-0010) runs these and gates the `verifying → complete` transition.
+> **Lockticket acceptance criteria.** See [MOP_VERIFICATION_POLICY.md](../prompts/MOP_VERIFICATION_POLICY.md) — **`type: human` is forbidden** (blocks `complete`). Route domain tests via [DOMAIN_TEST_MATRIX.md](../prompts/DOMAIN_TEST_MATRIX.md). Run `/integrity-check` then `/verify-mop MOP-XXXX`.
 
 ```yaml
 verification:
-  - id: example-file-exists
-    type: file-exists
-    path: src/example.ts
-
-  - id: example-grep-present
-    type: grep
-    path: src/example.ts
-    pattern: 'expectedSymbol'
-    expect: present
-
-  - id: example-grep-absent
-    type: grep
-    path: src/example.ts
-    pattern: 'forbiddenPattern'
-    expect: absent
-
-  - id: example-command
+  - id: lint-clean
     type: command
     run: npm run lint
     expect_exit: 0
 
-  - id: example-test
-    type: test-passes
-    pattern: 'test name or file pattern'
+  - id: build-clean
+    type: command
+    run: npm run build
+    expect_exit: 0
 
-  - id: example-human
-    type: human
-    description: A criterion that requires human judgment (UX, code quality, etc.)
-    target: clearly-stated target
-    hard_gate: true  # optional — if true, MOP cannot complete without this passing
+  - id: unit-tests
+    type: command
+    run: npm run test:run
+    expect_exit: 0
+
+  # Domain-specific — copy from DOMAIN_TEST_MATRIX.md for your Scope Map
+  - id: domain-suite
+    type: command
+    run: npm run test:run -- src/path/__tests__/example.test.ts
+    expect_exit: 0
 ```
 
-Assertion types: `file-exists`, `grep`, `command`, `test-passes`, `human`. See MOP-0010 for full schema.
+Allowed assertion types: `file-exists`, `grep`, `command`, `test-passes`. **Not allowed:** `human`.
+
+## Manual Follow-up (non-blocking)
+
+> Optional human review **after** `complete`. Never gates status.
+
+- [ ] [UX review, staging spot-check, etc.]
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] All `verification` block items pass
+- [ ] All `verification` block items pass (`/verify-mop`)
+- [ ] `/integrity-check` passes for this MOP's domains
 - [ ] [Criterion 1]
 - [ ] [Criterion 2]
 - [ ] Documentation updated per `/update-docs` procedure

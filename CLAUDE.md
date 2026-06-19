@@ -77,7 +77,13 @@ Equivalent user-invoked path: `/surface` slash command.
 |---|---|
 | `doc-adherence` | Documentation compliance audit; supersedes `doc-keeper` |
 | `qa-auditor` | Architectural rule audit |
-| `data-integrity` | Vitest + RLS integration verification |
+| `integrity-orchestrator` | Domain-routed test execution (DOMAIN_TEST_MATRIX) |
+| `data-integrity` | Deep numeric + RLS verification (after orchestrator) |
+| `meal-planning-sme` | Meal planner + grocery cart expert |
+| `household-sme` | Household sharing + invites + visibility expert |
+| `platform-auth-sme` | Auth, session, OAuth, profiles, username expert |
+| `recipe-pipeline-sme` | Recipe pipeline + library expert |
+| `chat-rag-sme` | Chat + RAG + search expert |
 | `ui-designer` | Premium UI restyling |
 | `cooking-bot-architect` | In-product AI agent design + implementation |
 | `surface-reviewer` | Mid-session finding triage → MOP/ADR/inline disposition |
@@ -88,4 +94,6 @@ Equivalent user-invoked path: `/surface` slash command.
 | `/new-mop` | Scaffold next sequential MOP from template |
 | `/new-adr` | Scaffold next sequential ADR from authoring guide |
 | `/update-registry` | Reconcile `REGISTRY.md` against on-disk MOP headers |
+| `/integrity-check` | Run domain-routed integrity tests |
+| `/verify-mop` | Verify MOP acceptance block (no human gates) |
 | `/surface` | User-invoked surface review |

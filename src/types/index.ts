@@ -165,6 +165,10 @@ export interface ChatMessageResponse {
   }
   recipe?: StructuredRecipe // Optional structured recipe data (single)
   recipes?: StructuredRecipe[] // Optional multiple recipes
+  /** Best client keyframe (data URL) for upload on save */
+  previewImageDataUrl?: string
+  /** oEmbed / platform thumbnail HTTP URL */
+  thumbnailUrl?: string
 }
 
 export interface RecipesResponse {

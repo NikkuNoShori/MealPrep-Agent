@@ -13,6 +13,7 @@ import {
 import { runAgentLoop } from "./agent-loop.ts";
 import { executeConfirmedTool } from "./tools/handlers.ts";
 import type { ToolContext } from "./tools/dispatch.ts";
+import { enrichMessageContent } from "./conversation-context.ts";
 
 // ═══════════════════════════════════════════════════════════════════
 // MAIN REQUEST HANDLER
@@ -52,6 +53,11 @@ serve(async (req) => {
     if (!auth) return corsError("Invalid or expired token", 401);
 
     const { user, supabase } = auth;
+
+    // Persist client-side extractions (e.g. video intake) — no OpenRouter needed
+    if (method === "POST" && path.includes("/persist-extraction")) {
+      return await handlePersistExtraction(req, supabase, user);
+    }
 
     let openRouter: OpenRouterClient;
     try {
@@ -207,7 +213,7 @@ async function handleSendMessage(
     // Recent conversation history → ChatMessage[]
     const { data: recentMessages } = await supabase
       .from("chat_messages")
-      .select("content, sender, created_at")
+      .select("content, sender, created_at, metadata")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(10);
@@ -218,7 +224,7 @@ async function handleSendMessage(
         role: (msg.sender === "user" ? "user" : "assistant") as
           | "user"
           | "assistant",
-        content: msg.content || "",
+        content: enrichMessageContent(msg),
       }));
 
     const toolCtx: ToolContext = {
@@ -319,7 +325,7 @@ async function handleSendMessage(
           "Generate a very short title (4-6 words max) for this conversation. Return ONLY the title text, nothing else.",
           `User: ${(message || "").substring(0, 200)}\nAssistant: ${aiResponse.substring(0, 200)}`,
           "qwen/qwen-2.5-7b-instruct",
-          { temperature: 0.3, max_tokens: 20 }
+          { temperature: 0.3, max_tokens: 20, billing: "chat" }
         );
         generatedTitle = titleResponse.trim().replace(/^["']|["']$/g, "");
         if (generatedTitle) {
@@ -457,5 +463,127 @@ async function handleClearHistory(req: Request, supabase: any, user: any) {
     return corsResponse({ message: "Chat history cleared successfully" });
   } catch (error) {
     return corsError(error.message, 500);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PERSIST CLIENT-SIDE EXTRACTION (video upload path → chat_messages)
+// ═══════════════════════════════════════════════════════════════════
+
+async function handlePersistExtraction(
+  req: Request,
+  supabase: any,
+  user: { id: string }
+) {
+  try {
+    const body = await req.json();
+    const {
+      sessionId,
+      conversationId: requestedConversationId,
+      userMessage,
+      assistantContent,
+      recipe,
+      recipes,
+      userMetadata,
+      thumbnailUrl,
+    } = body;
+
+    if (!sessionId || !assistantContent) {
+      return corsError("sessionId and assistantContent are required", 400);
+    }
+
+    let conversationId: string | undefined = requestedConversationId;
+
+    if (conversationId) {
+      const { data: owned } = await supabase
+        .from("chat_conversations")
+        .select("id")
+        .eq("id", conversationId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!owned) conversationId = undefined;
+    }
+
+    if (!conversationId) {
+      const { data: existingConv, error: findError } = await supabase
+        .from("chat_conversations")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingConv && !findError) {
+        conversationId = existingConv.id;
+      } else {
+        const placeholderTitle =
+          (userMessage as string | undefined)?.length > 50
+            ? String(userMessage).substring(0, 50) + "..."
+            : userMessage || "Video recipe extraction";
+        const { data: newConv, error: convError } = await supabase
+          .from("chat_conversations")
+          .insert({
+            user_id: user.id,
+            title: placeholderTitle,
+            session_id: sessionId,
+            metadata: userMetadata || {},
+          })
+          .select()
+          .single();
+        if (convError) throw convError;
+        conversationId = newConv.id;
+      }
+    }
+
+    await supabase.from("chat_messages").insert({
+      conversation_id: conversationId,
+      content: userMessage || "[Video recipe intake]",
+      sender: "user",
+      message_type: "text",
+      metadata: {
+        ...(userMetadata || {}),
+        source: "video_intake",
+      },
+    });
+
+    const { data: aiMessage, error: aiError } = await supabase
+      .from("chat_messages")
+      .insert({
+        conversation_id: conversationId,
+        content: assistantContent,
+        sender: "ai",
+        message_type: recipe ? "recipe" : "text",
+        metadata: {
+          source: "video_intake",
+          recipe: recipe || null,
+          recipes: recipes || null,
+          thumbnail_url: thumbnailUrl || recipe?.image_url || recipe?.imageUrl || null,
+        },
+      })
+      .select()
+      .single();
+
+    if (aiError) throw aiError;
+
+    await supabase
+      .from("chat_conversations")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", conversationId);
+
+    return corsResponse({
+      conversationId,
+      response: {
+        id: aiMessage.id,
+        content: assistantContent,
+        sender: "ai",
+        timestamp: aiMessage.created_at,
+      },
+      recipe: recipe || undefined,
+      recipes: recipes && recipes.length > 1 ? recipes : undefined,
+    });
+  } catch (error) {
+    console.error("persist-extraction error:", error);
+    return corsError(error.message || "Failed to persist extraction", 500);
   }
 }

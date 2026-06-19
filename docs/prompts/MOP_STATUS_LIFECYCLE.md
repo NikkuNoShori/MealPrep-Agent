@@ -42,11 +42,13 @@ draft → evaluation → approved → planned → in_progress → verifying → 
 1. **Every MOP must have exactly one status** from the table above. No other status values are valid.
 2. **evaluation → approved** means "the evaluation concluded that this is feasible and worth doing." It does NOT mean the work is scheduled.
 3. **approved → planned** means "this is assigned to a specific sprint, milestone, or time window."
-4. **verifying** is the lockticket gate. A MOP cannot transition `verifying → complete` until every assertion in its `## Verification` block passes. The `/verify-mop` skill (MOP-0010) enforces this.
+4. **verifying** is the lockticket gate. A MOP cannot transition `verifying → complete` until every assertion in its `## Verification` block passes **and** [MOP_VERIFICATION_POLICY.md](MOP_VERIFICATION_POLICY.md) is satisfied (no `type: human` gates). The `/verify-mop` skill enforces this.
 5. **complete triggers documentation**: When a MOP status changes to complete, the `/update-docs` skill MUST be invoked before the session ends.
 6. **cancelled and deferred require a reason**: Add a `> **Reason:**` blockquote below the status line explaining why.
 7. **deferred is not cancelled**: Deferred MOPs are expected to be revisited. Cancelled MOPs are permanently closed.
 8. **Deferred-with-trigger MOPs** (e.g., MOP-0011) must include trigger conditions in their body. Status stays `deferred` until a trigger fires; then promotes to `planned`.
+9. **Verification block required before `verifying`**: Every MOP must have a `## Verification` YAML block. See [MOP_VERIFICATION_POLICY.md](MOP_VERIFICATION_POLICY.md).
+10. **Manual steps block `complete`**: `type: human` assertions are forbidden in the verification block. Human-only steps belong in `## Manual Follow-up (non-blocking)` and do not gate completion.
 
 ---
 

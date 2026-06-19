@@ -55,7 +55,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
   onSelectCollection,
   onCollectionNameChange,
   onViewModeChange,
-  viewMode = 'public',
+  viewMode = 'mine',
 }) => {
   const { data: collections, isLoading } = useMyCollections()
   const createCollection = useCreateCollection()
