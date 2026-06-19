@@ -714,11 +714,22 @@ curl -s -o /dev/null -w "%{http_code}" \
 ### Symptom
 - Chat replies with "Sorry, I encountered an error"
 - Edge logs show OpenRouter 404 or no tool-capable endpoint for the model
+- Browser error: `No endpoints found for google/gemini-2.0-flash-001`
 
 ### Likely causes
 - Agent model set to `qwen/qwen-2.5-7b-instruct` (no tool-use endpoints on OpenRouter)
+- **`OPENROUTER_AGENT_MODEL` set to a vision-only model** (e.g. `google/gemini-2.0-flash-001`) — works in `recipe-pipeline` extract but **not** in the agent loop because `chatWithTools` sends `provider: { require_parameters: true }` and requires endpoints that advertise `tools`
 - `OPENROUTER_AGENT_MODEL` secret points at a non-tool model
 - Missing `require_parameters` on OpenRouter provider routing
+
+### Valid agent models (tool + `require_parameters`)
+- `qwen/qwen3-8b` (default; may hit shared-pool 429)
+- `qwen/qwen3-14b`
+- `openai/gpt-4o-mini` (reliable fallback; higher cost)
+
+Filter live list: `https://openrouter.ai/api/v1/models?supported_parameters=tools`
+
+**Do not use for agent:** `google/gemini-2.0-flash-001`, `qwen/qwen-2.5-7b-instruct`, `qwen/qwen-2.5-vl-7b-instruct` (vision/extract only).
 
 ### Verification steps
 ```bash
@@ -726,14 +737,24 @@ supabase functions logs chat-api --project-ref <project-ref>
 # Look for OpenRouter 404 or "No endpoints found"
 ```
 
-Check `supabase/functions/chat-api/agent-loop.ts` — default should be `qwen/qwen3-8b`.
+Check `supabase/functions/chat-api/agent-loop.ts` — default should be `qwen/qwen3-8b` with fallbacks `qwen/qwen3-14b`, `openai/gpt-4o-mini`.
 
 ### Fix steps
-1. Deploy latest `chat-api`
-2. Optional override: `npx supabase secrets set OPENROUTER_AGENT_MODEL=qwen/qwen3-8b`
-3. Confirm `_shared/openrouter-client.ts` `chatWithTools` sends `provider: { require_parameters: true }`
+1. Deploy latest `chat-api` (includes model fallback chain on 429/404)
+2. Fix secret if mis-set:
+   ```bash
+   npx supabase secrets unset OPENROUTER_AGENT_MODEL
+   # or pick a tool-capable model:
+   npx supabase secrets set OPENROUTER_AGENT_MODEL=openai/gpt-4o-mini
+   ```
+3. Optional fallback override:
+   ```bash
+   npx supabase secrets set OPENROUTER_AGENT_MODEL_FALLBACKS=qwen/qwen3-8b,qwen/qwen3-14b,openai/gpt-4o-mini
+   ```
+4. Confirm `_shared/openrouter-client.ts` `chatWithTools` sends `provider: { require_parameters: true }`
 
-**Added:** 2026-06-16
+**Added:** 2026-06-16  
+**Updated:** 2026-06-19 (gemini-2.0-flash agent mismatch; fallback chain)
 
 ---
 

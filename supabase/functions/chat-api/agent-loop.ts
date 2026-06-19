@@ -11,8 +11,10 @@
 
 import type {
   ChatMessage,
+  ChatWithToolsResult,
   OpenRouterClient,
   ToolCall,
+  ToolSpec,
 } from "../_shared/openrouter-client.ts";
 import { CHAT_AGENT_SYSTEM_PROMPT } from "../_shared/recipe-prompts.ts";
 import { dispatchTool, type ToolContext, type ToolResult } from "./tools/dispatch.ts";
@@ -22,6 +24,82 @@ export const MAX_ITERS = 5;
 /** Tool-use requires a model with function-calling on OpenRouter (2.5-7b has none). */
 export const AGENT_MODEL =
   Deno.env.get("OPENROUTER_AGENT_MODEL")?.trim() || "qwen/qwen3-8b";
+
+/**
+ * Models that advertise `tools` + pass OpenRouter `require_parameters: true`.
+ * Vision-only models (e.g. gemini-2.0-flash-001 in extract.ts) are NOT valid here.
+ */
+export const DEFAULT_AGENT_MODEL_FALLBACKS = [
+  "qwen/qwen3-8b",
+  "qwen/qwen3-14b",
+  "openai/gpt-4o-mini",
+] as const;
+
+export function resolveAgentModels(): string[] {
+  const primary = AGENT_MODEL;
+  const fromEnv = Deno.env.get("OPENROUTER_AGENT_MODEL_FALLBACKS")
+    ?.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const fallbacks = fromEnv ?? [...DEFAULT_AGENT_MODEL_FALLBACKS];
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const model of [primary, ...fallbacks]) {
+    if (!seen.has(model)) {
+      seen.add(model);
+      ordered.push(model);
+    }
+  }
+  return ordered;
+}
+
+function isRetryableOpenRouterError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    /\b429\b/.test(msg) ||
+    /\b502\b/.test(msg) ||
+    /\b503\b/.test(msg) ||
+    /rate.?limit/i.test(msg) ||
+    /No endpoints found/i.test(msg)
+  );
+}
+
+async function chatWithToolsResilient(
+  openRouter: OpenRouterClient,
+  systemPrompt: string,
+  messages: ChatMessage[],
+  tools: ToolSpec[],
+  options: {
+    temperature?: number;
+    max_tokens?: number;
+    tool_choice?: "auto" | "none" | "required";
+  }
+): Promise<ChatWithToolsResult> {
+  const models = resolveAgentModels();
+  const errors: string[] = [];
+
+  for (const model of models) {
+    try {
+      console.log(`Agent loop trying model: ${model}`);
+      return await openRouter.chatWithTools(
+        systemPrompt,
+        messages,
+        tools,
+        model,
+        options
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${model}: ${msg.slice(0, 240)}`);
+      if (!isRetryableOpenRouterError(err)) throw err;
+      console.warn(
+        `Agent model ${model} unavailable (${msg.slice(0, 120)}), trying next...`
+      );
+    }
+  }
+
+  throw new Error(`All agent models failed: ${errors.join(" | ")}`);
+}
 
 export interface PendingConfirmation {
   tool: string;
@@ -100,11 +178,11 @@ export async function runAgentLoop(
 
   while (iteration < MAX_ITERS) {
     iteration++;
-    const llmResponse = await openRouter.chatWithTools(
+    const llmResponse = await chatWithToolsResilient(
+      openRouter,
       systemPrompt,
       messages,
       tools,
-      AGENT_MODEL,
       { temperature: 0.2, tool_choice: "auto", max_tokens: 1024 }
     );
 
@@ -203,11 +281,11 @@ export async function runAgentLoop(
   // tool_choice:"none" to compose what it has.
   hitMaxIters = true;
   try {
-    const closing = await openRouter.chatWithTools(
+    const closing = await chatWithToolsResilient(
+      openRouter,
       systemPrompt,
       messages,
       tools,
-      AGENT_MODEL,
       { temperature: 0.2, tool_choice: "none", max_tokens: 600 }
     );
     return {
