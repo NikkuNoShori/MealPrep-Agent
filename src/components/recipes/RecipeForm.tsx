@@ -1125,7 +1125,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Input
                     value={newIngredient.name}
                     onChange={(e) =>
@@ -1267,7 +1267,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
               />
 
               {formData.tags.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[...formData.tags].sort().map((tag, index) => (
                     <div
                       key={index}

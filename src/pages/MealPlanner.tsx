@@ -580,98 +580,101 @@ const MealPlanner = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-primary-500/50" />
               </div>
             ) : calendarView === 'days' ? (
-              <div className="grid grid-cols-7 gap-2">
-                {/* Day Headers */}
-                {weekDates.map((date, i) => {
-                  const dateStr = formatDateKey(date);
-                  const isToday = dateStr === today;
-                  return (
-                    <div key={`header-${i}`} className="text-center pb-1">
-                      <p className="text-xs font-medium text-stone-400 dark:text-gray-500 uppercase tracking-widest">
-                        {DAYS_SHORT[i]}
-                      </p>
-                      <p className={`text-lg font-bold mt-0.5 transition-colors ${
-                        isToday
-                          ? 'text-primary-500'
-                          : 'text-stone-700 dark:text-gray-300'
-                      }`}>
-                        {date.getDate()}
-                      </p>
-                    </div>
-                  );
-                })}
+              /* Mobile: horizontally-swipeable day cards (7 columns squeezed
+                 to ~50px each was unreadable). Desktop (md+): unchanged
+                 7-column grid. Each day's header + card are one unit now so
+                 they scroll together. */
+              <div className="overflow-x-auto -mx-4 px-4 pb-1 snap-x snap-mandatory md:overflow-visible md:mx-0 md:px-0 md:pb-0 md:snap-none">
+                <div className="flex gap-2 md:grid md:grid-cols-7">
+                  {weekDates.map((date, i) => {
+                    const dateStr = formatDateKey(date);
+                    const isToday = dateStr === today;
+                    const dayMeals = weekPlan?.meals?.[dateStr];
 
-                {/* Day Columns */}
-                {weekDates.map((date) => {
-                  const dateStr = formatDateKey(date);
-                  const isToday = dateStr === today;
-                  const dayMeals = weekPlan?.meals?.[dateStr];
+                    return (
+                      <div
+                        key={dateStr}
+                        className="flex-shrink-0 w-[82%] sm:w-[45%] md:w-auto snap-center md:snap-align-none"
+                      >
+                        {/* Day header */}
+                        <div className="text-center pb-1">
+                          <p className="text-xs font-medium text-stone-400 dark:text-gray-500 uppercase tracking-widest">
+                            {DAYS_SHORT[i]}
+                          </p>
+                          <p className={`text-lg font-bold mt-0.5 transition-colors ${
+                            isToday
+                              ? 'text-primary-500'
+                              : 'text-stone-700 dark:text-gray-300'
+                          }`}>
+                            {date.getDate()}
+                          </p>
+                        </div>
 
-                  return (
-                    <div
-                      key={dateStr}
-                      className={`group relative rounded-2xl border p-2.5 min-h-[220px] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
-                        isToday
-                          ? 'border-primary-500/30 bg-primary-500/[0.03] dark:bg-primary-500/[0.05] shadow-md shadow-primary-500/10 ring-1 ring-primary-500/20'
-                          : 'border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] hover:border-stone-300 dark:hover:border-white/[0.12]'
-                      }`}
-                    >
-                      {/* Today indicator dot */}
-                      {isToday && (
-                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500 animate-pulse-slow" />
-                      )}
+                        <div
+                          className={`group relative rounded-2xl border p-2.5 min-h-[220px] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
+                            isToday
+                              ? 'border-primary-500/30 bg-primary-500/[0.03] dark:bg-primary-500/[0.05] shadow-md shadow-primary-500/10 ring-1 ring-primary-500/20'
+                              : 'border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] hover:border-stone-300 dark:hover:border-white/[0.12]'
+                          }`}
+                        >
+                          {/* Today indicator dot */}
+                          {isToday && (
+                            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500 animate-pulse-slow" />
+                          )}
 
-                      <div className="space-y-1.5">
-                        {DAILY_SLOTS.map((slot) => {
-                          const slotMeals = dayMeals?.[slot.key] || [];
-                          return (
-                            <div key={slot.key} className="group/slot">
-                              <div className="flex items-center gap-1 mb-0.5">
-                                <slot.icon className={`h-3 w-3 ${slot.color} opacity-60`} />
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-400 dark:text-gray-500">
-                                  {slot.label}
-                                </span>
-                              </div>
-                              {slotMeals.length > 0 ? (
-                                <>
-                                  {slotMeals.map((meal: any) => (
-                                    <div
-                                      key={meal.id}
-                                      className="group/meal flex items-center gap-1 px-2 py-1 rounded-lg bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-xs text-stone-700 dark:text-gray-300 transition-all duration-200 hover:bg-stone-100 dark:hover:bg-white/[0.08] hover:shadow-sm"
-                                      title={meal.recipeName}
-                                    >
-                                      <span className="truncate flex-1">{meal.recipeName}</span>
+                          <div className="space-y-1.5">
+                            {DAILY_SLOTS.map((slot) => {
+                              const slotMeals = dayMeals?.[slot.key] || [];
+                              return (
+                                <div key={slot.key} className="group/slot">
+                                  <div className="flex items-center gap-1 mb-0.5">
+                                    <slot.icon className={`h-3 w-3 ${slot.color} opacity-60`} />
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-400 dark:text-gray-500">
+                                      {slot.label}
+                                    </span>
+                                  </div>
+                                  {slotMeals.length > 0 ? (
+                                    <>
+                                      {slotMeals.map((meal: any) => (
+                                        <div
+                                          key={meal.id}
+                                          className="group/meal flex items-center gap-1 px-2 py-1 rounded-lg bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-xs text-stone-700 dark:text-gray-300 transition-all duration-200 hover:bg-stone-100 dark:hover:bg-white/[0.08] hover:shadow-sm"
+                                          title={meal.recipeName}
+                                        >
+                                          <span className="truncate flex-1">{meal.recipeName}</span>
+                                          <button
+                                            className="flex-shrink-0 opacity-70 md:opacity-0 md:group-hover/meal:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                                            onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
+                                            title="Remove"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      ))}
                                       <button
-                                        className="flex-shrink-0 opacity-0 group-hover/meal:opacity-100 text-stone-400 hover:text-destructive transition-all"
-                                        onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
-                                        title="Remove"
+                                        className="w-full px-2 py-0.5 rounded-lg text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 transition-all duration-200 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100"
+                                        onClick={() => openRecipeSelector(dateStr, slot.key)}
                                       >
-                                        <X className="h-3 w-3" />
+                                        + Add more
                                       </button>
-                                    </div>
-                                  ))}
-                                  <button
-                                    className="w-full px-2 py-0.5 rounded-lg text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 transition-all duration-200 opacity-0 group-hover/slot:opacity-100"
-                                    onClick={() => openRecipeSelector(dateStr, slot.key)}
-                                  >
-                                    + Add more
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  className="w-full px-2 py-1 rounded-lg border border-dashed border-stone-200/60 dark:border-white/[0.06] text-[10px] text-stone-300 dark:text-gray-600 hover:border-primary-500/40 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-0 group-hover/slot:opacity-100 group-hover:opacity-60"
-                                  onClick={() => openRecipeSelector(dateStr, slot.key)}
-                                >
-                                  + Add
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
+                                    </>
+                                  ) : (
+                                    <button
+                                      className="w-full px-2 py-1 rounded-lg border border-dashed border-stone-200/60 dark:border-white/[0.06] text-[10px] text-stone-300 dark:text-gray-600 hover:border-primary-500/40 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 md:group-hover:opacity-60"
+                                      onClick={() => openRecipeSelector(dateStr, slot.key)}
+                                    >
+                                      + Add
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               /* ── Meals View: rows by meal type, columns by day ── */
@@ -766,8 +769,11 @@ const MealPlanner = () => {
                           )}
                         </div>
                       ) : (
-                        /* Daily slots: 7-day horizontal grid */
-                        <div className="grid grid-cols-7 divide-x divide-stone-100 dark:divide-white/[0.04]">
+                        /* Daily slots: 7-day horizontal grid. Below md this
+                           scrolls horizontally at a fixed per-day width
+                           instead of squeezing 7 columns into ~50px each. */
+                        <div className="overflow-x-auto">
+                          <div className="grid grid-cols-7 divide-x divide-stone-100 dark:divide-white/[0.04] min-w-[560px] md:min-w-0">
                           {weekDates.map((date) => {
                             const dateStr = formatDateKey(date);
                             const isToday = dateStr === today;
@@ -797,7 +803,7 @@ const MealPlanner = () => {
                                     >
                                       <span className="truncate flex-1">{meal.recipeName}</span>
                                       <button
-                                        className="flex-shrink-0 opacity-0 group-hover/meal:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                                        className="flex-shrink-0 opacity-70 md:opacity-0 md:group-hover/meal:opacity-100 text-stone-400 hover:text-destructive transition-all"
                                         onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
                                       >
                                         <X className="h-2.5 w-2.5" />
@@ -808,7 +814,7 @@ const MealPlanner = () => {
                                   {/* Add button */}
                                   {weekPlan && (
                                     <button
-                                      className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                      className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-70 md:opacity-0 md:group-hover:opacity-100"
                                       onClick={() => openRecipeSelector(dateStr, slot.key)}
                                     >
                                       + Add
@@ -818,6 +824,7 @@ const MealPlanner = () => {
                               </div>
                             );
                           })}
+                          </div>
                         </div>
                       )}
                     </div>
