@@ -216,7 +216,14 @@ export const ChatInterface: React.FC = () => {
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isResizing, setIsResizing] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // On mobile the sidebar is an overlay drawer rather than an inline column,
+  // so start collapsed there to avoid squeezing the chat down to a sliver.
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768
+  );
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768
+  );
   const sidebarRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -732,6 +739,16 @@ export const ChatInterface: React.FC = () => {
   useEffect(() => {
     localStorage.setItem("chat-sidebar-width", sidebarWidth.toString());
   }, [sidebarWidth]);
+
+  // Track the mobile breakpoint (matches the `md:` breakpoint used elsewhere,
+  // e.g. Header.tsx) so the sidebar can switch between an inline column and
+  // an overlay drawer.
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, []);
 
   // Handle sidebar resize
   useEffect(() => {
@@ -1421,15 +1438,32 @@ export const ChatInterface: React.FC = () => {
   const currentConversation = getCurrentConversation();
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* Sidebar - Conversation History */}
+    <div className="relative flex h-full min-h-0">
+      {/* Backdrop — mobile only, dismisses the overlay drawer */}
+      {isMobile && !isSidebarCollapsed && (
+        <div
+          className="absolute inset-0 z-30 bg-black/40 md:hidden"
+          onClick={() => setIsSidebarCollapsed(true)}
+          aria-hidden="true"
+        />
+      )}
+      {/* Sidebar - Conversation History.
+          Desktop: inline, resizable column pushed in the flex row.
+          Mobile: fixed-width overlay drawer that floats above the chat
+          instead of squeezing it down to a sliver. */}
       <div
         ref={sidebarRef}
-        className={`bg-stone-100 dark:bg-white/[0.03] border-r border-stone-200/60 dark:border-white/[0.06] flex flex-col min-h-0 relative transition-[width] duration-200 ${isSidebarCollapsed ? 'overflow-hidden' : ''}`}
-        style={{ width: isSidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
+        className={`bg-stone-100 dark:bg-white/[0.03] border-r border-stone-200/60 dark:border-white/[0.06] flex flex-col min-h-0 transition-all duration-200 ease-in-out ${
+          isMobile
+            ? `absolute inset-y-0 left-0 z-40 shadow-xl ${isSidebarCollapsed ? "-translate-x-full" : "translate-x-0"}`
+            : `relative ${isSidebarCollapsed ? "overflow-hidden" : ""}`
+        }`}
+        style={{
+          width: isMobile ? "min(85vw, 320px)" : isSidebarCollapsed ? "0px" : `${sidebarWidth}px`,
+        }}
       >
-        {/* Resize Handle */}
-        {!isSidebarCollapsed && (
+        {/* Resize Handle — desktop only; mobile drawer has a fixed width */}
+        {!isSidebarCollapsed && !isMobile && (
           <div
             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary-500/50 dark:hover:bg-primary-400/50 transition-colors z-10 group"
             onMouseDown={(e) => {
@@ -1444,7 +1478,10 @@ export const ChatInterface: React.FC = () => {
         <div className="p-3 border-b border-stone-200/60 dark:border-white/[0.06] bg-white/50 dark:bg-white/[0.02] backdrop-blur-sm">
           <div className="flex gap-2">
             <Button
-              onClick={createNewConversation}
+              onClick={() => {
+                createNewConversation();
+                if (isMobile) setIsSidebarCollapsed(true);
+              }}
               variant="outline"
               size="icon"
               title="New Chat"
@@ -1537,6 +1574,7 @@ export const ChatInterface: React.FC = () => {
                     if (!isLocalTempConversationId(conversation.id)) {
                       void refreshConversationMessages(conversation.id);
                     }
+                    if (isMobile) setIsSidebarCollapsed(true);
                   }
                 }}
               >
@@ -1631,14 +1669,14 @@ export const ChatInterface: React.FC = () => {
           }`}
         >
           {!currentConversation || currentConversation.messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full py-8">
+            <div className="flex flex-col items-center justify-center h-full py-8 px-4 text-center">
               <h2 className="text-xl font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Hey {getFirstName()}, what can I help you with?
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                 You can start typing, or use the buttons below for quick actions
               </p>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap justify-center gap-3">
                 <Button
                   onClick={() => handleIntentSelection("recipe_extraction")}
                   variant="outline"
@@ -1672,7 +1710,7 @@ export const ChatInterface: React.FC = () => {
                   // Full-width recipe display (single or multi)
                   <div className="flex-1">
                     {message.content && (
-                      <div className="relative mb-3 max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
+                      <div className="relative mb-3 max-w-[90%] sm:max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
                         <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">
                           {message.content}
                         </p>
@@ -1794,7 +1832,7 @@ export const ChatInterface: React.FC = () => {
                   </div>
                 ) : (
                   // Regular message display
-                  <div className="relative group/bubble max-w-[70%] min-w-0">
+                  <div className="relative group/bubble max-w-[90%] sm:max-w-[70%] min-w-0">
                     <div
                       className={`rounded-lg px-4 py-2 ${
                         message.sender === "user"

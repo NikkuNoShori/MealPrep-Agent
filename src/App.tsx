@@ -57,7 +57,7 @@ function AppRoutes() {
         path="/chat"
         element={
           <ProtectedRoute>
-            <Layout>
+            <Layout hideFooter>
               <Chat />
             </Layout>
           </ProtectedRoute>
