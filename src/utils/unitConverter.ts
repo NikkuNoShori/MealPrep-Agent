@@ -116,6 +116,50 @@ export function convertValue(
 }
 
 /**
+ * Convert a value between metric/imperial without display rounding.
+ *
+ * convertValue() above rounds to 1-2 decimals via roundToReasonablePrecision
+ * — appropriate for showing a number to a user, wrong for feeding into
+ * further arithmetic (e.g. summing several converted amounts before a
+ * final display rounding), where the intermediate rounding error can be
+ * amplified by orders of magnitude — e.g. converting 0.5lb -> kg rounds to
+ * 0.23kg, and scaling that by 1000 to get grams turns a <1g error into a
+ * >3g one. Callers that accumulate/sum converted amounts should use this
+ * and round only once, at the end.
+ */
+export function convertValuePrecise(
+  value: number,
+  fromUnit: Unit,
+  toSystem: MeasurementSystem
+): { value: number; unit: Unit } {
+  if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+    return { value: 0, unit: fromUnit };
+  }
+  if (isCountableUnit(fromUnit)) {
+    return { value, unit: fromUnit };
+  }
+  if (toSystem === 'metric' && isMetricUnit(fromUnit)) {
+    return { value, unit: fromUnit };
+  }
+  if (toSystem === 'imperial' && isImperialUnit(fromUnit)) {
+    return { value, unit: fromUnit };
+  }
+
+  const conversion = CONVERSIONS[fromUnit as keyof typeof CONVERSIONS];
+  if (!conversion) {
+    return { value, unit: fromUnit };
+  }
+
+  if (toSystem === 'imperial' && 'toImperial' in conversion) {
+    return { value: conversion.toImperial(value), unit: conversion.imperialUnit as Unit };
+  } else if (toSystem === 'metric' && 'toMetric' in conversion) {
+    return { value: conversion.toMetric(value), unit: conversion.metricUnit as Unit };
+  }
+
+  return { value, unit: fromUnit };
+}
+
+/**
  * Round to reasonable precision for display
  * - Whole numbers for large values
  * - 1 decimal for medium values
