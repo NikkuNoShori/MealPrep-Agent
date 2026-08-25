@@ -58,7 +58,7 @@ const DayAssignmentModal = ({
   recipes,
   weekDates,
   defaultDate,
-  defaultSlot: _defaultSlot,
+  defaultSlot,
   onConfirm,
   onClose,
 }: DayAssignmentModalProps) => {
@@ -67,16 +67,21 @@ const DayAssignmentModal = ({
   const [showDays, setShowDays] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Initialize — no slot pre-selected, default date pre-selected
+  // Initialize — pre-select the slot the user already chose by clicking a
+  // specific day's "+Add" button (defaultSlot), plus the default date.
+  // Previously defaultSlot was received and discarded (destructured as
+  // `_defaultSlot`, never read), so every recipe opened with no slot
+  // selected regardless of which +Add button triggered this flow.
   useEffect(() => {
     if (!open || recipes.length === 0) return;
     const initial = new Map<string, { slot: MealSlot | null; dates: string[] }>();
     for (const r of recipes) {
-      initial.set(r.recipeId, { slot: null, dates: [defaultDate] });
+      const dates = defaultSlot === 'snacks' ? [] : [defaultDate];
+      initial.set(r.recipeId, { slot: defaultSlot, dates });
     }
     setAssignments(initial);
     setShowDays(false);
-  }, [open, recipes, defaultDate]);
+  }, [open, recipes, defaultDate, defaultSlot]);
 
   // Escape to close
   useEffect(() => {
