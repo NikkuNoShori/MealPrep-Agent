@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
-import { useRecipes, useMealPlans } from '@/services/api'
+import { useRecipes, useMealPlans, useMyHousehold } from '@/services/api'
+import type { MealPlan, GroceryItem } from '@/types/mealPlan'
 import { Link } from 'react-router-dom'
 import {
   Plus,
@@ -17,17 +18,27 @@ import {
 const Dashboard = () => {
   const { data: recipesData, isLoading: recipesLoading } = useRecipes({ limit: 10 })
   const { data: mealPlansData, isLoading: mealPlansLoading } = useMealPlans({ limit: 7 })
+  const { data: householdData, isLoading: householdLoading } = useMyHousehold()
 
   const recipes = recipesData?.recipes || []
   const mealPlans = mealPlansData || []
   const thisWeekMeals = mealPlans.length
   const recentRecipes = recipes.slice(0, 5)
 
+  // Grocery count comes from the most relevant plan already fetched above
+  // (no extra request needed — getMealPlans() selects the full row,
+  // groceryList included): prefer an active plan, otherwise the most
+  // recent one. Matches the !isRemoved filtering used everywhere else
+  // grocery counts are shown (GroceryCart.tsx, MealPlanHistory.tsx).
+  const relevantPlan = mealPlans.find((p: MealPlan) => p.status === 'active') || mealPlans[0]
+  const groceryCount = relevantPlan?.groceryList?.items?.filter((i: GroceryItem) => !i.isRemoved).length || 0
+  const familyCount = householdData?.members?.length || 0
+
   const stats = [
     { label: 'Recipes', value: recipes.length, icon: BookOpen, color: 'text-primary-600 dark:text-primary-400', loading: recipesLoading },
     { label: 'This week', value: thisWeekMeals, icon: Calendar, color: 'text-amber-600 dark:text-amber-400', loading: mealPlansLoading },
-    { label: 'Family', value: 0, icon: Users, color: 'text-rose-500 dark:text-rose-400', loading: false },
-    { label: 'Grocery', value: 0, icon: ShoppingCart, color: 'text-teal-600 dark:text-teal-400', loading: false },
+    { label: 'Family', value: familyCount, icon: Users, color: 'text-rose-500 dark:text-rose-400', loading: householdLoading },
+    { label: 'Grocery', value: groceryCount, icon: ShoppingCart, color: 'text-teal-600 dark:text-teal-400', loading: mealPlansLoading },
   ]
 
   return (
