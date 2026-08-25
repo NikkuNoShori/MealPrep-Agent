@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSendMessage, useChatHistory } from "../../services/api";
 import type { PendingConfirmation, ConfirmActionInput } from "../../services/api";
 import { ConfirmationPrompt } from "./ConfirmationPrompt";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 import { apiClient } from "../../services/api";
 import { detectIntent } from "../../services/ragService";
 import { Logger } from "../../services/logger";
@@ -206,6 +207,9 @@ export const ChatInterface: React.FC = () => {
     Set<string>
   >(new Set());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [deleteConversationTarget, setDeleteConversationTarget] = useState<{ id: string; title: string } | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [pendingImages, setPendingImages] = useState<File[]>([]); // Images to be sent with next message
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
@@ -527,10 +531,12 @@ export const ChatInterface: React.FC = () => {
           createNewConversation();
         }
       }
+      setDeleteConversationTarget(null);
       return;
     }
 
     // If it's in the database (has messages), delete it via API
+    setIsDeletingConversation(true);
     try {
       await apiClient.deleteConversation(conversationId);
       useDraftRecipeStore.getState().clearConversationDrafts(conversationId);
@@ -555,50 +561,62 @@ export const ChatInterface: React.FC = () => {
       refetchHistory();
     } catch (error) {
       Logger.chat.error('deleteConversation', error as Error, { conversationId });
+      toast.error("Couldn't delete conversation. Try again.");
       // Revert state change on error
       refetchHistory();
+    } finally {
+      setIsDeletingConversation(false);
+      setDeleteConversationTarget(null);
     }
   };
 
   const deleteSelectedConversations = async () => {
     const conversationsToDelete = Array.from(selectedConversations);
+    setIsDeletingConversation(true);
 
-    // Delete each conversation from the database
+    // Delete each conversation from the database, tracking which ones
+    // actually succeeded — a partial failure must not remove conversations
+    // from local state that were never actually deleted server-side (that
+    // silently desyncs the UI from the database with no error shown).
+    const succeededIds = new Set<string>();
+    const failedIds: string[] = [];
+
     const deletePromises = conversationsToDelete.map(async (conversationId) => {
       const conversation = conversations.find(
         (conv) => conv.id === conversationId
       );
 
-      // Only call API for non-temporary conversations with messages
+      // Only call API for non-temporary conversations with messages;
+      // temporary/empty ones never existed server-side, so they always
+      // "succeed" locally.
       if (
         conversation &&
         !(conversation.isTemporary && conversation.messages.length === 0)
       ) {
         try {
           await apiClient.deleteConversation(conversationId);
+          succeededIds.add(conversationId);
         } catch (error) {
-          console.error(
-            `Error deleting conversation ${conversationId}:`,
-            error
-          );
+          Logger.chat.error("deleteSelectedConversations", error as Error, { conversationId });
+          failedIds.push(conversationId);
         }
+      } else {
+        succeededIds.add(conversationId);
       }
     });
 
     await Promise.all(deletePromises);
 
-    // Remove from state after successful API calls
+    // Remove only the conversations that were actually deleted.
     setConversations((prev) =>
-      prev.filter((conv) => !selectedConversations.has(conv.id))
+      prev.filter((conv) => !succeededIds.has(conv.id))
     );
 
-    // If current conversation is being deleted, switch to another one
-    if (
-      currentConversationId &&
-      selectedConversations.has(currentConversationId)
-    ) {
+    // If current conversation was among the ones actually deleted, switch
+    // to another one.
+    if (currentConversationId && succeededIds.has(currentConversationId)) {
       const remainingConversations = conversations.filter(
-        (conv) => !selectedConversations.has(conv.id)
+        (conv) => !succeededIds.has(conv.id)
       );
       if (remainingConversations.length > 0) {
         setCurrentConversationId(remainingConversations[0].id);
@@ -611,8 +629,22 @@ export const ChatInterface: React.FC = () => {
     setSelectedConversations(new Set());
     setIsMultiSelectMode(false);
 
+    if (failedIds.length > 0) {
+      toast.error(
+        failedIds.length === 1
+          ? "Couldn't delete 1 conversation. Try again."
+          : `Couldn't delete ${failedIds.length} conversations. Try again.`
+      );
+    } else if (succeededIds.size > 0) {
+      toast.success(
+        succeededIds.size === 1 ? "Conversation deleted" : `${succeededIds.size} conversations deleted`
+      );
+    }
+
     // Refetch to sync with database
     refetchHistory();
+    setIsDeletingConversation(false);
+    setShowBulkDeleteConfirm(false);
   };
 
   const toggleConversationSelection = (conversationId: string) => {
@@ -1529,7 +1561,7 @@ export const ChatInterface: React.FC = () => {
 
             {isMultiSelectMode && selectedConversations.size > 0 && (
               <Button
-                onClick={deleteSelectedConversations}
+                onClick={() => setShowBulkDeleteConfirm(true)}
                 variant="destructive"
                 size="icon"
                 className="h-8 w-8 flex-1"
@@ -1621,7 +1653,7 @@ export const ChatInterface: React.FC = () => {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteConversation(conversation.id);
+                        setDeleteConversationTarget({ id: conversation.id, title: conversation.title });
                       }}
                       className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                     >
@@ -2109,6 +2141,26 @@ export const ChatInterface: React.FC = () => {
           />
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteConversationTarget}
+        title="Delete conversation?"
+        description={`"${deleteConversationTarget?.title || "This conversation"}" will be permanently deleted. This can't be undone.`}
+        confirmLabel="Delete conversation"
+        isConfirming={isDeletingConversation}
+        onConfirm={() => deleteConversationTarget && deleteConversation(deleteConversationTarget.id)}
+        onCancel={() => setDeleteConversationTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={showBulkDeleteConfirm}
+        title="Delete selected conversations?"
+        description={`${selectedConversations.size} conversation${selectedConversations.size === 1 ? "" : "s"} will be permanently deleted. This can't be undone.`}
+        confirmLabel="Delete"
+        isConfirming={isDeletingConversation}
+        onConfirm={deleteSelectedConversations}
+        onCancel={() => setShowBulkDeleteConfirm(false)}
+      />
     </div>
   );
 };

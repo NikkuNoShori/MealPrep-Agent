@@ -972,6 +972,7 @@ const MealPlanner = () => {
               onStatusChange={handleStatusChange}
               onDelete={handleDeletePlan}
               copyPending={copyMealPlan.isPending}
+              deletePending={deleteMealPlan.isPending}
             />
           </TabsContent>
         </Tabs>

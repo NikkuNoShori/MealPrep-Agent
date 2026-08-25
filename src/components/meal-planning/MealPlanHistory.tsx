@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import {
   Clock,
   CheckCircle2,
@@ -55,6 +56,7 @@ interface MealPlanHistoryProps {
   onStatusChange: (planId: string, status: MealPlanStatus) => void;
   onDelete: (planId: string) => void;
   copyPending?: boolean;
+  deletePending?: boolean;
 }
 
 const MealPlanHistory = ({
@@ -66,8 +68,20 @@ const MealPlanHistory = ({
   onStatusChange,
   onDelete,
   copyPending,
+  deletePending,
 }: MealPlanHistoryProps) => {
   const [detailPlan, setDetailPlan] = useState<MealPlan | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MealPlan | null>(null);
+  const wasDeletingRef = useRef(false);
+
+  // Close the confirm dialog once the pending delete settles (success or
+  // error — either way the mutation already surfaces its own toast).
+  useEffect(() => {
+    if (wasDeletingRef.current && !deletePending) {
+      setDeleteTarget(null);
+    }
+    wasDeletingRef.current = !!deletePending;
+  }, [deletePending]);
 
   useEffect(() => {
     if (!detailPlan) return;
@@ -185,7 +199,11 @@ const MealPlanHistory = ({
                       <div className="my-1 border-t border-stone-100 dark:border-white/[0.06]" />
                       <button
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
-                        onClick={() => onDelete(plan.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPlanMenuToggle(null);
+                          setDeleteTarget(plan);
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                         Delete
@@ -311,6 +329,16 @@ const MealPlanHistory = ({
         </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete meal plan?"
+        description={`"${deleteTarget?.title || 'Untitled Plan'}" will be permanently deleted. This can't be undone.`}
+        confirmLabel="Delete plan"
+        isConfirming={deletePending}
+        onConfirm={() => deleteTarget && onDelete(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   );
 };
