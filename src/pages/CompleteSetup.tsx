@@ -41,7 +41,7 @@ const CompleteSetup: React.FC = () => {
 
   const handleCancel = async () => {
     await supabase.auth.signOut()
-    navigate('/login', { replace: true })
+    navigate('/signin', { replace: true })
   }
 
   const handleLinkGoogle = async () => {

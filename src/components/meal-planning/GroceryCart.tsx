@@ -87,6 +87,10 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
       const existing = existingMap.get(item.name.toLowerCase());
       if (existing) {
         item.isChecked = existing.isChecked;
+        // Without this, an item the user dismissed (isRemoved) reappears as
+        // active on every regenerate, since aggregateIngredients has no way
+        // to know it was previously removed.
+        item.isRemoved = existing.isRemoved;
       }
     }
 

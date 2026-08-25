@@ -631,6 +631,13 @@ class ApiClient {
     // Cast to Json at insert site (line below) — see line ~571.
     if (source.meals && typeof source.meals === 'object') {
       for (const [dateStr, slots] of Object.entries(source.meals)) {
+        // Plan-level lists (e.g. "_snacks", "_non_recipe" — see MealPlanner.tsx
+        // PLAN_LISTS) aren't tied to a calendar date and must not go through
+        // the date-shift below; carry them over unchanged instead.
+        if (dateStr.startsWith('_')) {
+          shiftedMeals[dateStr] = slots;
+          continue;
+        }
         const oldDate = new Date(dateStr);
         oldDate.setDate(oldDate.getDate() + dayOffset);
         const newDateStr = oldDate.toISOString().split('T')[0];

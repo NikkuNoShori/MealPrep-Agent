@@ -7,6 +7,9 @@ import Layout from "./components/common/Layout";
 import LandingPage from "./pages/LandingPage";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
 import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
@@ -18,6 +21,7 @@ import InviteAccept from "./pages/InviteAccept";
 import CompleteSetup from "./pages/CompleteSetup";
 import Admin from "./pages/Admin";
 import AdminRoute from "./components/auth/AdminRoute";
+import NotFound from "./pages/NotFound";
 import { useAuthStore } from "./stores/authStore";
 
 function AppRoutes() {
@@ -33,6 +37,9 @@ function AppRoutes() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/signin" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/invite/accept" element={<InviteAccept />} />
       <Route
@@ -113,6 +120,7 @@ function AppRoutes() {
           </AdminRoute>
         }
       />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

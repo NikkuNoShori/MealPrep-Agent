@@ -12,7 +12,6 @@ import {
   X,
   Save,
   ArrowLeft,
-  TestTube,
   Upload,
   Image as ImageIcon,
   GripVertical,
@@ -777,40 +776,6 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
     }
   };
 
-  const populateTestData = () => {
-    setFormData({
-      title: "Classic Spaghetti Carbonara",
-      description:
-        "A traditional Italian pasta dish with eggs, cheese, pancetta, and black pepper. Rich, creamy, and absolutely delicious!",
-      prepTime: "15",
-      cookTime: "20",
-      servings: "4",
-      difficulty: "medium",
-      tags: ["Italian", "Pasta", "Quick", "Comfort Food", "Dinner"],
-      ingredients: [
-        { name: "Spaghetti", amount: 14, unit: "oz" },
-        { name: "Pancetta", amount: 5.3, unit: "oz" },
-        { name: "Large eggs", amount: 4, unit: "piece" },
-        { name: "Parmesan cheese", amount: 3.5, unit: "oz" },
-        { name: "Black pepper", amount: 1, unit: "tsp" },
-        { name: "Salt", amount: 1, unit: "tsp" },
-        { name: "Olive oil", amount: 2, unit: "tbsp" },
-      ],
-      instructions: [
-        "Bring a large pot of salted water to boil and cook spaghetti according to package directions.",
-        "While pasta cooks, cut pancetta into small cubes and cook in a large skillet over medium heat until crispy.",
-        "In a bowl, whisk together eggs, grated Parmesan, and black pepper.",
-        "Drain pasta, reserving 1 cup of pasta water.",
-        "Add hot pasta to the skillet with pancetta and toss to combine.",
-        "Remove from heat and quickly stir in egg mixture, adding pasta water as needed to create a creamy sauce.",
-        "Serve immediately with extra Parmesan and black pepper.",
-      ],
-      imageUrl: "none",
-      sourceUrl: "",
-      sourceName: "",
-    });
-  };
-
   const isLoading =
     createRecipeMutation.isPending || updateRecipeMutation.isPending;
 
@@ -834,17 +799,6 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {!isEditing && (
-            <Button
-              variant="outline"
-              onClick={populateTestData}
-              className="gap-2 bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700 hover:text-orange-800 dark:bg-orange-900/20 dark:hover:bg-orange-900/30 dark:border-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
-              title="Fill this form with sample recipe data (Spaghetti Carbonara) - different from the test recipe button"
-            >
-              <TestTube className="h-4 w-4" />
-              Fill Sample Data
-            </Button>
-          )}
           <Button
             onClick={handleSubmit}
             disabled={isLoading || isUploadingImage}

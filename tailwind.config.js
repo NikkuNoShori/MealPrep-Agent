@@ -9,6 +9,8 @@ export default {
     extend: {
       colors: {
         primary: {
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
           50: 'var(--primary-50)',
           100: 'var(--primary-100)',
           200: 'var(--primary-200)',
@@ -21,6 +23,8 @@ export default {
           900: 'var(--primary-900)',
         },
         secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
           50: 'var(--secondary-50)',
           100: 'var(--secondary-100)',
           200: 'var(--secondary-200)',
