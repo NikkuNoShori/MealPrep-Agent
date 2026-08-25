@@ -12,11 +12,39 @@ const Header = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userMenuButtonRef = useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => {
     setAvatarError(false);
   }, [user?.id, user?.avatar_url]);
+
+  // Click-outside and Escape-to-close for the account menu. This is a
+  // click/keyboard-driven disclosure, not hover-only — the previous
+  // onMouseEnter/onMouseLeave-only implementation meant the menu (Household,
+  // Settings, Admin, Sign Out) was unreachable on touch devices and via
+  // keyboard entirely.
+  React.useEffect(() => {
+    if (!isUserMenuOpen) return;
+
+    const handlePointerDown = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsUserMenuOpen(false);
+        userMenuButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isUserMenuOpen]);
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard" },
@@ -30,20 +58,6 @@ const Header = () => {
     if (user?.display_name) return user.display_name.split(" ")[0];
     if (user?.email) return user.email.split("@")[0];
     return "User";
-  };
-
-  const handleUserMenuMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    setIsUserMenuOpen(true);
-  };
-
-  const handleUserMenuMouseLeave = () => {
-    timeoutRef.current = setTimeout(() => {
-      setIsUserMenuOpen(false);
-    }, 200);
   };
 
   const handleChatClick = (e: React.MouseEvent) => {
@@ -100,13 +114,16 @@ const Header = () => {
           {/* User Menu & Mobile */}
           <div className="flex items-center gap-2">
             {user && (
-              <div
-                className="relative"
-                ref={userMenuRef}
-                onMouseEnter={handleUserMenuMouseEnter}
-                onMouseLeave={handleUserMenuMouseLeave}
-              >
-                <button className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg transition-all duration-150 group">
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  ref={userMenuButtonRef}
+                  type="button"
+                  onClick={() => setIsUserMenuOpen((open) => !open)}
+                  aria-haspopup="true"
+                  aria-expanded={isUserMenuOpen}
+                  aria-label="Account menu"
+                  className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg transition-all duration-150 group"
+                >
                   {user?.avatar_url && !avatarError ? (
                     <img
                       src={user.avatar_url}
