@@ -958,7 +958,7 @@ const MealPlanner = () => {
 
           {/* ── Grocery Cart Tab ── */}
           <TabsContent value="grocery" className="mt-6">
-            <GroceryCart plan={weekPlan} />
+            <GroceryCart plan={weekPlan} isActive={activeTab === 'grocery'} />
           </TabsContent>
 
           {/* ── History Tab ── */}

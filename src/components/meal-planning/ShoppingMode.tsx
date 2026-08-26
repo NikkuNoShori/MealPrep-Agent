@@ -65,21 +65,24 @@ const ShoppingMode = ({ grouped, onToggleCheck }: ShoppingModeProps) => {
                   </span>
 
                   <span
-                    className={`flex-1 text-base ${
+                    className={`flex-1 flex items-baseline justify-between gap-3 text-base ${
                       item.isChecked
                         ? 'line-through text-stone-400 dark:text-gray-500'
                         : 'text-stone-800 dark:text-gray-200'
                     }`}
                   >
-                    {item.amount !== null && (
-                      <span className="font-semibold mr-1">{item.amount}</span>
-                    )}
-                    {item.unit && (
-                      <span className="text-stone-500 dark:text-gray-400 mr-1">
-                        {item.unit}
+                    <span className="min-w-0 truncate">{item.name}</span>
+                    {(item.amount !== null || item.unit) && (
+                      <span className="flex-shrink-0 font-semibold tabular-nums text-primary-600 dark:text-primary-400">
+                        {item.amount !== null && item.amount}
+                        {item.unit && (item.amount !== null ? ` ${item.unit}` : item.unit)}
+                        {item.rawAmount !== undefined && (
+                          <span className="ml-1 font-normal text-xs text-stone-400 dark:text-gray-500">
+                            (need {item.rawAmount})
+                          </span>
+                        )}
                       </span>
                     )}
-                    {item.name}
                   </span>
                 </button>
               ))}

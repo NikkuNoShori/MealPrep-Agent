@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -31,9 +31,13 @@ import ShoppingMode from '@/components/meal-planning/ShoppingMode';
 
 interface GroceryCartProps {
   plan: any; // The current week's meal plan
+  /** Whether the Grocery tab is the one currently visible. Drives the
+   * silent auto-regenerate-on-open effect below — deliberately not tied to
+   * every meal-plan edit (see that effect's comment for why). */
+  isActive?: boolean;
 }
 
-const GroceryCart = ({ plan }: GroceryCartProps) => {
+const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [addingManual, setAddingManual] = useState(false);
   const [manualName, setManualName] = useState('');
@@ -65,25 +69,22 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
   // Current grocery list from the plan
   const groceryItems: GroceryItem[] = plan?.groceryList?.items || [];
 
-  // Generate/regenerate grocery list from planned meals
-  const handleGenerate = () => {
-    if (!plan?.meals) {
-      toast.error('No meals planned yet');
-      return;
-    }
+  // Re-aggregates plan.meals and merges the result with the current list,
+  // preserving isChecked/isRemoved on matching items and keeping manual
+  // items untouched. Shared by the manual "Generate" button and the silent
+  // auto-sync effect below — the merge behavior must be identical either
+  // way, only what happens with the result (toast + always save, vs.
+  // silent + save-only-if-different) differs.
+  const computeMergedList = (): { generatedItems: GroceryItem[]; allItems: GroceryItem[] } => {
+    const generatedItems = aggregateIngredients(plan.meals as MealPlanMeals, recipeMap);
 
-    const items = aggregateIngredients(plan.meals as MealPlanMeals, recipeMap);
-
-    // Preserve checked/removed state from existing items where names match
     const existingMap = new Map<string, GroceryItem>();
     for (const item of groceryItems) {
       existingMap.set(item.name.toLowerCase(), item);
     }
-
-    // Preserve manual items
     const manualItems = groceryItems.filter((i) => i.isManual && !i.isRemoved);
 
-    for (const item of items) {
+    for (const item of generatedItems) {
       const existing = existingMap.get(item.name.toLowerCase());
       if (existing) {
         item.isChecked = existing.isChecked;
@@ -94,8 +95,33 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
       }
     }
 
-    const allItems = [...items, ...manualItems];
+    return { generatedItems, allItems: [...generatedItems, ...manualItems] };
+  };
 
+  // Content fingerprint of the *generated* (non-manual) portion of a list,
+  // deliberately excluding id (aggregateIngredients mints a fresh
+  // crypto.randomUUID() every call, even for identical content) and
+  // isChecked/isRemoved (those are shopping-progress state, not ingredient
+  // content — checking items off must never look like a "change" that
+  // needs re-saving).
+  const fingerprint = (items: GroceryItem[]): string =>
+    items
+      // rawAmount included so a shift in the exact (pre-rounding) need still
+      // counts as "stale" even when the rounded buy-quantity happens to stay
+      // the same — otherwise the "need X" annotation could go out of sync
+      // without ever triggering a re-save.
+      .map((i) => `${i.name.toLowerCase()}|${i.unit}|${i.amount}|${i.category}|${i.rawAmount ?? ''}`)
+      .sort()
+      .join(';');
+
+  // Generate/regenerate grocery list from planned meals (manual button —
+  // always saves and always tells the user what happened).
+  const handleGenerate = () => {
+    if (!plan?.meals) {
+      toast.error('No meals planned yet');
+      return;
+    }
+    const { generatedItems, allItems } = computeMergedList();
     updateMealPlan.mutate(
       {
         id: plan.id,
@@ -107,11 +133,44 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
         },
       },
       {
-        onSuccess: () => toast.success(`Generated ${items.length} grocery items`),
+        onSuccess: () => toast.success(`Generated ${generatedItems.length} grocery items`),
         onError: (err: any) => toast.error(err?.message || 'Failed to generate list'),
       }
     );
   };
+
+  // Silent auto-sync: when the Grocery tab becomes the active one, check
+  // whether the stored list is stale relative to the current plan and
+  // regenerate in the background if so — no toast, no button click needed.
+  // Deliberately NOT tied to every meals change (see GroceryCartProps):
+  // that would fire a second save on every single meal-plan edit and could
+  // reflow an in-progress shopping-mode checklist out from under the user.
+  // Instead this only ever runs at the moment you actually look at the
+  // list, and the fingerprint check below means it's a no-op save-wise
+  // unless the ingredients actually changed since the last generate.
+  const lastAutoSyncKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isActive || !plan?.id || !plan?.meals || updateMealPlan.isPending) return;
+    if (Object.keys(plan.meals).length === 0) return;
+
+    const { generatedItems, allItems } = computeMergedList();
+    const existingGenerated = groceryItems.filter((i) => !i.isManual);
+    const newFingerprint = fingerprint(generatedItems);
+    if (newFingerprint === fingerprint(existingGenerated)) return; // already in sync
+
+    // Guard against re-attempting the exact same sync repeatedly (e.g. if
+    // the save is still in flight when this effect re-runs on a cache
+    // refetch) — only re-try once the target content actually changes.
+    const syncKey = `${plan.id}:${newFingerprint}`;
+    if (lastAutoSyncKeyRef.current === syncKey) return;
+    lastAutoSyncKeyRef.current = syncKey;
+
+    updateMealPlan.mutate({
+      id: plan.id,
+      data: { groceryList: { items: allItems, lastGenerated: new Date().toISOString() } },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, plan?.id, plan?.meals]);
 
   // Toggle check on an item
   const handleToggleCheck = (itemId: string) => {
@@ -476,19 +535,24 @@ const GroceryCart = ({ plan }: GroceryCartProps) => {
                             </div>
                           ) : (
                             <>
-                              <p className={`text-sm ${
+                              <div className={`flex items-baseline justify-between gap-3 text-sm ${
                                 item.isChecked
                                   ? 'line-through text-stone-400 dark:text-gray-500'
                                   : 'text-stone-700 dark:text-gray-300'
                               }`}>
-                                {item.amount !== null && (
-                                  <span className="font-medium">{item.amount} </span>
+                                <span className="min-w-0 truncate">{item.name}</span>
+                                {(item.amount !== null || item.unit) && (
+                                  <span className="flex-shrink-0 font-semibold tabular-nums text-primary-600 dark:text-primary-400">
+                                    {item.amount !== null && item.amount}
+                                    {item.unit && (item.amount !== null ? ` ${item.unit}` : item.unit)}
+                                    {item.rawAmount !== undefined && (
+                                      <span className="ml-1 font-normal text-[10px] text-stone-400 dark:text-gray-500">
+                                        (need {item.rawAmount})
+                                      </span>
+                                    )}
+                                  </span>
                                 )}
-                                {item.unit && (
-                                  <span className="text-stone-500 dark:text-gray-400">{item.unit} </span>
-                                )}
-                                {item.name}
-                              </p>
+                              </div>
                               {item.sourceRecipes.length > 0 && (
                                 <p className="text-[10px] text-stone-400 dark:text-gray-500 mt-0.5 truncate">
                                   From: {item.sourceRecipes.join(', ')}
