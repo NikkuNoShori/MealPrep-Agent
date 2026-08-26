@@ -31,6 +31,9 @@ export interface MealPlanMeals {
 export interface GroceryItem {
   id: string;
   name: string;
+  /** The actionable/buyable quantity — for discrete items (piece, whole,
+   * clove, ...) this is rounded UP from the exact recipe math so the
+   * requirement is always covered. See rawAmount for the unrounded figure. */
   amount: number | null;
   unit: string;
   category: string;
@@ -39,6 +42,12 @@ export interface GroceryItem {
   isChecked: boolean;
   isRemoved: boolean;
   notes?: string;
+  /** The exact, unrounded quantity the recipe math actually calls for —
+   * only set when it differs from `amount` (i.e. only for discrete/
+   * countable items that got rounded up). Weight/volume items and anything
+   * that was already a whole number leave this undefined. Purely
+   * informational — display only, never used in further calculations. */
+  rawAmount?: number;
 }
 
 export interface GroceryList {

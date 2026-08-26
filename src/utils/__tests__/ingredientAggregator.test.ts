@@ -223,6 +223,114 @@ describe('aggregateIngredients', () => {
     expect(flour).toHaveLength(2);
     expect(flour.map((i) => i.unit).sort()).toEqual(['cup', 'g']);
   });
+
+  it('rounds up discrete/countable ingredients so a fractional need is always covered', () => {
+    // 1 apple at 4 servings, planned at 6 -> scale 1.5 -> needs 1.5 apples.
+    // You can't buy half an apple, and 1 wouldn't cover the recipe, so this
+    // must round UP to 2, not round-to-nearest (which would wrongly give 2
+    // here too, but round(1.5)=2 by luck — the real test is 1.1 below,
+    // where round-to-nearest would wrongly give 1).
+    const recipeMap = new Map([
+      [
+        'a-1',
+        {
+          id: 'a-1',
+          title: 'Apple Snack',
+          servings: 4,
+          ingredients: [{ name: 'Apple', amount: 1, unit: 'whole', category: 'produce' }],
+        },
+      ],
+    ]);
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        lunch: [{ id: 'm-1', recipeId: 'a-1', recipeName: 'Apple Snack', servings: 6 }],
+      },
+    };
+
+    const items = aggregateIngredients(meals, recipeMap);
+    const apple = items.find((i) => i.name === 'Apple');
+    expect(apple!.amount).toBe(2);
+    // The exact math (1.5) is preserved for display alongside the rounded
+    // buy-quantity — not hidden behind a settings toggle.
+    expect(apple!.rawAmount).toBe(1.5);
+  });
+
+  it('rounds up on the smallest possible overage, not just clean halves', () => {
+    // 1 egg at 4 servings, planned at 5 -> scale 1.25 -> needs 1.25 eggs.
+    // Math.round would give 1 (wrong — 1 egg doesn't meet a 1.25-egg need).
+    // Ceiling correctly gives 2.
+    const recipeMap = new Map([
+      [
+        'e-1',
+        {
+          id: 'e-1',
+          title: 'Omelette',
+          servings: 4,
+          ingredients: [{ name: 'Egg', amount: 1, unit: 'piece', category: 'dairy' }],
+        },
+      ],
+    ]);
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        breakfast: [{ id: 'm-1', recipeId: 'e-1', recipeName: 'Omelette', servings: 5 }],
+      },
+    };
+
+    const items = aggregateIngredients(meals, recipeMap);
+    const egg = items.find((i) => i.name === 'Egg');
+    expect(egg!.amount).toBe(2);
+    expect(egg!.rawAmount).toBe(1.25);
+  });
+
+  it('does not over-round an exact whole-number total from floating point noise', () => {
+    // Three recipes each needing 2 cloves at the same servings ratio should
+    // sum to exactly 6, not tip over to 7 from float accumulation error.
+    const recipeMap = new Map([
+      ['g-1', { id: 'g-1', title: 'Sauce A', servings: 4, ingredients: [{ name: 'Garlic', amount: 2, unit: 'clove', category: 'produce' }] }],
+      ['g-2', { id: 'g-2', title: 'Sauce B', servings: 4, ingredients: [{ name: 'Garlic', amount: 2, unit: 'clove', category: 'produce' }] }],
+      ['g-3', { id: 'g-3', title: 'Sauce C', servings: 4, ingredients: [{ name: 'Garlic', amount: 2, unit: 'clove', category: 'produce' }] }],
+    ]);
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        dinner: [
+          { id: 'm-1', recipeId: 'g-1', recipeName: 'Sauce A', servings: 4 },
+          { id: 'm-2', recipeId: 'g-2', recipeName: 'Sauce B', servings: 4 },
+          { id: 'm-3', recipeId: 'g-3', recipeName: 'Sauce C', servings: 4 },
+        ],
+      },
+    };
+
+    const items = aggregateIngredients(meals, recipeMap);
+    const garlic = items.find((i) => i.name === 'Garlic');
+    expect(garlic!.amount).toBe(6);
+    // Already a whole number — nothing extra to show, so rawAmount stays unset.
+    expect(garlic!.rawAmount).toBeUndefined();
+  });
+
+  it('does not round up weight/volume amounts — fractions are normal to buy', () => {
+    const recipeMap = new Map([
+      [
+        'w-1',
+        {
+          id: 'w-1',
+          title: 'Stew',
+          servings: 4,
+          ingredients: [{ name: 'Beef', amount: 1, unit: 'lb', category: 'protein' }],
+        },
+      ],
+    ]);
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        dinner: [{ id: 'm-1', recipeId: 'w-1', recipeName: 'Stew', servings: 6 }],
+      },
+    };
+
+    const items = aggregateIngredients(meals, recipeMap);
+    const beef = items.find((i) => i.name === 'Beef');
+    // 1lb at 4 servings, scaled to 6 -> 1.5lb exactly, not rounded up to 2.
+    expect(beef!.amount).toBe(1.5);
+    expect(beef!.rawAmount).toBeUndefined();
+  });
 });
 
 describe('groupByCategory', () => {

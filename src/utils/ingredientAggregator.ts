@@ -227,10 +227,37 @@ export function aggregateIngredients(
       displayUnit = optimized.unit;
     }
 
+    // Round the FINAL summed-across-recipes total, once — never per-recipe
+    // before summing, or partial fractions would each round independently
+    // (0.3 + 0.3 + 0.3 would become 1+1+1=3 instead of ceil(0.9)=1).
+    let finalAmount: number | null = null;
+    let rawAmount: number | undefined;
+    if (displayAmount !== null) {
+      if (unitCategory(displayUnit) === 'other') {
+        // Discrete/countable ingredients (piece, whole, clove, egg, unitless
+        // produce, ...) can't be bought fractionally: round UP so the plan's
+        // requirement is always met — needing 1.5 apples means buying a
+        // full 2nd one, since 1.0 wouldn't cover the recipe. A tiny epsilon
+        // guards against float-sum noise (e.g. 1.9999999999998) rounding up
+        // to one more than actually needed.
+        const EPSILON = 1e-9;
+        finalAmount = displayAmount <= 0 ? 0 : Math.ceil(displayAmount - EPSILON);
+        const roundedRaw = Math.round(displayAmount * 100) / 100;
+        // Only surface the exact figure when rounding actually changed
+        // something — an item that was already a whole number has nothing
+        // extra to show.
+        if (roundedRaw !== finalAmount) rawAmount = roundedRaw;
+      } else {
+        // Weight/volume: fractional amounts are completely normal to buy
+        // (1.5 lb, 0.5 cup) — keep the existing 2-decimal display rounding.
+        finalAmount = Math.round(displayAmount * 100) / 100;
+      }
+    }
+
     items.push({
       id: crypto.randomUUID(),
       name: val.name,
-      amount: displayAmount !== null ? Math.round(displayAmount * 100) / 100 : null,
+      amount: finalAmount,
       unit: displayUnit,
       category: val.category,
       sourceRecipes: Array.from(val.sourceRecipes),
@@ -238,6 +265,7 @@ export function aggregateIngredients(
       isChecked: false,
       isRemoved: false,
       notes: val.notes.length > 0 ? val.notes.join('; ') : undefined,
+      ...(rawAmount !== undefined ? { rawAmount } : {}),
     });
   }
 
