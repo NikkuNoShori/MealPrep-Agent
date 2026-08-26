@@ -196,7 +196,7 @@ function parseRecipeResponse(response: string): ExtractedRecipe | ExtractedRecip
  * Normalize a raw recipe object into an ExtractedRecipe.
  * Shared by both single and multi-recipe paths.
  */
-function normalizeExtractedRecipe(raw: any): ExtractedRecipe {
+export function normalizeExtractedRecipe(raw: any): ExtractedRecipe {
   // Normalize field name aliases — models don't always follow the prompt exactly
   const recipe = normalizeFieldNames(raw);
 
@@ -229,12 +229,31 @@ function normalizeExtractedRecipe(raw: any): ExtractedRecipe {
             notes: parsed.notes || ing.notes || "",
           };
         }
+        // Model returned a correct { name, amount, unit } shape, but
+        // sometimes puts the actual unit word in `notes` and leaves `unit`
+        // empty (e.g. { amount: 0.25, unit: "", notes: "teaspoon" }) — the
+        // quantity-string branch above already recovers a misplaced unit
+        // via parseQuantityString(); this branch previously had no
+        // equivalent recovery, so a genuine volume/weight measurement (a
+        // quarter teaspoon of cayenne) would silently pass through
+        // unit-less and get misclassified downstream as a discrete/
+        // countable item just because the unit landed in the wrong field.
+        let unit = ing.unit || "";
+        let notes = ing.notes || "";
+        if (!unit && notes) {
+          const unitMatch = notes.match(UNITS_CAPTURE);
+          if (unitMatch) {
+            unit = unitMatch[1];
+            notes = notes.slice(unitMatch[0].length).replace(/^[,\s]+/, "").trim();
+          }
+        }
+
         return {
           name: ing.name || ing.ingredient || "",
           amount: ing.amount ?? null,
-          unit: ing.unit || "",
+          unit,
           category: ing.category || "",
-          notes: ing.notes || "",
+          notes,
         };
       })
     : [];
