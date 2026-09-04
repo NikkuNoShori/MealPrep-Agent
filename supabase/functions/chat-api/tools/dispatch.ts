@@ -348,5 +348,18 @@ export async function dispatchTool(
     };
   }
 
-  return { ok: true, data: raw };
+  // Unwrap handler envelope. Handlers return { ok: true, data: payload };
+  // returning { ok: true, data: raw } would nest payload one level too deep,
+  // making result.data.recipe undefined in agent-loop.ts and preventing
+  // StructuredRecipeDisplay from ever mounting. The ok:false branch above
+  // already passes through correctly — this mirrors that behaviour for ok:true.
+  const payload =
+    raw &&
+    typeof raw === "object" &&
+    "ok" in (raw as Record<string, unknown>) &&
+    (raw as { ok: unknown }).ok === true &&
+    "data" in (raw as Record<string, unknown>)
+      ? (raw as { ok: true; data: unknown }).data
+      : raw;
+  return { ok: true, data: payload };
 }

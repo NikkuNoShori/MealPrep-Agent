@@ -326,6 +326,19 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
   const [showIngredients, setShowIngredients] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [visibility, setVisibility] = useState<RecipeVisibility>("private");
+
+  // Editable metadata fields — initialized from recipe props, edited inline via badge clicks
+  const [editedServings, setEditedServings] = useState<number>(recipe.servings ?? 4);
+  const [editedDifficulty, setEditedDifficulty] = useState<"easy" | "medium" | "hard">(
+    (recipe.difficulty as "easy" | "medium" | "hard") ?? "medium"
+  );
+  const [editedPrepTime, setEditedPrepTime] = useState<number>(
+    recipe.prepTime ?? (recipe as any).prep_time ?? 0
+  );
+  const [editedCookTime, setEditedCookTime] = useState<number>(
+    recipe.cookTime ?? (recipe as any).cook_time ?? 0
+  );
+  const [editingField, setEditingField] = useState<"servings" | "difficulty" | "prepTime" | "cookTime" | null>(null);
   const createRecipeMutation = useCreateRecipe();
   const updateRecipeMutation = useUpdateRecipe();
   const draftInitializedRef = useRef<string | null>(null);
@@ -392,9 +405,8 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
   const effectiveThumbnail = draftEntry?.thumbnailUrl ?? thumbnailUrl;
 
   // Normalize snake_case/camelCase fields from pipeline
-  const prepTime = recipe.prepTime ?? recipe.prep_time ?? null;
-  const cookTime = recipe.cookTime ?? recipe.cook_time ?? null;
-  const totalTime = recipe.totalTime ?? recipe.total_time ?? (prepTime || cookTime ? (prepTime || 0) + (cookTime || 0) : null);
+  // totalTime derives from the user-editable values so the badge stays in sync as they edit
+  const totalTime = editedPrepTime || editedCookTime ? editedPrepTime + editedCookTime : null;
   const imageUrl = recipe.imageUrl ?? recipe.image_url ?? null;
   const sourceUrl = recipe.sourceUrl ?? recipe.source_url ?? null;
   const sourceName = recipe.sourceName ?? recipe.source_name ?? null;
@@ -476,14 +488,14 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
     return imageUrl || "";
   };
 
-  /** Build the recipe data object for save. */
+  /** Build the recipe data object for save. Uses inline-edited values when present. */
   const buildRecipeData = (title: string, finalImageUrl: string) => ({
     title,
     description: recipe.description || "",
-    prepTime: prepTime || 0,
-    cookTime: cookTime || 0,
-    servings: recipe.servings || 4,
-    difficulty: recipe.difficulty || "medium",
+    prepTime: editedPrepTime,
+    cookTime: editedCookTime,
+    servings: editedServings,
+    difficulty: editedDifficulty,
     tags: recipe.tags || [],
     ingredients,
     instructions,
@@ -621,33 +633,124 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           </p>
         )}
         <div className="flex flex-wrap gap-2 items-center">
-          {prepTime != null && prepTime > 0 && (
-            <Badge variant="outline" className="gap-1">
+          {/* Prep time — click to edit */}
+          {editingField === "prepTime" ? (
+            <div className="flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs">
               <Clock className="h-3 w-3" />
-              Prep: {prepTime}m
-            </Badge>
-          )}
-          {cookTime != null && cookTime > 0 && (
-            <Badge variant="outline" className="gap-1">
+              <span>Prep:</span>
+              <input
+                type="number"
+                min={0}
+                className="w-12 bg-transparent outline-none text-center"
+                value={editedPrepTime}
+                autoFocus
+                onChange={(e) => setEditedPrepTime(Math.max(0, parseInt(e.target.value) || 0))}
+                onBlur={() => setEditingField(null)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingField(null); }}
+              />
+              <span>m</span>
+            </div>
+          ) : editedPrepTime > 0 ? (
+            <Badge
+              variant="outline"
+              className="gap-1 cursor-pointer hover:bg-muted transition-colors"
+              title="Click to edit"
+              onClick={() => setEditingField("prepTime")}
+            >
               <Clock className="h-3 w-3" />
-              Cook: {cookTime}m
+              Prep: {editedPrepTime}m
             </Badge>
-          )}
+          ) : null}
+
+          {/* Cook time — click to edit */}
+          {editingField === "cookTime" ? (
+            <div className="flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs">
+              <Clock className="h-3 w-3" />
+              <span>Cook:</span>
+              <input
+                type="number"
+                min={0}
+                className="w-12 bg-transparent outline-none text-center"
+                value={editedCookTime}
+                autoFocus
+                onChange={(e) => setEditedCookTime(Math.max(0, parseInt(e.target.value) || 0))}
+                onBlur={() => setEditingField(null)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingField(null); }}
+              />
+              <span>m</span>
+            </div>
+          ) : editedCookTime > 0 ? (
+            <Badge
+              variant="outline"
+              className="gap-1 cursor-pointer hover:bg-muted transition-colors"
+              title="Click to edit"
+              onClick={() => setEditingField("cookTime")}
+            >
+              <Clock className="h-3 w-3" />
+              Cook: {editedCookTime}m
+            </Badge>
+          ) : null}
+
+          {/* Total time — derived, read-only */}
           {totalTime != null && totalTime > 0 && (
             <Badge variant="outline" className="gap-1">
               Total: {totalTime}m
             </Badge>
           )}
-          {recipe.servings != null && (
-            <Badge variant="outline" className="gap-1">
+
+          {/* Servings — click to edit */}
+          {editingField === "servings" ? (
+            <div className="flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs">
               <Users className="h-3 w-3" />
-              {recipe.servings} servings
+              <input
+                type="number"
+                min={1}
+                className="w-10 bg-transparent outline-none text-center"
+                value={editedServings}
+                autoFocus
+                onChange={(e) => setEditedServings(Math.max(1, parseInt(e.target.value) || 1))}
+                onBlur={() => setEditingField(null)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingField(null); }}
+              />
+              <span>servings</span>
+            </div>
+          ) : (
+            <Badge
+              variant="outline"
+              className="gap-1 cursor-pointer hover:bg-muted transition-colors"
+              title="Click to edit"
+              onClick={() => setEditingField("servings")}
+            >
+              <Users className="h-3 w-3" />
+              {editedServings} servings
             </Badge>
           )}
-          {recipe.difficulty && (
-            <Badge className={getDifficultyColor(recipe.difficulty)}>
+
+          {/* Difficulty — click to cycle easy → medium → hard */}
+          {editingField === "difficulty" ? (
+            <div className="flex gap-1">
+              {(["easy", "medium", "hard"] as const).map((d) => (
+                <button
+                  key={d}
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                    editedDifficulty === d
+                      ? getDifficultyColor(d) + " border-transparent"
+                      : "border-border hover:bg-muted"
+                  }`}
+                  onClick={() => { setEditedDifficulty(d); setEditingField(null); }}
+                >
+                  {d.charAt(0).toUpperCase() + d.slice(1)}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <Badge
+              className={getDifficultyColor(editedDifficulty) + " cursor-pointer"}
+              title="Click to change difficulty"
+              onClick={() => setEditingField("difficulty")}
+            >
               <ChefHat className="h-3 w-3 mr-1" />
-              {recipe.difficulty.charAt(0).toUpperCase() + recipe.difficulty.slice(1)}
+              {editedDifficulty.charAt(0).toUpperCase() + editedDifficulty.slice(1)}
             </Badge>
           )}
         </div>

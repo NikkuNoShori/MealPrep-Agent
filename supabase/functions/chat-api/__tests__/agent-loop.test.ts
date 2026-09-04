@@ -432,3 +432,45 @@ Deno.test(
     }
   }
 );
+
+// ─── Regression: dispatch.ts must not double-wrap handler envelopes ───
+//
+// Before the fix, dispatchTool returned { ok: true, data: { ok: true, data: payload } }
+// for every successful tool. agent-loop.ts read result.data.recipe which landed on the
+// outer { ok, data } object — always undefined — so StructuredRecipeDisplay never
+// mounted and recipes were never saved from chat.
+//
+// This test catches the double-wrap by asserting that result.data does NOT itself
+// carry an `ok` key (which would only be present if the handler envelope leaked through).
+
+Deno.test(
+  "dispatcher: result.data is the payload, not a double-wrapped handler envelope",
+  async () => {
+    // search_recipes is a non-destructive tool whose handler calls supabase.rpc().
+    // The fake supabase returns { data: [], error: null } so the handler succeeds
+    // with an ok:true envelope. After the fix, dispatch must unwrap it.
+    const ctx = makeCtx();
+    const result = await dispatchTool(
+      "search_recipes",
+      JSON.stringify({ query: "pasta" }),
+      ctx
+    );
+
+    assertEquals(result.ok, true, "dispatch should succeed");
+    if (result.ok === true && "data" in result) {
+      // If double-wrapping were present, result.data would be { ok: true, data: [...] }.
+      // After the fix, result.data is the actual payload object — it must NOT have an
+      // `ok` property at its top level.
+      assert(
+        result.data !== null && typeof result.data === "object",
+        "result.data should be an object"
+      );
+      assert(
+        !("ok" in (result.data as Record<string, unknown>)),
+        "result.data must not contain an 'ok' key — that would indicate double-wrapping"
+      );
+    } else {
+      throw new Error("expected ok:true result with data field");
+    }
+  }
+);

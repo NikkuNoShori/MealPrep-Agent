@@ -250,6 +250,10 @@ export async function runAgentLoop(
             summary: result.summary,
             idempotencyKey: result.idempotencyKey,
           },
+          // Preserve any recipe extracted earlier in this same turn so the
+          // card still renders when a destructive tool follows an extraction.
+          recipe: lastRecipe || undefined,
+          recipes: lastRecipes.length ? lastRecipes : undefined,
           iterations: iteration,
           hitMaxIters: false,
         };
