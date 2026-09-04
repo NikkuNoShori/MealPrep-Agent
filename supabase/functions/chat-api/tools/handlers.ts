@@ -1224,6 +1224,192 @@ async function deleteRecipe(
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// remove_grocery_item — MOP-0018 P1
+// ─────────────────────────────────────────────────────────────────────
+
+async function removeGroceryItem(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const itemName = (args.item_name as string).toLowerCase();
+  const mealPlanId = args.meal_plan_id as string | undefined;
+
+  let plan: { id: string; grocery_list: unknown } | null = null;
+  if (mealPlanId) {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, grocery_list")
+      .eq("id", mealPlanId)
+      .eq("user_id", ctx.user.id)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  } else {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, grocery_list")
+      .eq("user_id", ctx.user.id)
+      .eq("status", "active")
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  }
+
+  if (!plan) {
+    return { ok: false, error: "No active meal plan found.", retryable: false };
+  }
+
+  const items = Array.isArray(plan.grocery_list)
+    ? [...(plan.grocery_list as Record<string, unknown>[])]
+    : [];
+
+  const filtered = items.filter((i) => {
+    const name = ((i as { item?: string }).item || "").toLowerCase();
+    return !(name.includes(itemName) || itemName.includes(name));
+  });
+
+  const removed = items.length - filtered.length;
+  if (removed === 0) {
+    return {
+      ok: false,
+      error: `No item matching "${itemName}" found in the grocery list.`,
+      retryable: false,
+    };
+  }
+
+  const { error: updErr } = await ctx.supabase
+    .from("meal_plans")
+    .update({ grocery_list: filtered, last_edited_by: ctx.user.id })
+    .eq("id", plan.id);
+  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+
+  return {
+    ok: true,
+    data: { removed_count: removed, item_name: itemName, remaining: filtered.length, meal_plan_id: plan.id },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// create_meal_plan — MOP-0018 P1
+// ─────────────────────────────────────────────────────────────────────
+
+async function createMealPlan(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const startDate = args.start_date as string;
+  const endDate = args.end_date as string;
+  const title =
+    (args.title as string | undefined) ||
+    `Meal Plan (${startDate} – ${endDate})`;
+
+  const { data: created, error } = await ctx.supabase
+    .from("meal_plans")
+    .insert({
+      user_id: ctx.user.id,
+      created_by: ctx.user.id,
+      last_edited_by: ctx.user.id,
+      title,
+      start_date: startDate,
+      end_date: endDate,
+      meals: {},
+      grocery_list: [],
+      status: "draft",
+    })
+    .select("id, title, start_date, end_date, status")
+    .single();
+
+  if (error) return { ok: false, error: error.message, retryable: true };
+
+  return {
+    ok: true,
+    data: {
+      meal_plan_id: (created as { id: string }).id,
+      title: (created as { title: string }).title,
+      start_date: startDate,
+      end_date: endDate,
+      status: "draft",
+      message: `Created "${title}". You can now assign recipes to slots.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// clear_meal_plan_slot — MOP-0018 P1
+// ─────────────────────────────────────────────────────────────────────
+
+async function clearMealPlanSlot(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const date = args.date as string;
+  const slot = args.slot as string;
+  const mealPlanId = args.meal_plan_id as string | undefined;
+
+  let plan: { id: string; meals: unknown } | null = null;
+  if (mealPlanId) {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, meals")
+      .eq("id", mealPlanId)
+      .eq("user_id", ctx.user.id)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  } else {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, meals")
+      .eq("user_id", ctx.user.id)
+      .lte("start_date", date)
+      .gte("end_date", date)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  }
+
+  if (!plan) {
+    return { ok: false, error: `No meal plan found covering ${date}.`, retryable: false };
+  }
+
+  const currentMeals = (
+    plan.meals && typeof plan.meals === "object"
+      ? { ...(plan.meals as Record<string, Record<string, string>>) }
+      : {}
+  ) as Record<string, Record<string, string>>;
+
+  const daySlots = currentMeals[date] ? { ...currentMeals[date] } : {};
+  if (!daySlots[slot]) {
+    return {
+      ok: true,
+      data: { message: `The ${slot} slot on ${date} was already empty.`, meal_plan_id: plan.id },
+    };
+  }
+
+  delete daySlots[slot];
+  if (Object.keys(daySlots).length === 0) {
+    delete currentMeals[date];
+  } else {
+    currentMeals[date] = daySlots;
+  }
+
+  const { error: updErr } = await ctx.supabase
+    .from("meal_plans")
+    .update({ meals: currentMeals, last_edited_by: ctx.user.id })
+    .eq("id", plan.id);
+  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+
+  return {
+    ok: true,
+    data: { cleared: true, date, slot, meal_plan_id: plan.id },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Registry
 // ─────────────────────────────────────────────────────────────────────
 
@@ -1240,11 +1426,14 @@ export const HANDLERS: Record<string, ToolHandler> = {
   update_recipe: updateRecipe as ToolHandler,
   delete_recipe: deleteRecipe as ToolHandler,
   web_search_recipe: webSearchRecipe as ToolHandler,
-  // MOP-0018: new tools
+  // MOP-0018: new tools (P0 + P1)
   save_recipe: saveRecipe as ToolHandler,
   check_recipe_safety: checkRecipeSafety as ToolHandler,
   get_grocery_list: getGroceryList as ToolHandler,
   mark_grocery_item_purchased: markGroceryItemPurchased as ToolHandler,
+  remove_grocery_item: removeGroceryItem as ToolHandler,
+  create_meal_plan: createMealPlan as ToolHandler,
+  clear_meal_plan_slot: clearMealPlanSlot as ToolHandler,
 };
 
 /**

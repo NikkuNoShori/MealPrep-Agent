@@ -487,6 +487,99 @@ export const TOOL_CATALOG: CatalogEntry[] = [
     },
   },
 
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "remove_grocery_item",
+        description:
+          "Remove an item from the grocery list by name. Fuzzy-matches the item name. Use when the user says 'remove X', 'delete X from the list', or 'I don't need X anymore'.",
+        parameters: {
+          type: "object",
+          properties: {
+            item_name: {
+              type: "string",
+              minLength: 1,
+              description: "Name of the item to remove (fuzzy matched).",
+            },
+            meal_plan_id: {
+              type: "string",
+              format: "uuid",
+              description: "Specific plan. Omit to use the active plan.",
+            },
+          },
+          required: ["item_name"],
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "create_meal_plan",
+        description:
+          "Create a new meal plan for a date range. Returns the new plan ID so you can immediately chain assign_recipe_to_meal_plan_slot calls. Use when the user asks to start a new plan or when no plan exists for the target week.",
+        parameters: {
+          type: "object",
+          properties: {
+            start_date: {
+              type: "string",
+              format: "date",
+              description: "First day of the plan (YYYY-MM-DD).",
+            },
+            end_date: {
+              type: "string",
+              format: "date",
+              description: "Last day of the plan (YYYY-MM-DD).",
+            },
+            title: {
+              type: "string",
+              description: "Optional plan name. Defaults to 'Meal Plan (start – end)'.",
+            },
+          },
+          required: ["start_date", "end_date"],
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "clear_meal_plan_slot",
+        description:
+          "Remove the recipe from a specific date + slot (breakfast/lunch/dinner/snack) without deleting the whole plan. No confirmation required — the slot can be reassigned with assign_recipe_to_meal_plan_slot.",
+        parameters: {
+          type: "object",
+          properties: {
+            date: {
+              type: "string",
+              format: "date",
+              description: "The date of the slot to clear (YYYY-MM-DD).",
+            },
+            slot: {
+              type: "string",
+              enum: ["breakfast", "lunch", "dinner", "snack"],
+            },
+            meal_plan_id: {
+              type: "string",
+              format: "uuid",
+              description: "Specific plan. Omit to use the plan covering that date.",
+            },
+          },
+          required: ["date", "slot"],
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+
   // ── MOP-0008 Addendum 1 — web search (keep last) ─────────────────
 
   {
