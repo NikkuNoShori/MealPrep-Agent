@@ -15,11 +15,14 @@ test.describe('Navigation', () => {
   });
 
   test('unauthenticated visit to /recipes redirects to sign-in', async ({ browser }) => {
-    // New context with no auth state.
-    const ctx = await browser.newContext();
+    // Explicitly create a context with NO storageState — the project-level
+    // storageState in playwright.config.ts applies to all contexts by default,
+    // so we must opt out here to simulate an unauthenticated visitor.
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await ctx.newPage();
     await page.goto('/recipes');
-    await expect(page).toHaveURL(/signin/);
+    // ProtectedRoute shows a spinner while auth initialises then redirects — give it 10s.
+    await expect(page).toHaveURL(/signin/, { timeout: 10_000 });
     await ctx.close();
   });
 
@@ -42,11 +45,20 @@ test.describe('Recipes page', () => {
 
   test('shows recipe library or empty state', async ({ page }) => {
     await page.goto('/recipes');
-    // Either recipes exist or an empty-state message is shown — both are valid.
+    // Wait for the loading skeleton / spinner to disappear (data has arrived).
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+    // Either recipes exist (a card/grid is shown) or an empty-state message is shown.
+    // The empty-state heading says "Start building your recipe collection".
     const hasContent = await page
-      .locator('text=/recipe|add|import|no recipes/i')
+      .locator([
+        'h3:has-text("building your recipe")',
+        'h3:has-text("No recipes")',
+        '[class*="recipe-card"]',
+        '[data-testid="recipe-card"]',
+        'article',
+      ].join(', '))
       .first()
-      .isVisible()
+      .isVisible({ timeout: 10_000 })
       .catch(() => false);
     expect(hasContent).toBe(true);
   });
