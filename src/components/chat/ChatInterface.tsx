@@ -143,6 +143,12 @@ interface Message {
    * handleConfirmAction / handleCancelConfirmation in ChatInterface.
    */
   pendingConfirmation?: PendingConfirmation;
+  /**
+   * When true, this is an optimistic placeholder bubble rendered while
+   * the server is processing. It is replaced by the real AI message
+   * when the response arrives and never persisted.
+   */
+  isThinking?: boolean;
 }
 
 function mapDbMessagesToLocal(messages: Array<Record<string, unknown>>): Message[] {
@@ -941,6 +947,23 @@ export const ChatInterface: React.FC = () => {
         : "Thinking..."
     );
 
+    // Optimistic placeholder — shows an AI "thinking" bubble immediately so
+    // the user sees acknowledgment before the server responds.
+    const thinkingMessage: Message = {
+      id: "ai-thinking-placeholder",
+      content: "",
+      sender: "ai",
+      timestamp: new Date(),
+      isThinking: true,
+    };
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === currentConversationId
+          ? { ...conv, messages: [...conv.messages, thinkingMessage] }
+          : conv
+      )
+    );
+
     try {
       let response: ChatMessageResponse;
       let videoMessagesSynced = false;
@@ -1247,7 +1270,11 @@ export const ChatInterface: React.FC = () => {
           conv.id === resolvedConversationId
             ? {
                 ...conv,
-                messages: [...conv.messages, aiMessage],
+                // Replace the optimistic thinking placeholder with the real message.
+                messages: [
+                  ...conv.messages.filter((m) => m.id !== "ai-thinking-placeholder"),
+                  aiMessage,
+                ],
                 lastMessage: response.response.content,
                 ...(serverTitle ? { title: serverTitle } : {}),
               }
@@ -1286,7 +1313,10 @@ export const ChatInterface: React.FC = () => {
           conv.id === currentConversationId
             ? {
                 ...conv,
-                messages: [...conv.messages, errorMessage],
+                messages: [
+                  ...conv.messages.filter((m) => m.id !== "ai-thinking-placeholder"),
+                  errorMessage,
+                ],
                 lastMessage: "Error occurred",
               }
             : conv
@@ -1738,7 +1768,23 @@ export const ChatInterface: React.FC = () => {
                     <Bot className="h-4 w-4 text-primary" />
                   </div>
                 )}
-                {(message.recipe || message.recipes) && message.sender === "ai" ? (
+                {/* Optimistic thinking placeholder — three animated dots */}
+                {message.isThinking ? (
+                  <div className="rounded-lg px-4 py-3 bg-gray-100 dark:bg-gray-800 flex items-center gap-1.5">
+                    <span
+                      className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <span
+                      className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <span
+                      className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </div>
+                ) : (message.recipe || message.recipes) && message.sender === "ai" ? (
                   // Full-width recipe display (single or multi)
                   <div className="flex-1">
                     {message.content && (

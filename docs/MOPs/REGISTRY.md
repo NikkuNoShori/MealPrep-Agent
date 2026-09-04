@@ -48,8 +48,11 @@
 | [MOP-0014](MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | draft | 2026-06-01 | 2026-06-01 | — | surface-reviewer |
 | [MOP-0015](MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle — fix stale embeddings from edited recipes | draft | 2026-06-04 | 2026-06-04 | — | chat-rag-sme audit |
 | [MOP-0016](MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | in_progress | 2026-06-15 | 2026-06-16 | — | Nick Neal |
+| [MOP-0017](MOP-0017-streaming-chat-responses.md) | Streaming Chat Responses | approved | 2026-09-03 | 2026-09-03 | — | Nick Neal |
 
 > **MOP-0016:** Phases 1–3b shipped 2026-06-16 (`chat-api` deployed). **Outstanding:** deploy `recipe-pipeline`, run §Operator smoke tests, then promote to `verifying`. MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
+
+> **MOP-0017:** Phase 1 (optimistic placeholder bubble) shipped 2026-09-03 in commit `dc8bf5d`. Phases 2–4 (true SSE streaming) approved and queued — implement when chat UX is next prioritized.
 
 > **Deferred-with-trigger MOPs:** MOP-0011 is in `draft` but explicitly deferred — execute only when a documented trigger condition fires (see MOP-0011 §Trigger Conditions). This is a new MOP pattern; if more deferred MOPs accumulate, codify the pattern in MOP_TEMPLATE.md.
 
