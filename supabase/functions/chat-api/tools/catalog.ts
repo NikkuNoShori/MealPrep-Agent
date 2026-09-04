@@ -350,8 +350,146 @@ export const TOOL_CATALOG: CatalogEntry[] = [
       },
     },
   },
+  // ── MOP-0018 new tools ─────────────────────────────────────────────
+
   {
-    // MOP-0008 Addendum 1 — web search. Read-only.
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "save_recipe",
+        description:
+          "Save a recipe to the user's library. Call ONLY after extract_recipe_from_source returns a recipe AND the user confirms they want to keep it. Runs a duplicate title check first — if a duplicate is found, returns status='duplicate' and the user must confirm before re-calling with override_duplicate:true.",
+        parameters: {
+          type: "object",
+          properties: {
+            recipe: {
+              type: "object",
+              description:
+                "The recipe object from extract_recipe_from_source. Must include title and ingredients.",
+              properties: {
+                title: { type: "string", minLength: 1 },
+                description: { type: "string" },
+                ingredients: { type: "array", items: { type: "object" } },
+                instructions: { type: "array", items: { type: "string" } },
+                prepTime: { type: "number" },
+                cookTime: { type: "number" },
+                totalTime: { type: "number" },
+                servings: { type: "number" },
+                difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
+                tags: { type: "array", items: { type: "string" } },
+                cuisine: { type: "string" },
+                source_url: { type: "string" },
+                source_name: { type: "string" },
+                image_url: { type: "string" },
+              },
+              required: ["title", "ingredients"],
+              additionalProperties: false,
+            },
+            override_duplicate: {
+              type: "boolean",
+              description:
+                "Pass true only after the user explicitly confirms they want to save despite a detected duplicate.",
+              default: false,
+            },
+          },
+          required: ["recipe"],
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "check_recipe_safety",
+        description:
+          "Cross-reference a recipe's ingredients against every household member's allergen list. Returns warnings per affected member. Call automatically after extract_recipe_from_source returns a recipe — do NOT wait for the user to ask.",
+        parameters: {
+          type: "object",
+          properties: {
+            recipe: {
+              type: "object",
+              description: "The recipe object (from extraction or any source). Use this when you have the full recipe object.",
+              properties: {
+                title: { type: "string" },
+                ingredients: { type: "array", items: { type: "object" } },
+              },
+              required: ["title", "ingredients"],
+              additionalProperties: false,
+            },
+            recipe_id: {
+              type: "string",
+              format: "uuid",
+              description: "Alternatively, look up a saved recipe by ID.",
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "get_grocery_list",
+        description:
+          "Read the current grocery list for the active (or specified) meal plan. Returns all items with name, amount, unit, category, and purchased status. Use when the user asks 'what's on my grocery list', 'what do I need to buy', or when managing shopping.",
+        parameters: {
+          type: "object",
+          properties: {
+            meal_plan_id: {
+              type: "string",
+              format: "uuid",
+              description: "Specific meal plan ID. Omit to use the active plan.",
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "mark_grocery_item_purchased",
+        description:
+          "Toggle the purchased status of a grocery item. Use when the user says 'mark X as done/bought/purchased' or 'uncheck X'. Fuzzy-matches the item name.",
+        parameters: {
+          type: "object",
+          properties: {
+            item_name: {
+              type: "string",
+              minLength: 1,
+              description: "Name of the item to update (fuzzy matched).",
+            },
+            purchased: {
+              type: "boolean",
+              default: true,
+              description: "true = mark purchased, false = unmark.",
+            },
+            meal_plan_id: {
+              type: "string",
+              format: "uuid",
+              description: "Specific plan. Omit to use the active plan.",
+            },
+          },
+          required: ["item_name"],
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+
+  // ── MOP-0008 Addendum 1 — web search (keep last) ─────────────────
+
+  {
     // Omitted from the catalog at startup when WEB_SEARCH_API_KEY is unset
     // (capability gating — agent simply lacks the tool).
     destructive: false,
