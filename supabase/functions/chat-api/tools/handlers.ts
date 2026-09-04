@@ -1410,6 +1410,295 @@ async function clearMealPlanSlot(
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// react_to_recipe — MOP-0018 P2
+// Upserts a thumbs_up / thumbs_down / removes reaction for a family member.
+// ─────────────────────────────────────────────────────────────────────
+
+async function reactToRecipe(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const recipeId = args.recipe_id as string;
+  const reaction = args.reaction as "thumbs_up" | "thumbs_down" | "remove";
+  const memberName = args.member_name as string | undefined;
+
+  // Verify the recipe is accessible.
+  const { data: recipe, error: recErr } = await ctx.supabase
+    .from("recipes")
+    .select("id, title")
+    .eq("id", recipeId)
+    .maybeSingle();
+  if (recErr || !recipe) {
+    return { ok: false, error: "Recipe not found or you don't have access to it.", retryable: false };
+  }
+  const recipeTitle = (recipe as { title: string }).title;
+
+  // Determine reactor: family member by name, or the authenticated user.
+  let familyMemberId: string | null = null;
+  let reactorLabel = "you";
+
+  if (memberName) {
+    const { data: members } = await ctx.supabase
+      .from("family_members")
+      .select("id, name")
+      .eq("managed_by", ctx.user.id)
+      .eq("is_active", true)
+      .ilike("name", memberName);
+
+    if (!members || members.length === 0) {
+      return {
+        ok: false,
+        error: `No family member named "${memberName}" found. Check the name and try again.`,
+        retryable: false,
+      };
+    }
+    familyMemberId = (members[0] as { id: string }).id;
+    reactorLabel = (members[0] as { name: string }).name;
+  }
+
+  // Remove reaction.
+  if (reaction === "remove") {
+    const deleteQuery = ctx.supabase.from("recipe_reactions").delete();
+    const filtered = familyMemberId
+      ? (deleteQuery as any).eq("recipe_id", recipeId).eq("family_member_id", familyMemberId)
+      : (deleteQuery as any).eq("recipe_id", recipeId).eq("user_id", ctx.user.id);
+    const { error } = await filtered;
+    if (error) return { ok: false, error: error.message, retryable: true };
+    return {
+      ok: true,
+      data: { removed: true, recipe_title: recipeTitle, reactor: reactorLabel },
+    };
+  }
+
+  // Upsert reaction.
+  const row = familyMemberId
+    ? { recipe_id: recipeId, family_member_id: familyMemberId, user_id: null, reaction }
+    : { recipe_id: recipeId, user_id: ctx.user.id, family_member_id: null, reaction };
+
+  const conflictColumn = familyMemberId
+    ? "recipe_id, family_member_id"
+    : "recipe_id, user_id";
+
+  const { error: upsertErr } = await ctx.supabase
+    .from("recipe_reactions")
+    .upsert(row, { onConflict: conflictColumn });
+
+  if (upsertErr) return { ok: false, error: upsertErr.message, retryable: true };
+
+  const emoji = reaction === "thumbs_up" ? "👍" : "👎";
+  return {
+    ok: true,
+    data: {
+      reaction,
+      recipe_id: recipeId,
+      recipe_title: recipeTitle,
+      reactor: reactorLabel,
+      message: `${emoji} Marked "${recipeTitle}" as ${reaction === "thumbs_up" ? "liked" : "disliked"} for ${reactorLabel}.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// get_recommendations — MOP-0018 P2
+// Recipes the household or a named member tends to like.
+// ─────────────────────────────────────────────────────────────────────
+
+async function getRecommendations(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const memberName = args.member_name as string | undefined;
+  const reactionFilter = (args.reaction as string | undefined) ?? "thumbs_up";
+  const limit = (args.limit as number | undefined) ?? 10;
+
+  // Resolve family member ID if name given.
+  let familyMemberId: string | null = null;
+  let scopeLabel = "your household";
+
+  if (memberName) {
+    const { data: members } = await ctx.supabase
+      .from("family_members")
+      .select("id, name")
+      .eq("managed_by", ctx.user.id)
+      .eq("is_active", true)
+      .ilike("name", memberName);
+
+    if (!members || members.length === 0) {
+      return {
+        ok: false,
+        error: `No family member named "${memberName}" found.`,
+        retryable: false,
+      };
+    }
+    familyMemberId = (members[0] as { id: string }).id;
+    scopeLabel = (members[0] as { name: string }).name;
+  }
+
+  // Query reactions joined to recipes.
+  // When a specific member is named, filter by family_member_id.
+  // When no member is named, return recipes that have at least one thumbs_up
+  // from anyone in the household (user_id = auth user OR family_member managed_by auth user).
+  let query = ctx.supabase
+    .from("recipe_reactions")
+    .select(
+      "recipe_id, reaction, recipes!inner(id, title, description, cuisine, difficulty, prep_time, cook_time, tags)"
+    )
+    .eq("reaction", reactionFilter);
+
+  if (familyMemberId) {
+    query = (query as any).eq("family_member_id", familyMemberId);
+  } else {
+    // Household scope: reactions by the user themselves.
+    query = (query as any).eq("user_id", ctx.user.id);
+  }
+
+  const { data, error } = await (query as any).limit(limit);
+  if (error) return { ok: false, error: error.message, retryable: true };
+
+  const results = (data || []).map((row: any) => ({
+    recipe_id: row.recipe_id,
+    title: row.recipes?.title,
+    description: row.recipes?.description,
+    cuisine: row.recipes?.cuisine,
+    difficulty: row.recipes?.difficulty,
+    prep_time: row.recipes?.prep_time,
+    cook_time: row.recipes?.cook_time,
+    tags: row.recipes?.tags,
+  }));
+
+  return {
+    ok: true,
+    data: {
+      scope: scopeLabel,
+      reaction: reactionFilter,
+      count: results.length,
+      results,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// update_member_allergens — MOP-0018 P2 (always destructive — gated)
+// ─────────────────────────────────────────────────────────────────────
+
+async function updateMemberAllergens(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const memberName = args.member_name as string;
+  const add = (args.add as string[] | undefined) ?? [];
+  const remove = (args.remove as string[] | undefined) ?? [];
+
+  if (add.length === 0 && remove.length === 0) {
+    return { ok: false, error: "Provide at least one allergen to add or remove.", retryable: false };
+  }
+
+  // Resolve member.
+  const { data: members, error: memberErr } = await ctx.supabase
+    .from("family_members")
+    .select("id, name, allergies")
+    .eq("managed_by", ctx.user.id)
+    .eq("is_active", true)
+    .ilike("name", memberName);
+
+  if (memberErr) return { ok: false, error: memberErr.message, retryable: true };
+  if (!members || members.length === 0) {
+    return {
+      ok: false,
+      error: `No family member named "${memberName}" found.`,
+      retryable: false,
+    };
+  }
+
+  const member = members[0] as { id: string; name: string; allergies: string[] | null };
+  const current = new Set<string>((member.allergies || []).map((a) => a.toLowerCase()));
+
+  for (const a of add) current.add(a.toLowerCase());
+  for (const r of remove) current.delete(r.toLowerCase());
+
+  const updated = Array.from(current);
+
+  const { error: updErr } = await ctx.supabase
+    .from("family_members")
+    .update({ allergies: updated })
+    .eq("id", member.id)
+    .eq("managed_by", ctx.user.id);
+
+  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+
+  return {
+    ok: true,
+    data: {
+      member_name: member.name,
+      allergies: updated,
+      added: add,
+      removed: remove,
+      message: `Updated ${member.name}'s allergen list. Current allergies: ${updated.length > 0 ? updated.join(", ") : "none"}.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// scale_recipe — MOP-0018 P2 (read-only)
+// Returns ingredient quantities scaled to a target serving count.
+// ─────────────────────────────────────────────────────────────────────
+
+async function scaleRecipe(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const recipeId = args.recipe_id as string;
+  const targetServings = args.target_servings as number;
+
+  const { data: recipe, error } = await ctx.supabase
+    .from("recipes")
+    .select("id, title, servings, ingredients, instructions, prep_time, cook_time")
+    .eq("id", recipeId)
+    .maybeSingle();
+
+  if (error || !recipe) {
+    return { ok: false, error: "Recipe not found or you don't have access to it.", retryable: false };
+  }
+
+  const originalServings = (recipe as { servings?: number }).servings;
+  if (!originalServings || originalServings <= 0) {
+    return {
+      ok: false,
+      error: "This recipe doesn't have a serving count — can't scale it.",
+      retryable: false,
+    };
+  }
+
+  const factor = targetServings / originalServings;
+  const rawIngredients = (recipe as { ingredients?: unknown[] }).ingredients || [];
+
+  const scaled = rawIngredients.map((ing) => {
+    if (!ing || typeof ing !== "object") return ing;
+    const i = ing as { name?: string; amount?: number; unit?: string; category?: string; notes?: string };
+    return {
+      ...i,
+      amount: i.amount != null ? Math.round(i.amount * factor * 100) / 100 : null,
+    };
+  });
+
+  return {
+    ok: true,
+    data: {
+      recipe_id: recipeId,
+      title: (recipe as { title: string }).title,
+      original_servings: originalServings,
+      target_servings: targetServings,
+      scale_factor: Math.round(factor * 100) / 100,
+      ingredients: scaled,
+      instructions: (recipe as { instructions?: string[] }).instructions || [],
+      prep_time: (recipe as { prep_time?: number }).prep_time,
+      cook_time: (recipe as { cook_time?: number }).cook_time,
+      note: `Scaled from ${originalServings} to ${targetServings} servings. Times don't change — adjust based on batch size.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Registry
 // ─────────────────────────────────────────────────────────────────────
 
@@ -1434,6 +1723,11 @@ export const HANDLERS: Record<string, ToolHandler> = {
   remove_grocery_item: removeGroceryItem as ToolHandler,
   create_meal_plan: createMealPlan as ToolHandler,
   clear_meal_plan_slot: clearMealPlanSlot as ToolHandler,
+  // MOP-0018: P2
+  react_to_recipe: reactToRecipe as ToolHandler,
+  get_recommendations: getRecommendations as ToolHandler,
+  update_member_allergens: updateMemberAllergens as ToolHandler,
+  scale_recipe: scaleRecipe as ToolHandler,
 };
 
 /**
@@ -1530,6 +1824,10 @@ export async function executeConfirmedTool(
       ok: true,
       data: { meal_plan_id: mealPlanId, date, slot, recipe_id: recipeId },
     };
+  }
+
+  if (name === "update_member_allergens") {
+    return updateMemberAllergens(args, ctx);
   }
 
   return { ok: false, error: `No confirmed-execution path for ${name}`, retryable: false };

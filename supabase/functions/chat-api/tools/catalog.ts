@@ -580,6 +580,125 @@ export const TOOL_CATALOG: CatalogEntry[] = [
     },
   },
 
+  // ── MOP-0018 P2 tools ──────────────────────────────────────────────
+
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "react_to_recipe",
+        description:
+          "Record a thumbs_up or thumbs_down reaction for a recipe, optionally on behalf of a named family member. Use when the user says 'mark this as liked for Alex', 'the kids love this', 'we didn't like that one', etc. Pass reaction='remove' to clear a previous reaction.",
+        parameters: {
+          type: "object",
+          properties: {
+            recipe_id: { type: "string", format: "uuid" },
+            reaction: {
+              type: "string",
+              enum: ["thumbs_up", "thumbs_down", "remove"],
+              description: "thumbs_up = liked, thumbs_down = disliked, remove = clear reaction.",
+            },
+            member_name: {
+              type: "string",
+              description:
+                "Name of the family member reacting. Omit to record the reaction for the authenticated user.",
+            },
+          },
+          required: ["recipe_id", "reaction"],
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "get_recommendations",
+        description:
+          "Return recipes the household or a specific family member has reacted positively (or negatively) to. Use for 'show me recipes the whole family likes', 'what does Alex enjoy', 'what do we always dislike'.",
+        parameters: {
+          type: "object",
+          properties: {
+            member_name: {
+              type: "string",
+              description:
+                "Filter to a specific family member. Omit to scope to the authenticated user's own reactions.",
+            },
+            reaction: {
+              type: "string",
+              enum: ["thumbs_up", "thumbs_down"],
+              default: "thumbs_up",
+              description: "Which reaction type to query. Default: thumbs_up.",
+            },
+            limit: { type: "integer", minimum: 1, maximum: 20, default: 10 },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+  {
+    destructive: true,
+    spec: {
+      type: "function",
+      function: {
+        name: "update_member_allergens",
+        description:
+          "Add or remove allergens on a named family member's profile. ALWAYS requires confirmation — never run without the user explicitly requesting it. Use when the user says 'add peanuts to Alex's allergies' or 'remove shellfish from Sam's list'.",
+        parameters: {
+          type: "object",
+          properties: {
+            member_name: {
+              type: "string",
+              minLength: 1,
+              description: "Name of the family member to update.",
+            },
+            add: {
+              type: "array",
+              items: { type: "string" },
+              description: "Allergens to add (e.g. ['peanuts', 'shellfish']).",
+            },
+            remove: {
+              type: "array",
+              items: { type: "string" },
+              description: "Allergens to remove.",
+            },
+          },
+          required: ["member_name"],
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+  {
+    destructive: false,
+    spec: {
+      type: "function",
+      function: {
+        name: "scale_recipe",
+        description:
+          "Return a copy of a recipe with all ingredient quantities scaled to a target serving count. Read-only — does NOT overwrite the saved recipe. Use when the user says 'scale this to 2 servings', 'I'm cooking for 8', etc.",
+        parameters: {
+          type: "object",
+          properties: {
+            recipe_id: { type: "string", format: "uuid" },
+            target_servings: {
+              type: "number",
+              minimum: 0.5,
+              maximum: 100,
+              description: "The serving count to scale to.",
+            },
+          },
+          required: ["recipe_id", "target_servings"],
+          additionalProperties: false,
+        },
+      },
+    },
+  },
+
   // ── MOP-0008 Addendum 1 — web search (keep last) ─────────────────
 
   {
@@ -626,6 +745,7 @@ export const TOOL_CATALOG: CatalogEntry[] = [
 export const DESTRUCTIVE_TOOLS: ReadonlySet<string> = new Set([
   "update_recipe",
   "delete_recipe",
+  "update_member_allergens",
 ]);
 
 /**

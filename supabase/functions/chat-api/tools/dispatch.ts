@@ -199,6 +199,14 @@ function summarizeForConfirmation(
       return `Update recipe ${args.recipe_id} with ${JSON.stringify(args.changes ?? {})}?`;
     case "assign_recipe_to_meal_plan_slot":
       return `Overwrite ${args.slot} on ${args.date} with recipe ${args.recipe_id}?`;
+    case "update_member_allergens": {
+      const add = (args.add as string[] | undefined) ?? [];
+      const remove = (args.remove as string[] | undefined) ?? [];
+      const parts: string[] = [];
+      if (add.length) parts.push(`add: ${add.join(", ")}`);
+      if (remove.length) parts.push(`remove: ${remove.join(", ")}`);
+      return `Update ${args.member_name}'s allergens — ${parts.join("; ")}?`;
+    }
     default:
       return `Confirm ${name}?`;
   }
