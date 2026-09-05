@@ -2,8 +2,23 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (video intake + draft store + chat UX on branch `cursor/mop-0008-golden-routing-video-intake`)
+**Last reviewed:** 2026-09-04
+**Last updated:** 2026-09-04 (MOP-0013 E2E suite; MOP-0018 tool expansion)
+
+---
+
+## 2026-09-04 (Playwright E2E suite + AI tool expansion) `main`
+
+**Testing (MOP-0013 — complete)**
+- Playwright E2E suite added: 19 tests across smoke, golden-path, and chat specs running against Chromium.
+- Chat E2E tests exercise live AI tool flows: recipe search, text extraction, grocery list, destructive confirmation gate, and recipe scaling.
+- Auth fixture signs in programmatically via Supabase REST; test-data helpers seed and clean up recipes/meal plans per spec.
+- `ChatInterface` textarea now exposes `data-conversation-id` attribute so tests can gate on conversation initialization, eliminating a race condition in headless mode.
+- See [docs/Development/E2E_TESTING.md](Development/E2E_TESTING.md) for authoring guide.
+
+**AI Tool Catalog (MOP-0018 — in progress, tools shipped)**
+- 11 new agent tools added to `chat-api` (catalog now 23 tools, up from 12): `save_recipe`, `check_recipe_safety`, `get_grocery_list`, `mark_grocery_item_purchased`, `remove_grocery_item`, `create_meal_plan`, `clear_meal_plan_slot`, `react_to_recipe`, `get_recommendations`, `update_member_allergens`, `scale_recipe`.
+- Chef Marcus can now save extracted recipes, read/modify the grocery list, create meal plans, react to recipes, check allergen safety, update household member allergens, scale servings, and suggest recommendations — all in a single user turn.
 
 ---
 

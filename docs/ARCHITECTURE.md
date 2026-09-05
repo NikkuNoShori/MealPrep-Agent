@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (video intake UX + `draftRecipeStore` session cache, `persist-extraction`, React Query `staleTime`, agent model `qwen/qwen3-8b`)
+**Last reviewed:** 2026-09-04
+**Last updated:** 2026-09-04 (MOP-0018: tool catalog expanded to 23 tools; MOP-0013: E2E test suite added)
 
 ---
 
@@ -113,7 +113,7 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 
 ### Chat Agent Loop (MOP-0008)
 
-The `chat-api` edge function runs a **single tool-using agent** ("Chef Marcus"). The previous router pattern (one LLM call classifies intent → branches to one of three handlers) is gone. Each user turn drives up to 5 LLM iterations against a 12-tool catalog; the model picks zero, one, or many tools per iteration. Full design: [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md).
+The `chat-api` edge function runs a **single tool-using agent** ("Chef Marcus"). The previous router pattern (one LLM call classifies intent → branches to one of three handlers) is gone. Each user turn drives up to 5 LLM iterations against a 23-tool catalog; the model picks zero, one, or many tools per iteration. Full design: [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md).
 
 ```
 POST /chat-api/message
@@ -151,7 +151,7 @@ Persist AI message + metadata.toolCalls (audit log)
 | Concept | Location |
 |---|---|
 | Agent loop | `supabase/functions/chat-api/agent-loop.ts` |
-| Tool catalog (12 tools, OpenAI-format JSON schemas) | `supabase/functions/chat-api/tools/catalog.ts` |
+| Tool catalog (23 tools, OpenAI-format JSON schemas) | `supabase/functions/chat-api/tools/catalog.ts` |
 | Dispatcher (schema validation, `user_id` reject, destructive short-circuit) | `supabase/functions/chat-api/tools/dispatch.ts` |
 | Tool handlers | `supabase/functions/chat-api/tools/handlers.ts` |
 | Recipe context injection for agent history | `supabase/functions/chat-api/conversation-context.ts` |
@@ -166,7 +166,10 @@ Persist AI message + metadata.toolCalls (audit log)
 | Read (DB) | `search_recipes`, `find_similar_recipes`, `get_household_recipes`, `get_household_profile`, `get_meal_plan`, `propose_substitution` |
 | Read (web) | `web_search_recipe` (gated on `WEB_SEARCH_API_KEY`) |
 | Capture | `extract_recipe_from_source` (delegates to `recipe-pipeline/extract-only`) |
-| Plan / cart | `assign_recipe_to_meal_plan_slot` (conditionally destructive), `add_to_grocery_list` |
+| Plan / cart | `assign_recipe_to_meal_plan_slot` (conditionally destructive), `add_to_grocery_list`, `create_meal_plan`, `clear_meal_plan_slot` |
+| Grocery | `get_grocery_list`, `mark_grocery_item_purchased`, `remove_grocery_item` |
+| Social / safety | `react_to_recipe`, `check_recipe_safety`, `update_member_allergens`, `get_recommendations` |
+| Utility | `scale_recipe`, `save_recipe` |
 | Destructive | `update_recipe`, `delete_recipe` — always return `pendingConfirmation`; user must reply via `context.confirmAction` |
 
 Models: **`qwen/qwen3-8b`** default for the agent loop (`OPENROUTER_AGENT_MODEL` override; `supabase/functions/chat-api/agent-loop.ts`). OpenRouter `chatWithTools` uses `provider.require_parameters: true` so only tool-capable endpoints are selected. Vision/text inside `recipe-pipeline` still uses `qwen/qwen-2.5-vl-7b-instruct` / `qwen/qwen-2.5-7b-instruct` as appropriate. Temperature 0.2, `tool_choice: auto`, `MAX_ITERS = 5`.
@@ -385,6 +388,35 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 - **Path pattern:** `{userId}/recipes/{timestamp}-{random}.{ext}`
 - **Access:** Private (signed URLs)
 - **Limits:** 5MB max file size, `image/*` types only
+
+---
+
+## Testing
+
+### Unit / Integration Tests
+Vitest (`src/test/`, `supabase/functions/**/__tests__/`). Run with `npm run test:run`. See [docs/prompts/DOMAIN_TEST_MATRIX.md](prompts/DOMAIN_TEST_MATRIX.md) for domain → suite routing.
+
+### End-to-End Tests (MOP-0013)
+Playwright, Chromium only. Runs against the hosted Supabase project (remote DB, not local).
+
+```
+npx playwright test               # full suite (smoke + golden-path + chat)
+npx playwright test --ui          # Playwright UI mode
+npx playwright test e2e/chat.spec.ts  # chat suite only
+```
+
+| File | Covers |
+|------|--------|
+| `e2e/smoke.spec.ts` | App shell loads; unauthenticated redirect |
+| `e2e/golden-path.spec.ts` | Authenticated nav, recipe library, meal planner, chat input |
+| `e2e/chat.spec.ts` | AI tool flows: send/receive, recipe search, extraction, grocery, destructive gate, scale |
+| `e2e/fixtures/auth.ts` | `getTestSession()` — Supabase Auth REST call for test user JWT |
+| `e2e/fixtures/test-data.ts` | `createTestRecipe`, `createTestMealPlan`, cleanup helpers |
+| `e2e/global-setup.ts` | Signs in via UI; saves `storageState` to `e2e/.auth/user.json` |
+
+**Key implementation detail:** `ChatInterface` exposes `data-conversation-id` on its textarea so E2E tests can gate on conversation initialization before sending messages (eliminates the `handleSendMessage → !currentConversationId` race).
+
+See [docs/Development/E2E_TESTING.md](Development/E2E_TESTING.md) for full authoring guide.
 
 ---
 

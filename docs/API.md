@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (`POST /chat-api/persist-extraction`, video `source_metadata.extra.thumbnail_url`, agent model `qwen/qwen3-8b`, abortable send)
+**Last reviewed:** 2026-09-04
+**Last updated:** 2026-09-04 (tool catalog expanded to 23 tools — MOP-0018)
 
 ---
 
@@ -107,7 +107,7 @@ apikey: <supabase-anon-key>
 
 **Tool-call lifecycle (MOP-0008):**
 
-1. The model receives the user message + the tool catalog (up to 12 tools, see [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md)).
+1. The model receives the user message + the tool catalog (23 tools — see [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md) and [MOPs/MOP-0018-ai-tool-expansion.md](MOPs/MOP-0018-ai-tool-expansion.md) for catalog details).
 2. Each iteration the model emits 0..many `tool_calls`. The dispatcher validates args against the tool's JSON Schema, rejects any `user_id` key, and:
    - Always-destructive tools (`update_recipe`, `delete_recipe`) → return a `pendingConfirmation` envelope; the handler does NOT run.
    - Conditionally destructive (`assign_recipe_to_meal_plan_slot` when the slot is occupied) → same envelope.

@@ -2,8 +2,8 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (added `draftRecipeStore`, `queryCache.ts` references; video intake docs in ARCHITECTURE/API/RUNBOOK)
+**Last reviewed:** 2026-09-04
+**Last updated:** 2026-09-04 (added E2E_TESTING.md; updated MOP table through MOP-0018)
 
 ---
 
@@ -45,6 +45,7 @@ Setup guides, tooling, and operational procedures.
 |----------|-------------|
 | [LOCAL_DEVELOPMENT.md](Development/LOCAL_DEVELOPMENT.md) | Local development setup guide |
 | [EDGE_FUNCTION_README.md](Development/EDGE_FUNCTION_README.md) | Edge function documentation |
+| [E2E_TESTING.md](Development/E2E_TESTING.md) | Playwright E2E test setup, authoring guide, and CI notes (MOP-0013) |
 | [VECTOR_VS_TEXT_SEARCH.md](Development/VECTOR_VS_TEXT_SEARCH.md) | Vector vs text search comparison |
 | [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md) | Google OAuth configuration |
 | [SESSION_HANDOFF.md](SESSION_HANDOFF.md) | Latest session status and merge checklist (ephemeral — refresh each session) |
@@ -75,16 +76,23 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 | [MOP-0001](MOPs/MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | complete |
 | [MOP-0002](MOPs/MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | complete |
 | [MOP-0003](MOPs/MOP-0003.md) | Dietary Profiles & Allergen Detection | draft |
-| [MOP-0004](MOPs/MOP-0004.md) | Meal Planner & Grocery Cart | in_progress |
-| [MOP-0005](MOPs/MOP-0005.md) | Test Coverage & Testing Infrastructure | in_progress |
-| [MOP-0006](MOPs/MOP-0006.md) | Generated Supabase Types & API Typing | draft |
+| [MOP-0004](MOPs/MOP-0004.md) | Meal Planner & Grocery Cart | complete |
+| [MOP-0005](MOPs/MOP-0005.md) | Test Coverage & Testing Infrastructure | complete |
+| [MOP-0006](MOPs/MOP-0006.md) | Generated Supabase Types & API Typing | complete |
 | [MOP-0007](MOPs/MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | draft |
-| [MOP-0008](MOPs/MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | draft |
+| [MOP-0008](MOPs/MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | complete |
 | [MOP-0009](MOPs/MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | draft |
 | [MOP-0010](MOPs/MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | draft |
 | [MOP-0011](MOPs/MOP-0011.md) | Normalize `meal_plans` JSONB → Child Tables | draft (deferred) |
+| [MOP-0012](MOPs/MOP-0012.md) | Recipe-Pipeline Test Fixture Library | draft |
+| [MOP-0013](MOPs/MOP-0013.md) | Playwright E2E Test Setup | complete |
+| [MOP-0014](MOPs/MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | draft |
+| [MOP-0015](MOPs/MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle | draft |
+| [MOP-0016](MOPs/MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | in_progress |
+| [MOP-0017](MOPs/MOP-0017-streaming-chat-responses.md) | Streaming Chat Responses | approved |
+| [MOP-0018](MOPs/MOP-0018-ai-tool-expansion.md) | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions | in_progress |
 
-> Status vocabulary is defined in [prompts/MOP_STATUS_LIFECYCLE.md](prompts/MOP_STATUS_LIFECYCLE.md).
+> Status vocabulary is defined in [prompts/MOP_STATUS_LIFECYCLE.md](prompts/MOP_STATUS_LIFECYCLE.md). See [MOPs/REGISTRY.md](MOPs/REGISTRY.md) for the authoritative index with dates.
 
 ---
 
