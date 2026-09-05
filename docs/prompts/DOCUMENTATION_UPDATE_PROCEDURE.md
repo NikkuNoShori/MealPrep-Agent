@@ -268,3 +268,4 @@ Append to the update log at the bottom of this document:
 | 2026-03-14 | Nick | enhancement/feature-release (invites, reactions, admin, setup, RPC optimization, migrations 014-025) | ARCHITECTURE, DATA_MODEL, API, RUNBOOK, CHANGELOG, docs/README, MOP-0002, REGISTRY |
 | 2026-06-01 | Nick Neal | main (11 commits 72895a7..c2d7c7e: test harness, agent system, MOP/ADR governance, AI Integration Audit, ARCHITECTURE/RUNBOOK security tightening) | CHANGELOG, docs/README, ARCHITECTURE, RUNBOOK, DOCUMENTATION_UPDATE_PROCEDURE |
 | 2026-06-16 | Nick Neal | cursor/mop-0008-golden-routing-video-intake | ARCHITECTURE, API, RUNBOOK, CHANGELOG, docs/README, MOP-0016, REGISTRY, SESSION_HANDOFF, DOCUMENTATION_UPDATE_PROCEDURE |
+| 2026-09-04 | Nick Neal | main (MOP-0013 E2E suite, MOP-0018 tool expansion — commits 5d56fdb..a7e25f2) | ARCHITECTURE, API, CHANGELOG, docs/README, MOP-0013, REGISTRY |
