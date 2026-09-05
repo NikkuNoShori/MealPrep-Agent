@@ -1385,8 +1385,13 @@ export const ChatInterface: React.FC = () => {
       e.preventDefault();
       handleSendMessage();
     } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (historyIndex < messageHistory.length - 1) {
+      // Only trigger history navigation when the cursor is on the first line
+      // (or the textarea is empty). Otherwise let the caret move normally.
+      const ta = e.currentTarget as HTMLTextAreaElement;
+      const textBeforeCursor = ta.value.slice(0, ta.selectionStart ?? 0);
+      const isOnFirstLine = !textBeforeCursor.includes("\n");
+      if (isOnFirstLine && historyIndex < messageHistory.length - 1) {
+        e.preventDefault();
         const newIndex = historyIndex + 1;
         setHistoryIndex(newIndex);
         if (newIndex === 0) {
@@ -1395,14 +1400,20 @@ export const ChatInterface: React.FC = () => {
         setInputMessage(messageHistory[newIndex]);
       }
     } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInputMessage(messageHistory[newIndex]);
-      } else if (historyIndex === 0) {
-        setHistoryIndex(-1);
-        setInputMessage(tempInput);
+      // Only trigger history navigation when the cursor is on the last line.
+      const ta = e.currentTarget as HTMLTextAreaElement;
+      const textAfterCursor = ta.value.slice(ta.selectionEnd ?? ta.value.length);
+      const isOnLastLine = !textAfterCursor.includes("\n");
+      if (isOnLastLine && historyIndex >= 0) {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          const newIndex = historyIndex - 1;
+          setHistoryIndex(newIndex);
+          setInputMessage(messageHistory[newIndex]);
+        } else {
+          setHistoryIndex(-1);
+          setInputMessage(tempInput);
+        }
       }
     }
   };
