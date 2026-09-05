@@ -3,7 +3,7 @@
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
 **Last reviewed:** 2026-09-04
-**Last updated:** 2026-09-04 (MOP-0018: tool catalog expanded to 23 tools; MOP-0013: E2E test suite added)
+**Last updated:** 2026-09-04 (MOP-0017: SSE streaming for chat agent final reply)
 
 ---
 
@@ -173,6 +173,33 @@ Persist AI message + metadata.toolCalls (audit log)
 | Destructive | `update_recipe`, `delete_recipe` — always return `pendingConfirmation`; user must reply via `context.confirmAction` |
 
 Models: **`qwen/qwen3-8b`** default for the agent loop (`OPENROUTER_AGENT_MODEL` override; `supabase/functions/chat-api/agent-loop.ts`). OpenRouter `chatWithTools` uses `provider.require_parameters: true` so only tool-capable endpoints are selected. Vision/text inside `recipe-pipeline` still uses `qwen/qwen-2.5-vl-7b-instruct` / `qwen/qwen-2.5-7b-instruct` as appropriate. Temperature 0.2, `tool_choice: auto`, `MAX_ITERS = 5`.
+
+### SSE Streaming (MOP-0017)
+
+When the client sends `Accept: text/event-stream`, `/chat-api/message` switches to a streaming response. The tool loop runs synchronously first; only the **final prose reply** is streamed via OpenRouter's SSE endpoint (`stream: true`).
+
+```
+Client: Accept: text/event-stream
+  │
+  ▼
+handleSendMessage detects wantsStream=true
+  → returns ReadableStream immediately
+  │
+  ├─► Tool loop runs synchronously (same as non-streaming)
+  │
+  ├─► Final reply: openRouter.streamChatWithTools(... onDelta ...)
+  │     → each content delta → enqueue sseEvent({type:"delta", text})
+  │
+  ├─► sseEvent({type:"recipe", recipe})        (if recipe extracted)
+  ├─► sseEvent({type:"done", messageId, ...})  (terminal frame)
+  └─► controller.close()
+```
+
+SSE event types: `delta` · `recipe` · `recipes` · `confirmation` · `done` · `error`.
+
+Non-streaming callers (no `Accept: text/event-stream`) receive the existing JSON response unchanged — **fully backwards-compatible**.
+
+Frontend: `apiClient.sendMessageStream()` (`src/services/api.ts`) reads the stream and calls `onEvent` per frame. `ChatInterface` updates the thinking-placeholder bubble in-place on each `delta`, then finalises on `done`. Key files: `supabase/functions/_shared/openrouter-client.ts` (`streamChatWithTools`), `supabase/functions/chat-api/agent-loop.ts` (`onDelta` hookup), `supabase/functions/chat-api/index.ts` (SSE path).
 
 ### Short-Form Video Intake (MOP-0016)
 

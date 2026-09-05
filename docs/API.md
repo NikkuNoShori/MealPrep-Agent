@@ -3,7 +3,7 @@
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
 **Last reviewed:** 2026-09-04
-**Last updated:** 2026-09-04 (tool catalog expanded to 23 tools — MOP-0018)
+**Last updated:** 2026-09-04 (MOP-0017: SSE streaming mode added to /chat-api/message)
 
 ---
 
@@ -79,6 +79,20 @@ apikey: <supabase-anon-key>
 ```
 
 `pendingConfirmation` is present only when the agent emitted a destructive tool call. The handler did **not** execute — the UI must render a Confirm/Cancel surface and resend on Confirm with `context.confirmAction` carrying the same `{ tool, args, idempotencyKey }`.
+
+**SSE streaming mode (MOP-0017):** Add `Accept: text/event-stream` to the request headers. The endpoint returns `Content-Type: text/event-stream` and streams `data: <json>\n\n` frames as the agent runs. The tool loop runs synchronously; only the final prose reply is streamed token-by-token.
+
+SSE frame types:
+```
+data: {"type":"delta","text":"..."}          — content token (one or more per response)
+data: {"type":"recipe","recipe":{...}}       — extracted recipe (if present)
+data: {"type":"recipes","recipes":[...]}     — multiple recipes (if present)
+data: {"type":"confirmation","pendingConfirmation":{...}}  — destructive tool gate
+data: {"type":"done","messageId":"uuid","conversationId":"uuid","sessionId":"...","intentMetadata":{...},"title":"..."}
+data: {"type":"error","message":"..."}       — error; stream closes after this
+```
+
+The `done` frame is the terminal success signal and carries the same metadata as the JSON response. Non-streaming callers (no `Accept` header) receive the JSON response unchanged.
 
 **`recipe` object shape:**
 ```json

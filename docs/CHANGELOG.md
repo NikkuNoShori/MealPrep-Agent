@@ -2,8 +2,24 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-09-05
-**Last updated:** 2026-09-05 (MOP-0016 and MOP-0018 verified complete; both edge functions deployed)
+**Last reviewed:** 2026-09-04
+**Last updated:** 2026-09-04 (MOP-0017 SSE streaming complete; arrow-key history fix)
+
+---
+
+## 2026-09-04 (MOP-0017: SSE streaming chat) `main`
+
+**Streaming chat responses (MOP-0017 — complete)**
+- Chat agent now streams the final prose reply token-by-token via SSE. The thinking-placeholder bubble fills in real-time instead of appearing all at once after the full round-trip.
+- Add `Accept: text/event-stream` to opt in. Non-streaming callers (JSON) are unchanged. SSE frame types: `delta`, `recipe`, `recipes`, `confirmation`, `done`, `error`.
+- Frontend: `apiClient.sendMessageStream()` + in-place placeholder update in `ChatInterface`.
+- Edge function: `streamChatWithTools()` in `openrouter-client.ts`; `onDelta` hookup in `agent-loop.ts`; `ReadableStream` response branch in `chat-api/index.ts`.
+
+**Arrow-key history navigation fix**
+- ArrowUp/Down no longer hijack cursor movement inside multi-line messages. History cycling only triggers when the cursor is already at the first (Up) or last (Down) line of the textarea.
+
+**Test fix**
+- `draftRecipeStore` unit test corrected: assertion now checks for the full `thumbnailUrl` value rather than a bare filename substring.
 
 ---
 

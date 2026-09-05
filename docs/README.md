@@ -89,7 +89,7 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 | [MOP-0014](MOPs/MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | draft |
 | [MOP-0015](MOPs/MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle | draft |
 | [MOP-0016](MOPs/MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | complete |
-| [MOP-0017](MOPs/MOP-0017-streaming-chat-responses.md) | Streaming Chat Responses | approved |
+| [MOP-0017](MOPs/MOP-0017-streaming-chat-responses.md) | Streaming Chat Responses | complete |
 | [MOP-0018](MOPs/MOP-0018-ai-tool-expansion.md) | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions | complete |
 
 > Status vocabulary is defined in [prompts/MOP_STATUS_LIFECYCLE.md](prompts/MOP_STATUS_LIFECYCLE.md). See [MOPs/REGISTRY.md](MOPs/REGISTRY.md) for the authoritative index with dates.
