@@ -6,9 +6,9 @@
 | **Title** | Streaming Chat Responses |
 | **Date Submitted** | 2026-09-03 |
 | **Date Updated** | 2026-09-04 |
-| **Date Completed** | — |
+| **Date Completed** | 2026-09-04 |
 | **Submitted By** | Nick Neal |
-| **Status** | verifying |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md).
 
