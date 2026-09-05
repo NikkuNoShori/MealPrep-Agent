@@ -40,6 +40,28 @@ export interface ConfirmActionInput {
   idempotencyKey?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// MOP-0017 — SSE streaming types
+// ─────────────────────────────────────────────────────────────────────
+
+export type SSEEvent =
+  | { type: "delta"; text: string }
+  | { type: "recipe"; recipe: any }
+  | { type: "recipes"; recipes: any[] }
+  | { type: "confirmation"; pendingConfirmation: any }
+  | { type: "done"; messageId?: string; conversationId: string; sessionId: string; intentMetadata?: any; title?: string }
+  | { type: "error"; message: string };
+
+/**
+ * Callback-based streaming interface. `onEvent` fires for every SSE frame;
+ * the returned `Promise<void>` resolves when the stream closes or rejects on
+ * network error. Callers can abort via the `signal` on the input.
+ */
+export type StreamCallbacks = {
+  onEvent: (event: SSEEvent) => void;
+  onError?: (err: Error) => void;
+};
+
 export interface ChatToolCallTrace {
   name: string;
   args: Record<string, unknown>;
@@ -432,6 +454,82 @@ class ApiClient {
         messageLength: data.message.length,
       });
       throw error;
+    }
+  }
+
+  /**
+   * MOP-0017 — SSE streaming variant of sendMessage.
+   *
+   * Sends a request with `Accept: text/event-stream`; the edge function returns
+   * a ReadableStream of SSE frames. Each frame is parsed and forwarded to
+   * `callbacks.onEvent`. The Promise resolves on `{type:"done"}` or stream end,
+   * and rejects on network/parse error.
+   */
+  async sendMessageStream(
+    data: SendMessageInput,
+    callbacks: StreamCallbacks
+  ): Promise<void> {
+    const endpoint = `${SUPABASE_FUNCTIONS_URL}/chat-api/message`;
+    const { signal, ...payload } = data;
+
+    // Build auth header the same way `request()` does.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream",
+      "apikey": SUPABASE_ANON_KEY,
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`SSE request failed: ${response.status} ${text.slice(0, 200)}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      let reading = true;
+      while (reading) {
+        const { done, value } = await reader.read();
+        if (done) { reading = false; break; }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const payload = trimmed.slice(5).trim();
+          if (!payload) continue;
+
+          let event: SSEEvent;
+          try {
+            event = JSON.parse(payload) as SSEEvent;
+          } catch {
+            continue; // malformed frame — skip
+          }
+
+          callbacks.onEvent(event);
+
+          if (event.type === "done" || event.type === "error") {
+            return; // stream logically complete
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
     }
   }
 

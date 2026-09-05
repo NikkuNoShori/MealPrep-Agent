@@ -130,6 +130,8 @@ export interface AgentLoopInput {
   message: string;
   images?: string[];
   conversationHistory: ChatMessage[];
+  /** When provided, the final prose reply is streamed via this callback. */
+  onDelta?: (text: string) => void;
 }
 
 /**
@@ -157,6 +159,7 @@ export async function runAgentLoop(
 ): Promise<AgentReply> {
   const systemPrompt = buildSystemPrompt();
   const tools = getToolSpecs();
+  const onDelta = input.onDelta;
 
   const messages: ChatMessage[] = [
     ...input.conversationHistory,
@@ -188,6 +191,13 @@ export async function runAgentLoop(
 
     // No tool calls → final reply.
     if (!llmResponse.tool_calls || llmResponse.tool_calls.length === 0) {
+      // If streaming is requested and the model returned content without
+      // tool calls on this non-final iteration, stream it directly.
+      if (onDelta && llmResponse.content) {
+        // Emit the already-assembled content as a single delta (the
+        // non-streaming chatWithTools call gave us the full string).
+        onDelta(llmResponse.content);
+      }
       return {
         content: llmResponse.content || "",
         toolCalls: toolCallTrace,
@@ -284,18 +294,33 @@ export async function runAgentLoop(
   // Hit MAX_ITERS without a final reply. Ask the model once more with
   // tool_choice:"none" to compose what it has.
   hitMaxIters = true;
+  const fallback =
+    "I was looking into that — here's what I found so far. Want me to keep going?";
   try {
-    const closing = await chatWithToolsResilient(
-      openRouter,
-      systemPrompt,
-      messages,
-      tools,
-      { temperature: 0.2, tool_choice: "none", max_tokens: 600 }
-    );
+    let closingContent: string | null;
+    if (onDelta) {
+      // Stream the closing reply.
+      const closing = await openRouter.streamChatWithTools(
+        systemPrompt,
+        messages,
+        tools,
+        onDelta,
+        undefined, // use default model
+        { temperature: 0.2, tool_choice: "none", max_tokens: 600 }
+      );
+      closingContent = closing.content;
+    } else {
+      const closing = await chatWithToolsResilient(
+        openRouter,
+        systemPrompt,
+        messages,
+        tools,
+        { temperature: 0.2, tool_choice: "none", max_tokens: 600 }
+      );
+      closingContent = closing.content;
+    }
     return {
-      content:
-        closing.content ||
-        "I was looking into that — here's what I found so far. Want me to keep going?",
+      content: closingContent || fallback,
       toolCalls: toolCallTrace,
       recipe: lastRecipe,
       recipes: lastRecipes,
@@ -304,8 +329,7 @@ export async function runAgentLoop(
     };
   } catch {
     return {
-      content:
-        "I was looking into that — here's what I found so far. Want me to keep going?",
+      content: fallback,
       toolCalls: toolCallTrace,
       recipe: lastRecipe,
       recipes: lastRecipes,

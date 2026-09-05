@@ -1139,88 +1139,128 @@ export const ChatInterface: React.FC = () => {
 
         response = sendResponse;
       } else {
-        // Handle general chat and RAG queries
-        // Server performs AI-powered intent detection, but we can provide a client-side hint
+        // ── MOP-0017: SSE streaming path for general chat and RAG queries ──
+        // Server performs AI-powered intent detection; we stream the prose reply
+        // and update the thinking-placeholder in real-time as deltas arrive.
         const detectedIntent = detectIntent(inputMessage);
         Logger.chat.intentDetected(detectedIntent, 0.8, 'Client-side hint (server will make final decision)', inputMessage);
 
-        // Only send explicit intent if client-side detection strongly suggests recipe_extraction
-        // Otherwise, let server's AI-powered detection decide (it handles images, context, etc.)
-        // Server intents: 'recipe_extraction' | 'rag_search' | 'general_chat'
         const intentToSend =
           detectedIntent === "recipe_extraction"
-            ? "recipe_extraction" // Explicitly request recipe extraction
-            : undefined; // Let server's AI detection decide (handles RAG search, general chat, etc.)
+            ? "recipe_extraction"
+            : undefined;
 
-        const messageData: {
-          message: string;
-          sessionId: string;
-          intent?: string;
-          images?: string[];
-          context: any;
-          signal?: AbortSignal;
-        } = {
+        const messageData = {
           message: messageText,
           sessionId: currentConversation.sessionId,
-          intent: intentToSend, // Only set if recipe_extraction, otherwise undefined for server to detect
+          intent: intentToSend,
+          images: imageDataUrls.length > 0 ? imageDataUrls : undefined,
           context: {
             recentMessages: currentConversation.messages.slice(-5),
             conversationId: currentConversationId,
-            clientDetectedIntent: detectedIntent, // Pass as hint for logging/debugging
+            clientDetectedIntent: detectedIntent,
           },
           signal,
         };
-        if (imageDataUrls.length > 0) {
-          messageData.images = imageDataUrls;
-        }
-        const sendResponse = (await sendMessageMutation.mutateAsync(
-          messageData
-        )) as ChatMessageResponse & {
-          conversationId?: string;
-          sessionId?: string;
-        };
+
+        // Accumulate stream state — populated by SSE callbacks.
+        let streamedContent = "";
+        let streamedRecipe: any = null;
+        let streamedRecipes: any[] | null = null;
+        let streamedConfirmation: any = null;
+        let doneEvent: any = null;
+
+        await apiClient.sendMessageStream(messageData, {
+          onEvent: (event) => {
+            if (signal.aborted) return;
+
+            if (event.type === "delta") {
+              streamedContent += event.text;
+              // Update the thinking-placeholder in-place so the bubble fills
+              // character-by-character without re-mounting the component.
+              setConversations((prev) =>
+                prev.map((conv) =>
+                  conv.id === currentConversationId
+                    ? {
+                        ...conv,
+                        messages: conv.messages.map((m) =>
+                          m.id === "ai-thinking-placeholder"
+                            ? { ...m, content: streamedContent, isThinking: false }
+                            : m
+                        ),
+                      }
+                    : conv
+                )
+              );
+            } else if (event.type === "recipe") {
+              streamedRecipe = event.recipe;
+            } else if (event.type === "recipes") {
+              streamedRecipes = event.recipes;
+            } else if (event.type === "confirmation") {
+              streamedConfirmation = event.pendingConfirmation;
+            } else if (event.type === "done") {
+              doneEvent = event;
+            } else if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          },
+        });
+
         if (signal.aborted) return;
 
-        // Update conversation ID if this is a new conversation (from database)
-        if (sendResponse.conversationId && currentConversation.isTemporary) {
+        // Construct a synthetic ChatMessageResponse so the code below that
+        // replaces the placeholder and updates conversation state is unchanged.
+        const doneConversationId: string = doneEvent?.conversationId ?? currentConversationId;
+        const doneSessionId: string = doneEvent?.sessionId ?? currentConversation.sessionId;
+
+        // Persist the new conversationId if this was a temporary conversation.
+        if (doneConversationId !== currentConversationId && currentConversation.isTemporary) {
           Logger.chat.stateChange('conversation_persisted', {
             oldId: currentConversationId,
-            newId: sendResponse.conversationId,
+            newId: doneConversationId,
           });
           setConversations((prev) =>
             prev.map((conv) =>
               conv.id === currentConversationId
-                ? {
-                    ...conv,
-                    id: sendResponse.conversationId!,
-                    isTemporary: false,
-                  }
+                ? { ...conv, id: doneConversationId, isTemporary: false }
                 : conv
             )
           );
-          setCurrentConversationId(sendResponse.conversationId);
+          setCurrentConversationId(doneConversationId);
         }
 
-        // Update sessionId if provided
-        if (
-          sendResponse.sessionId &&
-          sendResponse.sessionId !== currentConversation.sessionId
-        ) {
-          Logger.chat.stateChange('sessionId_updated', {
-            conversationId: sendResponse.conversationId || currentConversationId,
-            oldSessionId: currentConversation.sessionId,
-            newSessionId: sendResponse.sessionId,
-          });
+        // Update sessionId if it changed.
+        if (doneSessionId && doneSessionId !== currentConversation.sessionId) {
           setConversations((prev) =>
             prev.map((conv) =>
-              conv.id === (sendResponse.conversationId || currentConversationId)
-                ? { ...conv, sessionId: sendResponse.sessionId! }
+              conv.id === doneConversationId
+                ? { ...conv, sessionId: doneSessionId }
                 : conv
             )
           );
         }
 
-        response = sendResponse;
+        // The local ChatMessageResponse type (from ../../types) is the slim
+        // frontend-only shape. Extra fields (conversationId, title, etc.) are
+        // accessed via the `as any` casts already present in the shared path
+        // below — so we cast here to satisfy TS while carrying the extras.
+        response = {
+          response: {
+            id: doneEvent?.messageId ?? `stream-${Date.now()}`,
+            content: streamedContent,
+            timestamp: new Date().toISOString(),
+          },
+          recipe: streamedRecipe ?? undefined,
+          recipes: streamedRecipes ?? undefined,
+          // Carry extras via type assertion — consumed below as (response as any).xxx
+          ...({
+            pendingConfirmation: streamedConfirmation ?? undefined,
+            conversationId: doneConversationId,
+            sessionId: doneSessionId,
+            intentMetadata: doneEvent?.intentMetadata,
+            title: doneEvent?.title,
+          } as any),
+        };
       }
 
       if (signal.aborted) return;

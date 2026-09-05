@@ -16,6 +16,23 @@ import type { ToolContext } from "./tools/dispatch.ts";
 import { enrichMessageContent } from "./conversation-context.ts";
 
 // ═══════════════════════════════════════════════════════════════════
+// SSE HELPERS
+// ═══════════════════════════════════════════════════════════════════
+
+/** Encode one SSE event as a UTF-8 byte chunk. */
+function sseEvent(data: unknown): Uint8Array {
+  return new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  "Connection": "keep-alive",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// ═══════════════════════════════════════════════════════════════════
 // MAIN REQUEST HANDLER
 // ═══════════════════════════════════════════════════════════════════
 
@@ -68,7 +85,8 @@ serve(async (req) => {
 
     // Route handling
     if (method === "POST" && path.includes("/message")) {
-      return await handleSendMessage(req, supabase, user, openRouter, userToken);
+      const wantsStream = req.headers.get("Accept")?.includes("text/event-stream") ?? false;
+      return await handleSendMessage(req, supabase, user, openRouter, userToken, wantsStream);
     } else if (method === "GET" && path.includes("/history")) {
       const limit = parseInt(url.searchParams.get("limit") || "50");
       return await handleGetHistory(req, supabase, user, limit);
@@ -92,7 +110,8 @@ async function handleSendMessage(
   supabase: any,
   user: any,
   openRouter: OpenRouterClient,
-  userToken: string
+  userToken: string,
+  stream = false
 ) {
   try {
     const {
@@ -235,6 +254,113 @@ async function handleSendMessage(
       attachedImages: imageUrls.length > 0 ? imageUrls : images,
     };
 
+    // ── Run agent (streaming or non-streaming) ──────────────────────
+    if (stream) {
+      // SSE path: return a ReadableStream immediately; run the agent inside
+      // the stream controller so deltas flow to the client in real-time.
+      const readableStream = new ReadableStream({
+        async start(controller) {
+          const enqueue = (data: unknown) => {
+            try { controller.enqueue(sseEvent(data)); } catch { /* closed */ }
+          };
+
+          try {
+            let aiResponse: string;
+            let recipe: any = null;
+            let recipes: any[] | null = null;
+            let pendingConfirmation: any = null;
+            let toolCallsTrace: any[] = [];
+            let iterations = 0;
+            let hitMaxIters = false;
+            let confirmActionResult: any = null;
+
+            if (confirmAction) {
+              const result = await executeConfirmedTool(
+                confirmAction.tool, confirmAction.args || {}, toolCtx
+              );
+              confirmActionResult = result;
+              const r = result as { ok?: boolean; error?: string };
+              aiResponse = r?.ok === false
+                ? `That didn't work: ${r.error || "unknown error"}.`
+                : `Done — I applied that change.`;
+              toolCallsTrace = [{ name: confirmAction.tool, args: confirmAction.args, ok: r?.ok !== false, confirmed: true }];
+              // Emit the short response as a single delta.
+              enqueue({ type: "delta", text: aiResponse });
+            } else {
+              const agentReply = await runAgentLoop(
+                { message: message || "", images, conversationHistory,
+                  onDelta: (text) => enqueue({ type: "delta", text }) },
+                toolCtx, openRouter
+              );
+              aiResponse = agentReply.content;
+              recipe = agentReply.recipe || null;
+              recipes = agentReply.recipes || null;
+              pendingConfirmation = agentReply.pendingConfirmation || null;
+              toolCallsTrace = agentReply.toolCalls;
+              iterations = agentReply.iterations;
+              hitMaxIters = agentReply.hitMaxIters;
+            }
+
+            const routingDuration = Date.now() - startTime;
+            const intentMetadata = {
+              source: "agent", manualIntent: manualIntent || null,
+              toolCalls: toolCallsTrace, iterations, hitMaxIters,
+              confirmAction: confirmActionResult ? true : undefined,
+            };
+
+            // Persist AI message.
+            const { data: aiMessage } = await supabase
+              .from("chat_messages").insert({
+                conversation_id: conversationId,
+                content: aiResponse, sender: "ai",
+                message_type: recipe ? "recipe" : "text",
+                metadata: { ...intentMetadata, recipe, recipes, pendingConfirmation, routingDuration },
+              }).select().single();
+
+            // Generate title (non-blocking).
+            let generatedTitle: string | undefined;
+            if (isFirstMessage) {
+              try {
+                const t = await openRouter.chat(
+                  "Generate a very short title (4-6 words max) for this conversation. Return ONLY the title text, nothing else.",
+                  `User: ${(message || "").substring(0, 200)}\nAssistant: ${aiResponse.substring(0, 200)}`,
+                  "qwen/qwen-2.5-7b-instruct",
+                  { temperature: 0.3, max_tokens: 20, billing: "chat" }
+                );
+                generatedTitle = t.trim().replace(/^["']|["']$/g, "");
+                if (generatedTitle) {
+                  await supabase.from("chat_conversations")
+                    .update({ title: generatedTitle }).eq("id", conversationId);
+                }
+              } catch (e) { console.warn("Title generation failed:", e.message); }
+            }
+
+            // Terminal SSE events.
+            if (recipe) enqueue({ type: "recipe", recipe });
+            if (recipes && recipes.length > 1) enqueue({ type: "recipes", recipes });
+            if (pendingConfirmation) enqueue({ type: "confirmation", pendingConfirmation });
+            enqueue({
+              type: "done",
+              messageId: aiMessage?.id,
+              conversationId,
+              sessionId: session_id,
+              intentMetadata,
+              title: generatedTitle,
+            });
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error("SSE agent error:", msg);
+            try { controller.enqueue(sseEvent({ type: "error", message: msg })); } catch { /* closed */ }
+          } finally {
+            try { controller.close(); } catch { /* already closed */ }
+          }
+        },
+      });
+
+      return new Response(readableStream, { headers: SSE_HEADERS });
+    }
+
+    // ── Non-streaming (JSON) path — unchanged ───────────────────────
     let aiResponse: string;
     let recipe: any = null;
     let recipes: any[] | null = null;

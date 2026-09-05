@@ -276,6 +276,154 @@ export class OpenRouterClient {
     };
   }
 
+  /**
+   * Tool-using chat completion with SSE streaming for the final text reply.
+   *
+   * The tool loop (tool_calls) is NOT streamed — only the final prose content
+   * delta is streamed. Call this only for the concluding reply turn
+   * (tool_choice: "none" or after all tools have resolved).
+   *
+   * @param onDelta   Called once per content delta as it arrives.
+   * @returns         The full ChatWithToolsResult (content assembled from deltas).
+   */
+  async streamChatWithTools(
+    systemPrompt: string,
+    messages: ChatMessage[],
+    tools: ToolSpec[],
+    onDelta: (text: string) => void,
+    model = "qwen/qwen3-8b",
+    options?: {
+      temperature?: number;
+      max_tokens?: number;
+      tool_choice?: "auto" | "none" | "required";
+    }
+  ): Promise<ChatWithToolsResult> {
+    const apiKey = this.chatApiKey;
+
+    const fullMessages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      ...messages,
+    ];
+
+    const body: Record<string, unknown> = {
+      model,
+      messages: fullMessages,
+      tools,
+      tool_choice: options?.tool_choice ?? "none",
+      temperature: options?.temperature ?? 0.2,
+      max_tokens: options?.max_tokens ?? 1024,
+      provider: { require_parameters: true },
+      stream: true,
+    };
+
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": Deno.env.get("FRONTEND_URL") || "",
+        "X-Title": "MealPrep Agent",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter streamChatWithTools error:", response.status, errorText);
+      throw new Error(`OpenRouter API failed: ${response.status} - ${errorText}`);
+    }
+
+    if (!response.body) {
+      throw new Error("OpenRouter returned no body for streaming request");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let assembledContent = "";
+    const tool_calls: ToolCall[] = [];
+    let finish_reason: string | null = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        // Keep the last (potentially incomplete) line in the buffer.
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith("data:")) continue;
+          const payload = trimmed.slice(5).trim();
+          if (payload === "[DONE]") {
+            finish_reason = finish_reason ?? "stop";
+            break;
+          }
+
+          let chunk: Record<string, unknown>;
+          try {
+            chunk = JSON.parse(payload);
+          } catch {
+            // Malformed SSE line — skip.
+            continue;
+          }
+
+          const choice = (chunk.choices as Array<Record<string, unknown>> | undefined)?.[0];
+          if (!choice) continue;
+
+          // finish_reason arrives on the last chunk.
+          if (choice.finish_reason) {
+            finish_reason = choice.finish_reason as string;
+          }
+
+          const delta = choice.delta as Record<string, unknown> | undefined;
+          if (!delta) continue;
+
+          // Content delta.
+          const text = delta.content as string | undefined;
+          if (text) {
+            assembledContent += text;
+            onDelta(text);
+          }
+
+          // Tool call deltas (present when the model uses tool_choice:"auto"
+          // mid-stream — rare but possible).
+          const deltaToolCalls = delta.tool_calls as Array<{
+            index: number;
+            id?: string;
+            type?: string;
+            function?: { name?: string; arguments?: string };
+          }> | undefined;
+          if (deltaToolCalls) {
+            for (const dtc of deltaToolCalls) {
+              const idx = dtc.index;
+              if (!tool_calls[idx]) {
+                tool_calls[idx] = {
+                  id: dtc.id ?? `call_${idx}`,
+                  type: "function",
+                  function: { name: "", arguments: "" },
+                };
+              }
+              if (dtc.function?.name) tool_calls[idx].function.name += dtc.function.name;
+              if (dtc.function?.arguments) tool_calls[idx].function.arguments += dtc.function.arguments;
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return {
+      content: assembledContent || null,
+      tool_calls,
+      finish_reason,
+    };
+  }
+
   async generateEmbedding(text: string): Promise<number[]> {
     const apiKey = this.mediaApiKey;
     const response = await fetch(`${this.baseUrl}/embeddings`, {
