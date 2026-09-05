@@ -2,8 +2,8 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-09-04
-**Last updated:** 2026-09-04 (added E2E_TESTING.md; updated MOP table through MOP-0018)
+**Last reviewed:** 2026-09-05
+**Last updated:** 2026-09-05 (MOP-0016 and MOP-0018 marked complete)
 
 ---
 
@@ -88,9 +88,9 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 | [MOP-0013](MOPs/MOP-0013.md) | Playwright E2E Test Setup | complete |
 | [MOP-0014](MOPs/MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | draft |
 | [MOP-0015](MOPs/MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle | draft |
-| [MOP-0016](MOPs/MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | in_progress |
+| [MOP-0016](MOPs/MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | complete |
 | [MOP-0017](MOPs/MOP-0017-streaming-chat-responses.md) | Streaming Chat Responses | approved |
-| [MOP-0018](MOPs/MOP-0018-ai-tool-expansion.md) | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions | in_progress |
+| [MOP-0018](MOPs/MOP-0018-ai-tool-expansion.md) | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions | complete |
 
 > Status vocabulary is defined in [prompts/MOP_STATUS_LIFECYCLE.md](prompts/MOP_STATUS_LIFECYCLE.md). See [MOPs/REGISTRY.md](MOPs/REGISTRY.md) for the authoritative index with dates.
 
