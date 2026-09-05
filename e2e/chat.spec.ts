@@ -24,17 +24,55 @@ import { getTestSession } from './fixtures/auth';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Type a message and press Enter to send. */
+
+/**
+ * Type text into the chat textarea and send it.
+ *
+ * Uses pressSequentially so React onChange fires on each keypress (fill() bypasses
+ * React's synthetic events). After typing, clicks the Send button via JS.
+ *
+ * Important: call this only after the conversation is fully loaded (textarea visible
+ * and a real conversation — not just the welcome screen — is active).
+ */
 async function sendMessage(page: import('@playwright/test').Page, text: string) {
   const textarea = page.locator('textarea').last();
-  await textarea.click();
+  // fill() triggers React onChange in headless Chromium, setting inputMessage state.
   await textarea.fill(text);
-  await textarea.press('Enter');
+  // Wait for the send button to be enabled (inputMessage non-empty → disabled prop removed).
+  // The send button has data-testid="send-message-btn" added to ChatInterface.tsx.
+  const sendBtn = page.getByTestId('send-message-btn');
+  await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
+  await sendBtn.click();
 }
 
 /**
- * Wait for the AI to respond — returns when a new AI message bubble appears
- * after the thinking placeholder, or times out.
+ * Navigate to /chat and wait until the ChatInterface is fully initialized:
+ * - The conversation history has loaded from DB
+ * - currentConversationId is set (a "New Chat" sidebar item appears)
+ * - The textarea is ready for input
+ *
+ * We wait for a sidebar conversation item to appear, which means loadConversations()
+ * has completed and setCurrentConversationId() has been called.
+ */
+async function goToFreshChat(page: import('@playwright/test').Page) {
+  await page.goto('/chat');
+  // Wait until currentConversationId is set in ChatInterface.
+  // We expose it as data-conversation-id on the textarea (added to ChatInterface.tsx).
+  // This attribute becomes non-empty only after loadConversations() completes and
+  // setCurrentConversationId() fires — the exact same guard that handleSendMessage checks.
+  await page.waitForFunction(() => {
+    const ta = document.querySelector('textarea[data-testid="chat-input"]');
+    return ta !== null && (ta as HTMLTextAreaElement).getAttribute('data-conversation-id')!.length > 0;
+  }, { timeout: 30_000 });
+}
+
+/**
+ * Wait for the AI to respond.
+ *
+ * Strategy:
+ * 1. Wait up to 20s for the thinking dots (.animate-bounce) to appear (non-fatal).
+ * 2. Wait up to `timeout` for them to disappear.
+ * 3. Return the last AI message bubble (justify-start wrapper).
  */
 async function waitForAIResponse(
   page: import('@playwright/test').Page,
@@ -42,22 +80,18 @@ async function waitForAIResponse(
 ) {
   const timeout = options.timeout ?? 60_000;
 
-  // Wait for thinking bubble to appear first.
-  await page
-    .locator('.animate-bounce')
-    .first()
-    .waitFor({ state: 'visible', timeout: 15_000 })
-    .catch(() => {/* already gone */});
+  // Wait for thinking dots to appear (confirms message was sent and AI is working).
+  await page.locator('.animate-bounce').first()
+    .waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
 
-  // Then wait for thinking bubble to disappear (real response replaced it).
-  await page
-    .locator('.animate-bounce')
-    .first()
-    .waitFor({ state: 'hidden', timeout })
-    .catch(() => {/* bubble was already gone */});
+  // Wait for thinking dots to disappear (response rendered).
+  await page.locator('.animate-bounce').first()
+    .waitFor({ state: 'hidden', timeout }).catch(() => {});
 
-  // Return the last AI message bubble.
-  return page.locator('[class*="justify-start"]').last();
+  // Return the last AI message bubble. AI messages have justify-start on their wrapper.
+  const aiMsg = page.locator('[class*="justify-start"]').last();
+  await aiMsg.waitFor({ state: 'visible', timeout: 10_000 });
+  return aiMsg;
 }
 
 /** Get the current test session token + user info. Cached per test run. */
@@ -71,9 +105,7 @@ async function session() {
 
 test.describe('Chat — basic', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/chat');
-    // Wait for the chat input to be ready.
-    await page.locator('textarea').last().waitFor({ state: 'visible', timeout: 10_000 });
+    await goToFreshChat(page);
   });
 
   test('chat input accepts text', async ({ page }) => {
@@ -85,9 +117,14 @@ test.describe('Chat — basic', () => {
   test('sends a message and receives an AI reply', async ({ page }) => {
     test.setTimeout(90_000);
     await sendMessage(page, 'Say exactly: OK');
-    const aiMsg = await waitForAIResponse(page, { timeout: 60_000 });
-    await expect(aiMsg).toBeVisible();
-    // Some text content should be present in the last AI bubble.
+    // Wait for thinking dots → disappear → AI bubble with text appears.
+    await page.locator('.animate-bounce').first()
+      .waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+    await page.locator('.animate-bounce').first()
+      .waitFor({ state: 'hidden', timeout: 60_000 }).catch(() => {});
+    // The AI replied — wait for a message bubble on the left (justify-start = AI side).
+    const aiMsg = page.locator('[class*="justify-start"]').last();
+    await aiMsg.waitFor({ state: 'visible', timeout: 10_000 });
     const text = await aiMsg.innerText();
     expect(text.length).toBeGreaterThan(0);
   });
@@ -116,8 +153,7 @@ test.describe('Chat — recipe search', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/chat');
-    await page.locator('textarea').last().waitFor({ state: 'visible', timeout: 10_000 });
+    await goToFreshChat(page);
   });
 
   test('search returns the seeded recipe by name', async ({ page }) => {
@@ -149,8 +185,7 @@ test.describe('Chat — recipe extraction from text', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/chat');
-    await page.locator('textarea').last().waitFor({ state: 'visible', timeout: 10_000 });
+    await goToFreshChat(page);
   });
 
   test('extracts a recipe from pasted text and shows a card', async ({ page }) => {
@@ -197,8 +232,7 @@ test.describe('Chat — meal plan', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/chat');
-    await page.locator('textarea').last().waitFor({ state: 'visible', timeout: 10_000 });
+    await goToFreshChat(page);
   });
 
   test('agent can read the grocery list', async ({ page }) => {
@@ -236,8 +270,7 @@ test.describe('Chat — destructive confirmation gate', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/chat');
-    await page.locator('textarea').last().waitFor({ state: 'visible', timeout: 10_000 });
+    await goToFreshChat(page);
   });
 
   test('delete request shows confirmation prompt, cancel does not delete', async ({ page }) => {
@@ -293,8 +326,7 @@ test.describe('Chat — scale recipe', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/chat');
-    await page.locator('textarea').last().waitFor({ state: 'visible', timeout: 10_000 });
+    await goToFreshChat(page);
   });
 
   test('agent scales recipe servings on request', async ({ page }) => {

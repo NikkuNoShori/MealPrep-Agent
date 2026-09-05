@@ -2119,6 +2119,8 @@ export const ChatInterface: React.FC = () => {
                 <textarea
                   ref={textareaRef}
                   value={inputMessage}
+                  data-testid="chat-input"
+                  data-conversation-id={currentConversationId ?? ''}
                   onChange={(e) => {
                     setInputMessage(e.target.value);
                     // Auto-resize textarea
@@ -2158,6 +2160,7 @@ export const ChatInterface: React.FC = () => {
                       !pendingVideo
                     }
                     size="icon"
+                    data-testid="send-message-btn"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
