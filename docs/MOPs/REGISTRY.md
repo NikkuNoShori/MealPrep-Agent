@@ -44,7 +44,7 @@
 | [MOP-0010](MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0011](MOP-0011.md) | Normalize `meal_plans` JSONB → Child Tables | draft (deferred) | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0012](MOP-0012.md) | Recipe-Pipeline Test Fixture Library | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
-| [MOP-0013](MOP-0013.md) | Playwright E2E Test Setup | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
+| [MOP-0013](MOP-0013.md) | Playwright E2E Test Setup | complete | 2026-06-01 | 2026-09-04 | 2026-09-04 | Nick Neal |
 | [MOP-0014](MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | draft | 2026-06-01 | 2026-06-01 | — | surface-reviewer |
 | [MOP-0015](MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle — fix stale embeddings from edited recipes | draft | 2026-06-04 | 2026-06-04 | — | chat-rag-sme audit |
 | [MOP-0016](MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | in_progress | 2026-06-15 | 2026-06-16 | — | Nick Neal |
