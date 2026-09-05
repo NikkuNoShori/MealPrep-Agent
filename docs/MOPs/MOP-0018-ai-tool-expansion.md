@@ -5,10 +5,10 @@
 | **MOP** | MOP-0018 |
 | **Title** | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions |
 | **Date Submitted** | 2026-09-04 |
-| **Date Updated** | 2026-09-04 |
-| **Date Completed** | — |
+| **Date Updated** | 2026-09-05 |
+| **Date Completed** | 2026-09-05 |
 | **Submitted By** | Nick Neal |
-| **Status** | in_progress |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md).
 
@@ -231,20 +231,32 @@ Domain: `chat`, `recipes`, `grocery`, `household` per DOMAIN_TEST_MATRIX.md.
 verification:
   - id: save-recipe-handler-exists
     type: grep
-    path: supabase/functions/chat-api/tools/save_recipe.ts
-    pattern: 'export.*handleSaveRecipe|export.*saveRecipe'
-    expect: present
-
-  - id: save-recipe-registered
-    type: grep
-    path: supabase/functions/chat-api/tools/dispatch.ts
+    path: supabase/functions/chat-api/tools/handlers.ts
     pattern: 'save_recipe'
     expect: present
 
-  - id: check-safety-auto-hooked
+  - id: save-recipe-in-catalog
     type: grep
-    path: supabase/functions/chat-api/agent-loop.ts
-    pattern: 'check_recipe_safety|checkRecipeSafety'
+    path: supabase/functions/chat-api/tools/catalog.ts
+    pattern: 'name: "save_recipe"'
+    expect: present
+
+  - id: grocery-tools-in-catalog
+    type: grep
+    path: supabase/functions/chat-api/tools/catalog.ts
+    pattern: 'name: "get_grocery_list"'
+    expect: present
+
+  - id: check-safety-in-catalog
+    type: grep
+    path: supabase/functions/chat-api/tools/catalog.ts
+    pattern: 'name: "check_recipe_safety"'
+    expect: present
+
+  - id: scale-recipe-in-catalog
+    type: grep
+    path: supabase/functions/chat-api/tools/catalog.ts
+    pattern: 'name: "scale_recipe"'
     expect: present
 
   - id: lint-clean
