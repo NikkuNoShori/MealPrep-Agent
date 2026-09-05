@@ -307,7 +307,7 @@ export const TOOL_CATALOG: CatalogEntry[] = [
       function: {
         name: "update_recipe",
         description:
-          "Modify fields on an existing recipe. ALWAYS destructive — runtime returns a confirmation request.",
+          "Modify fields on an existing recipe (title, description, servings, ingredients, instructions, prep_time, cook_time, difficulty, cuisine, tags, is_favorite). ALWAYS destructive — runtime returns a confirmation request before applying changes.",
         parameters: {
           type: "object",
           properties: {
@@ -321,6 +321,29 @@ export const TOOL_CATALOG: CatalogEntry[] = [
                 tags_add: { type: "array", items: { type: "string" } },
                 tags_remove: { type: "array", items: { type: "string" } },
                 is_favorite: { type: "boolean" },
+                ingredients: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      amount: { type: "number" },
+                      unit: { type: "string" },
+                      category: { type: "string" },
+                      notes: { type: "string" },
+                    },
+                    required: ["name"],
+                    additionalProperties: false,
+                  },
+                },
+                instructions: {
+                  type: "array",
+                  items: { type: "string" },
+                },
+                prep_time: { type: "integer", minimum: 0 },
+                cook_time: { type: "integer", minimum: 0 },
+                difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
+                cuisine: { type: "string" },
               },
               additionalProperties: false,
               minProperties: 1,
