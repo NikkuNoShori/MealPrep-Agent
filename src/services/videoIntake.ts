@@ -160,8 +160,7 @@ export async function processVideoIntake(input: {
 
 /** Map recipe-pipeline result to chat UI shape (preview, no save). */
 export function mapPipelineToChatResponse(
-  outcome: VideoIntakeOutcome | { pipeline?: Record<string, unknown> } & Record<string, unknown>,
-  legacyDirect?: never
+  outcome: VideoIntakeOutcome | { pipeline?: Record<string, unknown> } & Record<string, unknown>
 ): ChatMessageResponse {
   const pipeline =
     "pipeline" in outcome && outcome.pipeline

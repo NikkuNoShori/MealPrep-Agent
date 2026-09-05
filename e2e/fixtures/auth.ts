@@ -60,7 +60,6 @@ export async function globalSignIn(page: import('@playwright/test').Page) {
 
 /** Extended test fixture that automatically loads the saved auth state. */
 export const test = base.extend<{ authFile: string }>({
-  // eslint-disable-next-line no-empty-pattern
   authFile: [AUTH_FILE, { option: true }],
 
   page: async ({ browser, authFile }, use) => {
