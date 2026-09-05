@@ -156,7 +156,7 @@ export class OpenRouterClient {
     systemPrompt: string,
     userMessage: string,
     images: string[],
-    model = "qwen/qwen2.5-vl-7b-instruct",
+    model = "qwen/qwen3-vl-8b-instruct", // qwen-2.5-vl-7b retired; Qwen3 VL 8B is the successor
     options?: {
       temperature?: number;
       max_tokens?: number;

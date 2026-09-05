@@ -10,10 +10,15 @@ import { RECIPE_EXTRACTION_PROMPT, IMAGE_EXTRACTION_PROMPT } from "../../_shared
 /** Maximum number of recipes allowed per request */
 const MAX_RECIPES_PER_REQUEST = 5;
 
-/** Vision models to try in order — fallback if first returns 500/404 */
+/**
+ * Vision models to try in order — fallback chain if primary fails.
+ * qwen-2.5-vl-7b was retired from OpenRouter; replaced with Qwen3 VL family.
+ * Updated 2026-09-05: confirmed live slugs via GET /api/v1/models.
+ */
 const VISION_MODELS = [
-  "qwen/qwen2.5-vl-7b-instruct",   // current OpenRouter slug (no hyphen before 2.5)
-  "google/gemini-2.0-flash-001",
+  "qwen/qwen3-vl-8b-instruct",    // Qwen3 VL 8B — successor to retired qwen-2.5-vl-7b
+  "qwen/qwen2.5-vl-72b-instruct", // Qwen2.5 VL 72B — quality fallback (larger, slower)
+  "google/gemini-2.0-flash-001",  // Google fallback
 ];
 
 /** Minimum caption/OCR text before we skip vision re-processing in extract. */
