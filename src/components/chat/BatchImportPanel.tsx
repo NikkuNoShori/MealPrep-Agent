@@ -20,6 +20,7 @@ import {
   CheckCheck,
   XCircle,
   DownloadCloud,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +28,17 @@ import { apiClient, parseImportUrls } from "@/services/api";
 import type { BatchSSEEvent } from "@/services/api";
 import { BatchImportCard } from "./BatchImportCard";
 import type { BatchCardEntry } from "./BatchImportCard";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Social media URL detection (mirrors video-url-utils.ts patterns)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SOCIAL_RE =
+  /^https?:\/\/(?:(?:www|vm|vt)\.)?tiktok\.com|^https?:\/\/(?:www\.)?instagram\.com\/(?:reel|p)\//i;
+
+function isSocialUrl(url: string): boolean {
+  return SOCIAL_RE.test(url);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -67,6 +79,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
   const parsedUrls = parseImportUrls(urlInput);
   const urlCount = parsedUrls.length;
   const canImport = urlCount > 0 && urlCount <= 50;
+  const socialCount = parsedUrls.filter(isSocialUrl).length;
 
   const doneSaving = cards.every((c) => c.status === "saved");
   const saveableCount = cards.filter((c) => c.status === "done").length;
@@ -298,6 +311,16 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
             className="resize-none text-sm font-mono min-h-[96px]"
             rows={4}
           />
+          {/* Social media warning */}
+          {socialCount > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-400/40 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                <strong>{socialCount} TikTok/Instagram URL{socialCount !== 1 ? "s" : ""} detected.</strong>{" "}
+                These platforms block automated scraping — extraction will likely fail. For best results, use regular recipe website URLs (allrecipes.com, seriouseats.com, etc.).
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
               {urlCount > 0

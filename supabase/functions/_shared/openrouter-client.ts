@@ -156,7 +156,7 @@ export class OpenRouterClient {
     systemPrompt: string,
     userMessage: string,
     images: string[],
-    model = "qwen/qwen-2.5-vl-7b-instruct",
+    model = "qwen/qwen2.5-vl-7b-instruct",
     options?: {
       temperature?: number;
       max_tokens?: number;
