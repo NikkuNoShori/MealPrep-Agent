@@ -2,8 +2,20 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-09-04
-**Last updated:** 2026-09-04 (MOP-0017 SSE streaming complete; arrow-key history fix)
+**Last reviewed:** 2026-09-05
+**Last updated:** 2026-09-05 (MOP-0019 Batch Recipe Import complete)
+
+---
+
+## 2026-09-05 (MOP-0019: Batch Recipe Import) `main`
+
+**Batch Recipe Import (MOP-0019 — complete)**
+- New `PackagePlus` toolbar button in the chat input area opens a **Batch Import Panel** — a drawer that accepts up to 50 recipe URLs (pasted or comma-separated).
+- Extraction runs in parallel waves of 10 (SSE-streamed from `chat-api/batch-extract`). Each URL gets a live card showing `extracting → done / error`.
+- Per-URL **Save** button and **Save All** bulk action persist recipes through the full `recipe-pipeline/ingest` path (dedup-safe, embeddings on save).
+- **Retry** button re-extracts individual failed cards. **Abort** button cancels an in-flight run.
+- Saved recipes echo a confirmation message into the chat conversation.
+- All-in unit tests (9) and Playwright E2E spec (14 test cases) added.
 
 ---
 

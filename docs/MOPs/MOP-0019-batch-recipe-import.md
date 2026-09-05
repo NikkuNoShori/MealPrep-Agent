@@ -6,9 +6,9 @@
 | **Title** | Batch Recipe Import — SSE-Streamed Multi-URL Extraction |
 | **Date Submitted** | 2026-09-05 |
 | **Date Updated** | 2026-09-05 |
-| **Date Completed** | — |
+| **Date Completed** | 2026-09-05 |
 | **Submitted By** | Nick Neal |
-| **Status** | approved |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md).
 

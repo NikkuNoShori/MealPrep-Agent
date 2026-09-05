@@ -3,7 +3,7 @@
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
 **Last reviewed:** 2026-09-04
-**Last updated:** 2026-09-04 (MOP-0017: SSE streaming mode added to /chat-api/message)
+**Last updated:** 2026-09-05 (MOP-0019: batch-extract SSE endpoint added)
 
 ---
 
@@ -202,6 +202,42 @@ Persist a **client-side** video extraction into `chat_messages` so follow-up age
 - AI message: `message_type: recipe`, `metadata.recipe`, `metadata.recipes`, `metadata.thumbnail_url` (HTTP URL only — **no base64 keyframes**)
 
 **Client:** `apiClient.persistChatExtraction()` in `src/services/api.ts`; called from `ChatInterface` after `processVideoIntake`.
+
+---
+
+### POST `/functions/v1/chat-api/batch-extract`
+
+MOP-0019 — SSE-streamed batch URL extraction. Accepts up to 50 recipe URLs, runs parallel extraction (wave-chunked into groups of 10 to stay within Supabase's 150s wall-clock limit), and emits SSE events for each result.
+
+**Location:** `supabase/functions/chat-api/batch-extract.ts`
+
+**Headers:** Same as `/chat-api/message` (Authorization + apikey). Must include `Accept: text/event-stream`.
+
+**Request body:**
+```json
+{
+  "urls": ["string (up to 50 valid http/https URLs; dupes silently dropped)"]
+}
+```
+
+**Response:** `Content-Type: text/event-stream`. Each `data:` frame is a JSON object — one of:
+
+| Event type | Shape |
+|------------|-------|
+| `progress` | `{ type, index, total, url, status: "extracting" }` |
+| `result` | `{ type, index, url, recipe: <extracted recipe object> }` |
+| `error` | `{ type, index, url, message: string }` |
+| `done` | `{ type, total, succeeded, failed }` |
+
+**Extraction path per URL:** `POST /recipe-pipeline/extract-only` with `auto_save: false`. The client saves via `apiClient.ingestRecipeFromUrl(url, true)` on user confirmation.
+
+**Constraints:**
+- URLs capped at 50 (excess silently truncated server-side)
+- Per-URL timeout: 50s (AbortSignal.timeout)
+- Wave size: 10 concurrent extractions
+- All waves processed before `done` is emitted
+
+**Client:** `apiClient.batchImport(urls, callbacks, signal?)` in `src/services/api.ts`, rendered in `BatchImportPanel` + `BatchImportCard` components.
 
 ---
 

@@ -14,6 +14,7 @@ import { runAgentLoop } from "./agent-loop.ts";
 import { executeConfirmedTool } from "./tools/handlers.ts";
 import type { ToolContext } from "./tools/dispatch.ts";
 import { enrichMessageContent } from "./conversation-context.ts";
+import { handleBatchExtract } from "./batch-extract.ts";
 
 // ═══════════════════════════════════════════════════════════════════
 // SSE HELPERS
@@ -74,6 +75,11 @@ serve(async (req) => {
     // Persist client-side extractions (e.g. video intake) — no OpenRouter needed
     if (method === "POST" && path.includes("/persist-extraction")) {
       return await handlePersistExtraction(req, supabase, user);
+    }
+
+    // MOP-0019 — Batch recipe import (SSE-streamed multi-URL extraction)
+    if (method === "POST" && path.includes("/batch-extract")) {
+      return await handleBatchExtract(req, supabase, user, userToken);
     }
 
     let openRouter: OpenRouterClient;

@@ -91,7 +91,7 @@ Tracked improvement initiatives with `MOP-XXXX` numbering. See [MOPs/REGISTRY.md
 | [MOP-0016](MOPs/MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | complete |
 | [MOP-0017](MOPs/MOP-0017-streaming-chat-responses.md) | Streaming Chat Responses | complete |
 | [MOP-0018](MOPs/MOP-0018-ai-tool-expansion.md) | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions | complete |
-| [MOP-0019](MOPs/MOP-0019-batch-recipe-import.md) | Batch Recipe Import — SSE-Streamed Multi-URL Extraction | approved |
+| [MOP-0019](MOPs/MOP-0019-batch-recipe-import.md) | Batch Recipe Import — SSE-Streamed Multi-URL Extraction | complete |
 | [MOP-0020](MOPs/MOP-0020-realtime-reasoning-display.md) | Realtime Reasoning Display — Tool Step Visibility in Chat | approved |
 
 > Status vocabulary is defined in [prompts/MOP_STATUS_LIFECYCLE.md](prompts/MOP_STATUS_LIFECYCLE.md). See [MOPs/REGISTRY.md](MOPs/REGISTRY.md) for the authoritative index with dates.

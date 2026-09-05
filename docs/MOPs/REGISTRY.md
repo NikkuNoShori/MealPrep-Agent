@@ -50,7 +50,7 @@
 | [MOP-0016](MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | complete | 2026-06-15 | 2026-09-05 | 2026-09-05 | Nick Neal |
 | [MOP-0017](MOP-0017-streaming-chat-responses.md) | Streaming Chat Responses | complete | 2026-09-03 | 2026-09-04 | 2026-09-04 | Nick Neal |
 | [MOP-0018](MOP-0018-ai-tool-expansion.md) | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions | complete | 2026-09-04 | 2026-09-05 | 2026-09-05 | Nick Neal |
-| [MOP-0019](MOP-0019-batch-recipe-import.md) | Batch Recipe Import — SSE-Streamed Multi-URL Extraction | approved | 2026-09-05 | 2026-09-05 | — | Nick Neal |
+| [MOP-0019](MOP-0019-batch-recipe-import.md) | Batch Recipe Import — SSE-Streamed Multi-URL Extraction | complete | 2026-09-05 | 2026-09-05 | 2026-09-05 | Nick Neal |
 | [MOP-0020](MOP-0020-realtime-reasoning-display.md) | Realtime Reasoning Display — Tool Step Visibility in Chat | approved | 2026-09-05 | 2026-09-05 | — | Nick Neal |
 
 > **MOP-0016:** Phases 1–3b shipped 2026-06-16 (`chat-api` deployed). **Outstanding:** deploy `recipe-pipeline`, run §Operator smoke tests, then promote to `verifying`. MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).

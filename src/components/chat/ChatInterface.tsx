@@ -8,6 +8,7 @@ import { apiClient } from "../../services/api";
 import { detectIntent } from "../../services/ragService";
 import { Logger } from "../../services/logger";
 import { Button } from "../ui/button";
+import { BatchImportPanel } from "./BatchImportPanel";
 import {
   Send,
   Loader2,
@@ -26,6 +27,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Save,
+  PackagePlus,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { ChatMessageResponse, StructuredRecipe } from "../../types";
@@ -252,6 +254,8 @@ export const ChatInterface: React.FC = () => {
   // Tracks the message id whose pendingConfirmation is currently being
   // dispatched, so the Confirm/Cancel buttons can show a busy state.
   const [confirmingMessageId, setConfirmingMessageId] = useState<string | null>(null);
+  // MOP-0019 — Batch import panel visibility
+  const [showBatchPanel, setShowBatchPanel] = useState(false);
 
   const sendMessageMutation = useSendMessage();
   const queryClient = useQueryClient();
@@ -2093,6 +2097,37 @@ export const ChatInterface: React.FC = () => {
 
         {/* Input Area */}
         <div className="border-t p-4 flex-shrink-0">
+          {/* MOP-0019 — Batch Import Panel (drawer above input) */}
+          {showBatchPanel && (
+            <div className="mb-3">
+              <BatchImportPanel
+                onDismiss={() => setShowBatchPanel(false)}
+                onSaveComplete={(summary) => {
+                  setShowBatchPanel(false);
+                  // Echo a system-level confirmation into the chat conversation.
+                  const conversationId = currentConversationId ?? `local-${Date.now()}`;
+                  setConversations((prev) =>
+                    prev.map((conv) =>
+                      conv.id === conversationId
+                        ? {
+                            ...conv,
+                            messages: [
+                              ...conv.messages,
+                              {
+                                id: `batch-save-${Date.now()}`,
+                                content: `✅ ${summary}`,
+                                sender: "ai" as const,
+                                timestamp: new Date(),
+                              },
+                            ],
+                          }
+                        : conv,
+                    ),
+                  );
+                }}
+              />
+            </div>
+          )}
           <div className="space-y-2">
               {/* Image Previews */}
               {pendingImages.length > 0 && (
@@ -2166,6 +2201,16 @@ export const ChatInterface: React.FC = () => {
                   }
                 >
                   <ImageIcon className="h-4 w-4" />
+                </Button>
+                {/* MOP-0019 — Batch import button */}
+                <Button
+                  onClick={() => setShowBatchPanel((v) => !v)}
+                  variant={showBatchPanel ? "secondary" : "outline"}
+                  size="icon"
+                  title="Batch import recipes from URLs"
+                  data-testid="batch-import-toolbar-btn"
+                >
+                  <PackagePlus className="h-4 w-4" />
                 </Button>
                 <textarea
                   ref={textareaRef}

@@ -3,7 +3,7 @@
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
 **Last reviewed:** 2026-09-04
-**Last updated:** 2026-09-04 (MOP-0017: SSE streaming for chat agent final reply)
+**Last updated:** 2026-09-05 (MOP-0019: Batch Recipe Import added)
 
 ---
 
@@ -200,6 +200,40 @@ SSE event types: `delta` · `recipe` · `recipes` · `confirmation` · `done` ·
 Non-streaming callers (no `Accept: text/event-stream`) receive the existing JSON response unchanged — **fully backwards-compatible**.
 
 Frontend: `apiClient.sendMessageStream()` (`src/services/api.ts`) reads the stream and calls `onEvent` per frame. `ChatInterface` updates the thinking-placeholder bubble in-place on each `delta`, then finalises on `done`. Key files: `supabase/functions/_shared/openrouter-client.ts` (`streamChatWithTools`), `supabase/functions/chat-api/agent-loop.ts` (`onDelta` hookup), `supabase/functions/chat-api/index.ts` (SSE path).
+
+### Batch Recipe Import (MOP-0019)
+
+Allows the user to paste up to 50 recipe URLs and extract them in a single SSE-streamed operation directly from the chat input toolbar.
+
+```
+User pastes URLs into BatchImportPanel textarea
+  → parseImportUrls() deduplicates + validates client-side
+  → apiClient.batchImport(urls, callbacks, signal)
+      POST /chat-api/batch-extract   (Accept: text/event-stream)
+        │
+        ├─► Wave loop (10 concurrent per wave):
+        │     extractOne(url) → POST /recipe-pipeline/extract-only (auto_save:false)
+        │       → SSE: {type:"progress", index, url, status:"extracting"}
+        │       → SSE: {type:"result", index, url, recipe}  (success)
+        │         or: {type:"error",  index, url, message}  (failure)
+        │
+        └─► SSE: {type:"done", total, succeeded, failed}
+  → BatchImportPanel renders BatchImportCard per URL
+      extracting → pulsing skeleton
+      done       → title, ingredient count, Save button
+      error      → message, Retry button
+      saved      → green confirmation
+
+User: per-card Save or "Save All"
+  → apiClient.ingestRecipeFromUrl(url, true)
+      POST /recipe-pipeline/ingest (full pipeline: extract + embed + save)
+```
+
+**Wave chunking** keeps total execution time within Supabase's 150s wall-clock limit. Per-URL timeout: 50s (`AbortSignal.timeout`). The endpoint accepts an abort signal — the panel's Abort button cancels the in-flight fetch.
+
+**Save path:** `ingestRecipeFromUrl(url, true)` re-runs extraction + dedup check + embedding on save. Cards store the preview recipe object for display only; the canonical save goes through the full pipeline.
+
+Key files: `supabase/functions/chat-api/batch-extract.ts`, `src/components/chat/BatchImportPanel.tsx`, `src/components/chat/BatchImportCard.tsx`, `src/services/api.ts` (`batchImport`, `parseImportUrls`).
 
 ### Short-Form Video Intake (MOP-0016)
 

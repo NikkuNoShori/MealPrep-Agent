@@ -62,6 +62,39 @@ export type StreamCallbacks = {
   onError?: (err: Error) => void;
 };
 
+// ─────────────────────────────────────────────────────────────────────
+// MOP-0019 — Batch import types
+// ─────────────────────────────────────────────────────────────────────
+
+export type BatchSSEEvent =
+  | { type: "progress"; index: number; total: number; url: string; status: "extracting" }
+  | { type: "result";   index: number; url: string; recipe: any }
+  | { type: "error";    index: number; url: string; message: string }
+  | { type: "done";     total: number; succeeded: number; failed: number };
+
+export type BatchImportCallbacks = {
+  onEvent: (event: BatchSSEEvent) => void;
+};
+
+/** Parse a raw textarea value into a deduplicated, validated URL list. */
+export function parseImportUrls(raw: string): string[] {
+  const seen = new Set<string>();
+  const valid: string[] = [];
+  for (const chunk of raw.split(/[\s,]+/)) {
+    const trimmed = chunk.trim();
+    if (!trimmed) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    try {
+      const u = new URL(trimmed);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        valid.push(trimmed);
+      }
+    } catch { /* skip invalid */ }
+  }
+  return valid;
+}
+
 export interface ChatToolCallTrace {
   name: string;
   args: Record<string, unknown>;
@@ -526,6 +559,77 @@ class ApiClient {
           if (event.type === "done" || event.type === "error") {
             return; // stream logically complete
           }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  /**
+   * MOP-0019 — Batch recipe import.
+   *
+   * Sends up to 50 URLs to POST /chat-api/batch-extract and streams SSE
+   * progress/result/error/done events back via callbacks.
+   */
+  async batchImport(
+    urls: string[],
+    callbacks: BatchImportCallbacks,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const endpoint = `${SUPABASE_FUNCTIONS_URL}/chat-api/batch-extract`;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream",
+      "apikey": SUPABASE_ANON_KEY,
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ urls }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`Batch import failed: ${response.status} ${text.slice(0, 200)}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      let reading = true;
+      while (reading) {
+        const { done, value } = await reader.read();
+        if (done) { reading = false; break; }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const payload = trimmed.slice(5).trim();
+          if (!payload) continue;
+
+          let event: BatchSSEEvent;
+          try {
+            event = JSON.parse(payload) as BatchSSEEvent;
+          } catch {
+            continue;
+          }
+
+          callbacks.onEvent(event);
+
+          if (event.type === "done") return;
         }
       }
     } finally {
