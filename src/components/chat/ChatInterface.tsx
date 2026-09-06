@@ -2097,13 +2097,14 @@ export const ChatInterface: React.FC = () => {
 
         {/* Input Area */}
         <div className="border-t p-4 flex-shrink-0">
-          {/* MOP-0019 — Batch Import Panel (drawer above input) */}
-          {showBatchPanel && (
-            <div className="mb-3">
-              <BatchImportPanel
-                onDismiss={() => setShowBatchPanel(false)}
-                onSaveComplete={(summary) => {
-                  setShowBatchPanel(false);
+          {/* MOP-0019 — Batch Import Panel (drawer above input).
+              Rendered but hidden (display:none) when closed so card state
+              survives panel open/close — the user can reopen and review results. */}
+          <div className="mb-3" style={{ display: showBatchPanel ? undefined : "none" }}>
+            <BatchImportPanel
+              onDismiss={() => setShowBatchPanel(false)}
+              onSaveComplete={(summary) => {
+                  // Keep panel open so user can review what was saved.
                   // Echo a system-level confirmation into the chat conversation.
                   const conversationId = currentConversationId ?? `local-${Date.now()}`;
                   setConversations((prev) =>
@@ -2126,8 +2127,7 @@ export const ChatInterface: React.FC = () => {
                   );
                 }}
               />
-            </div>
-          )}
+          </div>
           <div className="space-y-2">
               {/* Image Previews */}
               {pendingImages.length > 0 && (

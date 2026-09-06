@@ -259,8 +259,8 @@ test.describe("Batch Import Panel", () => {
     await expect(card.getByRole("button", { name: "Save" })).toBeVisible({ timeout: 10_000 });
     await card.getByRole("button", { name: "Save" }).click();
 
-    // Card should transition to "saved" state
-    await expect(card).toContainText("Saved to library", { timeout: 5_000 });
+    // Card should transition to "saved" state — badge reads "Saved ✓"
+    await expect(card).toContainText("Saved ✓", { timeout: 5_000 });
   });
 
   // TC-010

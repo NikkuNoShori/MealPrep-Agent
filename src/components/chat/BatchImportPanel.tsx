@@ -21,6 +21,7 @@ import {
   XCircle,
   DownloadCloud,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -169,10 +170,35 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
   }
 
   // ── save one ──
+  // Use createRecipe with the already-extracted data instead of re-running
+  // ingestRecipeFromUrl (which re-fetches and re-extracts, causing 422 failures).
   const handleSave = useCallback(async (entry: BatchCardEntry) => {
     setSavingIndices((prev) => new Set(prev).add(entry.index));
     try {
-      await apiClient.ingestRecipeFromUrl(entry.url, true);
+      const raw = entry.recipe;
+      // Unwrap PipelineResult shape if present
+      const recipe = (raw?.success !== undefined && raw?.recipe)
+        ? raw.recipe
+        : (raw?.recipes?.[0] ?? raw);
+
+      if (!recipe?.title) throw new Error("No recipe data to save");
+
+      // Map snake_case pipeline fields → camelCase for createRecipe
+      await apiClient.createRecipe({
+        title: recipe.title,
+        description: recipe.description,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        prepTime: recipe.prep_time ?? recipe.prepTime,
+        cookTime: recipe.cook_time ?? recipe.cookTime,
+        totalTime: recipe.total_time ?? recipe.totalTime,
+        servings: recipe.servings,
+        difficulty: recipe.difficulty,
+        cuisine: recipe.cuisine,
+        tags: recipe.tags,
+        imageUrl: recipe.image_url ?? recipe.imageUrl,
+        sourceUrl: entry.url,
+      });
       updateCard(entry.index, { status: "saved" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Save failed";
@@ -222,6 +248,17 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
     });
   }, []);
 
+  // ── new import (reset to idle) ──
+  function handleNewImport() {
+    abortRef.current?.abort();
+    setCards([]);
+    setPhase("idle");
+    setDoneStats(null);
+    setUrlInput("");
+    setSavingIndices(new Set());
+    setSavingAll(false);
+  }
+
   // ── dismiss ──
   function handleDismiss() {
     abortRef.current?.abort();
@@ -261,6 +298,20 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
           >
             <XCircle className="h-3.5 w-3.5 mr-1" />
             Abort
+          </Button>
+        )}
+
+        {/* New import (done phase) */}
+        {phase === "done" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={handleNewImport}
+            data-testid="batch-new-import-btn"
+          >
+            <RotateCcw className="h-3.5 w-3.5 mr-1" />
+            New import
           </Button>
         )}
 
