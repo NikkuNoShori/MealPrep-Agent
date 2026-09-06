@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +33,6 @@ import {
   Play,
   LayoutGrid,
   Rows,
-  ArrowLeftRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { MealPlanStatus, MealSlot, PlannedMealEntry } from '@/types/mealPlan';
@@ -123,9 +122,6 @@ const MealPlanner = () => {
   const [showServingsModal, setShowServingsModal] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [planListInputs, setPlanListInputs] = useState<Record<string, string>>({});
-  // ── Swap-dates mode (meals view only) ──
-  const [swapMode, setSwapMode] = useState(false);
-  const [swapFirstDate, setSwapFirstDate] = useState<string | null>(null);
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const titleEditRef = useRef<HTMLDivElement>(null);
@@ -386,50 +382,6 @@ const MealPlanner = () => {
     );
   };
 
-  // ── Swap-dates handler ──────────────────────────────────────────────────────
-  // Called when the user clicks a day header during swap mode.
-  // First click → remember the date. Second click → swap all meal slots for
-  // the two selected dates and persist via updateMealPlan.
-  const handleSwapDateClick = useCallback((dateStr: string) => {
-    if (!swapMode || !weekPlan) return;
-
-    if (!swapFirstDate) {
-      // First selection
-      setSwapFirstDate(dateStr);
-      return;
-    }
-
-    if (swapFirstDate === dateStr) {
-      // Tapped same date — cancel selection
-      setSwapFirstDate(null);
-      return;
-    }
-
-    // Second selection — perform the swap
-    const currentMeals = { ...(weekPlan.meals || {}) };
-    const dateAMeals = currentMeals[swapFirstDate] ?? {};
-    const dateBMeals = currentMeals[dateStr] ?? {};
-    currentMeals[swapFirstDate] = dateBMeals;
-    currentMeals[dateStr] = dateAMeals;
-
-    updateMealPlan.mutate(
-      { id: weekPlan.id, data: { meals: currentMeals } },
-      {
-        onSuccess: () => {
-          toast.success(`Swapped meals for ${swapFirstDate} and ${dateStr}`);
-          setSwapMode(false);
-          setSwapFirstDate(null);
-        },
-        onError: (err: any) => toast.error(err?.message || 'Failed to swap dates'),
-      }
-    );
-  }, [swapMode, swapFirstDate, weekPlan, updateMealPlan]);
-
-  const cancelSwapMode = useCallback(() => {
-    setSwapMode(false);
-    setSwapFirstDate(null);
-  }, []);
-
   const weekLabel = `${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   return (
@@ -610,7 +562,7 @@ const MealPlanner = () => {
                 <div className="flex items-center rounded-lg border border-stone-200/80 dark:border-white/[0.08] bg-stone-100/60 dark:bg-white/[0.03] p-0.5">
                   <button
                     className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'days' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary-500' : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300'}`}
-                    onClick={() => { setCalendarView('days'); cancelSwapMode(); }}
+                    onClick={() => setCalendarView('days')}
                     title="Days view"
                   >
                     <LayoutGrid className="h-3.5 w-3.5" />
@@ -624,53 +576,10 @@ const MealPlanner = () => {
                   </button>
                 </div>
 
-                {/* Planner settings — extensible option menu */}
-                <PlannerSettingsMenu
-                  active={swapMode}
-                  options={[
-                    {
-                      id: 'swap-dates',
-                      label: 'Swap dates',
-                      icon: ArrowLeftRight,
-                      description: calendarView !== 'meals'
-                        ? 'Switch to Meals view to use this'
-                        : swapMode
-                          ? 'Click two day columns to swap their meals'
-                          : 'Select two days to swap their meals',
-                      disabled: calendarView !== 'meals',
-                      onClick: () => {
-                        if (calendarView !== 'meals') return;
-                        if (swapMode) {
-                          cancelSwapMode();
-                        } else {
-                          setSwapMode(true);
-                          setSwapFirstDate(null);
-                        }
-                      },
-                    },
-                  ]}
-                />
+                {/* Planner settings — extensible option menu (populated by future MOPs) */}
+                <PlannerSettingsMenu options={[]} />
               </div>
             </div>
-
-            {/* Swap mode instruction banner */}
-            {swapMode && calendarView === 'meals' && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary-500/[0.08] border border-primary-500/20 text-xs text-primary-600 dark:text-primary-400 animate-fade-in">
-                <ArrowLeftRight className="h-3.5 w-3.5 flex-shrink-0" />
-                <span className="flex-1">
-                  {swapFirstDate
-                    ? `"${swapFirstDate}" selected — click a second day column to complete the swap`
-                    : 'Click a day column header to select it for swapping'}
-                </span>
-                <button
-                  onClick={cancelSwapMode}
-                  className="text-primary-400 hover:text-primary-600 dark:hover:text-primary-200 transition-colors"
-                  title="Cancel swap"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
 
             {/* Calendar Grid — Days View or Meals View */}
             {isLoading ? (
@@ -876,33 +785,19 @@ const MealPlanner = () => {
                             const dateStr = formatDateKey(date);
                             const isToday = dateStr === today;
                             const slotMeals = weekPlan?.meals?.[dateStr]?.[slot.key] || [];
-                            const isSwapSelected = swapMode && swapFirstDate === dateStr;
-                            const isSwapTarget = swapMode && swapFirstDate && swapFirstDate !== dateStr;
 
                             return (
                               <div
                                 key={dateStr}
-                                className={[
-                                  'group p-2 min-h-[80px] transition-colors',
-                                  isToday ? 'bg-primary-500/[0.03] dark:bg-primary-500/[0.05]' : '',
-                                  isSwapSelected ? 'bg-primary-500/[0.10] dark:bg-primary-500/[0.15] ring-1 ring-inset ring-primary-500/40' : '',
-                                ].join(' ')}
+                                className={`group p-2 min-h-[80px] transition-colors ${
+                                  isToday ? 'bg-primary-500/[0.03] dark:bg-primary-500/[0.05]' : ''
+                                }`}
                               >
-                                {/* Day label — clickable during swap mode */}
-                                <p
-                                  className={[
-                                    'text-[10px] font-semibold text-center mb-1.5 transition-colors',
-                                    isSwapSelected ? 'text-primary-500 font-bold' : '',
-                                    !isSwapSelected && isToday ? 'text-primary-500' : '',
-                                    !isSwapSelected && !isToday ? 'text-stone-400 dark:text-gray-500' : '',
-                                    swapMode && !isSwapSelected && isSwapTarget ? 'cursor-pointer hover:text-primary-400' : '',
-                                    swapMode && !swapFirstDate ? 'cursor-pointer hover:text-primary-400' : '',
-                                  ].join(' ')}
-                                  onClick={swapMode ? () => handleSwapDateClick(dateStr) : undefined}
-                                  title={swapMode ? (isSwapSelected ? 'Selected — click another day to swap' : 'Click to select for swap') : undefined}
-                                >
+                                {/* Day label */}
+                                <p className={`text-[10px] font-semibold text-center mb-1.5 ${
+                                  isToday ? 'text-primary-500' : 'text-stone-400 dark:text-gray-500'
+                                }`}>
                                   {DAYS_SHORT[date.getDay()]} {date.getDate()}
-                                  {isSwapSelected && <span className="ml-0.5">✓</span>}
                                 </p>
 
                                 {/* Meals */}
@@ -923,8 +818,8 @@ const MealPlanner = () => {
                                     </div>
                                   ))}
 
-                                  {/* Add button — hidden during swap mode */}
-                                  {weekPlan && !swapMode && (
+                                  {/* Add button */}
+                                  {weekPlan && (
                                     <button
                                       className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-70 md:opacity-0 md:group-hover:opacity-100"
                                       onClick={() => openRecipeSelector(dateStr, slot.key)}
