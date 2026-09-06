@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/authStore';
 import {
   useMyHousehold,
   useUpdateHousehold,
+  useUpdateHouseholdPermissions,
   useCreateHouseholdInvite,
   useMyPendingInvites,
   useRespondToInvite,
@@ -41,8 +42,10 @@ import {
   ThumbsDown,
   Clock,
   ChevronDown,
+  ChevronRight,
   LogOut,
   ArrowRightLeft,
+  Lock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -111,44 +114,111 @@ const Household = () => {
   const removeMember = useRemoveHouseholdMember();
   const transferOwnership = useTransferOwnership();
 
-  // My dietary profile (MOP-0025)
+  // My dietary profile (MOP-0025 / ADR-0005)
   const { data: myDietaryProfile } = useMyDietaryProfile();
   const setMyDietaryProfile = useSetMyDietaryProfile();
-  const [myRestrictions, setMyRestrictions] = useState<string[]>([]);
-  const [myAllergies, setMyAllergies] = useState<string[]>([]);
-  const [myProfileSaving, setMyProfileSaving] = useState(false);
-  const [editingMyProfile, setEditingMyProfile] = useState(false);
+  const updateHouseholdPermissions = useUpdateHouseholdPermissions();
 
-  // Sync local state when server data loads
-  React.useEffect(() => {
-    if (myDietaryProfile) {
-      setMyRestrictions(myDietaryProfile.dietaryRestrictions);
-      setMyAllergies(myDietaryProfile.allergies);
+  // Dietary profile UI state
+  // profileForm: null = picker closed; 'self' = editing own; string = editing dependent id; 'new' = adding new free-text
+  const [profileForm, setProfileForm] = useState<null | 'self' | 'new' | string>(null);
+  const [profilePickerValue, setProfilePickerValue] = useState('');
+  const [profileFormData, setProfileFormData] = useState({
+    name: '',
+    relationship: '',
+    dietaryRestrictions: [] as string[],
+    allergies: [] as string[],
+    likedFoods: '',
+    dislikedFoods: '',
+  });
+  // Which accordion sections are open per profile entry (key = 'self' | dep.id)
+  const [openSections, setOpenSections] = useState<Record<string, Record<string, boolean>>>({});
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  const toggleSection = (profileKey: string, section: string) =>
+    setOpenSections(prev => ({
+      ...prev,
+      [profileKey]: { ...(prev[profileKey] ?? {}), [section]: !(prev[profileKey]?.[section]) },
+    }));
+
+  const openProfileForm = (target: 'self' | 'new' | string) => {
+    setProfileForm(target);
+    if (target === 'self') {
+      setProfileFormData({
+        name: user?.email ?? '',
+        relationship: '',
+        dietaryRestrictions: myDietaryProfile?.dietaryRestrictions ?? [],
+        allergies: myDietaryProfile?.allergies ?? [],
+        likedFoods: '',
+        dislikedFoods: '',
+      });
+    } else if (target === 'new') {
+      setProfileFormData({ name: '', relationship: '', dietaryRestrictions: [], allergies: [], likedFoods: '', dislikedFoods: '' });
+    } else {
+      // editing existing dependent
+      const dep = (householdData?.dependents ?? []).find((d: any) => d.id === target);
+      if (dep) {
+        setProfileFormData({
+          name: dep.name,
+          relationship: dep.relationship ?? '',
+          dietaryRestrictions: dep.dietaryRestrictions ?? [],
+          allergies: dep.allergies ?? [],
+          likedFoods: (dep.preferences?.likedFoods ?? []).join(', '),
+          dislikedFoods: (dep.preferences?.dislikedFoods ?? []).join(', '),
+        });
+      }
     }
-  }, [myDietaryProfile]);
-
-  const myProfileDirty =
-    JSON.stringify(myRestrictions.slice().sort()) !== JSON.stringify((myDietaryProfile?.dietaryRestrictions ?? []).slice().sort()) ||
-    JSON.stringify(myAllergies.slice().sort()) !== JSON.stringify((myDietaryProfile?.allergies ?? []).slice().sort());
-
-  const handleSaveMyProfile = async () => {
-    setMyProfileSaving(true);
-    try {
-      await setMyDietaryProfile.mutateAsync({ dietaryRestrictions: myRestrictions, allergies: myAllergies });
-      setEditingMyProfile(false);
-      toast.success('Your dietary profile saved');
-    } catch {
-      toast.error('Failed to save dietary profile');
-    } finally {
-      setMyProfileSaving(false);
-    }
+    setProfilePickerValue('');
   };
 
-  const toggleMyRestriction = (r: string) =>
-    setMyRestrictions(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  const closeProfileForm = () => { setProfileForm(null); setProfilePickerValue(''); };
 
-  const toggleMyAllergy = (a: string) =>
-    setMyAllergies(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
+  const handleSaveProfile = async () => {
+    if (!profileForm) return;
+    setProfileSaving(true);
+    try {
+      if (profileForm === 'self') {
+        await setMyDietaryProfile.mutateAsync({
+          dietaryRestrictions: profileFormData.dietaryRestrictions,
+          allergies: profileFormData.allergies,
+        });
+      } else if (profileForm === 'new') {
+        if (!householdData?.household?.id) throw new Error('No household');
+        const prefs: any = {};
+        if (profileFormData.likedFoods.trim()) prefs.likedFoods = profileFormData.likedFoods.split(',').map(s => s.trim()).filter(Boolean);
+        if (profileFormData.dislikedFoods.trim()) prefs.dislikedFoods = profileFormData.dislikedFoods.split(',').map(s => s.trim()).filter(Boolean);
+        await createFamilyMember.mutateAsync({
+          householdId: householdData.household.id,
+          name: profileFormData.name.trim(),
+          relationship: profileFormData.relationship || 'Other',
+          dietaryRestrictions: profileFormData.dietaryRestrictions,
+          allergies: profileFormData.allergies,
+          preferences: prefs,
+        });
+      } else {
+        // updating existing dependent
+        const prefs: any = {};
+        if (profileFormData.likedFoods.trim()) prefs.likedFoods = profileFormData.likedFoods.split(',').map(s => s.trim()).filter(Boolean);
+        if (profileFormData.dislikedFoods.trim()) prefs.dislikedFoods = profileFormData.dislikedFoods.split(',').map(s => s.trim()).filter(Boolean);
+        await updateFamilyMember.mutateAsync({
+          memberId: profileForm,
+          updates: {
+            name: profileFormData.name.trim(),
+            relationship: profileFormData.relationship || undefined,
+            dietaryRestrictions: profileFormData.dietaryRestrictions,
+            allergies: profileFormData.allergies,
+            preferences: prefs,
+          },
+        });
+      }
+      toast.success('Dietary profile saved');
+      closeProfileForm();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   // Member management state
   const [memberMenuOpen, setMemberMenuOpen] = useState<string | null>(null);
@@ -157,6 +227,13 @@ const Household = () => {
   const myRole = householdData?.myRole;
   const canInvite = myRole === 'owner' || myRole === 'admin';
   const isOwner = myRole === 'owner';
+  const isAdmin = myRole === 'admin';
+  const isOwnerOrAdmin = isOwner || isAdmin;
+  // ADR-0005: RBAC — what can this member do to dietary profiles?
+  const allowMemberEdits = householdData?.household?.allowMemberEdits ?? false;
+  const allowMemberChildEdits = householdData?.household?.allowMemberChildEdits ?? false;
+  const canEditOtherMemberProfiles = isOwnerOrAdmin || allowMemberEdits;
+  const canEditChildProfiles = isOwnerOrAdmin || allowMemberChildEdits;
 
   const handleSendInvite = () => {
     if (!inviteEmail.trim() || !householdData?.household?.id) return;
@@ -735,84 +812,164 @@ const Household = () => {
               </Card>
             )}
 
-            {/* Dietary Profiles — unified card for self + dependents (MOP-0025) */}
+            {/* Dietary Profiles — ADR-0005 unified UX */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5" />
-                  Dietary Profiles
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Heart className="h-5 w-5" />
+                    Dietary Profiles
+                  </CardTitle>
+                  {profileForm === null && (
+                    <Button size="sm" className="gap-1.5" onClick={() => setProfileForm('picker')}>
+                      <Plus className="h-4 w-4" />
+                      Add Dietary Profile
+                    </Button>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  Manage dietary restrictions and allergies for everyone in your household.
+                  Restrictions, allergies, and preferences for each person in your household. Only add profiles that are relevant.
                 </p>
               </CardHeader>
-              <CardContent>
-                {/* Member list — pinned "you" row + dependents + add-new slot */}
-                <div className="space-y-px">
-                  {/* Pinned: the account holder */}
-                  {editingMyProfile ? (
-                    <div className="rounded-xl border border-primary-500/30 p-4 space-y-4 bg-primary-500/[0.03]">
-                      <div className="flex items-center justify-between">
+              <CardContent className="space-y-2">
+                {/* ── Picker: choose who to add a profile for ── */}
+                {profileForm === 'picker' && (() => {
+                  const memberOptions = [
+                    { value: 'self', label: `${user?.email ?? 'Me'} (you)` },
+                    ...((householdData?.members ?? [])
+                      .filter((m: any) => m.userId !== user?.id)
+                      .map((m: any) => ({ value: `member:${m.userId}`, label: m.email ?? m.userId }))),
+                    { value: 'new', label: '+ Add new person (not in household)' },
+                  ];
+                  return (
+                    <div className="rounded-xl border border-border/60 p-4 space-y-3 bg-accent/20">
+                      <p className="text-sm font-medium">Who is this profile for?</p>
+                      <Select value={profilePickerValue} onValueChange={setProfilePickerValue}>
+                        <SelectTrigger><SelectValue placeholder="Select a person..." /></SelectTrigger>
+                        <SelectContent>
+                          {memberOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <div className="flex gap-2 pt-1">
+                        <Button size="sm" disabled={!profilePickerValue} onClick={() => {
+                          if (profilePickerValue === 'self') openProfileForm('self');
+                          else openProfileForm('new');
+                        }}>Continue</Button>
+                        <Button size="sm" variant="outline" onClick={closeProfileForm}>Cancel</Button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── Inline form: editing self or adding/editing a dep ── */}
+                {profileForm && profileForm !== 'picker' && profileForm !== null && (() => {
+                  const isSelf = profileForm === 'self';
+                  const formKey = profileForm;
+                  const sections = [
+                    { key: 'restrictions', label: 'Dietary Restrictions' },
+                    { key: 'allergies', label: 'Allergies' },
+                    { key: 'preferences', label: 'Preferences' },
+                  ];
+                  return (
+                    <div className="rounded-xl border border-border/60 p-4 space-y-3 bg-accent/20">
+                      {!isSelf ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label>Name *</Label>
+                            <Input value={profileFormData.name} onChange={e => setProfileFormData(p => ({ ...p, name: e.target.value }))} placeholder="Name" autoFocus />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Relationship</Label>
+                            <Select value={profileFormData.relationship} onValueChange={v => setProfileFormData(p => ({ ...p, relationship: v }))}>
+                              <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                              <SelectContent>{RELATIONSHIPS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ) : (
                         <p className="text-sm font-medium flex items-center gap-2">
                           <User className="h-3.5 w-3.5 text-primary-500" />
                           {user?.email}
                           <Badge variant="secondary" className="text-[10px]">You</Badge>
                         </p>
-                      </div>
-                      {/* Dietary Restrictions */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <Label>Dietary Restrictions</Label>
-                          <div className="flex gap-1">
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setMyRestrictions([...DIETARY_RESTRICTIONS])}>Select All</button>
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setMyRestrictions([])}>Clear</button>
+                      )}
+
+                      {sections.map(sec => {
+                        const isOpen = openSections[formKey]?.[sec.key];
+                        return (
+                          <div key={sec.key} className="border border-border/40 rounded-lg overflow-hidden">
+                            <button
+                              type="button"
+                              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/40 transition-colors"
+                              onClick={() => toggleSection(formKey, sec.key)}
+                            >
+                              <span>{sec.label}</span>
+                              <span className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground font-normal">
+                                  {sec.key === 'restrictions' && (profileFormData.dietaryRestrictions.length > 0 ? profileFormData.dietaryRestrictions.join(', ') : 'None set')}
+                                  {sec.key === 'allergies' && (profileFormData.allergies.length > 0 ? profileFormData.allergies.join(', ') : 'None set')}
+                                  {sec.key === 'preferences' && ([profileFormData.likedFoods, profileFormData.dislikedFoods].filter(Boolean).join(' · ') || 'None set')}
+                                </span>
+                                {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                              </span>
+                            </button>
+                            {isOpen && (
+                              <div className="px-3 pb-3 pt-2 space-y-2 border-t border-border/40">
+                                {sec.key === 'restrictions' && (
+                                  <>
+                                    <div className="flex justify-end gap-1">
+                                      <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}>Select All</button>
+                                      <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, dietaryRestrictions: [] }))}>Clear</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {DIETARY_RESTRICTIONS.map(r => { const sel = profileFormData.dietaryRestrictions.includes(r); return <Badge key={r} variant={sel ? 'default' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm' : 'opacity-70 hover:opacity-100 hover:border-primary/40'}`} onClick={() => setProfileFormData(p => ({ ...p, dietaryRestrictions: sel ? p.dietaryRestrictions.filter(x => x !== r) : [...p.dietaryRestrictions, r] }))}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{r}</Badge>; })}
+                                    </div>
+                                  </>
+                                )}
+                                {sec.key === 'allergies' && (
+                                  <>
+                                    <div className="flex justify-end gap-1">
+                                      <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}>Select All</button>
+                                      <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, allergies: [] }))}>Clear</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {COMMON_ALLERGIES.map(a => { const sel = profileFormData.allergies.includes(a); return <Badge key={a} variant={sel ? 'destructive' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm' : 'opacity-70 hover:opacity-100 hover:border-destructive/40'}`} onClick={() => setProfileFormData(p => ({ ...p, allergies: sel ? p.allergies.filter(x => x !== a) : [...p.allergies, a] }))}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{a}</Badge>; })}
+                                    </div>
+                                  </>
+                                )}
+                                {sec.key === 'preferences' && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                      <Label className="flex items-center gap-1.5 text-xs"><ThumbsUp className="h-3 w-3 text-green-500" />Liked Foods</Label>
+                                      <Input value={profileFormData.likedFoods} onChange={e => setProfileFormData(p => ({ ...p, likedFoods: e.target.value }))} placeholder="pasta, chicken… (comma-separated)" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label className="flex items-center gap-1.5 text-xs"><ThumbsDown className="h-3 w-3 text-red-500" />Disliked Foods</Label>
+                                      <Input value={profileFormData.dislikedFoods} onChange={e => setProfileFormData(p => ({ ...p, dislikedFoods: e.target.value }))} placeholder="mushrooms, olives… (comma-separated)" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {DIETARY_RESTRICTIONS.map((r) => {
-                            const selected = myRestrictions.includes(r);
-                            return (
-                              <Badge key={r} variant={selected ? 'default' : 'outline'} className={`cursor-pointer transition-all duration-150 ${selected ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-primary/40'}`} onClick={() => toggleMyRestriction(r)}>
-                                {selected && <Check className="h-2.5 w-2.5 mr-0.5" />}{r}
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      {/* Allergies */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <Label>Allergies</Label>
-                          <div className="flex gap-1">
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setMyAllergies([...COMMON_ALLERGIES])}>Select All</button>
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setMyAllergies([])}>Clear</button>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {COMMON_ALLERGIES.map((a) => {
-                            const selected = myAllergies.includes(a);
-                            return (
-                              <Badge key={a} variant={selected ? 'destructive' : 'outline'} className={`cursor-pointer transition-all duration-150 ${selected ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-destructive/40'}`} onClick={() => toggleMyAllergy(a)}>
-                                {selected && <Check className="h-2.5 w-2.5 mr-0.5" />}{a}
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      {/* Actions */}
-                      <div className="flex gap-2">
-                        <Button size="sm" className="gap-1.5" onClick={handleSaveMyProfile} disabled={myProfileSaving}>
-                          {myProfileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        );
+                      })}
+
+                      <div className="flex gap-2 pt-1">
+                        <Button size="sm" className="gap-1.5" onClick={handleSaveProfile} disabled={profileSaving || (!isSelf && !profileFormData.name.trim())}>
+                          {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                           Save
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setMyRestrictions(myDietaryProfile?.dietaryRestrictions ?? []);
-                          setMyAllergies(myDietaryProfile?.allergies ?? []);
-                          setEditingMyProfile(false);
-                        }}>Cancel</Button>
+                        <Button size="sm" variant="outline" onClick={closeProfileForm}>Cancel</Button>
                       </div>
                     </div>
-                  ) : (
+                  );
+                })()}
+
+                {/* ── Existing profiles list ── */}
+                <div className="space-y-px">
+                  {/* Self — only shown if they've set something */}
+                  {((myDietaryProfile?.dietaryRestrictions?.length ?? 0) > 0 || (myDietaryProfile?.allergies?.length ?? 0) > 0) && profileForm !== 'self' && (
                     <div className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent/30 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -820,194 +977,88 @@ const Household = () => {
                           <Badge variant="secondary" className="text-xs">You</Badge>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {myRestrictions.map((r) => (
-                            <Badge key={r} variant="outline" className="text-[10px] px-1.5 py-0">{r}</Badge>
-                          ))}
-                          {myAllergies.map((a) => (
-                            <Badge key={a} variant="destructive" className="text-[10px] px-1.5 py-0">{a}</Badge>
-                          ))}
-                          {myRestrictions.length === 0 && myAllergies.length === 0 && (
-                            <span className="text-[10px] text-muted-foreground">No restrictions set</span>
-                          )}
+                          {(myDietaryProfile?.dietaryRestrictions ?? []).map(r => <Badge key={r} variant="outline" className="text-[10px] px-1.5 py-0">{r}</Badge>)}
+                          {(myDietaryProfile?.allergies ?? []).map(a => <Badge key={a} variant="destructive" className="text-[10px] px-1.5 py-0">{a}</Badge>)}
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0 ml-2" onClick={() => setEditingMyProfile(true)}>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0 ml-2" onClick={() => openProfileForm('self')}>
                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
                     </div>
                   )}
 
-                  {/* Dependents — each collapses to summary row, expands inline for edit */}
-                  {(householdData.dependents || []).map((dep: any) => (
-                    editingDependentId === dep.id ? (
-                      /* ── Inline edit form for this dependent ── */
-                      <div key={dep.id} className="border border-border/60 rounded-xl p-4 space-y-4 bg-accent/20 mt-px">
-                        <p className="text-sm font-medium text-muted-foreground">Editing {dep.name}</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="dep-name">Name *</Label>
-                            <Input id="dep-name" value={depForm.name} onChange={(e) => setDepForm((p) => ({ ...p, name: e.target.value }))} placeholder="Name" autoFocus />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="dep-relationship">Relationship *</Label>
-                            <Select value={depForm.relationship} onValueChange={(v) => setDepForm((p) => ({ ...p, relationship: v }))}>
-                              <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                              <SelectContent>{RELATIONSHIPS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="dep-age">Age</Label>
-                            <Input id="dep-age" type="number" value={depForm.age} onChange={(e) => setDepForm((p) => ({ ...p, age: e.target.value }))} placeholder="Age" min="0" max="120" />
-                          </div>
+                  {/* Dependents */}
+                  {(householdData?.dependents ?? []).filter((d: any) => profileForm !== d.id).map((dep: any) => (
+                    <div key={dep.id} className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent/30 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-sm font-medium">{dep.name}</p>
+                          {dep.relationship && <Badge variant="outline" className="text-xs">{dep.relationship}</Badge>}
                         </div>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <Label>Dietary Restrictions</Label>
-                            <div className="flex gap-1">
-                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}>Select All</button>
-                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [] }))}>Clear</button>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {DIETARY_RESTRICTIONS.map((r) => { const sel = depForm.dietaryRestrictions.includes(r); return <Badge key={r} variant={sel ? 'default' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-primary/40'}`} onClick={() => toggleRestriction(r)}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{r}</Badge>; })}
-                          </div>
+                        <div className="flex flex-wrap gap-1">
+                          {(dep.dietaryRestrictions ?? []).map((r: string) => <Badge key={r} variant="outline" className="text-[10px] px-1.5 py-0">{r}</Badge>)}
+                          {(dep.allergies ?? []).map((a: string) => <Badge key={a} variant="destructive" className="text-[10px] px-1.5 py-0">{a}</Badge>)}
+                          {!(dep.dietaryRestrictions?.length) && !(dep.allergies?.length) && <span className="text-[10px] text-muted-foreground">No restrictions set</span>}
                         </div>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <Label>Allergies</Label>
-                            <div className="flex gap-1">
-                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}>Select All</button>
-                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, allergies: [] }))}>Clear</button>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {COMMON_ALLERGIES.map((a) => { const sel = depForm.allergies.includes(a); return <Badge key={a} variant={sel ? 'destructive' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-destructive/40'}`} onClick={() => toggleAllergy(a)}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{a}</Badge>; })}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="dep-liked" className="flex items-center gap-1.5"><ThumbsUp className="h-3.5 w-3.5 text-green-500" />Liked Foods</Label>
-                            <Input id="dep-liked" value={depForm.likedFoods} onChange={(e) => setDepForm((p) => ({ ...p, likedFoods: e.target.value }))} placeholder="e.g. pasta, chicken, broccoli" />
-                            <p className="text-[10px] text-muted-foreground">Comma-separated</p>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="dep-disliked" className="flex items-center gap-1.5"><ThumbsDown className="h-3.5 w-3.5 text-red-500" />Disliked Foods</Label>
-                            <Input id="dep-disliked" value={depForm.dislikedFoods} onChange={(e) => setDepForm((p) => ({ ...p, dislikedFoods: e.target.value }))} placeholder="e.g. mushrooms, olives" />
-                            <p className="text-[10px] text-muted-foreground">Comma-separated</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button onClick={handleUpdateDependent} disabled={!depForm.name.trim() || !depForm.relationship || updateFamilyMember.isPending} className="gap-1.5">
-                            {updateFamilyMember.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                            Update
+                      </div>
+                      <div className="flex gap-1 shrink-0 ml-2">
+                        {canEditChildProfiles ? (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openProfileForm(dep.id)}>
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
-                          <Button variant="outline" onClick={resetDepForm}>Cancel</Button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* ── Collapsed summary row ── */
-                      <div key={dep.id} className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent/30 transition-colors mt-px">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-medium">{dep.name}</p>
-                            <Badge variant="outline" className="text-xs">{dep.relationship}</Badge>
-                            {dep.age && <Badge variant="secondary" className="text-xs">{dep.age} yrs</Badge>}
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {(dep.dietaryRestrictions || []).map((r: string) => <Badge key={r} variant="outline" className="text-[10px] px-1.5 py-0">{r}</Badge>)}
-                            {(dep.allergies || []).map((a: string) => <Badge key={a} variant="destructive" className="text-[10px] px-1.5 py-0">{a}</Badge>)}
-                            {!(dep.dietaryRestrictions?.length) && !(dep.allergies?.length) && <span className="text-[10px] text-muted-foreground">No restrictions set</span>}
-                          </div>
-                          {((dep.preferences?.likedFoods?.length > 0) || (dep.preferences?.dislikedFoods?.length > 0)) && (
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {dep.preferences?.likedFoods?.length > 0 && <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-0.5"><ThumbsUp className="h-2.5 w-2.5" />{dep.preferences.likedFoods.join(', ')}</span>}
-                              {dep.preferences?.dislikedFoods?.length > 0 && <span className="text-[10px] text-red-500 dark:text-red-400 flex items-center gap-0.5"><ThumbsDown className="h-2.5 w-2.5" />{dep.preferences.dislikedFoods.join(', ')}</span>}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex gap-1 shrink-0 ml-2">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEditingDependent(dep)}><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteDependent(dep.id, dep.name)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                        </div>
-                      </div>
-                    )
-                  ))}
-
-                  {/* Add-new member slot — inline at bottom of list */}
-                  {isAddingDependent ? (
-                    <div className="border border-border/60 rounded-xl p-4 space-y-4 bg-accent/20 mt-px">
-                      <p className="text-sm font-medium text-muted-foreground">New member</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="new-dep-name">Name *</Label>
-                          <Input id="new-dep-name" value={depForm.name} onChange={(e) => setDepForm((p) => ({ ...p, name: e.target.value }))} placeholder="Name" autoFocus />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="new-dep-relationship">Relationship *</Label>
-                          <Select value={depForm.relationship} onValueChange={(v) => setDepForm((p) => ({ ...p, relationship: v }))}>
-                            <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                            <SelectContent>{RELATIONSHIPS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="new-dep-age">Age</Label>
-                          <Input id="new-dep-age" type="number" value={depForm.age} onChange={(e) => setDepForm((p) => ({ ...p, age: e.target.value }))} placeholder="Age" min="0" max="120" />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <Label>Dietary Restrictions</Label>
-                          <div className="flex gap-1">
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}>Select All</button>
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [] }))}>Clear</button>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {DIETARY_RESTRICTIONS.map((r) => { const sel = depForm.dietaryRestrictions.includes(r); return <Badge key={r} variant={sel ? 'default' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-primary/40'}`} onClick={() => toggleRestriction(r)}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{r}</Badge>; })}
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <Label>Allergies</Label>
-                          <div className="flex gap-1">
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}>Select All</button>
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, allergies: [] }))}>Clear</button>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {COMMON_ALLERGIES.map((a) => { const sel = depForm.allergies.includes(a); return <Badge key={a} variant={sel ? 'destructive' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-destructive/40'}`} onClick={() => toggleAllergy(a)}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{a}</Badge>; })}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="new-dep-liked" className="flex items-center gap-1.5"><ThumbsUp className="h-3.5 w-3.5 text-green-500" />Liked Foods</Label>
-                          <Input id="new-dep-liked" value={depForm.likedFoods} onChange={(e) => setDepForm((p) => ({ ...p, likedFoods: e.target.value }))} placeholder="e.g. pasta, chicken, broccoli" />
-                          <p className="text-[10px] text-muted-foreground">Comma-separated</p>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="new-dep-disliked" className="flex items-center gap-1.5"><ThumbsDown className="h-3.5 w-3.5 text-red-500" />Disliked Foods</Label>
-                          <Input id="new-dep-disliked" value={depForm.dislikedFoods} onChange={(e) => setDepForm((p) => ({ ...p, dislikedFoods: e.target.value }))} placeholder="e.g. mushrooms, olives" />
-                          <p className="text-[10px] text-muted-foreground">Comma-separated</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={handleAddDependent} disabled={!depForm.name.trim() || !depForm.relationship || createFamilyMember.isPending} className="gap-1.5">
-                          {createFamilyMember.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                          Add
-                        </Button>
-                        <Button variant="outline" onClick={resetDepForm}>Cancel</Button>
+                        ) : (
+                          <span title="Only owner/admin can edit" className="self-center mr-1"><Lock className="h-3.5 w-3.5 text-muted-foreground/40" /></span>
+                        )}
+                        {isOwnerOrAdmin && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteDependent(dep.id, dep.name)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
-                  ) : (
-                    <button
-                      className="w-full mt-px p-3 rounded-xl border border-dashed border-border/60 text-sm text-muted-foreground hover:border-primary/40 hover:text-primary-500 hover:bg-primary-500/[0.02] transition-colors flex items-center justify-center gap-2"
-                      onClick={() => { resetDepForm(); setIsAddingDependent(true); }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add member
-                    </button>
+                  ))}
+
+                  {/* Empty state */}
+                  {profileForm === null &&
+                    (myDietaryProfile?.dietaryRestrictions?.length ?? 0) === 0 &&
+                    (myDietaryProfile?.allergies?.length ?? 0) === 0 &&
+                    (householdData?.dependents ?? []).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No dietary profiles yet. Add one for anyone in your household who has restrictions or allergies.
+                    </p>
                   )}
                 </div>
+
+                {/* ── Owner: member permissions ── */}
+                {isOwner && householdData?.household?.id && (
+                  <div className="mt-2 pt-4 border-t border-border/40 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Member Permissions</p>
+                    {([
+                      { key: 'allowMemberEdits', label: "Members can edit each other's dietary profiles", current: allowMemberEdits },
+                      { key: 'allowMemberChildEdits', label: 'Members can create and edit child/dependent profiles', current: allowMemberChildEdits },
+                    ] as const).map(flag => (
+                      <div key={flag.key} className="flex items-center justify-between gap-3 py-1">
+                        <span className="text-sm text-muted-foreground">{flag.label}</span>
+                        <button
+                          type="button"
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${flag.current ? 'bg-primary-500' : 'bg-muted'}`}
+                          onClick={() => {
+                            const update = flag.key === 'allowMemberEdits'
+                              ? { allowMemberEdits: !flag.current }
+                              : { allowMemberChildEdits: !flag.current };
+                            updateHouseholdPermissions.mutate(
+                              { householdId: householdData.household.id, ...update },
+                              { onSuccess: () => toast.success('Permission updated'), onError: () => toast.error('Failed to update permission') }
+                            );
+                          }}
+                          disabled={updateHouseholdPermissions.isPending}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${flag.current ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </>

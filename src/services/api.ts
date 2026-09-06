@@ -1319,9 +1319,13 @@ class ApiClient {
     return snakeToCamel(data);
   }
 
-  async updateHousehold(householdId: string, data: { name: string }) {
-    const { data: household, error } = await supabase.from("households")
-      .update({ name: data.name })
+  async updateHousehold(householdId: string, data: { name?: string; allowMemberEdits?: boolean; allowMemberChildEdits?: boolean }) {
+    const payload: Record<string, any> = {};
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.allowMemberEdits !== undefined) payload.allow_member_edits = data.allowMemberEdits;
+    if (data.allowMemberChildEdits !== undefined) payload.allow_member_child_edits = data.allowMemberChildEdits;
+    const { data: household, error } = await (supabase.from("households") as any)
+      .update(payload)
       .eq("id", householdId)
       .select()
       .single();
@@ -2052,6 +2056,20 @@ export const useUpdateHousehold = () => {
   return useMutation({
     mutationFn: ({ householdId, name }: { householdId: string; name: string }) =>
       apiClient.updateHousehold(householdId, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useUpdateHouseholdPermissions = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ householdId, allowMemberEdits, allowMemberChildEdits }: {
+      householdId: string;
+      allowMemberEdits?: boolean;
+      allowMemberChildEdits?: boolean;
+    }) => apiClient.updateHousehold(householdId, { allowMemberEdits, allowMemberChildEdits }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["household"] });
     },
