@@ -17,7 +17,7 @@ import toast from 'react-hot-toast';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-export type PlanStartOn = 'monday' | 'sunday' | 'today' | 'saturday';
+export type PlanStartOn = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'today';
 
 export interface PlanPeriodConfigValue {
   unit: 'weeks' | 'days';
@@ -36,6 +36,10 @@ export const DEFAULT_PLAN_PERIOD: PlanPeriodConfigValue = {
 const START_DAY_INDEX: Record<PlanStartOn, number> = {
   sunday: 0,
   monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
   saturday: 6,
   today: -1, // special: computed dynamically
 };
@@ -79,8 +83,12 @@ const DURATION_OPTIONS: { label: string; unit: 'weeks'; count: number }[] = [
 ];
 
 const START_ON_OPTIONS: { label: string; value: PlanStartOn }[] = [
-  { label: 'Monday', value: 'monday' },
   { label: 'Sunday', value: 'sunday' },
+  { label: 'Monday', value: 'monday' },
+  { label: 'Tuesday', value: 'tuesday' },
+  { label: 'Wednesday', value: 'wednesday' },
+  { label: 'Thursday', value: 'thursday' },
+  { label: 'Friday', value: 'friday' },
   { label: 'Saturday', value: 'saturday' },
   { label: "Today's date", value: 'today' },
 ];
