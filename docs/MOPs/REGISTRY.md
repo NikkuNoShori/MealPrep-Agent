@@ -52,6 +52,11 @@
 | [MOP-0018](MOP-0018-ai-tool-expansion.md) | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions | complete | 2026-09-04 | 2026-09-05 | 2026-09-05 | Nick Neal |
 | [MOP-0019](MOP-0019-batch-recipe-import.md) | Batch Recipe Import — SSE-Streamed Multi-URL Extraction | complete | 2026-09-05 | 2026-09-05 | 2026-09-05 | Nick Neal |
 | [MOP-0020](MOP-0020-realtime-reasoning-display.md) | Realtime Reasoning Display — Tool Step Visibility in Chat | approved | 2026-09-05 | 2026-09-05 | — | Nick Neal |
+| [MOP-0021](MOP-0021-multi-week-meal-planner-view.md) | Multi-Week Meal Planner View | draft | 2026-09-05 | 2026-09-05 | — | Nick Neal |
+| [MOP-0022](MOP-0022-configurable-plan-period.md) | Configurable Default Meal Plan Period | draft | 2026-09-05 | 2026-09-05 | — | Nick Neal |
+| [MOP-0023](MOP-0023-meal-randomizer.md) | "I Don't Know" Meal Randomizer | draft | 2026-09-05 | 2026-09-05 | — | Nick Neal |
+| [MOP-0024](MOP-0024-allergy-tagging.md) | Automatic Allergy Tagging on Recipe Import | draft | 2026-09-05 | 2026-09-05 | — | Nick Neal |
+| [MOP-0025](MOP-0025-dietary-allergy-profiles.md) | Household Dietary & Allergy Profiles UI | draft | 2026-09-05 | 2026-09-05 | — | Nick Neal |
 
 > **MOP-0016:** Phases 1–3b shipped 2026-06-16 (`chat-api` deployed). **Outstanding:** deploy `recipe-pipeline`, run §Operator smoke tests, then promote to `verifying`. MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
 
