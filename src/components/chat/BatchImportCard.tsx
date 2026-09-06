@@ -36,6 +36,24 @@ interface BatchImportCardProps {
   isSaving: boolean;
 }
 
+/** Extract a clean human-readable message from a raw error string (may be JSON). */
+function cleanError(raw: string | undefined): string {
+  if (!raw) return "Unknown error";
+  // Try to pull the innermost message from pipeline JSON error shapes.
+  try {
+    const parsed = JSON.parse(raw.replace(/^HTTP \d+:\s*/, ""));
+    // { errors: [{ message }] }
+    const firstMsg = parsed?.errors?.[0]?.message;
+    if (firstMsg) return firstMsg;
+    // { message }
+    if (parsed?.message) return parsed.message;
+    // { error }
+    if (parsed?.error) return parsed.error;
+  } catch { /* not JSON — use raw */ }
+  // Strip leading "HTTP 422: " prefix for readability
+  return raw.replace(/^HTTP \d+:\s*/, "").slice(0, 200);
+}
+
 export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImportCardProps) {
   const [expanded, setExpanded] = useState(false);
   const { url, status, recipe, error } = entry;
@@ -70,7 +88,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-destructive">{displayUrl}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{error}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{cleanError(error)}</p>
         </div>
         <Button
           variant="ghost"
@@ -106,7 +124,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
     return (
       <div
         data-testid={`batch-card-${entry.index}`}
-        className="rounded-lg border border-green-500/30 bg-green-500/5 overflow-hidden"
+        className="rounded-lg border border-green-500/40 bg-green-500/10 overflow-hidden"
       >
         <div className="flex items-center gap-3 p-3">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
@@ -140,7 +158,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   return (
     <div
       data-testid={`batch-card-${entry.index}`}
-      className="rounded-lg border border-border bg-card overflow-hidden"
+      className="rounded-lg border border-border bg-muted/30 overflow-hidden"
     >
       {/* Header row */}
       <div className="flex items-start gap-3 p-3">
