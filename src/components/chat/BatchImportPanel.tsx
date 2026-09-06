@@ -235,7 +235,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
   return (
     <div
       data-testid="batch-import-panel"
-      className="flex flex-col rounded-xl border border-border bg-background shadow-xl overflow-hidden"
+      className="flex flex-col rounded-xl border border-border bg-card shadow-xl overflow-hidden"
       style={{ maxHeight: "70vh" }}
     >
       {/* ── Header ── */}
@@ -372,6 +372,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
         <div
           data-testid="batch-card-list"
           className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 min-h-0"
+            style={{ backgroundColor: "hsl(var(--background))" }}
         >
           {cards.map((entry) => (
             <BatchImportCard

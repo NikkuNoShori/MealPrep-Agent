@@ -67,7 +67,8 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
     return (
       <div
         data-testid={`batch-card-${entry.index}`}
-        className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3 animate-pulse"
+        className="flex items-center gap-3 rounded-lg border border-border p-3 animate-pulse"
+        style={{ backgroundColor: "hsl(var(--muted))" }}
       >
         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
         <div className="min-w-0 flex-1">
@@ -124,7 +125,8 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
     return (
       <div
         data-testid={`batch-card-${entry.index}`}
-        className="rounded-lg border border-green-500/40 bg-green-500/10 overflow-hidden"
+        className="rounded-lg border border-green-600/50 overflow-hidden"
+        style={{ backgroundColor: "color-mix(in srgb, #22c55e 12%, hsl(var(--card)))" }}
       >
         <div className="flex items-center gap-3 p-3">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
@@ -158,7 +160,8 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   return (
     <div
       data-testid={`batch-card-${entry.index}`}
-      className="rounded-lg border border-border bg-muted/30 overflow-hidden"
+      className="rounded-lg border border-border overflow-hidden"
+      style={{ backgroundColor: "hsl(var(--card))", boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }}
     >
       {/* Header row */}
       <div className="flex items-start gap-3 p-3">
