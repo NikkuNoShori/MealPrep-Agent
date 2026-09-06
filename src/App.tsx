@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { useEffect } from "react";
 import { Toaster } from 'react-hot-toast';
+import * as Sentry from '@sentry/react';
 import { ThemeProvider } from "./providers/ThemeProvider";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Layout from "./components/common/Layout";
@@ -25,13 +26,23 @@ import NotFound from "./pages/NotFound";
 import { useAuthStore } from "./stores/authStore";
 
 function AppRoutes() {
-  const { initialize } = useAuthStore();
+  const { initialize, user } = useAuthStore();
 
   // Initialize auth on app mount (only once)
   useEffect(() => {
     initialize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
+
+  // Attach authenticated user identity to Sentry reports
+  useEffect(() => {
+    if (user) {
+      Sentry.setUser({ id: user.id, email: user.email ?? undefined });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user]);
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
