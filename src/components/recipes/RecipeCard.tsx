@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Clock, Users, ChefHat, Edit, Trash2, ThumbsUp, ThumbsDown, MoreVertical, Share2, Check, ChevronDown, ChevronUp, CheckCircle2, Loader2 } from "lucide-react";
+import { Clock, Users, ChefHat, Edit, Trash2, ThumbsUp, ThumbsDown, MoreVertical, Share2, Check, ChevronDown, ChevronUp, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import AddToPlanButton from "@/components/meal-planning/AddToPlanButton";
 import { Button } from "@/components/ui/button";
 
@@ -95,6 +95,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
   const recipeId = (recipe as RecipeBase & { id?: string }).id;
 
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
+  const hasAllergyWarning = Array.isArray(recipe.tags) && recipe.tags.includes("ALLERGY WARNING");
 
   // Overflow menu state
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
@@ -208,6 +209,16 @@ export const RecipeCard: React.FC<Props> = (props) => {
           </div>
         )}
       </div>
+    );
+  };
+
+  const AllergyBadge = () => {
+    if (!hasAllergyWarning) return null;
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold flex-shrink-0">
+        <ShieldAlert className="h-3 w-3" />
+        Allergen
+      </span>
     );
   };
 
@@ -459,17 +470,18 @@ export const RecipeCard: React.FC<Props> = (props) => {
 
             {/* Bottom: meta + reactions */}
             <div className="flex items-center justify-between gap-3 mt-auto">
-              <div className="flex items-center gap-3 text-[12px] text-stone-400 dark:text-stone-500">
+              <div className="flex items-center gap-2 flex-wrap text-[12px] text-stone-400 dark:text-stone-500">
+                <AllergyBadge />
                 {recipe.servings && (
                   <span className="flex items-center gap-1">
                     <Users className="h-3 w-3" /> {recipe.servings}
                   </span>
                 )}
-                {recipe.tags && recipe.tags.slice(0, 2).map((tag, i) => (
+                {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
                   <span key={i} className="text-stone-400 dark:text-stone-500">{tag}</span>
                 ))}
-                {recipe.tags && recipe.tags.length > 2 && (
-                  <span className="text-stone-300 dark:text-stone-600">+{recipe.tags.length - 2}</span>
+                {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
+                  <span className="text-stone-300 dark:text-stone-600">+{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}</span>
                 )}
               </div>
               {!isPreview && <ReactionBadges size="sm" />}
@@ -582,16 +594,17 @@ export const RecipeCard: React.FC<Props> = (props) => {
 
           {/* Footer: tags + reactions */}
           <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-stone-100 dark:border-white/[0.04]">
-            {/* Tags */}
-            <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
-              {recipe.tags && recipe.tags.slice(0, 2).map((tag, i) => (
+            {/* Tags (allergy badge first, then regular tags) */}
+            <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden flex-wrap">
+              <AllergyBadge />
+              {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
                 <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-stone-100 dark:bg-white/[0.06] text-[11px] font-medium text-stone-500 dark:text-stone-400 truncate max-w-[80px]">
                   {tag}
                 </span>
               ))}
-              {recipe.tags && recipe.tags.length > 2 && (
+              {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
                 <span className="text-[11px] text-stone-300 dark:text-stone-600 font-medium flex-shrink-0">
-                  +{recipe.tags.length - 2}
+                  +{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}
                 </span>
               )}
             </div>

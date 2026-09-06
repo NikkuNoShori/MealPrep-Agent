@@ -105,12 +105,39 @@ function getWeekMealCount(meals: any, weekDates: Date[]): number {
   return dailyCount + snacksCount + nonRecipeCount;
 }
 
+/** All calendar dates in [startDate, endDate] inclusive. */
+function getPlanDates(startDate: string, endDate: string): Date[] {
+  const dates: Date[] = [];
+  const cur = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
+  while (cur <= end) {
+    dates.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+/** Partition an array into chunks of size n. */
+function chunkArray<T>(arr: T[], n: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += n) chunks.push(arr.slice(i, i + n));
+  return chunks;
+}
+
+/** Duration options for the create-plan form. */
+const DURATION_OPTIONS = [
+  { label: '1 week', days: 7 },
+  { label: '2 weeks', days: 14 },
+  { label: '4 weeks', days: 28 },
+] as const;
+
 const MealPlanner = () => {
   const [activeTab, setActiveTab] = useState('calendar');
   const [calendarView, setCalendarView] = useState<'days' | 'meals'>('days');
   const [currentWeek, setCurrentWeek] = useState(() => getWeekStart(new Date()));
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
+  const [newPlanDays, setNewPlanDays] = useState<7 | 14 | 28>(7);
   const [planMenuOpen, setPlanMenuOpen] = useState<string | null>(null);
   const [isEditingPlanTitle, setIsEditingPlanTitle] = useState(false);
   const [editedPlanTitle, setEditedPlanTitle] = useState('');
@@ -182,6 +209,29 @@ const MealPlanner = () => {
     return mealPlans.filter((p: any) => p.status === 'completed' || p.status === 'archived');
   }, [mealPlans]);
 
+  // ── Multi-week plan support (MOP-0021) ────────────────────────────────────
+  // planDates = every day in weekPlan's date range (may be 7, 14, or 28 days)
+  // planWeeks = planDates partitioned into 7-day rows for the meals view
+  // currentPlanWeekIndex = which week row the navigator is currently showing
+  const planDates = useMemo(() => {
+    if (!weekPlan) return weekDates; // fall back to navigator week
+    return getPlanDates(weekPlan.startDate, weekPlan.endDate);
+  }, [weekPlan, weekDates]);
+
+  const planWeeks = useMemo(() => chunkArray(planDates, 7), [planDates]);
+
+  const currentPlanWeekIndex = useMemo(() => {
+    if (planWeeks.length <= 1) return 0;
+    return planWeeks.findIndex(week =>
+      week.some(d => formatDateKey(d) >= weekStart && formatDateKey(d) <= weekEnd)
+    );
+  }, [planWeeks, weekStart, weekEnd]);
+
+  // Track which slot sections have had extra weeks expanded in the meals view
+  const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({});
+  const toggleExpandedWeek = (slotKey: string) =>
+    setExpandedWeeks(prev => ({ ...prev, [slotKey]: !prev[slotKey] }));
+
   const navigateWeek = (direction: 'prev' | 'next') => {
     const newWeek = new Date(currentWeek);
     newWeek.setDate(newWeek.getDate() + (direction === 'next' ? 7 : -7));
@@ -191,11 +241,12 @@ const MealPlanner = () => {
   const handleCreatePlan = () => {
     const startDate = formatDateKey(currentWeek);
     const endDateObj = new Date(currentWeek);
-    endDateObj.setDate(endDateObj.getDate() + 6);
+    endDateObj.setDate(endDateObj.getDate() + newPlanDays - 1);
+    const durationLabel = DURATION_OPTIONS.find(o => o.days === newPlanDays)?.label ?? `${newPlanDays} days`;
 
     createMealPlan.mutate(
       {
-        title: newPlanTitle.trim() || `Week of ${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+        title: newPlanTitle.trim() || `${durationLabel} — ${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
         startDate,
         endDate: formatDateKey(endDateObj),
         meals: {},
@@ -206,6 +257,7 @@ const MealPlanner = () => {
           toast.success('Meal plan created');
           setShowCreateForm(false);
           setNewPlanTitle('');
+          setNewPlanDays(7);
         },
         onError: (err: any) => toast.error(err?.message || 'Failed to create plan'),
       }
@@ -413,24 +465,49 @@ const MealPlanner = () => {
         {/* ── Create Plan Form ── */}
         {showCreateForm && (
           <Card className="border-primary-500/20 shadow-lg shadow-primary-500/5 animate-slide-up">
-            <CardContent className="p-4">
+            <CardContent className="p-4 space-y-3">
+              {/* Title row */}
               <div className="flex items-end gap-3">
                 <div className="flex-1">
-                  <Label htmlFor="plan-title" className="text-xs font-medium">New Plan for {weekLabel}</Label>
+                  <Label htmlFor="plan-title" className="text-xs font-medium">
+                    New Plan — starting {currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Label>
                   <Input
                     id="plan-title"
-                    placeholder={`Week of ${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                    placeholder="Plan title (optional)"
                     value={newPlanTitle}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPlanTitle(e.target.value)}
                     className="mt-1"
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreatePlan()}
                   />
                 </div>
-                <Button onClick={handleCreatePlan} disabled={createMealPlan.isPending} className="gap-2">
-                  {createMealPlan.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  Create
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => { setShowCreateForm(false); setNewPlanTitle(''); }}>
+                <Button variant="ghost" size="sm" onClick={() => { setShowCreateForm(false); setNewPlanTitle(''); setNewPlanDays(7); }}>
                   <X className="h-4 w-4" />
+                </Button>
+              </div>
+              {/* Duration picker + create */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-stone-500 dark:text-stone-400 shrink-0">Duration:</span>
+                <div className="flex gap-1">
+                  {DURATION_OPTIONS.map(opt => (
+                    <button
+                      key={opt.days}
+                      onClick={() => setNewPlanDays(opt.days as 7 | 14 | 28)}
+                      className={[
+                        'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
+                        newPlanDays === opt.days
+                          ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400'
+                          : 'border-stone-200 dark:border-white/[0.08] text-stone-500 dark:text-stone-400 hover:border-stone-300',
+                      ].join(' ')}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex-1" />
+                <Button onClick={handleCreatePlan} disabled={createMealPlan.isPending} size="sm" className="gap-1.5">
+                  {createMealPlan.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  Create
                 </Button>
               </div>
             </CardContent>
@@ -451,9 +528,16 @@ const MealPlanner = () => {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <h2 className="text-sm font-semibold text-stone-900 dark:text-white whitespace-nowrap">
-                  {weekLabel}
-                </h2>
+                <div className="flex flex-col items-center">
+                  <h2 className="text-sm font-semibold text-stone-900 dark:text-white whitespace-nowrap">
+                    {weekLabel}
+                  </h2>
+                  {planWeeks.length > 1 && currentPlanWeekIndex >= 0 && (
+                    <span className="text-[10px] text-stone-400 dark:text-stone-500 -mt-0.5">
+                      Week {currentPlanWeekIndex + 1} of {planWeeks.length}
+                    </span>
+                  )}
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"

@@ -1458,6 +1458,10 @@ class ApiClient {
     age?: number | null;
     dietaryRestrictions?: string[];
     allergies?: string[];
+    /** Structured lifestyle dietary flags: 'vegan','vegetarian','gluten-free','dairy-free','halal','kosher','keto','paleo' */
+    dietaryFlags?: string[];
+    /** Soft ingredient/cuisine dislikes (non-allergy) */
+    dislikes?: string[];
     preferences?: Record<string, any>;
   }) {
     const payload: Record<string, unknown> = {};
@@ -1466,6 +1470,8 @@ class ApiClient {
     if (updates.age !== undefined) payload.age = updates.age;
     if (updates.dietaryRestrictions !== undefined) payload.dietary_restrictions = updates.dietaryRestrictions;
     if (updates.allergies !== undefined) payload.allergies = updates.allergies;
+    if (updates.dietaryFlags !== undefined) payload.dietary_flags = updates.dietaryFlags;
+    if (updates.dislikes !== undefined) payload.dislikes = updates.dislikes;
     if (updates.preferences !== undefined) payload.preferences = updates.preferences;
 
     const { data: member, error } = await supabase.from("family_members")
@@ -1476,6 +1482,19 @@ class ApiClient {
 
     if (error) throw error;
     return snakeToCamel(member);
+  }
+
+  /** Convenience alias — patches only the four dietary/allergy arrays. */
+  async updateFamilyMemberProfile(
+    memberId: string,
+    profile: {
+      allergies?: string[];
+      dietaryRestrictions?: string[];
+      dietaryFlags?: string[];
+      dislikes?: string[];
+    }
+  ) {
+    return this.updateFamilyMember(memberId, profile);
   }
 
   async deleteFamilyMember(memberId: string) {
@@ -2071,7 +2090,7 @@ export const useUpdateFamilyMember = () => {
   return useMutation({
     mutationFn: ({ memberId, updates }: {
       memberId: string;
-      updates: { name?: string; relationship?: string; age?: number | null; dietaryRestrictions?: string[]; allergies?: string[]; preferences?: Record<string, any> };
+      updates: { name?: string; relationship?: string; age?: number | null; dietaryRestrictions?: string[]; allergies?: string[]; dietaryFlags?: string[]; dislikes?: string[]; preferences?: Record<string, any> };
     }) => apiClient.updateFamilyMember(memberId, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["household"] });
