@@ -2147,7 +2147,7 @@ export const ChatInterface: React.FC = () => {
                         />
                         <button
                           onClick={() => removeImage(index)}
-                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                           aria-label="Remove image"
                         >
                           <X className="h-3 w-3 text-white" />

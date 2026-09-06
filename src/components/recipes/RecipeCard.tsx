@@ -446,7 +446,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
                 {isPreview ? (
                   <PreviewActions />
                 ) : (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
+                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
                     <ReactionButtons compact />
                     <AddToPlanButton
                       recipeId={(recipe as RecipeBase & { id: string }).id}
@@ -522,7 +522,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
 
           {/* Top-right: overflow menu (normal mode only) */}
           {!isPreview && (
-            <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+            <div className="absolute top-2.5 right-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
               <OverflowMenu />
             </div>
           )}
@@ -545,14 +545,14 @@ export const RecipeCard: React.FC<Props> = (props) => {
 
           {/* Bottom-right: hover reaction buttons (normal mode only) */}
           {!isPreview && onReact && (
-            <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+            <div className="absolute bottom-2.5 right-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 translate-y-0 md:translate-y-1 md:group-hover:translate-y-0">
               <ReactionButtons compact />
             </div>
           )}
 
           {/* Top-left: add to plan (normal mode only) */}
           {!isPreview && recipeId && (
-            <div className="absolute top-2.5 left-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+            <div className="absolute top-2.5 left-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
               <AddToPlanButton
                 recipeId={recipeId}
                 recipeName={recipe.title}

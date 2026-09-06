@@ -570,14 +570,14 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                         {editingItemId !== item.id && (
                           <>
                             <button
-                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-stone-400 hover:text-primary-500 transition-all"
+                              className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-stone-400 hover:text-primary-500 transition-all"
                               onClick={() => startEditingItem(item)}
                               title="Adjust quantity"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button
-                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                              className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-stone-400 hover:text-destructive transition-all"
                               onClick={() => handleRemoveItem(item.id)}
                               title="Remove"
                             >
