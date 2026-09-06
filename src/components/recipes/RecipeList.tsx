@@ -179,8 +179,11 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Search, Filters & Actions Bar */}
-      <div className="flex items-center gap-3">
+      {/* Search, Filters & Actions Bar.
+          Below sm this stacks: the search/filter panel gets its own
+          full-width row instead of being squeezed by the view-toggle and
+          Add Recipe button refusing to shrink in a single non-wrapping row. */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1 min-w-0">
           <RecipeSearch
             searchQuery={searchQuery}
@@ -190,43 +193,45 @@ export const RecipeList: React.FC<RecipeListProps> = ({
           />
         </div>
 
-        {/* View Toggle */}
-        <div className="flex items-center bg-stone-100 dark:bg-white/[0.04] rounded-xl p-1 shrink-0">
-          <Button
-            variant={viewMode === "grid" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("grid")}
-            className={`rounded-lg transition-all duration-200 ${
-              viewMode === "grid"
-                ? "bg-white dark:bg-white/[0.08] shadow-sm"
-                : ""
-            }`}
-          >
-            <Grid className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className={`rounded-lg transition-all duration-200 ${
-              viewMode === "list"
-                ? "bg-white dark:bg-white/[0.08] shadow-sm"
-                : ""
-            }`}
-          >
-            <List className="h-4 w-4" />
-          </Button>
-        </div>
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex items-center bg-stone-100 dark:bg-white/[0.04] rounded-xl p-1 shrink-0">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("grid")}
+              className={`rounded-lg transition-all duration-200 ${
+                viewMode === "grid"
+                  ? "bg-white dark:bg-white/[0.08] shadow-sm"
+                  : ""
+              }`}
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className={`rounded-lg transition-all duration-200 ${
+                viewMode === "list"
+                  ? "bg-white dark:bg-white/[0.08] shadow-sm"
+                  : ""
+              }`}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
 
-        {onAddRecipe && (
-          <Button
-            onClick={onAddRecipe}
-            className="bg-primary-500 hover:bg-primary-600 text-white px-5 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 shrink-0"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Recipe
-          </Button>
-        )}
+          {onAddRecipe && (
+            <Button
+              onClick={onAddRecipe}
+              className="flex-1 sm:flex-none bg-primary-500 hover:bg-primary-600 text-white px-5 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 shrink-0"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Recipe
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Recipe Grid/List with Enhanced Empty State */}
