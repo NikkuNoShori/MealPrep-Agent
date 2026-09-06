@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { PlanPeriodConfig } from '@/components/settings/PlanPeriodConfig';
+import { usePlanPeriodConfig, useSetPlanPeriodConfig } from '../services/api';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -37,6 +39,10 @@ const Settings = () => {
   const [stagedTheme, setStagedTheme] = useState<typeof theme>(theme);
   const [stagedColorScheme, setStagedColorScheme] = useState<string>(colorScheme.name);
   const [stagedMeasurementSystem, setStagedMeasurementSystem] = useState<typeof system>(system);
+
+  // Plan period config (MOP-0022)
+  const { data: planPeriodConfig } = usePlanPeriodConfig();
+  const setPlanPeriodConfig = useSetPlanPeriodConfig();
 
   // Profile state
   const { data: profile } = useMyProfile();
@@ -368,6 +374,15 @@ const Settings = () => {
         </section>
 
         {/* ── Preferences ── */}
+        {/* ── Meal Planning ── */}
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-4">Meal Planning</h2>
+          <PlanPeriodConfig
+            value={planPeriodConfig ?? null}
+            onSave={(config) => setPlanPeriodConfig.mutateAsync(config)}
+          />
+        </section>
+
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-4">Preferences</h2>
           <div className="space-y-5">

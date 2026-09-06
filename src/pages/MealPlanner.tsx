@@ -33,6 +33,7 @@ import {
   Play,
   LayoutGrid,
   Rows,
+  Shuffle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { MealPlanStatus, MealSlot, PlannedMealEntry } from '@/types/mealPlan';
@@ -44,6 +45,10 @@ import type { RecipeAssignment } from '@/components/meal-planning/DayAssignmentM
 import GroceryCart from '@/components/meal-planning/GroceryCart';
 import MealPlanHistory from '@/components/meal-planning/MealPlanHistory';
 import { PlannerSettingsMenu } from '@/components/meal-planning/PlannerSettingsMenu';
+import { usePlanPeriodConfig, useRecipesLight } from '@/services/api';
+import type { PlanPeriodConfigValue } from '@/components/settings/PlanPeriodConfig';
+import { selectRandomMeals, toPlanEntry } from '@/services/randomizer';
+import type { RandomizerPoolRecipe } from '@/services/randomizer';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -131,6 +136,32 @@ const DURATION_OPTIONS = [
   { label: '4 weeks', days: 28 },
 ] as const;
 
+/** Compute the next plan start date from a PlanPeriodConfig. */
+function nextPlanStart(config: PlanPeriodConfigValue | null | undefined): Date {
+  if (!config) return getWeekStart(new Date()); // default: this Monday
+  const DAY_INDEX: Record<string, number> = {
+    sunday: 0, monday: 1, saturday: 6, today: -1,
+  };
+  const idx = DAY_INDEX[config.startOn] ?? 1;
+  if (idx === -1) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = (idx - today.getDay() + 7) % 7;
+  const d = new Date(today);
+  d.setDate(today.getDate() + diff);
+  return d;
+}
+
+/** Total days from a PlanPeriodConfig (for default newPlanDays). */
+function configToDays(config: PlanPeriodConfigValue | null | undefined): 7 | 14 | 28 {
+  if (!config) return 7;
+  const total = config.unit === 'weeks' ? config.count * 7 : config.count;
+  if (total >= 28) return 28;
+  if (total >= 14) return 14;
+  return 7;
+}
+
 const MealPlanner = () => {
   const [activeTab, setActiveTab] = useState('calendar');
   const [calendarView, setCalendarView] = useState<'days' | 'meals'>('days');
@@ -180,6 +211,8 @@ const MealPlanner = () => {
 
   // Queries & mutations
   const { data: mealPlans, isLoading } = useMealPlans();
+  const { data: planPeriodConfig } = usePlanPeriodConfig();
+  const { data: recipesLight } = useRecipesLight();
   const createMealPlan = useCreateMealPlan();
   const updateMealPlan = useUpdateMealPlan();
   const deleteMealPlan = useDeleteMealPlan();
@@ -434,6 +467,36 @@ const MealPlanner = () => {
     );
   };
 
+  // ── "I Don't Know" single-slot randomizer (MOP-0023 Phase 2) ────────────────
+  const handleRandomizeSlot = (dateStr: string, slotKey: MealSlot) => {
+    if (!weekPlan || !recipesLight?.length) {
+      toast.error('No recipes in your library yet');
+      return;
+    }
+    const pool: RandomizerPoolRecipe[] = recipesLight.map(r => ({
+      id: r.id,
+      title: r.title,
+      tags: r.tags ?? [],
+      visibility: (r.visibility as any) ?? 'private',
+    }));
+    const [assignment] = selectRandomMeals(pool, [{ dateStr, slotKey }]);
+    if (!assignment) {
+      toast.error('No eligible recipes after allergy filtering');
+      return;
+    }
+    const currentMeals = { ...(weekPlan.meals || {}) };
+    const dayMeals: any = { ...(currentMeals[dateStr] || {}) };
+    dayMeals[slotKey] = [...(dayMeals[slotKey] || []), toPlanEntry(assignment.recipe)];
+    currentMeals[dateStr] = dayMeals;
+    updateMealPlan.mutate(
+      { id: weekPlan.id, data: { meals: currentMeals } },
+      {
+        onSuccess: () => toast.success(`Added "${assignment.recipe.title}"`),
+        onError: (err: any) => toast.error(err?.message || 'Failed to add meal'),
+      }
+    );
+  };
+
   const weekLabel = `${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   return (
@@ -633,7 +696,13 @@ const MealPlanner = () => {
               {!weekPlan && !isLoading && (
                 <Button
                   size="sm"
-                  onClick={() => setShowCreateForm(true)}
+                  onClick={() => {
+                    // Pre-fill start date + duration from the user's period config
+                    const start = nextPlanStart(planPeriodConfig);
+                    setCurrentWeek(start);
+                    setNewPlanDays(configToDays(planPeriodConfig));
+                    setShowCreateForm(true);
+                  }}
                   className="gap-1.5 rounded-xl text-xs"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -742,20 +811,38 @@ const MealPlanner = () => {
                                           </button>
                                         </div>
                                       ))}
-                                      <button
-                                        className="w-full px-2 py-0.5 rounded-lg text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 transition-all duration-200 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100"
-                                        onClick={() => openRecipeSelector(dateStr, slot.key)}
-                                      >
-                                        + Add more
-                                      </button>
+                                      <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 transition-all duration-200">
+                                        <button
+                                          className="flex-1 px-2 py-0.5 rounded-lg text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 transition-colors"
+                                          onClick={() => openRecipeSelector(dateStr, slot.key)}
+                                        >
+                                          + Add more
+                                        </button>
+                                        <button
+                                          className="px-1.5 py-0.5 rounded-lg text-[10px] text-stone-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
+                                          onClick={() => handleRandomizeSlot(dateStr, slot.key)}
+                                          title="I Don't Know"
+                                        >
+                                          <Shuffle className="h-2.5 w-2.5" />
+                                        </button>
+                                      </div>
                                     </>
                                   ) : (
-                                    <button
-                                      className="w-full px-2 py-1 rounded-lg border border-dashed border-stone-200/60 dark:border-white/[0.06] text-[10px] text-stone-300 dark:text-gray-600 hover:border-primary-500/40 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 md:group-hover:opacity-60"
-                                      onClick={() => openRecipeSelector(dateStr, slot.key)}
-                                    >
-                                      + Add
-                                    </button>
+                                    <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 md:group-hover:opacity-60 transition-all duration-200">
+                                      <button
+                                        className="flex-1 px-2 py-1 rounded-lg border border-dashed border-stone-200/60 dark:border-white/[0.06] text-[10px] text-stone-300 dark:text-gray-600 hover:border-primary-500/40 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-colors"
+                                        onClick={() => openRecipeSelector(dateStr, slot.key)}
+                                      >
+                                        + Add
+                                      </button>
+                                      <button
+                                        className="px-1.5 py-1 rounded-lg border border-dashed border-stone-200/60 dark:border-white/[0.06] text-[10px] text-stone-300 dark:text-gray-600 hover:border-amber-400/40 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
+                                        onClick={() => handleRandomizeSlot(dateStr, slot.key)}
+                                        title="I Don't Know"
+                                      >
+                                        <Shuffle className="h-2.5 w-2.5" />
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               );
@@ -925,14 +1012,23 @@ const MealPlanner = () => {
                                             </div>
                                           ))}
 
-                                          {/* Add button */}
+                                          {/* Add + Randomize buttons */}
                                           {weekPlan && (
-                                            <button
-                                              className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-70 md:opacity-0 md:group-hover:opacity-100"
-                                              onClick={() => openRecipeSelector(dateStr, slot.key)}
-                                            >
-                                              + Add
-                                            </button>
+                                            <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
+                                              <button
+                                                className="flex-1 px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-colors"
+                                                onClick={() => openRecipeSelector(dateStr, slot.key)}
+                                              >
+                                                + Add
+                                              </button>
+                                              <button
+                                                className="px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
+                                                onClick={() => handleRandomizeSlot(dateStr, slot.key as MealSlot)}
+                                                title="I Don't Know — pick a random recipe"
+                                              >
+                                                <Shuffle className="h-2.5 w-2.5" />
+                                              </button>
+                                            </div>
                                           )}
                                         </div>
                                       </div>

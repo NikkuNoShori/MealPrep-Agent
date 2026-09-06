@@ -213,6 +213,19 @@ class ApiClient {
     return { recipes: camelRecipes, total: camelRecipes.length };
   }
 
+  /** Lightweight recipe list for the randomizer — id, title, tags, visibility only. */
+  async getRecipesLight() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("id, title, tags, visibility")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data || []) as Array<{ id: string; title: string; tags: string[] | null; visibility: string }>;
+  }
+
   async getRecipe(idOrSlug: string) {
     const {
       data: { user },
@@ -1710,6 +1723,30 @@ class ApiClient {
     return snakeToCamel(data);
   }
 
+  // ── Plan Period Config (MOP-0022) ──
+
+  async getPlanPeriodConfig() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    // plan_period_config is a new column (migration 031) — cast to any until
+    // Supabase types are regenerated post-deploy.
+    const { data, error } = await (supabase.from("profiles") as any)
+      .select("plan_period_config")
+      .eq("id", user.id)
+      .single();
+    if (error) throw error;
+    return (data?.plan_period_config ?? null) as import("@/components/settings/PlanPeriodConfig").PlanPeriodConfigValue | null;
+  }
+
+  async setPlanPeriodConfig(config: import("@/components/settings/PlanPeriodConfig").PlanPeriodConfigValue) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const { error } = await (supabase.from("profiles") as any)
+      .update({ plan_period_config: config })
+      .eq("id", user.id);
+    if (error) throw error;
+  }
+
   // ── Admin Methods (via admin-api edge function) ──
 
   async adminGetAllUsers() {
@@ -1794,6 +1831,17 @@ export const useRecipes = (params?: { limit?: number; offset?: number }) => {
   return useQuery({
     queryKey: ["recipes", params],
     queryFn: () => apiClient.getRecipes(params),
+    staleTime: QUERY_STALE_TIME.domain,
+  });
+};
+
+/** Lightweight recipe hook for the randomizer — avoids loading full objects. */
+export const useRecipesLight = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["recipes-light"],
+    queryFn: () => apiClient.getRecipesLight(),
+    enabled: !authLoading && !!user,
     staleTime: QUERY_STALE_TIME.domain,
   });
 };
@@ -2282,6 +2330,29 @@ export const useUpdateUsername = () => {
   return useMutation({
     mutationFn: (username: string) => apiClient.updateUsername(username),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+};
+
+// ── Plan Period Config Hooks (MOP-0022) ──
+
+export const usePlanPeriodConfig = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["plan-period-config"],
+    queryFn: () => apiClient.getPlanPeriodConfig(),
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useSetPlanPeriodConfig = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: import("@/components/settings/PlanPeriodConfig").PlanPeriodConfigValue) =>
+      apiClient.setPlanPeriodConfig(config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plan-period-config"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
   });
