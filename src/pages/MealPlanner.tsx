@@ -292,9 +292,9 @@ const MealPlanner = () => {
     setExpandedWeeks({});
   };
 
-  // Derived week label from actual displayed dates
-  const weekStart = weekDates.length ? formatDateKey(weekDates[0]) : '';
-  const weekEnd = weekDates.length ? formatDateKey(weekDates[weekDates.length - 1]) : '';
+  // Derived week bounds (used for display/guards)
+  const _weekStart = weekDates.length ? formatDateKey(weekDates[0]) : '';
+  const _weekEnd = weekDates.length ? formatDateKey(weekDates[weekDates.length - 1]) : '';
 
   // Legacy alias so all existing references to weekPlan keep working
   const weekPlan = activePlan;

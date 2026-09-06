@@ -88,18 +88,6 @@ const Household = () => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
 
-  // Dependent form state
-  const [isAddingDependent, setIsAddingDependent] = useState(false);
-  const [editingDependentId, setEditingDependentId] = useState<string | null>(null);
-  const [depForm, setDepForm] = useState({
-    name: '',
-    relationship: '',
-    age: '',
-    dietaryRestrictions: [] as string[],
-    allergies: [] as string[],
-    likedFoods: '',
-    dislikedFoods: '',
-  });
 
   // Queries & mutations
   const { data: householdData, isLoading: householdLoading } = useMyHousehold();
@@ -232,7 +220,7 @@ const Household = () => {
   // ADR-0005: RBAC — what can this member do to dietary profiles?
   const allowMemberEdits = householdData?.household?.allowMemberEdits ?? false;
   const allowMemberChildEdits = householdData?.household?.allowMemberChildEdits ?? false;
-  const canEditOtherMemberProfiles = isOwnerOrAdmin || allowMemberEdits;
+  const _canEditOtherMemberProfiles = isOwnerOrAdmin || allowMemberEdits;
   const canEditChildProfiles = isOwnerOrAdmin || allowMemberChildEdits;
 
   const handleSendInvite = () => {
@@ -328,70 +316,6 @@ const Household = () => {
     );
   };
 
-  const resetDepForm = () => {
-    setDepForm({ name: '', relationship: '', age: '', dietaryRestrictions: [], allergies: [], likedFoods: '', dislikedFoods: '' });
-    setIsAddingDependent(false);
-    setEditingDependentId(null);
-  };
-
-  const handleAddDependent = () => {
-    if (!depForm.name.trim() || !depForm.relationship || !householdData?.household?.id) return;
-    const prefs: Record<string, any> = {};
-    if (depForm.likedFoods.trim()) prefs.likedFoods = depForm.likedFoods.split(',').map((s) => s.trim()).filter(Boolean);
-    if (depForm.dislikedFoods.trim()) prefs.dislikedFoods = depForm.dislikedFoods.split(',').map((s) => s.trim()).filter(Boolean);
-    createFamilyMember.mutate(
-      {
-        householdId: householdData.household.id,
-        name: depForm.name.trim(),
-        relationship: depForm.relationship,
-        age: depForm.age ? parseInt(depForm.age) : undefined,
-        dietaryRestrictions: depForm.dietaryRestrictions,
-        allergies: depForm.allergies,
-        preferences: prefs,
-      },
-      {
-        onSuccess: () => {
-          toast.success('Family member added');
-          resetDepForm();
-        },
-        onError: (err: any) => {
-          toast.error(err?.message || 'Failed to add family member');
-        },
-      }
-    );
-  };
-
-  const handleUpdateDependent = () => {
-    if (!editingDependentId || !depForm.name.trim() || !depForm.relationship) return;
-    const updatePrefs: Record<string, any> = {};
-    if (depForm.likedFoods.trim()) updatePrefs.likedFoods = depForm.likedFoods.split(',').map((s) => s.trim()).filter(Boolean);
-    else updatePrefs.likedFoods = [];
-    if (depForm.dislikedFoods.trim()) updatePrefs.dislikedFoods = depForm.dislikedFoods.split(',').map((s) => s.trim()).filter(Boolean);
-    else updatePrefs.dislikedFoods = [];
-    updateFamilyMember.mutate(
-      {
-        memberId: editingDependentId,
-        updates: {
-          name: depForm.name.trim(),
-          relationship: depForm.relationship,
-          age: depForm.age ? parseInt(depForm.age) : null,
-          dietaryRestrictions: depForm.dietaryRestrictions,
-          allergies: depForm.allergies,
-          preferences: updatePrefs,
-        },
-      },
-      {
-        onSuccess: () => {
-          toast.success('Family member updated');
-          resetDepForm();
-        },
-        onError: (err: any) => {
-          toast.error(err?.message || 'Failed to update family member');
-        },
-      }
-    );
-  };
-
   const handleDeleteDependent = (memberId: string, name: string) => {
     if (!confirm(`Remove ${name} from your household?`)) return;
     deleteFamilyMember.mutate(memberId, {
@@ -400,37 +324,6 @@ const Household = () => {
     });
   };
 
-  const startEditingDependent = (dep: any) => {
-    setEditingDependentId(dep.id);
-    setIsAddingDependent(true);
-    setDepForm({
-      name: dep.name,
-      relationship: dep.relationship || '',
-      age: dep.age?.toString() || '',
-      dietaryRestrictions: dep.dietaryRestrictions || [],
-      allergies: dep.allergies || [],
-      likedFoods: (dep.preferences?.likedFoods || []).join(', '),
-      dislikedFoods: (dep.preferences?.dislikedFoods || []).join(', '),
-    });
-  };
-
-  const toggleRestriction = (r: string) => {
-    setDepForm((prev) => ({
-      ...prev,
-      dietaryRestrictions: prev.dietaryRestrictions.includes(r)
-        ? prev.dietaryRestrictions.filter((x) => x !== r)
-        : [...prev.dietaryRestrictions, r],
-    }));
-  };
-
-  const toggleAllergy = (a: string) => {
-    setDepForm((prev) => ({
-      ...prev,
-      allergies: prev.allergies.includes(a)
-        ? prev.allergies.filter((x) => x !== a)
-        : [...prev.allergies, a],
-    }));
-  };
 
   if (householdLoading) {
     return (

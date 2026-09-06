@@ -5,7 +5,7 @@
  * batchImport() streaming contract using a mocked fetch + ReadableStream.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { parseImportUrls } from "../api";
 import type { BatchSSEEvent } from "../api";
 
