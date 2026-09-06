@@ -165,6 +165,10 @@ function configToDays(config: PlanPeriodConfigValue | null | undefined): 7 | 14 
 const MealPlanner = () => {
   const [activeTab, setActiveTab] = useState('calendar');
   const [calendarView, setCalendarView] = useState<'days' | 'meals'>('days');
+  // Plan-first navigation: which plan is open, and which week within it
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [planWeekOffset, setPlanWeekOffset] = useState(0); // 0 = first week of selected plan
+  // Legacy week state kept only for the create-plan form start date
   const [currentWeek, setCurrentWeek] = useState(() => getWeekStart(new Date()));
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
@@ -218,58 +222,81 @@ const MealPlanner = () => {
   const deleteMealPlan = useDeleteMealPlan();
   const copyMealPlan = useCopyMealPlan();
 
-  const weekDates = useMemo(() => getWeekDates(currentWeek), [currentWeek]);
   const today = formatDateKey(new Date());
 
-  // Find plan for the current week (any non-archived status, prefer active > draft > completed)
-  const weekStart = formatDateKey(currentWeek);
-  const weekEnd = formatDateKey(weekDates[6]);
-
-  const weekPlan = useMemo(() => {
-    if (!mealPlans) return null;
-    const weekPlans = mealPlans.filter((p: any) =>
-      p.status !== 'archived' &&
-      p.startDate <= weekEnd && p.endDate >= weekStart
-    );
-    // Prefer active, then draft, then completed
+  // ── Plan-first navigation ─────────────────────────────────────────────────
+  // Active plans shown in the calendar tab (non-archived, prefer active > draft > completed)
+  const activePlans = useMemo(() => {
+    if (!mealPlans) return [];
     const priority: Record<string, number> = { active: 0, draft: 1, completed: 2 };
-    weekPlans.sort((a: any, b: any) => (priority[a.status] ?? 3) - (priority[b.status] ?? 3));
-    return weekPlans[0] || null;
-  }, [mealPlans, weekStart, weekEnd]);
+    return mealPlans
+      .filter((p: any) => p.status !== 'archived')
+      .sort((a: any, b: any) => {
+        const pa = priority[a.status] ?? 3;
+        const pb = priority[b.status] ?? 3;
+        if (pa !== pb) return pa - pb;
+        // Within same status, most recent first
+        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+      });
+  }, [mealPlans]);
 
   const historyPlans = useMemo(() => {
     if (!mealPlans) return [];
     return mealPlans.filter((p: any) => p.status === 'completed' || p.status === 'archived');
   }, [mealPlans]);
 
-  // ── Multi-week plan support (MOP-0021) ────────────────────────────────────
-  // planDates = every day in weekPlan's date range (may be 7, 14, or 28 days)
-  // planWeeks = planDates partitioned into 7-day rows for the meals view
-  // currentPlanWeekIndex = which week row the navigator is currently showing
+  // The currently-open plan: explicit selection or default to first active plan
+  const activePlan = useMemo(() => {
+    if (!activePlans.length) return null;
+    if (selectedPlanId) {
+      return activePlans.find((p: any) => p.id === selectedPlanId) ?? activePlans[0];
+    }
+    return activePlans[0];
+  }, [activePlans, selectedPlanId]);
+
+  // All dates in the selected plan, chunked into 7-day weeks
   const planDates = useMemo(() => {
-    if (!weekPlan) return weekDates; // fall back to navigator week
-    return getPlanDates(weekPlan.startDate, weekPlan.endDate);
-  }, [weekPlan, weekDates]);
+    if (!activePlan) return [];
+    return getPlanDates(activePlan.startDate, activePlan.endDate);
+  }, [activePlan]);
 
   const planWeeks = useMemo(() => chunkArray(planDates, 7), [planDates]);
 
-  const currentPlanWeekIndex = useMemo(() => {
-    if (planWeeks.length <= 1) return 0;
-    return planWeeks.findIndex(week =>
-      week.some(d => formatDateKey(d) >= weekStart && formatDateKey(d) <= weekEnd)
-    );
-  }, [planWeeks, weekStart, weekEnd]);
+  // Clamp planWeekOffset to valid range whenever plan changes
+  const safeWeekOffset = Math.min(planWeekOffset, Math.max(0, planWeeks.length - 1));
+
+  // The 7 dates currently shown in the days view
+  const weekDates = useMemo(() => {
+    if (!planWeeks.length) return getWeekDates(getWeekStart(new Date()));
+    return planWeeks[safeWeekOffset] ?? planWeeks[0];
+  }, [planWeeks, safeWeekOffset]);
 
   // Track which slot sections have had extra weeks expanded in the meals view
   const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({});
   const toggleExpandedWeek = (slotKey: string) =>
     setExpandedWeeks(prev => ({ ...prev, [slotKey]: !prev[slotKey] }));
 
+  // Navigate within the plan's own weeks
   const navigateWeek = (direction: 'prev' | 'next') => {
-    const newWeek = new Date(currentWeek);
-    newWeek.setDate(newWeek.getDate() + (direction === 'next' ? 7 : -7));
-    setCurrentWeek(newWeek);
+    setPlanWeekOffset(prev => {
+      const next = prev + (direction === 'next' ? 1 : -1);
+      return Math.max(0, Math.min(next, planWeeks.length - 1));
+    });
   };
+
+  // When a new plan is selected, reset to week 0 and close expanded state
+  const selectPlan = (planId: string) => {
+    setSelectedPlanId(planId);
+    setPlanWeekOffset(0);
+    setExpandedWeeks({});
+  };
+
+  // Derived week label from actual displayed dates
+  const weekStart = weekDates.length ? formatDateKey(weekDates[0]) : '';
+  const weekEnd = weekDates.length ? formatDateKey(weekDates[weekDates.length - 1]) : '';
+
+  // Legacy alias so all existing references to weekPlan keep working
+  const weekPlan = activePlan;
 
   const handleCreatePlan = () => {
     const startDate = formatDateKey(currentWeek);
@@ -469,7 +496,11 @@ const MealPlanner = () => {
 
   // ── "I Don't Know" single-slot randomizer (MOP-0023 Phase 2) ────────────────
   const handleRandomizeSlot = (dateStr: string, slotKey: MealSlot) => {
-    if (!weekPlan || !recipesLight?.length) {
+    if (!activePlan) {
+      toast.error('No active plan — select a plan first');
+      return;
+    }
+    if (!recipesLight?.length) {
       toast.error('No recipes in your library yet');
       return;
     }
@@ -497,7 +528,11 @@ const MealPlanner = () => {
     );
   };
 
-  const weekLabel = `${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  const weekLabel = weekDates.length >= 7
+    ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    : weekDates.length
+      ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : '';
 
   return (
     <div className="bg-stone-50 dark:bg-[#0e0f13]">
@@ -579,6 +614,32 @@ const MealPlanner = () => {
 
           {/* ── Calendar Tab ── */}
           <TabsContent value="calendar" className="mt-4 space-y-3">
+
+            {/* Plan selector — shown when more than one active/draft plan exists */}
+            {!isLoading && activePlans.length > 1 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-medium text-stone-400 dark:text-stone-500 uppercase tracking-wide shrink-0">Plan:</span>
+                {activePlans.map((p: any) => (
+                  <button
+                    key={p.id}
+                    onClick={() => selectPlan(p.id)}
+                    className={[
+                      'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
+                      activePlan?.id === p.id
+                        ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400'
+                        : 'border-stone-200 dark:border-white/[0.08] text-stone-500 dark:text-stone-400 hover:border-stone-300 dark:hover:border-white/[0.15]',
+                    ].join(' ')}
+                  >
+                    {p.title || 'Untitled'}
+                    <span className="ml-1.5 opacity-50 text-[10px]">
+                      {new Date(p.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {p.startDate !== p.endDate && ` – ${new Date(p.endDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Week Navigation + Plan Info — single compact row */}
             <div className="flex items-center justify-between gap-2">
               {/* Left: prev + week label + next */}
@@ -587,7 +648,8 @@ const MealPlanner = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => navigateWeek('prev')}
-                  className="h-8 w-8 p-0 rounded-lg"
+                  disabled={safeWeekOffset === 0}
+                  className="h-8 w-8 p-0 rounded-lg disabled:opacity-30"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -595,9 +657,9 @@ const MealPlanner = () => {
                   <h2 className="text-sm font-semibold text-stone-900 dark:text-white whitespace-nowrap">
                     {weekLabel}
                   </h2>
-                  {planWeeks.length > 1 && currentPlanWeekIndex >= 0 && (
+                  {planWeeks.length > 1 && (
                     <span className="text-[10px] text-stone-400 dark:text-stone-500 -mt-0.5">
-                      Week {currentPlanWeekIndex + 1} of {planWeeks.length}
+                      Week {safeWeekOffset + 1} of {planWeeks.length}
                     </span>
                   )}
                 </div>
@@ -605,7 +667,8 @@ const MealPlanner = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => navigateWeek('next')}
-                  className="h-8 w-8 p-0 rounded-lg"
+                  disabled={safeWeekOffset >= planWeeks.length - 1}
+                  className="h-8 w-8 p-0 rounded-lg disabled:opacity-30"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -1169,14 +1232,14 @@ const MealPlanner = () => {
                   </div>
                 </div>
                 <h3 className="text-lg font-semibold text-stone-800 dark:text-gray-200 mb-1.5">
-                  No plan for this week
+                  No meal plans yet
                 </h3>
                 <p className="text-sm text-stone-500 dark:text-gray-400 max-w-sm mx-auto mb-5">
-                  Create a meal plan to start organizing your week and building a grocery list.
+                  Create a meal plan to start assigning recipes and building your grocery list.
                 </p>
                 <Button onClick={() => setShowCreateForm(true)} className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Create Plan for This Week
+                  Create Your First Plan
                 </Button>
               </div>
             )}

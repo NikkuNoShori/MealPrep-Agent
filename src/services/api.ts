@@ -213,14 +213,16 @@ class ApiClient {
     return { recipes: camelRecipes, total: camelRecipes.length };
   }
 
-  /** Lightweight recipe list for the randomizer — id, title, tags, visibility only. */
+  /** Lightweight recipe list for the randomizer — id, title, tags, visibility only.
+   *  Includes own recipes + household-visible recipes so the pool matches what
+   *  the user sees in their recipe library. RLS enforces actual access. */
   async getRecipesLight() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
     const { data, error } = await supabase
       .from("recipes")
       .select("id, title, tags, visibility")
-      .eq("user_id", user.id)
+      .or(`user_id.eq.${user.id},visibility.eq.household,visibility.eq.public`)
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data || []) as Array<{ id: string; title: string; tags: string[] | null; visibility: string }>;
@@ -2070,7 +2072,30 @@ export const useUpdateHouseholdPermissions = () => {
       allowMemberEdits?: boolean;
       allowMemberChildEdits?: boolean;
     }) => apiClient.updateHousehold(householdId, { allowMemberEdits, allowMemberChildEdits }),
-    onSuccess: () => {
+    onMutate: async ({ allowMemberEdits, allowMemberChildEdits }) => {
+      // Cancel any in-flight refetch so it doesn't overwrite optimistic state
+      await queryClient.cancelQueries({ queryKey: ["household"] });
+      const previous = queryClient.getQueryData(["household"]);
+      queryClient.setQueryData(["household"], (old: any) => {
+        if (!old?.household) return old;
+        return {
+          ...old,
+          household: {
+            ...old.household,
+            ...(allowMemberEdits !== undefined && { allowMemberEdits }),
+            ...(allowMemberChildEdits !== undefined && { allowMemberChildEdits }),
+          },
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context: any) => {
+      // Roll back to the snapshot taken before the mutation
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(["household"], context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["household"] });
     },
   });
