@@ -429,7 +429,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
           <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
             {/* Top: title + actions */}
             <div>
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-[15px] text-stone-900 dark:text-white leading-snug truncate" title={recipe.title}>
                     {recipe.title}
