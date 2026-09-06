@@ -738,220 +738,17 @@ const Household = () => {
             {/* Dietary Profiles — unified card for self + dependents (MOP-0025) */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Heart className="h-5 w-5" />
-                    Dietary Profiles
-                  </CardTitle>
-                  {!isAddingDependent && (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        resetDepForm();
-                        setIsAddingDependent(true);
-                      }}
-                      className="gap-1.5"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Member
-                    </Button>
-                  )}
-                </div>
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="h-5 w-5" />
+                  Dietary Profiles
+                </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Manage dietary restrictions and allergies for everyone in your household.
                 </p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Add/Edit Form */}
-                {isAddingDependent && (
-                  <div className="rounded-xl border border-border/60 p-4 space-y-4 bg-accent/20">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="dep-name">Name *</Label>
-                        <Input
-                          id="dep-name"
-                          value={depForm.name}
-                          onChange={(e) => setDepForm((p) => ({ ...p, name: e.target.value }))}
-                          placeholder="Name"
-                          autoFocus
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="dep-relationship">Relationship *</Label>
-                        <Select
-                          value={depForm.relationship}
-                          onValueChange={(v) => setDepForm((p) => ({ ...p, relationship: v }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {RELATIONSHIPS.map((r) => (
-                              <SelectItem key={r} value={r}>
-                                {r}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="dep-age">Age</Label>
-                        <Input
-                          id="dep-age"
-                          type="number"
-                          value={depForm.age}
-                          onChange={(e) => setDepForm((p) => ({ ...p, age: e.target.value }))}
-                          placeholder="Age"
-                          min="0"
-                          max="120"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Dietary Restrictions */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <Label>Dietary Restrictions</Label>
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
-                            onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}
-                          >
-                            Select All
-                          </button>
-                          <button
-                            type="button"
-                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
-                            onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [] }))}
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {DIETARY_RESTRICTIONS.map((r) => {
-                          const selected = depForm.dietaryRestrictions.includes(r);
-                          return (
-                            <Badge
-                              key={r}
-                              variant={selected ? 'default' : 'outline'}
-                              className={`cursor-pointer transition-all duration-150 ${
-                                selected
-                                  ? 'shadow-sm scale-[1.02]'
-                                  : 'opacity-70 hover:opacity-100 hover:border-primary/40'
-                              }`}
-                              onClick={() => toggleRestriction(r)}
-                            >
-                              {selected && <Check className="h-2.5 w-2.5 mr-0.5" />}
-                              {r}
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Allergies */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <Label>Allergies</Label>
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
-                            onClick={() => setDepForm((p) => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}
-                          >
-                            Select All
-                          </button>
-                          <button
-                            type="button"
-                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
-                            onClick={() => setDepForm((p) => ({ ...p, allergies: [] }))}
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {COMMON_ALLERGIES.map((a) => {
-                          const selected = depForm.allergies.includes(a);
-                          return (
-                            <Badge
-                              key={a}
-                              variant={selected ? 'destructive' : 'outline'}
-                              className={`cursor-pointer transition-all duration-150 ${
-                                selected
-                                  ? 'shadow-sm scale-[1.02]'
-                                  : 'opacity-70 hover:opacity-100 hover:border-destructive/40'
-                              }`}
-                              onClick={() => toggleAllergy(a)}
-                            >
-                              {selected && <Check className="h-2.5 w-2.5 mr-0.5" />}
-                              {a}
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Liked / Disliked Foods */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="dep-liked" className="flex items-center gap-1.5">
-                          <ThumbsUp className="h-3.5 w-3.5 text-green-500" />
-                          Liked Foods
-                        </Label>
-                        <Input
-                          id="dep-liked"
-                          value={depForm.likedFoods}
-                          onChange={(e) => setDepForm((p) => ({ ...p, likedFoods: e.target.value }))}
-                          placeholder="e.g. pasta, chicken, broccoli"
-                        />
-                        <p className="text-[10px] text-muted-foreground">Comma-separated</p>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="dep-disliked" className="flex items-center gap-1.5">
-                          <ThumbsDown className="h-3.5 w-3.5 text-red-500" />
-                          Disliked Foods
-                        </Label>
-                        <Input
-                          id="dep-disliked"
-                          value={depForm.dislikedFoods}
-                          onChange={(e) => setDepForm((p) => ({ ...p, dislikedFoods: e.target.value }))}
-                          placeholder="e.g. mushrooms, olives"
-                        />
-                        <p className="text-[10px] text-muted-foreground">Comma-separated</p>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={editingDependentId ? handleUpdateDependent : handleAddDependent}
-                        disabled={
-                          !depForm.name.trim() ||
-                          !depForm.relationship ||
-                          createFamilyMember.isPending ||
-                          updateFamilyMember.isPending
-                        }
-                        className="gap-1.5"
-                      >
-                        {(createFamilyMember.isPending || updateFamilyMember.isPending) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Check className="h-4 w-4" />
-                        )}
-                        {editingDependentId ? 'Update' : 'Add'}
-                      </Button>
-                      <Button variant="outline" onClick={resetDepForm}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Member list — pinned "you" row + dependents */}
-                <div className="space-y-2">
+              <CardContent>
+                {/* Member list — pinned "you" row + dependents + add-new slot */}
+                <div className="space-y-px">
                   {/* Pinned: the account holder */}
                   {editingMyProfile ? (
                     <div className="rounded-xl border border-primary-500/30 p-4 space-y-4 bg-primary-500/[0.03]">
@@ -1040,88 +837,176 @@ const Household = () => {
                     </div>
                   )}
 
-                  {/* Dependents */}
-                  {(householdData.dependents || []).length === 0 && !isAddingDependent && (
-                    <div className="text-center py-6">
-                      <p className="text-sm text-muted-foreground mb-3">
-                        No other members yet. Add children or dependents who don't have their own account.
-                      </p>
-                      <Button variant="outline" size="sm" onClick={() => { resetDepForm(); setIsAddingDependent(true); }} className="gap-1.5">
-                        <Plus className="h-4 w-4" />
-                        Add Member
-                      </Button>
-                    </div>
-                  )}
+                  {/* Dependents — each collapses to summary row, expands inline for edit */}
                   {(householdData.dependents || []).map((dep: any) => (
-                      <div
-                        key={dep.id}
-                        className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent/30 transition-colors"
-                      >
+                    editingDependentId === dep.id ? (
+                      /* ── Inline edit form for this dependent ── */
+                      <div key={dep.id} className="border border-border/60 rounded-xl p-4 space-y-4 bg-accent/20 mt-px">
+                        <p className="text-sm font-medium text-muted-foreground">Editing {dep.name}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="dep-name">Name *</Label>
+                            <Input id="dep-name" value={depForm.name} onChange={(e) => setDepForm((p) => ({ ...p, name: e.target.value }))} placeholder="Name" autoFocus />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="dep-relationship">Relationship *</Label>
+                            <Select value={depForm.relationship} onValueChange={(v) => setDepForm((p) => ({ ...p, relationship: v }))}>
+                              <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                              <SelectContent>{RELATIONSHIPS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="dep-age">Age</Label>
+                            <Input id="dep-age" type="number" value={depForm.age} onChange={(e) => setDepForm((p) => ({ ...p, age: e.target.value }))} placeholder="Age" min="0" max="120" />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label>Dietary Restrictions</Label>
+                            <div className="flex gap-1">
+                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}>Select All</button>
+                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [] }))}>Clear</button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {DIETARY_RESTRICTIONS.map((r) => { const sel = depForm.dietaryRestrictions.includes(r); return <Badge key={r} variant={sel ? 'default' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-primary/40'}`} onClick={() => toggleRestriction(r)}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{r}</Badge>; })}
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label>Allergies</Label>
+                            <div className="flex gap-1">
+                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}>Select All</button>
+                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, allergies: [] }))}>Clear</button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {COMMON_ALLERGIES.map((a) => { const sel = depForm.allergies.includes(a); return <Badge key={a} variant={sel ? 'destructive' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-destructive/40'}`} onClick={() => toggleAllergy(a)}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{a}</Badge>; })}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="dep-liked" className="flex items-center gap-1.5"><ThumbsUp className="h-3.5 w-3.5 text-green-500" />Liked Foods</Label>
+                            <Input id="dep-liked" value={depForm.likedFoods} onChange={(e) => setDepForm((p) => ({ ...p, likedFoods: e.target.value }))} placeholder="e.g. pasta, chicken, broccoli" />
+                            <p className="text-[10px] text-muted-foreground">Comma-separated</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="dep-disliked" className="flex items-center gap-1.5"><ThumbsDown className="h-3.5 w-3.5 text-red-500" />Disliked Foods</Label>
+                            <Input id="dep-disliked" value={depForm.dislikedFoods} onChange={(e) => setDepForm((p) => ({ ...p, dislikedFoods: e.target.value }))} placeholder="e.g. mushrooms, olives" />
+                            <p className="text-[10px] text-muted-foreground">Comma-separated</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={handleUpdateDependent} disabled={!depForm.name.trim() || !depForm.relationship || updateFamilyMember.isPending} className="gap-1.5">
+                            {updateFamilyMember.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            Update
+                          </Button>
+                          <Button variant="outline" onClick={resetDepForm}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── Collapsed summary row ── */
+                      <div key={dep.id} className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent/30 transition-colors mt-px">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <p className="text-sm font-medium">{dep.name}</p>
-                            <Badge variant="outline" className="text-xs">
-                              {dep.relationship}
-                            </Badge>
-                            {dep.age && (
-                              <Badge variant="secondary" className="text-xs">
-                                {dep.age} yrs
-                              </Badge>
-                            )}
+                            <Badge variant="outline" className="text-xs">{dep.relationship}</Badge>
+                            {dep.age && <Badge variant="secondary" className="text-xs">{dep.age} yrs</Badge>}
                           </div>
                           <div className="flex flex-wrap gap-1">
-                            {(dep.dietaryRestrictions || []).map((r: string) => (
-                              <Badge key={r} variant="outline" className="text-[10px] px-1.5 py-0">
-                                {r}
-                              </Badge>
-                            ))}
-                            {(dep.allergies || []).map((a: string) => (
-                              <Badge
-                                key={a}
-                                variant="destructive"
-                                className="text-[10px] px-1.5 py-0"
-                              >
-                                {a}
-                              </Badge>
-                            ))}
+                            {(dep.dietaryRestrictions || []).map((r: string) => <Badge key={r} variant="outline" className="text-[10px] px-1.5 py-0">{r}</Badge>)}
+                            {(dep.allergies || []).map((a: string) => <Badge key={a} variant="destructive" className="text-[10px] px-1.5 py-0">{a}</Badge>)}
+                            {!(dep.dietaryRestrictions?.length) && !(dep.allergies?.length) && <span className="text-[10px] text-muted-foreground">No restrictions set</span>}
                           </div>
                           {((dep.preferences?.likedFoods?.length > 0) || (dep.preferences?.dislikedFoods?.length > 0)) && (
                             <div className="flex flex-wrap gap-2 mt-1">
-                              {dep.preferences?.likedFoods?.length > 0 && (
-                                <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-0.5">
-                                  <ThumbsUp className="h-2.5 w-2.5" />
-                                  {dep.preferences.likedFoods.join(', ')}
-                                </span>
-                              )}
-                              {dep.preferences?.dislikedFoods?.length > 0 && (
-                                <span className="text-[10px] text-red-500 dark:text-red-400 flex items-center gap-0.5">
-                                  <ThumbsDown className="h-2.5 w-2.5" />
-                                  {dep.preferences.dislikedFoods.join(', ')}
-                                </span>
-                              )}
+                              {dep.preferences?.likedFoods?.length > 0 && <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-0.5"><ThumbsUp className="h-2.5 w-2.5" />{dep.preferences.likedFoods.join(', ')}</span>}
+                              {dep.preferences?.dislikedFoods?.length > 0 && <span className="text-[10px] text-red-500 dark:text-red-400 flex items-center gap-0.5"><ThumbsDown className="h-2.5 w-2.5" />{dep.preferences.dislikedFoods.join(', ')}</span>}
                             </div>
                           )}
                         </div>
                         <div className="flex gap-1 shrink-0 ml-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => startEditingDependent(dep)}
-                          >
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => handleDeleteDependent(dep.id, dep.name)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEditingDependent(dep)}><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteDependent(dep.id, dep.name)}><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                       </div>
-                    ))}
+                    )
+                  ))}
+
+                  {/* Add-new member slot — inline at bottom of list */}
+                  {isAddingDependent ? (
+                    <div className="border border-border/60 rounded-xl p-4 space-y-4 bg-accent/20 mt-px">
+                      <p className="text-sm font-medium text-muted-foreground">New member</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="new-dep-name">Name *</Label>
+                          <Input id="new-dep-name" value={depForm.name} onChange={(e) => setDepForm((p) => ({ ...p, name: e.target.value }))} placeholder="Name" autoFocus />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="new-dep-relationship">Relationship *</Label>
+                          <Select value={depForm.relationship} onValueChange={(v) => setDepForm((p) => ({ ...p, relationship: v }))}>
+                            <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                            <SelectContent>{RELATIONSHIPS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="new-dep-age">Age</Label>
+                          <Input id="new-dep-age" type="number" value={depForm.age} onChange={(e) => setDepForm((p) => ({ ...p, age: e.target.value }))} placeholder="Age" min="0" max="120" />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label>Dietary Restrictions</Label>
+                          <div className="flex gap-1">
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}>Select All</button>
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, dietaryRestrictions: [] }))}>Clear</button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {DIETARY_RESTRICTIONS.map((r) => { const sel = depForm.dietaryRestrictions.includes(r); return <Badge key={r} variant={sel ? 'default' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-primary/40'}`} onClick={() => toggleRestriction(r)}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{r}</Badge>; })}
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label>Allergies</Label>
+                          <div className="flex gap-1">
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}>Select All</button>
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setDepForm((p) => ({ ...p, allergies: [] }))}>Clear</button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {COMMON_ALLERGIES.map((a) => { const sel = depForm.allergies.includes(a); return <Badge key={a} variant={sel ? 'destructive' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-destructive/40'}`} onClick={() => toggleAllergy(a)}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{a}</Badge>; })}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="new-dep-liked" className="flex items-center gap-1.5"><ThumbsUp className="h-3.5 w-3.5 text-green-500" />Liked Foods</Label>
+                          <Input id="new-dep-liked" value={depForm.likedFoods} onChange={(e) => setDepForm((p) => ({ ...p, likedFoods: e.target.value }))} placeholder="e.g. pasta, chicken, broccoli" />
+                          <p className="text-[10px] text-muted-foreground">Comma-separated</p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="new-dep-disliked" className="flex items-center gap-1.5"><ThumbsDown className="h-3.5 w-3.5 text-red-500" />Disliked Foods</Label>
+                          <Input id="new-dep-disliked" value={depForm.dislikedFoods} onChange={(e) => setDepForm((p) => ({ ...p, dislikedFoods: e.target.value }))} placeholder="e.g. mushrooms, olives" />
+                          <p className="text-[10px] text-muted-foreground">Comma-separated</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={handleAddDependent} disabled={!depForm.name.trim() || !depForm.relationship || createFamilyMember.isPending} className="gap-1.5">
+                          {createFamilyMember.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          Add
+                        </Button>
+                        <Button variant="outline" onClick={resetDepForm}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="w-full mt-px p-3 rounded-xl border border-dashed border-border/60 text-sm text-muted-foreground hover:border-primary/40 hover:text-primary-500 hover:bg-primary-500/[0.02] transition-colors flex items-center justify-center gap-2"
+                      onClick={() => { resetDepForm(); setIsAddingDependent(true); }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add member
+                    </button>
+                  )}
                 </div>
               </CardContent>
             </Card>
