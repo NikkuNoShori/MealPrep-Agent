@@ -43,8 +43,6 @@ import {
   ChevronDown,
   LogOut,
   ArrowRightLeft,
-  ShieldAlert,
-  Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -119,6 +117,7 @@ const Household = () => {
   const [myRestrictions, setMyRestrictions] = useState<string[]>([]);
   const [myAllergies, setMyAllergies] = useState<string[]>([]);
   const [myProfileSaving, setMyProfileSaving] = useState(false);
+  const [editingMyProfile, setEditingMyProfile] = useState(false);
 
   // Sync local state when server data loads
   React.useEffect(() => {
@@ -136,6 +135,7 @@ const Household = () => {
     setMyProfileSaving(true);
     try {
       await setMyDietaryProfile.mutateAsync({ dietaryRestrictions: myRestrictions, allergies: myAllergies });
+      setEditingMyProfile(false);
       toast.success('Your dietary profile saved');
     } catch {
       toast.error('Failed to save dietary profile');
@@ -735,120 +735,7 @@ const Household = () => {
               </Card>
             )}
 
-            {/* My Dietary Profile — MOP-0025 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldAlert className="h-5 w-5" />
-                  Your Dietary Profile
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Your personal restrictions and allergies. Used when importing recipes to flag potential allergens.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Dietary Restrictions */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label>Dietary Restrictions</Label>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
-                        onClick={() => setMyRestrictions([...DIETARY_RESTRICTIONS])}
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
-                        onClick={() => setMyRestrictions([])}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DIETARY_RESTRICTIONS.map((r) => {
-                      const selected = myRestrictions.includes(r);
-                      return (
-                        <Badge
-                          key={r}
-                          variant={selected ? 'default' : 'outline'}
-                          className={`cursor-pointer transition-all duration-150 ${
-                            selected
-                              ? 'bg-primary-500 hover:bg-primary-600 text-white border-primary-500'
-                              : 'hover:border-primary-400'
-                          }`}
-                          onClick={() => toggleMyRestriction(r)}
-                        >
-                          {r}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Allergies */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label>Allergies</Label>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
-                        onClick={() => setMyAllergies([...COMMON_ALLERGIES])}
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
-                        onClick={() => setMyAllergies([])}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {COMMON_ALLERGIES.map((a) => {
-                      const selected = myAllergies.includes(a);
-                      return (
-                        <Badge
-                          key={a}
-                          variant={selected ? 'destructive' : 'outline'}
-                          className={`cursor-pointer transition-all duration-150 ${
-                            selected ? '' : 'hover:border-destructive/50'
-                          }`}
-                          onClick={() => toggleMyAllergy(a)}
-                        >
-                          {a}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Save */}
-                {myProfileDirty && (
-                  <div className="flex justify-end pt-1">
-                    <Button
-                      size="sm"
-                      className="gap-1.5 text-xs"
-                      onClick={handleSaveMyProfile}
-                      disabled={myProfileSaving}
-                    >
-                      {myProfileSaving
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : <Save className="h-3.5 w-3.5" />}
-                      Save
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Family Members / Dependents */}
+            {/* Dietary Profiles — unified card for self + dependents (MOP-0025) */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -871,7 +758,7 @@ const Household = () => {
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Track dietary needs for family members (children, dependents) who don't have their own account.
+                  Manage dietary restrictions and allergies for everyone in your household.
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1063,30 +950,109 @@ const Household = () => {
                   </div>
                 )}
 
-                {/* Dependents List */}
-                {(householdData.dependents || []).length === 0 && !isAddingDependent ? (
-                  <div className="text-center py-8">
-                    <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-                    <p className="text-sm text-muted-foreground mb-3">
-                      No family members added yet. Add children or dependents to personalize meal
-                      planning.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        resetDepForm();
-                        setIsAddingDependent(true);
-                      }}
-                      className="gap-1.5"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add First Member
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {(householdData.dependents || []).map((dep: any) => (
+                {/* Member list — pinned "you" row + dependents */}
+                <div className="space-y-2">
+                  {/* Pinned: the account holder */}
+                  {editingMyProfile ? (
+                    <div className="rounded-xl border border-primary-500/30 p-4 space-y-4 bg-primary-500/[0.03]">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium flex items-center gap-2">
+                          <User className="h-3.5 w-3.5 text-primary-500" />
+                          {user?.email}
+                          <Badge variant="secondary" className="text-[10px]">You</Badge>
+                        </p>
+                      </div>
+                      {/* Dietary Restrictions */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label>Dietary Restrictions</Label>
+                          <div className="flex gap-1">
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setMyRestrictions([...DIETARY_RESTRICTIONS])}>Select All</button>
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setMyRestrictions([])}>Clear</button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {DIETARY_RESTRICTIONS.map((r) => {
+                            const selected = myRestrictions.includes(r);
+                            return (
+                              <Badge key={r} variant={selected ? 'default' : 'outline'} className={`cursor-pointer transition-all duration-150 ${selected ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-primary/40'}`} onClick={() => toggleMyRestriction(r)}>
+                                {selected && <Check className="h-2.5 w-2.5 mr-0.5" />}{r}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {/* Allergies */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label>Allergies</Label>
+                          <div className="flex gap-1">
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setMyAllergies([...COMMON_ALLERGIES])}>Select All</button>
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setMyAllergies([])}>Clear</button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {COMMON_ALLERGIES.map((a) => {
+                            const selected = myAllergies.includes(a);
+                            return (
+                              <Badge key={a} variant={selected ? 'destructive' : 'outline'} className={`cursor-pointer transition-all duration-150 ${selected ? 'shadow-sm scale-[1.02]' : 'opacity-70 hover:opacity-100 hover:border-destructive/40'}`} onClick={() => toggleMyAllergy(a)}>
+                                {selected && <Check className="h-2.5 w-2.5 mr-0.5" />}{a}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {/* Actions */}
+                      <div className="flex gap-2">
+                        <Button size="sm" className="gap-1.5" onClick={handleSaveMyProfile} disabled={myProfileSaving}>
+                          {myProfileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          Save
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setMyRestrictions(myDietaryProfile?.dietaryRestrictions ?? []);
+                          setMyAllergies(myDietaryProfile?.allergies ?? []);
+                          setEditingMyProfile(false);
+                        }}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent/30 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-sm font-medium">{user?.email}</p>
+                          <Badge variant="secondary" className="text-xs">You</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {myRestrictions.map((r) => (
+                            <Badge key={r} variant="outline" className="text-[10px] px-1.5 py-0">{r}</Badge>
+                          ))}
+                          {myAllergies.map((a) => (
+                            <Badge key={a} variant="destructive" className="text-[10px] px-1.5 py-0">{a}</Badge>
+                          ))}
+                          {myRestrictions.length === 0 && myAllergies.length === 0 && (
+                            <span className="text-[10px] text-muted-foreground">No restrictions set</span>
+                          )}
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0 ml-2" onClick={() => setEditingMyProfile(true)}>
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Dependents */}
+                  {(householdData.dependents || []).length === 0 && !isAddingDependent && (
+                    <div className="text-center py-6">
+                      <p className="text-sm text-muted-foreground mb-3">
+                        No other members yet. Add children or dependents who don't have their own account.
+                      </p>
+                      <Button variant="outline" size="sm" onClick={() => { resetDepForm(); setIsAddingDependent(true); }} className="gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        Add Member
+                      </Button>
+                    </div>
+                  )}
+                  {(householdData.dependents || []).map((dep: any) => (
                       <div
                         key={dep.id}
                         className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent/30 transition-colors"
@@ -1156,8 +1122,7 @@ const Household = () => {
                         </div>
                       </div>
                     ))}
-                  </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           </>
