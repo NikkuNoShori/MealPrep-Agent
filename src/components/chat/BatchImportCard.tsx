@@ -67,7 +67,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   // ── Extracting ──────────────────────────────────────────────────────────────
   if (status === "extracting") {
     return (
-      <div data-testid={`batch-card-${entry.index}`}>
+      <div data-testid={`batch-card-${entry.index}`} className="min-w-0">
         <div className="flex items-stretch gap-4 p-3 rounded-2xl bg-white/60 dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/[0.06] animate-pulse">
           {/* Image placeholder */}
           <div className="relative w-28 h-28 rounded-xl flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-200/80 dark:from-gray-800 dark:to-gray-700" />
@@ -91,7 +91,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   // ── Error ───────────────────────────────────────────────────────────────────
   if (status === "error") {
     return (
-      <div data-testid={`batch-card-${entry.index}`}>
+      <div data-testid={`batch-card-${entry.index}`} className="min-w-0">
         <div className="flex items-stretch gap-4 p-3 rounded-2xl border border-destructive/40 bg-destructive/[0.06]">
           {/* Image placeholder — red tint */}
           <div className="relative w-28 h-28 rounded-xl flex-shrink-0 bg-gradient-to-br from-rose-100/60 to-rose-200/40 dark:from-rose-900/20 dark:to-rose-800/20 flex items-center justify-center">
@@ -163,7 +163,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   };
 
   return (
-    <div data-testid={`batch-card-${entry.index}`}>
+    <div data-testid={`batch-card-${entry.index}`} className="min-w-0">
       <RecipeCard
         recipe={recipeForCard}
         viewMode="list"

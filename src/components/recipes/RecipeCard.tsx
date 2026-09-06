@@ -390,7 +390,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
         className={!isPreview ? "group cursor-pointer" : "group"}
       >
         <div className={[
-          "flex items-stretch gap-4 p-3 rounded-2xl border transition-all duration-300",
+          "flex items-stretch gap-4 p-3 rounded-2xl border transition-all duration-300 overflow-hidden",
           isPreview && previewActions?.saved
             ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40"
             : "bg-white/60 dark:bg-white/[0.03] border-stone-200/60 dark:border-white/[0.06]",

@@ -272,13 +272,16 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
   return (
     <div
       data-testid="batch-import-panel"
-      className="flex flex-col rounded-xl border border-border bg-card shadow-xl overflow-hidden"
+      className="w-full flex flex-col rounded-xl border border-border bg-card shadow-xl overflow-hidden"
       style={{ maxHeight: "70vh" }}
     >
-      {/* ── Header ── */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
+      {/* ── Header ──
+          flex-wrap so the title/stats/action buttons drop to a second line
+          on narrow phones instead of forcing the whole panel wider than the
+          viewport (which was pushing everything below it off-screen too). */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 border-b border-border shrink-0">
         <PackagePlus className="h-4 w-4 text-primary shrink-0" />
-        <span className="flex-1 text-sm font-semibold">Batch Recipe Import</span>
+        <span className="flex-1 min-w-[8rem] text-sm font-semibold">Batch Recipe Import</span>
 
         {/* Running stats */}
         {phase !== "idle" && doneStats && (
@@ -422,7 +425,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
       {cards.length > 0 && (
         <div
           data-testid="batch-card-list"
-          className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 min-h-0"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-3 flex flex-col gap-2 min-h-0"
             style={{ backgroundColor: "hsl(var(--background))" }}
         >
           {cards.map((entry) => (
