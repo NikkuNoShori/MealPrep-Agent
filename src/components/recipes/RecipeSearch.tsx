@@ -186,7 +186,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                   </div>
                   <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Dietary Restrictions</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {DIETARY_RESTRICTIONS.map(restriction => (
                     <Badge
                       key={restriction}
@@ -212,7 +212,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                   </div>
                   <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Prep Time</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                   {PREP_TIME_RANGES.map(range => (
                     <Badge
                       key={range.value}
@@ -264,7 +264,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                   </div>
                   <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Popular Tags</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {['Quick', 'Healthy', 'Budget-Friendly', 'Family-Friendly', 'Spicy', 'Sweet', 'Savory'].map(tag => (
                     <Badge
                       key={tag}
