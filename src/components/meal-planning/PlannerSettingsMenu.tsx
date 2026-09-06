@@ -54,6 +54,11 @@ export function PlannerSettingsMenu({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  // Nothing to show yet (component is an extensible shell awaiting options
+  // from future MOPs) — don't render a trigger that opens to an empty popup.
+  // This check must come after all hook calls above (Rules of Hooks).
+  if (options.length === 0) return null;
+
   return (
     <div ref={menuRef} className="relative">
       {/* Trigger */}
