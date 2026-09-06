@@ -140,7 +140,8 @@ const DURATION_OPTIONS = [
 function nextPlanStart(config: PlanPeriodConfigValue | null | undefined): Date {
   if (!config) return getWeekStart(new Date()); // default: this Monday
   const DAY_INDEX: Record<string, number> = {
-    sunday: 0, monday: 1, saturday: 6, today: -1,
+    sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+    thursday: 4, friday: 5, saturday: 6, today: -1,
   };
   const idx = DAY_INDEX[config.startOn] ?? 1;
   if (idx === -1) {
@@ -172,7 +173,7 @@ const MealPlanner = () => {
   const [currentWeek, setCurrentWeek] = useState(() => getWeekStart(new Date()));
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
-  const [newPlanDays, setNewPlanDays] = useState<7 | 14 | 28>(7);
+  const [newPlanDays, setNewPlanDays] = useState<7 | 14 | 28>(7); // updated from settings on open
   const [planMenuOpen, setPlanMenuOpen] = useState<string | null>(null);
   const [isEditingPlanTitle, setIsEditingPlanTitle] = useState(false);
   const [editedPlanTitle, setEditedPlanTitle] = useState('');
@@ -199,7 +200,7 @@ const MealPlanner = () => {
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  });
+  }, [isEditingPlanTitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Click-outside to close banner menu
   useEffect(() => {
@@ -211,7 +212,7 @@ const MealPlanner = () => {
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  });
+  }, [bannerMenuOpen]);
 
   // Queries & mutations
   const { data: mealPlans, isLoading } = useMealPlans();
@@ -756,9 +757,10 @@ const MealPlanner = () => {
                   </div>
                 </div>
               )}
-              {!weekPlan && !isLoading && (
+              {!isLoading && (
                 <Button
                   size="sm"
+                  variant={weekPlan ? 'ghost' : 'default'}
                   onClick={() => {
                     // Pre-fill start date + duration from the user's period config
                     const start = nextPlanStart(planPeriodConfig);
