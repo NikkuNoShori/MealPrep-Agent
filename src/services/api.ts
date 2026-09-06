@@ -2358,6 +2358,51 @@ export const useSetPlanPeriodConfig = () => {
   });
 };
 
+// ── My Dietary Profile (MOP-0025) ──
+
+export const useMyDietaryProfile = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["my-dietary-profile"],
+    queryFn: async () => {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) throw new Error("Not authenticated");
+      // dietary_restrictions and allergies added in migration 030 — cast until types regenerated
+      const { data, error } = await (supabase.from("profiles") as any)
+        .select("dietary_restrictions, allergies")
+        .eq("id", u.id)
+        .single();
+      if (error) throw error;
+      return {
+        dietaryRestrictions: (data?.dietary_restrictions ?? []) as string[],
+        allergies: (data?.allergies ?? []) as string[],
+      };
+    },
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useSetMyDietaryProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (profile: { dietaryRestrictions: string[]; allergies: string[] }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await (supabase.from("profiles") as any)
+        .update({
+          dietary_restrictions: profile.dietaryRestrictions,
+          allergies: profile.allergies,
+        })
+        .eq("id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-dietary-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+};
+
 // ── Recipe Reaction Hooks ──
 
 export const useRecipeReactions = (recipeIds: string[]) => {

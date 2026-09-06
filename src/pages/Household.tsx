@@ -18,6 +18,8 @@ import {
   useUpdateMemberRole,
   useRemoveHouseholdMember,
   useTransferOwnership,
+  useMyDietaryProfile,
+  useSetMyDietaryProfile,
 } from '../services/api';
 import {
   Loader2,
@@ -41,6 +43,8 @@ import {
   ChevronDown,
   LogOut,
   ArrowRightLeft,
+  ShieldAlert,
+  Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -108,6 +112,43 @@ const Household = () => {
   const updateMemberRole = useUpdateMemberRole();
   const removeMember = useRemoveHouseholdMember();
   const transferOwnership = useTransferOwnership();
+
+  // My dietary profile (MOP-0025)
+  const { data: myDietaryProfile } = useMyDietaryProfile();
+  const setMyDietaryProfile = useSetMyDietaryProfile();
+  const [myRestrictions, setMyRestrictions] = useState<string[]>([]);
+  const [myAllergies, setMyAllergies] = useState<string[]>([]);
+  const [myProfileSaving, setMyProfileSaving] = useState(false);
+
+  // Sync local state when server data loads
+  React.useEffect(() => {
+    if (myDietaryProfile) {
+      setMyRestrictions(myDietaryProfile.dietaryRestrictions);
+      setMyAllergies(myDietaryProfile.allergies);
+    }
+  }, [myDietaryProfile]);
+
+  const myProfileDirty =
+    JSON.stringify(myRestrictions.slice().sort()) !== JSON.stringify((myDietaryProfile?.dietaryRestrictions ?? []).slice().sort()) ||
+    JSON.stringify(myAllergies.slice().sort()) !== JSON.stringify((myDietaryProfile?.allergies ?? []).slice().sort());
+
+  const handleSaveMyProfile = async () => {
+    setMyProfileSaving(true);
+    try {
+      await setMyDietaryProfile.mutateAsync({ dietaryRestrictions: myRestrictions, allergies: myAllergies });
+      toast.success('Your dietary profile saved');
+    } catch {
+      toast.error('Failed to save dietary profile');
+    } finally {
+      setMyProfileSaving(false);
+    }
+  };
+
+  const toggleMyRestriction = (r: string) =>
+    setMyRestrictions(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+
+  const toggleMyAllergy = (a: string) =>
+    setMyAllergies(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
 
   // Member management state
   const [memberMenuOpen, setMemberMenuOpen] = useState<string | null>(null);
@@ -693,6 +734,119 @@ const Household = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* My Dietary Profile — MOP-0025 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5" />
+                  Your Dietary Profile
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Your personal restrictions and allergies. Used when importing recipes to flag potential allergens.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Dietary Restrictions */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label>Dietary Restrictions</Label>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
+                        onClick={() => setMyRestrictions([...DIETARY_RESTRICTIONS])}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
+                        onClick={() => setMyRestrictions([])}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DIETARY_RESTRICTIONS.map((r) => {
+                      const selected = myRestrictions.includes(r);
+                      return (
+                        <Badge
+                          key={r}
+                          variant={selected ? 'default' : 'outline'}
+                          className={`cursor-pointer transition-all duration-150 ${
+                            selected
+                              ? 'bg-primary-500 hover:bg-primary-600 text-white border-primary-500'
+                              : 'hover:border-primary-400'
+                          }`}
+                          onClick={() => toggleMyRestriction(r)}
+                        >
+                          {r}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Allergies */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label>Allergies</Label>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
+                        onClick={() => setMyAllergies([...COMMON_ALLERGIES])}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
+                        onClick={() => setMyAllergies([])}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COMMON_ALLERGIES.map((a) => {
+                      const selected = myAllergies.includes(a);
+                      return (
+                        <Badge
+                          key={a}
+                          variant={selected ? 'destructive' : 'outline'}
+                          className={`cursor-pointer transition-all duration-150 ${
+                            selected ? '' : 'hover:border-destructive/50'
+                          }`}
+                          onClick={() => toggleMyAllergy(a)}
+                        >
+                          {a}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Save */}
+                {myProfileDirty && (
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={handleSaveMyProfile}
+                      disabled={myProfileSaving}
+                    >
+                      {myProfileSaving
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Save className="h-3.5 w-3.5" />}
+                      Save
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Family Members / Dependents */}
             <Card>
