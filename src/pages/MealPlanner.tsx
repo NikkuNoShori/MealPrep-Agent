@@ -768,17 +768,21 @@ const MealPlanner = () => {
                 </div>
               </div>
             ) : (
-              /* ── Meals View: rows by meal type, columns by day ── */
+              /* ── Meals View: rows by meal type, multi-week rows of 7 ── */
               <div className="space-y-3 animate-fade-in">
                 {[...DAILY_SLOTS, { key: 'snacks' as MealSlot, label: 'Snacks', icon: Cookie, color: 'text-pink-500' }].map((slot) => {
                   const isSnacks = slot.key === 'snacks';
                   const snackItems: PlannedMealEntry[] = isSnacks ? (weekPlan?.meals?.['_snacks'] || []) as PlannedMealEntry[] : [];
+                  // Count across entire plan date range (not just viewed week)
                   const totalForSlot = isSnacks
                     ? snackItems.length
-                    : weekDates.reduce((sum, date) => {
+                    : planDates.reduce((sum, date) => {
                         const dateStr = formatDateKey(date);
                         return sum + (weekPlan?.meals?.[dateStr]?.[slot.key]?.length || 0);
                       }, 0);
+                  const isExpanded = !!expandedWeeks[slot.key];
+                  // Weeks shown: always week 0, plus rest when expanded
+                  const visibleWeeks = isSnacks ? [] : (isExpanded ? planWeeks : planWeeks.slice(0, 1));
 
                   return (
                     <div
@@ -801,6 +805,9 @@ const MealPlanner = () => {
                           </h3>
                           <p className="text-[10px] text-stone-400 dark:text-gray-500">
                             {totalForSlot} {totalForSlot === 1 ? 'recipe' : 'recipes'} planned
+                            {!isSnacks && planWeeks.length > 1 && (
+                              <span className="ml-1">· {planWeeks.length} weeks</span>
+                            )}
                           </p>
                         </div>
                         {!isSnacks && weekPlan && (
@@ -808,7 +815,7 @@ const MealPlanner = () => {
                             variant="ghost"
                             size="sm"
                             className="h-7 gap-1 rounded-lg text-xs text-stone-400 hover:text-primary-500"
-                            onClick={() => openRecipeSelector(formatDateKey(weekDates[0]), slot.key)}
+                            onClick={() => openRecipeSelector(formatDateKey(planDates[0]), slot.key)}
                             title={`Add ${slot.label}`}
                           >
                             <Plus className="h-3 w-3" />
@@ -860,62 +867,94 @@ const MealPlanner = () => {
                           )}
                         </div>
                       ) : (
-                        /* Daily slots: 7-day horizontal grid. Below md this
-                           scrolls horizontally at a fixed per-day width
-                           instead of squeezing 7 columns into ~50px each. */
-                        <div className="overflow-x-auto">
-                          <div className="grid grid-cols-7 divide-x divide-stone-100 dark:divide-white/[0.04] min-w-[560px] md:min-w-0">
-                          {weekDates.map((date) => {
-                            const dateStr = formatDateKey(date);
-                            const isToday = dateStr === today;
-                            const slotMeals = weekPlan?.meals?.[dateStr]?.[slot.key] || [];
+                        /* Daily slots: one row of 7 per week, weeks 2+ collapsed */
+                        <div>
+                          {visibleWeeks.map((weekRow, weekIdx) => (
+                            <div key={weekIdx} className={weekIdx > 0 ? 'border-t border-stone-100 dark:border-white/[0.04]' : ''}>
+                              {/* Week label for multi-week plans */}
+                              {planWeeks.length > 1 && (
+                                <div className="px-3 pt-1.5 pb-0.5">
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-300 dark:text-stone-600">
+                                    Week {weekIdx + 1}
+                                    {weekRow[0] && (
+                                      <span className="ml-1 font-normal normal-case tracking-normal">
+                                        — {weekRow[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        {weekRow[weekRow.length - 1] && ` – ${weekRow[weekRow.length - 1].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {/* 7-day horizontal grid */}
+                              <div className="overflow-x-auto">
+                                <div className="grid grid-cols-7 divide-x divide-stone-100 dark:divide-white/[0.04] min-w-[560px] md:min-w-0">
+                                  {weekRow.map((date) => {
+                                    const dateStr = formatDateKey(date);
+                                    const isToday = dateStr === today;
+                                    const slotMeals = weekPlan?.meals?.[dateStr]?.[slot.key] || [];
 
-                            return (
-                              <div
-                                key={dateStr}
-                                className={`group p-2 min-h-[80px] transition-colors ${
-                                  isToday ? 'bg-primary-500/[0.03] dark:bg-primary-500/[0.05]' : ''
-                                }`}
-                              >
-                                {/* Day label */}
-                                <p className={`text-[10px] font-semibold text-center mb-1.5 ${
-                                  isToday ? 'text-primary-500' : 'text-stone-400 dark:text-gray-500'
-                                }`}>
-                                  {DAYS_SHORT[date.getDay()]} {date.getDate()}
-                                </p>
-
-                                {/* Meals */}
-                                <div className="space-y-1">
-                                  {slotMeals.map((meal: any) => (
-                                    <div
-                                      key={meal.id}
-                                      className="group/meal flex items-center gap-0.5 px-1.5 py-1 rounded-md bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-[10px] text-stone-700 dark:text-gray-300 transition-all hover:bg-stone-100 dark:hover:bg-white/[0.08]"
-                                      title={meal.recipeName}
-                                    >
-                                      <span className="truncate flex-1">{meal.recipeName}</span>
-                                      <button
-                                        className="flex-shrink-0 opacity-70 md:opacity-0 md:group-hover/meal:opacity-100 text-stone-400 hover:text-destructive transition-all"
-                                        onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
+                                    return (
+                                      <div
+                                        key={dateStr}
+                                        className={`group p-2 min-h-[80px] transition-colors ${
+                                          isToday ? 'bg-primary-500/[0.03] dark:bg-primary-500/[0.05]' : ''
+                                        }`}
                                       >
-                                        <X className="h-2.5 w-2.5" />
-                                      </button>
-                                    </div>
-                                  ))}
+                                        {/* Day label */}
+                                        <p className={`text-[10px] font-semibold text-center mb-1.5 ${
+                                          isToday ? 'text-primary-500' : 'text-stone-400 dark:text-gray-500'
+                                        }`}>
+                                          {DAYS_SHORT[date.getDay()]} {date.getDate()}
+                                        </p>
 
-                                  {/* Add button */}
-                                  {weekPlan && (
-                                    <button
-                                      className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-70 md:opacity-0 md:group-hover:opacity-100"
-                                      onClick={() => openRecipeSelector(dateStr, slot.key)}
-                                    >
-                                      + Add
-                                    </button>
-                                  )}
+                                        {/* Meals */}
+                                        <div className="space-y-1">
+                                          {slotMeals.map((meal: any) => (
+                                            <div
+                                              key={meal.id}
+                                              className="group/meal flex items-center gap-0.5 px-1.5 py-1 rounded-md bg-stone-50 dark:bg-white/[0.04] border border-stone-100 dark:border-white/[0.06] text-[10px] text-stone-700 dark:text-gray-300 transition-all hover:bg-stone-100 dark:hover:bg-white/[0.08]"
+                                              title={meal.recipeName}
+                                            >
+                                              <span className="truncate flex-1">{meal.recipeName}</span>
+                                              <button
+                                                className="flex-shrink-0 opacity-70 md:opacity-0 md:group-hover/meal:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                                                onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
+                                              >
+                                                <X className="h-2.5 w-2.5" />
+                                              </button>
+                                            </div>
+                                          ))}
+
+                                          {/* Add button */}
+                                          {weekPlan && (
+                                            <button
+                                              className="w-full px-1 py-0.5 rounded-md text-[10px] text-stone-300 dark:text-gray-600 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-all duration-200 opacity-70 md:opacity-0 md:group-hover:opacity-100"
+                                              onClick={() => openRecipeSelector(dateStr, slot.key)}
+                                            >
+                                              + Add
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
-                            );
-                          })}
-                          </div>
+                            </div>
+                          ))}
+
+                          {/* Expand / collapse toggle for weeks 2+ */}
+                          {planWeeks.length > 1 && (
+                            <button
+                              onClick={() => toggleExpandedWeek(slot.key)}
+                              className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] text-stone-400 dark:text-stone-500 hover:text-primary-500 hover:bg-stone-50 dark:hover:bg-white/[0.03] border-t border-stone-100 dark:border-white/[0.04] transition-colors"
+                            >
+                              <ChevronRight className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                              {isExpanded
+                                ? 'Show less'
+                                : `Show ${planWeeks.length - 1} more week${planWeeks.length > 2 ? 's' : ''}`}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
