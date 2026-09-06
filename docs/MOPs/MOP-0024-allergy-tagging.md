@@ -5,10 +5,10 @@
 | **MOP** | MOP-0024 |
 | **Title** | Automatic Allergy Tagging on Recipe Import |
 | **Date Submitted** | 2026-09-05 |
-| **Date Updated** | 2026-09-05 |
-| **Date Completed** | — |
+| **Date Updated** | 2026-09-06 |
+| **Date Completed** | 2026-09-06 |
 | **Submitted By** | Nick Neal |
-| **Status** | draft |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md).
 
