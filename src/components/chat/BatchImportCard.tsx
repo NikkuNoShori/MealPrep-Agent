@@ -45,13 +45,14 @@ interface BatchImportCardProps {
 /** Pull a clean human-readable message from a raw error string (may be JSON). */
 function cleanError(raw: string | undefined): string {
   if (!raw) return "Unknown error";
+  // Strip leading "HTTP NNN: " prefix that batch-extract prepends
+  const stripped = raw.replace(/^HTTP \d+:\s*/, "");
   try {
-    const json = raw.replace(/^HTTP \d+:\s*/, "");
-    const parsed = JSON.parse(json);
+    const parsed = JSON.parse(stripped);
     const firstMsg = parsed?.errors?.[0]?.message ?? parsed?.message ?? parsed?.error;
     if (firstMsg) return String(firstMsg);
-  } catch { /* not JSON */ }
-  return raw.replace(/^HTTP \d+:\s*/, "").slice(0, 200);
+  } catch { /* not JSON — use stripped text as-is */ }
+  return stripped.slice(0, 200);
 }
 
 /**

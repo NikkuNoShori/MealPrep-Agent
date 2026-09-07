@@ -97,9 +97,16 @@ async function extractOne(
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
+      // Try to extract a human-readable message from the pipeline's error shape
+      // { success: false, errors: [{ stage, code, message }], stage_failed }
+      let friendlyMsg: string | undefined;
+      try {
+        const parsed = JSON.parse(text);
+        friendlyMsg = parsed?.errors?.[0]?.message ?? parsed?.error ?? parsed?.message;
+      } catch { /* not JSON */ }
       return {
         ok: false,
-        message: `HTTP ${response.status}: ${text.slice(0, 200)}`,
+        message: friendlyMsg ?? `HTTP ${response.status}: ${text.slice(0, 200)}`,
       };
     }
 
