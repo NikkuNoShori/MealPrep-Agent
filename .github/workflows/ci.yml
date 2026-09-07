@@ -70,13 +70,11 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Build app
-        run: npm run build
-
       - name: Run Playwright tests
-        run: PLAYWRIGHT_SKIP_WEBSERVER=0 npm run test:e2e
+        run: npm run test:e2e
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:5173
+          PLAYWRIGHT_SKIP_WEBSERVER: ""
 
       - name: Upload Playwright report
         if: failure()
