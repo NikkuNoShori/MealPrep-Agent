@@ -7,7 +7,7 @@
  * saved state renders a read-only confirmed card.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   AlertCircle,
   BookOpen,
@@ -95,8 +95,8 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   const [editingField, setEditingField] = useState<
     "title" | "servings" | "difficulty" | "prepTime" | "cookTime" | null
   >(null);
-  const [editedTitle, setEditedTitle]         = useState<string>(recipe?.title ?? displayUrl);
-  const [editedServings, setEditedServings]   = useState<number>(recipe?.servings ?? 4);
+  const [editedTitle, setEditedTitle]           = useState<string>(recipe?.title ?? displayUrl);
+  const [editedServings, setEditedServings]     = useState<number>(recipe?.servings ?? 4);
   const [editedDifficulty, setEditedDifficulty] = useState<"easy" | "medium" | "hard">(
     recipe?.difficulty === "easy" || recipe?.difficulty === "medium" || recipe?.difficulty === "hard"
       ? recipe.difficulty
@@ -106,6 +106,25 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   const [editedCookTime, setEditedCookTime]   = useState<number>(derivedCookTime);
   const [visibility, setVisibility]           = useState<RecipeVisibility>("private");
   const [expanded, setExpanded]               = useState(false);
+
+  // The card instance persists across extracting→done (same React key), so the
+  // useState initializers above ran while recipe was still null. Resync editable
+  // fields once the real recipe data arrives — but only once, not on every re-render.
+  const syncedRef = useRef(false);
+  useEffect(() => {
+    if (!recipe || syncedRef.current) return;
+    syncedRef.current = true;
+    setEditedTitle(recipe.title ?? displayUrl);
+    setEditedServings(recipe.servings ?? 4);
+    if (recipe.difficulty === "easy" || recipe.difficulty === "medium" || recipe.difficulty === "hard") {
+      setEditedDifficulty(recipe.difficulty);
+    }
+    const rPrep  = recipe.prep_time  ?? recipe.prepTime  ?? 0;
+    const rCook  = recipe.cook_time  ?? recipe.cookTime  ?? 0;
+    const rTotal = recipe.total_time ?? recipe.totalTime ?? 0;
+    setEditedPrepTime(rPrep);
+    setEditedCookTime(rCook === 0 && rPrep === 0 && rTotal > 0 ? rTotal : rCook);
+  }, [recipe, displayUrl]);
 
   const totalTime = editedPrepTime + editedCookTime;
 
@@ -205,12 +224,15 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   }
 
   // ── Done — editable pre-save surface ────────────────────────────────────────
+  // NOTE: overflow-hidden must NOT be on this element — it triggers CSS flexbox
+  // min-height:auto collapse inside a bounded scroll container, collapsing the
+  // card to a thin line. Corner clipping is handled per-element instead.
   return (
-    <div data-testid={`batch-card-${entry.index}`} className="min-w-0 rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] overflow-hidden">
+    <div data-testid={`batch-card-${entry.index}`} className="min-w-0 rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03]">
 
-      {/* Image */}
+      {/* Image — rounded top corners to match card border-radius */}
       {imageUrl && (
-        <img src={imageUrl} alt={editedTitle} className="w-full h-40 object-cover" />
+        <img src={imageUrl} alt={editedTitle} className="w-full h-40 object-cover rounded-t-2xl" />
       )}
 
       <div className="p-3 space-y-2.5">
