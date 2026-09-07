@@ -76,10 +76,22 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Start vite preview server
+        run: npx vite preview --port 4173 &
+
+      - name: Wait for preview server
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4173 && break
+            echo "Waiting for server... attempt $i"
+            sleep 1
+          done
+
       - name: Run Playwright tests
         run: npm run test:e2e
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4173
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
 
       - name: Upload Playwright report
         if: failure()
