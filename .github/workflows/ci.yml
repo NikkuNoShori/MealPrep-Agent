@@ -70,16 +70,19 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Write .env for Vite dev server
-        run: |
-          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
-          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+      - name: Build app with real env vars
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Run Playwright tests
         run: npm run test:e2e
         env:
-          PLAYWRIGHT_BASE_URL: http://localhost:5173
-          PLAYWRIGHT_SKIP_WEBSERVER: ""
+          PLAYWRIGHT_BASE_URL: http://localhost:4173
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+          # Serve the production build via vite preview
+          CI_PREVIEW: "1"
 
       - name: Upload Playwright report
         if: failure()

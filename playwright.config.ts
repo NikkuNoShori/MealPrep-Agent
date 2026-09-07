@@ -29,7 +29,7 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
 
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || (process.env.PLAYWRIGHT_SKIP_WEBSERVER ? 'http://localhost:4173' : 'http://localhost:5173'),
     storageState: './e2e/.auth/user.json',   // every test starts authenticated
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
@@ -44,11 +44,18 @@ export default defineConfig({
   ],
 
   webServer: process.env.PLAYWRIGHT_SKIP_WEBSERVER
-    ? undefined
+    ? {
+        // CI: serve the pre-built production bundle via vite preview (port 4173)
+        command: 'npm run preview -- --port 4173',
+        url: 'http://localhost:4173',
+        reuseExistingServer: false,
+        timeout: 60_000,
+      }
     : {
+        // Local dev: start vite dev server
         command: 'npm run dev',
         url: 'http://localhost:5173',
-        reuseExistingServer: true,   // reuse if already running (local dev)
+        reuseExistingServer: true,
         timeout: 120_000,
         env: {
           VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || '',
