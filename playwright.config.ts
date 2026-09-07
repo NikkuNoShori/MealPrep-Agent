@@ -5,8 +5,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load test credentials from .env.test
-dotenv.config({ path: path.resolve(__dirname, '.env.test') });
+// Load test credentials from .env.test (local dev only — CI injects secrets via env vars)
+if (!process.env.CI) {
+  dotenv.config({ path: path.resolve(__dirname, '.env.test') });
+}
 
 /**
  * MOP-0013 — Playwright E2E configuration.
