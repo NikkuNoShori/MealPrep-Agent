@@ -76,6 +76,9 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Verify env vars baked into build
+        run: grep -c "tiibvcgnxnpgvygmqzvu" dist/assets/*.js && echo "✅ Supabase URL found in bundle" || echo "❌ Supabase URL NOT in bundle"
+
       - name: Start vite preview server
         run: npx vite preview --port 4173 &
 
