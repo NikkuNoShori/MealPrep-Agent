@@ -32,6 +32,13 @@ export default async function globalSetup() {
     );
   }
 
+  // Capture console errors to diagnose blank-page issues
+  const consoleErrors: string[] = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', err => consoleErrors.push(`[pageerror] ${err.message}`));
+
   console.log(`[global-setup] Signing in as ${email}…`);
 
   await page.goto(`${baseURL}/signin`, { waitUntil: 'networkidle' });
@@ -44,6 +51,9 @@ export default async function globalSetup() {
 
   await page.locator('#email').waitFor({ state: 'visible', timeout: 30_000 }).catch(async (err) => {
     await page.screenshot({ path: 'e2e/debug-signin.png', fullPage: true });
+    if (consoleErrors.length) {
+      console.error('[global-setup] Page errors:\n' + consoleErrors.join('\n'));
+    }
     throw err;
   });
   await page.locator('#email').fill(email);
