@@ -71,13 +71,15 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Build app with real env vars
-        run: npm run build
+        run: npx vite build --force
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Verify env vars baked into build
-        run: grep -c "tiibvcgnxnpgvygmqzvu" dist/assets/*.js && echo "✅ Supabase URL found in bundle" || echo "❌ Supabase URL NOT in bundle"
+        run: |
+          grep -c "tiibvcgnxnpgvygmqzvu" dist/assets/*.js && echo "✅ Supabase URL found in bundle" || echo "❌ Supabase URL NOT in bundle"
+          grep -o "https://[a-z]*.supabase.co" dist/assets/*.js | head -1
 
       - name: Start vite preview server
         run: npx vite preview --port 4173 &
