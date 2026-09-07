@@ -72,6 +72,11 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
   const [savingAll, setSavingAll] = useState(false);
   const [doneStats, setDoneStats] = useState<{ total: number; succeeded: number; failed: number } | null>(null);
 
+  // Derive counts live from cards so retries and edge-cases stay in sync.
+  // "succeeded" = done + saved; "failed" = error; "extracting" not counted yet.
+  const succeededCount = cards.filter((c) => c.status === "done" || c.status === "saved").length;
+  const failedCount    = cards.filter((c) => c.status === "error").length;
+
   // Abort controller kept in a ref so it survives re-renders without triggering them.
   const abortRef = useRef<AbortController | null>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
@@ -290,10 +295,10 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
         <PackagePlus className="h-4 w-4 text-primary shrink-0" />
         <span className="flex-1 min-w-[8rem] text-sm font-semibold">Batch Recipe Import</span>
 
-        {/* Running stats */}
-        {phase !== "idle" && doneStats && (
+        {/* Running stats — derived live from card states so retries stay in sync */}
+        {phase !== "idle" && cards.length > 0 && (
           <span className="text-xs text-muted-foreground mr-2">
-            {doneStats.succeeded} saved · {doneStats.failed} failed
+            {succeededCount} saved · {failedCount} failed
           </span>
         )}
 
@@ -419,8 +424,8 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
               <CheckCheck className="h-3.5 w-3.5 text-green-500" />
               <span className="text-xs text-muted-foreground">
                 Extraction complete —{" "}
-                {doneStats
-                  ? `${doneStats.succeeded} succeeded, ${doneStats.failed} failed`
+                {cards.length > 0
+                  ? `${succeededCount} succeeded, ${failedCount} failed`
                   : `${cards.length} processed`}
               </span>
             </>
