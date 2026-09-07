@@ -22,7 +22,7 @@ export default async function globalSetup() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
   const email = process.env.PLAYWRIGHT_TEST_EMAIL!;
   const password = process.env.PLAYWRIGHT_TEST_PASSWORD!;
 
