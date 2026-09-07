@@ -42,7 +42,10 @@ export default async function globalSetup() {
     // Spinner may never have appeared (fast load) — continue anyway
   });
 
-  await page.locator('#email').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.locator('#email').waitFor({ state: 'visible', timeout: 30_000 }).catch(async (err) => {
+    await page.screenshot({ path: 'e2e/debug-signin.png', fullPage: true });
+    throw err;
+  });
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
   await page.locator('button[type="submit"]').click();

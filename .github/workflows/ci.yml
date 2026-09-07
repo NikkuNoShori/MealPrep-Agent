@@ -81,5 +81,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            e2e/debug-signin.png
           retention-days: 7
