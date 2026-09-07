@@ -34,7 +34,8 @@ export default async function globalSetup() {
 
   console.log(`[global-setup] Signing in as ${email}…`);
 
-  await page.goto(`${baseURL}/signin`);
+  await page.goto(`${baseURL}/signin`, { waitUntil: 'networkidle' });
+  await page.locator('#email').waitFor({ state: 'visible', timeout: 30_000 });
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
   await page.locator('button[type="submit"]').click();
