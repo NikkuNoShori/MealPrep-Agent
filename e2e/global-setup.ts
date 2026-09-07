@@ -35,6 +35,13 @@ export default async function globalSetup() {
   console.log(`[global-setup] Signing in as ${email}…`);
 
   await page.goto(`${baseURL}/signin`, { waitUntil: 'networkidle' });
+
+  // Wait for the loading spinner to disappear before looking for the form.
+  // SignIn.tsx renders a spinner while authStore.isLoading is true.
+  await page.locator('.animate-spin').waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => {
+    // Spinner may never have appeared (fast load) — continue anyway
+  });
+
   await page.locator('#email').waitFor({ state: 'visible', timeout: 30_000 });
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
