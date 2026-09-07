@@ -183,21 +183,28 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
 
       if (!recipe?.title) throw new Error("No recipe data to save");
 
+      // Prefer user-edited overrides; fall back to pipeline values
+      const editedPrepTime = entry.editedPrepTime ?? recipe.prep_time ?? recipe.prepTime;
+      const editedCookTime = entry.editedCookTime ?? recipe.cook_time ?? recipe.cookTime;
+
       // Map snake_case pipeline fields → camelCase for createRecipe
       await apiClient.createRecipe({
-        title: recipe.title,
-        description: recipe.description,
-        ingredients: recipe.ingredients,
+        title:        entry.editedTitle     ?? recipe.title,
+        description:  recipe.description,
+        ingredients:  recipe.ingredients,
         instructions: recipe.instructions,
-        prepTime: recipe.prep_time ?? recipe.prepTime,
-        cookTime: recipe.cook_time ?? recipe.cookTime,
-        totalTime: recipe.total_time ?? recipe.totalTime,
-        servings: recipe.servings,
-        difficulty: recipe.difficulty,
-        cuisine: recipe.cuisine,
-        tags: recipe.tags,
-        imageUrl: recipe.image_url ?? recipe.imageUrl,
-        sourceUrl: entry.url,
+        prepTime:     editedPrepTime,
+        cookTime:     editedCookTime,
+        totalTime:    editedPrepTime != null && editedCookTime != null
+                        ? editedPrepTime + editedCookTime
+                        : (recipe.total_time ?? recipe.totalTime),
+        servings:     entry.editedServings  ?? recipe.servings,
+        difficulty:   entry.editedDifficulty ?? recipe.difficulty,
+        cuisine:      recipe.cuisine,
+        tags:         recipe.tags,
+        imageUrl:     recipe.image_url ?? recipe.imageUrl,
+        sourceUrl:    entry.url,
+        visibility:   entry.visibility ?? "private",
       });
       updateCard(entry.index, { status: "saved" });
     } catch (err: unknown) {
