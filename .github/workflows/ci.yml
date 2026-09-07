@@ -80,9 +80,6 @@ jobs:
         run: npm run test:e2e
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4173
-          PLAYWRIGHT_SKIP_WEBSERVER: "1"
-          # Serve the production build via vite preview
-          CI_PREVIEW: "1"
 
       - name: Upload Playwright report
         if: failure()
