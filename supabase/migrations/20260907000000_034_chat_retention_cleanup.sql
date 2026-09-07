@@ -4,16 +4,17 @@
 -- Adds a soft retention policy for chat history:
 --   - Conversations inactive for > 90 days are deleted
 --   - chat_messages cascade automatically (ON DELETE CASCADE already set)
---   - Scheduled weekly via pg_cron (Sunday 03:00 UTC)
 --
--- pg_cron must be enabled in the Supabase Dashboard (Extensions tab) before
--- the cron schedule takes effect. The cleanup function is always created;
--- the cron registration is wrapped so this migration succeeds even if
--- pg_cron is not yet enabled — just enable it and rerun the DO block, or
--- call cron.schedule() manually from the Dashboard SQL editor.
+-- CRON SETUP (manual — run in Supabase Dashboard SQL editor after enabling
+-- pg_cron in Database → Extensions):
 --
--- To adjust the retention window: change the INTERVAL in
--- purge_old_chat_conversations() below.
+--   SELECT cron.schedule(
+--     'purge-old-chat-conversations',
+--     '0 3 * * 0',
+--     'SELECT purge_old_chat_conversations()'
+--   );
+--
+-- To adjust the retention window: change the INTERVAL below.
 -- ============================================================================
 
 -- ── Cleanup function ──────────────────────────────────────────────────────────
@@ -43,31 +44,4 @@ $$;
 
 COMMENT ON FUNCTION purge_old_chat_conversations() IS
   'Deletes chat_conversations (and their messages via CASCADE) inactive for >90 days. '
-  'Scheduled weekly by pg_cron. Adjust INTERVAL to change retention window.';
-
--- ── pg_cron schedule ─────────────────────────────────────────────────────────
--- Runs every Sunday at 03:00 UTC. Wrapped in an exception block so the
--- migration succeeds even if pg_cron is not enabled yet.
-
-DO $$
-BEGIN
-  -- Remove any pre-existing schedule with this name (idempotent)
-  PERFORM cron.unschedule('purge-old-chat-conversations')
-  WHERE EXISTS (
-    SELECT 1 FROM cron.job WHERE jobname = 'purge-old-chat-conversations'
-  );
-
-  PERFORM cron.schedule(
-    'purge-old-chat-conversations',  -- job name
-    '0 3 * * 0',                     -- every Sunday 03:00 UTC
-    'SELECT purge_old_chat_conversations()'
-  );
-
-  RAISE NOTICE 'pg_cron job "purge-old-chat-conversations" scheduled (weekly Sunday 03:00 UTC)';
-
-EXCEPTION
-  WHEN undefined_schema THEN
-    RAISE NOTICE 'pg_cron not enabled — enable it in the Supabase Dashboard (Extensions) then run: SELECT cron.schedule(''purge-old-chat-conversations'', ''0 3 * * 0'', ''SELECT purge_old_chat_conversations()'');';
-  WHEN undefined_function THEN
-    RAISE NOTICE 'pg_cron not enabled — enable it in the Supabase Dashboard (Extensions) then run: SELECT cron.schedule(''purge-old-chat-conversations'', ''0 3 * * 0'', ''SELECT purge_old_chat_conversations()'');';
-END $$;
+  'Call manually or schedule via pg_cron. Adjust INTERVAL to change retention window.';
