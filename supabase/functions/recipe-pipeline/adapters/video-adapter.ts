@@ -104,7 +104,12 @@ export async function videoAdapter(
   // ── 3. Transcript: provided or auto-transcribe uploaded media ──
   let resolvedTranscript = transcript;
   if (!resolvedTranscript && shouldTranscribe) {
-    resolvedTranscript = await transcribeUploadedMedia(media_url, media_base64);
+    try {
+      resolvedTranscript = await transcribeUploadedMedia(media_url, media_base64);
+    } catch (transcribeError) {
+      // Transcription failure is non-fatal — frame OCR (step 5) can still extract content.
+      console.warn("[video-adapter] Transcription failed, falling back to frames only:", transcribeError);
+    }
   }
   if (resolvedTranscript) {
     textParts.push(`Transcript:\n${resolvedTranscript}`);

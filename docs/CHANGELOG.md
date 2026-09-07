@@ -2,8 +2,20 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-09-05
-**Last updated:** 2026-09-05 (MOP-0019 Batch Recipe Import complete)
+**Last reviewed:** 2026-09-06
+**Last updated:** 2026-09-06 (MOP-0015 Embedding Refresh Lifecycle complete)
+
+---
+
+## 2026-09-06 (MOP-0015: Embedding Refresh Lifecycle) `main`
+
+**Embedding refresh lifecycle fix (MOP-0015 — complete)**
+
+- Fixed a silent search degradation: editing a recipe previously nulled its embedding vector permanently, making edited recipes invisible to semantic search in chat. The longer a user used the app and edited recipes, the worse chat search became.
+- New `needs_reembed` flag on `recipes` table: trigger now sets the flag instead of nulling the vector. The stale vector stays queryable during the refresh window — search degrades gracefully instead of returning nothing.
+- New `embedding-refresh` scheduled edge function: runs every 5 minutes, picks up all flagged recipes in batches of 50, regenerates embeddings via OpenRouter, and clears the flag.
+- One-time backfill: all pre-existing null-vector rows are marked `needs_reembed = true` so they are picked up immediately after deploy.
+- Requires migration 029 + edge function deploy + cron schedule setup (see RUNBOOK).
 
 ---
 

@@ -295,7 +295,7 @@ async function handleSendMessage(
             } else {
               const agentReply = await runAgentLoop(
                 { message: message || "", images, conversationHistory,
-                  onDelta: (text) => enqueue({ type: "delta", text }) },
+                  onEvent: (event) => enqueue(event) },
                 toolCtx, openRouter
               );
               aiResponse = agentReply.content;

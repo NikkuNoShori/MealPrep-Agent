@@ -259,7 +259,9 @@ Attach saved MP4/WebM in chat
 Implementation: [MOPs/MOP-0016-short-form-video-intake.md](MOPs/MOP-0016-short-form-video-intake.md).
 
 ### Embedding Pipeline
-Recipe embeddings are still generated via `text-embedding-ada-002` (1536-dim) on extract → `recipes.embedding_vector`. Used by `search_recipes` and `find_similar_recipes` tool handlers via the existing semantic/full-text RPCs.
+Recipe embeddings are generated via `text-embedding-ada-002` (1536-dim) on initial extract/save → `recipes.embedding_vector`. Used by `search_recipes` and `find_similar_recipes` tool handlers via the existing semantic/full-text RPCs.
+
+**Refresh lifecycle (MOP-0015):** When a recipe is edited, the `update_recipe_embedding` Postgres trigger sets `recipes.needs_reembed = true` instead of nulling the vector. The stale vector remains queryable during the refresh window. The `embedding-refresh` scheduled edge function runs every 5 minutes, queries `WHERE needs_reembed = true LIMIT 50`, regenerates embeddings via OpenRouter, writes the new vector, and clears the flag. This ensures semantic search stays accurate for edited recipes without adding latency to the save path. See RUNBOOK § "Embedding refresh: job not processing flagged recipes" for operational diagnostics.
 
 ### Prompts
 **Server-side** (authoritative): `supabase/functions/_shared/recipe-prompts.ts`

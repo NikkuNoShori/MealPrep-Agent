@@ -338,7 +338,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
   const [editedCookTime, setEditedCookTime] = useState<number>(
     recipe.cookTime ?? (recipe as any).cook_time ?? 0
   );
-  const [editingField, setEditingField] = useState<"servings" | "difficulty" | "prepTime" | "cookTime" | null>(null);
+  const [editingField, setEditingField] = useState<"title" | "servings" | "difficulty" | "prepTime" | "cookTime" | null>(null);
   const createRecipeMutation = useCreateRecipe();
   const updateRecipeMutation = useUpdateRecipe();
   const draftInitializedRef = useRef<string | null>(null);
@@ -626,7 +626,23 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
   return (
     <Card className="w-full max-w-2xl my-4 border-2 border-primary/20">
       <CardHeader className="pb-3">
-        <CardTitle className="text-xl mb-2">{recipe.title}</CardTitle>
+        {editingField === "title" ? (
+          <input
+            autoFocus
+            className="text-xl font-semibold w-full bg-transparent border-b border-primary outline-none pb-0.5 mb-2"
+            value={saveTitle}
+            onChange={(e) => setSaveTitle(e.target.value)}
+            onBlur={() => setEditingField(null)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingField(null); }}
+          />
+        ) : (
+          <div
+            className="cursor-pointer hover:text-primary/80 transition-colors"
+            onClick={() => setEditingField("title")}
+          >
+            <CardTitle className="text-xl mb-2">{saveTitle}</CardTitle>
+          </div>
+        )}
         {recipe.description && (
           <p className="text-sm text-muted-foreground mb-3">
             {recipe.description}

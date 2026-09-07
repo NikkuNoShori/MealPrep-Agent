@@ -46,6 +46,8 @@ export interface ConfirmActionInput {
 
 export type SSEEvent =
   | { type: "delta"; text: string }
+  | { type: "tool_start"; name: string; label: string; index: number }
+  | { type: "tool_done";  name: string; ok: boolean; durationMs: number; index: number }
   | { type: "recipe"; recipe: any }
   | { type: "recipes"; recipes: any[] }
   | { type: "confirmation"; pendingConfirmation: any }
@@ -173,7 +175,9 @@ class ApiClient {
       const error = await response
         .json()
         .catch(() => ({ error: "Network error" }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+      // Pipeline errors return { errors: [{ message, stage, code }], stage_failed }
+      const pipelineMsg = Array.isArray(error.errors) && error.errors[0]?.message;
+      throw new Error(pipelineMsg || error.error || `HTTP ${response.status}`);
     }
 
     return response.json();

@@ -38,7 +38,8 @@ export const DEFAULT_AGENT_MODEL_FALLBACKS = [
 export function resolveAgentModels(): string[] {
   const primary = AGENT_MODEL;
   const fromEnv = Deno.env.get("OPENROUTER_AGENT_MODEL_FALLBACKS")
-    ?.split(",")
+    // Accept comma-separated OR space-separated values (both are common in Supabase secrets UI)
+    ?.split(/[\s,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
   const fallbacks = fromEnv ?? [...DEFAULT_AGENT_MODEL_FALLBACKS];
@@ -126,12 +127,49 @@ export interface AgentReply {
   hitMaxIters: boolean;
 }
 
+// ── Tool event types ──────────────────────────────────────────────────────────
+
+export type AgentEvent =
+  | { type: "delta";      text: string }
+  | { type: "tool_start"; name: string; label: string; index: number }
+  | { type: "tool_done";  name: string; ok: boolean; durationMs: number; index: number };
+
+/** Human-readable labels for every tool in the catalog. */
+const TOOL_LABELS: Record<string, string> = {
+  search_recipes:                  "Searching your recipes…",
+  find_similar_recipes:            "Finding similar recipes…",
+  extract_recipe_from_source:      "Fetching recipe from URL…",
+  get_household_recipes:           "Checking household recipes…",
+  get_household_profile:           "Loading household profile…",
+  get_meal_plan:                   "Checking your meal plan…",
+  assign_recipe_to_meal_plan_slot: "Scheduling meal…",
+  add_to_grocery_list:             "Adding to grocery list…",
+  get_grocery_list:                "Loading grocery list…",
+  mark_grocery_item_purchased:     "Marking item purchased…",
+  remove_grocery_item:             "Removing grocery item…",
+  propose_substitution:            "Finding substitutions…",
+  check_recipe_safety:             "Checking allergens and safety…",
+  update_member_allergens:         "Updating allergen profile…",
+  get_recommendations:             "Getting recommendations…",
+  react_to_recipe:                 "Saving reaction…",
+  scale_recipe:                    "Scaling recipe…",
+  save_recipe:                     "Saving recipe to library…",
+  update_recipe:                   "Preparing recipe update…",
+  delete_recipe:                   "Preparing to delete recipe…",
+  web_search_recipe:               "Searching the web…",
+  extract_recipe_from_text:        "Extracting recipe…",
+  create_meal_plan:                "Creating meal plan…",
+  clear_meal_plan_slot:            "Clearing meal slot…",
+};
+
 export interface AgentLoopInput {
   message: string;
   images?: string[];
   conversationHistory: ChatMessage[];
   /** When provided, the final prose reply is streamed via this callback. */
   onDelta?: (text: string) => void;
+  /** Extended event callback — receives delta, tool_start, and tool_done events. */
+  onEvent?: (event: AgentEvent) => void;
 }
 
 /**
@@ -161,16 +199,26 @@ export async function runAgentLoop(
   const tools = getToolSpecs();
   const onDelta = input.onDelta;
 
+  // onEvent supersedes onDelta; if only onDelta provided, wrap it for delta events
+  const emit: ((e: AgentEvent) => void) | null = input.onEvent
+    ? input.onEvent
+    : onDelta
+    ? (e: AgentEvent) => { if (e.type === "delta") onDelta(e.text); }
+    : null;
+
+  // Build the user message content. When images are present, append the hint
+  // so the model knows to call extract_recipe_from_source(source_type="images")
+  // even when the user also typed a message.
+  const imageHint =
+    input.images && input.images.length > 0
+      ? `\n[${input.images.length} image(s) attached — call extract_recipe_from_source with source_type="images" to read them]`
+      : "";
+  const userContent = (input.message || "") + imageHint ||
+    "What can I help you with?";
+
   const messages: ChatMessage[] = [
     ...input.conversationHistory,
-    {
-      role: "user",
-      content:
-        input.message ||
-        (input.images && input.images.length > 0
-          ? `[${input.images.length} image(s) attached]`
-          : ""),
-    },
+    { role: "user", content: userContent },
   ];
 
   const toolCallTrace: ToolCallTraceEntry[] = [];
@@ -178,25 +226,29 @@ export async function runAgentLoop(
   let lastRecipe: any = undefined;
   let lastRecipes: any[] | undefined = undefined;
   let hitMaxIters = false;
+  let toolIndex = 0;
+
+  // When images are attached, force the first LLM turn to call a tool.
+  // This prevents small models from ignoring the image hint and replying in prose.
+  const hasImages = (input.images?.length ?? 0) > 0;
 
   while (iteration < MAX_ITERS) {
     iteration++;
+    const toolChoice = (iteration === 1 && hasImages) ? "required" : "auto";
     const llmResponse = await chatWithToolsResilient(
       openRouter,
       systemPrompt,
       messages,
       tools,
-      { temperature: 0.2, tool_choice: "auto", max_tokens: 1024 }
+      { temperature: 0.2, tool_choice: toolChoice, max_tokens: 1024 }
     );
 
     // No tool calls → final reply.
     if (!llmResponse.tool_calls || llmResponse.tool_calls.length === 0) {
       // If streaming is requested and the model returned content without
       // tool calls on this non-final iteration, stream it directly.
-      if (onDelta && llmResponse.content) {
-        // Emit the already-assembled content as a single delta (the
-        // non-streaming chatWithTools call gave us the full string).
-        onDelta(llmResponse.content);
+      if (emit && llmResponse.content) {
+        emit({ type: "delta", text: llmResponse.content });
       }
       return {
         content: llmResponse.content || "",
@@ -217,13 +269,17 @@ export async function runAgentLoop(
 
     // Dispatch each tool call.
     for (const call of llmResponse.tool_calls as ToolCall[]) {
+      const name = call.function.name;
+      const idx = toolIndex++;
+      const label = TOOL_LABELS[name] ?? `Running ${name}…`;
+
+      if (emit) emit({ type: "tool_start", name, label, index: idx });
+
       const t0 = Date.now();
-      const result = await dispatchTool(
-        call.function.name,
-        call.function.arguments,
-        ctx
-      );
+      const result = await dispatchTool(name, call.function.arguments, ctx);
       const dt = Date.now() - t0;
+
+      if (emit) emit({ type: "tool_done", name, ok: result.ok, durationMs: dt, index: idx });
 
       // Trace entry.
       let parsedArgs: Record<string, unknown> = {};
@@ -236,7 +292,7 @@ export async function runAgentLoop(
         parsedArgs = { _raw: call.function.arguments };
       }
       toolCallTrace.push({
-        name: call.function.name,
+        name,
         args: parsedArgs,
         ok: result.ok,
         durationMs: dt,
@@ -298,13 +354,14 @@ export async function runAgentLoop(
     "I was looking into that — here's what I found so far. Want me to keep going?";
   try {
     let closingContent: string | null;
-    if (onDelta) {
-      // Stream the closing reply.
+    if (emit) {
+      // Stream the closing reply — wrap emit to extract delta text for streamChatWithTools
+      const deltaCallback = (text: string) => emit({ type: "delta", text });
       const closing = await openRouter.streamChatWithTools(
         systemPrompt,
         messages,
         tools,
-        onDelta,
+        deltaCallback,
         undefined, // use default model
         { temperature: 0.2, tool_choice: "none", max_tokens: 600 }
       );

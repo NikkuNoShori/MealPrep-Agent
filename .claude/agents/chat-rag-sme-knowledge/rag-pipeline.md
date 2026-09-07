@@ -40,60 +40,49 @@ The embedded text concatenates:
 | Trigger | Where | When |
 |---|---|---|
 | Recipe save via recipe-pipeline | `supabase/functions/recipe-pipeline/stages/load.ts:33-34` | At every successful recipe insert via the pipeline (chat extraction path, etc.). Non-fatal — if `generateRecipeEmbedding` throws, the recipe still saves with `embedding_vector = NULL` |
-| Manual edit via API client | None — `apiClient.updateRecipe` does not regenerate | Recipe edits via the frontend (RecipeDetail edit) update the row but do NOT regenerate the embedding |
-| Backfill job | **DOES NOT EXIST IN CURRENT CODE** | See critical issue below |
+| Manual edit via API client | None — `apiClient.updateRecipe` does not regenerate inline | Recipe edits via the frontend (RecipeDetail edit) set `needs_reembed = true`; the async refresh job regenerates within 5 minutes |
+| Async refresh job | `supabase/functions/embedding-refresh/index.ts` | Scheduled every 5 min; picks up all rows where `needs_reembed = true`, regenerates, clears flag |
 
-## 🚨 CRITICAL ISSUE — No embedding backfill
+## Embedding refresh lifecycle (MOP-0015 — shipped 2026-09-06)
 
-### The pathology
+**Previous behavior (FIXED):** the `update_recipe_embedding` trigger nulled `embedding_vector` on edit. Nothing regenerated it. Edited recipes became permanently invisible to semantic search.
 
-- Migration 004:68-85 defines `update_recipe_embedding` trigger that **NULLs `embedding_vector`** whenever `title`, `description`, `ingredients`, `instructions`, or `tags` change.
-- Nothing re-generates the embedding after that NULL.
-- Result: every recipe a user has ever edited (after initial save) has `embedding_vector IS NULL` and is **invisible to semantic search** — the `WHERE r.embedding_vector IS NOT NULL` filter in `search_recipes_semantic` (migration 004:224) and `find_similar_recipes` (migration 004:297) drops it.
+**Current behavior:** the trigger sets `needs_reembed = true` instead of nulling. The stale vector stays queryable. The `embedding-refresh` edge function runs on a 5-minute cron, regenerates embeddings for all flagged rows in batches of 50, and clears the flag. Recipes are invisible to semantic search for at most ~5 minutes after an edit, then reappear with a fresh vector.
 
-### Impact on each surface
+**Migration 029** (`20260604000001_029_embedding_refresh_lifecycle.sql`):
+- Adds `recipes.needs_reembed BOOLEAN NOT NULL DEFAULT false`
+- Replaces trigger function body (no longer nulls vector)
+- Adds partial index `idx_recipes_needs_reembed` for fast cron scans
+- One-time backfill: `UPDATE recipes SET needs_reembed = true WHERE embedding_vector IS NULL`
 
-| Surface | Behavior when embeddings are stale |
-|---|---|
-| Chat agent `search_recipes` | Hybrid path silently falls back to text-only (semantic returns 0; text returns whatever it has). User sees results, just missing the semantic signal. |
-| Recipe save flow `checkSimilarRecipes` | Embedding generated at save (load stage) so this is fine for NEWLY saved recipes. For users with mostly-old recipes, the duplicate check could miss matches. |
-| `find_similar_recipes` rail (proposed in MOP-0007 Phase 2) | **Will show nothing** when the source recipe's vector is NULL. Empty rail = bad UX. |
-| `search_recipes_semantic` standalone | Returns 0 results for any user whose recipes are all edited. |
-
-### The longer a user uses the app, the worse it gets
-
-Initial saves get embeddings. Every edit nulls the vector and nothing repopulates. Steady-state for an active user: most recipes have null vectors → semantic search is effectively useless for them.
-
-### Mitigation paths (recommend; do not implement)
-
-1. **Short-term (minimal change):** modify the trigger to set a boolean flag `needs_reembed` instead of nulling the vector. Keep the stale vector queryable for searches while the flag indicates regeneration is needed.
-2. **Medium-term (proper fix):** scheduled Supabase Edge Function (cron) that scans `WHERE embedding_vector IS NULL OR needs_reembed = true` and regenerates in batches. Bound by API rate limits.
-3. **Tactical (during refactor):** regenerate on the edit path — when `apiClient.updateRecipe` is called and any embedding-affecting field changes, call the embedding service inline. Adds 200-400ms to save latency.
-
-### `[verify]` external workers
-
-The SME-build agent's read pass found no in-repo backfill. **Confirm with user** whether a scheduled function in the Supabase Dashboard or an external worker (n8n, etc.) handles this. If yes, the pipeline is healthy; if no, this is a real bug.
+**Operational diagnostics:** RUNBOOK § "Embedding refresh: job not processing flagged recipes"
 
 ## Embedding lifecycle summary diagram
 
 ```
-[Recipe extraction in chat] 
+[Recipe extraction in chat]
     → recipe-pipeline/stages/load.ts:33-34
     → generateRecipeEmbedding(openRouter, recipe)
-    → INSERT INTO recipes (embedding_vector = '[...]') 
+    → INSERT INTO recipes (embedding_vector = '[...]')
     → ✅ Vector populated
 
 [User edits the recipe via UI]
     → apiClient.updateRecipe (api.ts)
-    → UPDATE recipes SET title='new'... 
+    → UPDATE recipes SET title='new'...
     → trigger update_recipe_embedding fires
-    → embedding_vector := NULL
-    → ❌ Vector nulled, never regenerated
+    → needs_reembed := true  (vector kept intact)
+    → ⏳ Stale vector still queryable
+
+[embedding-refresh cron fires (every 5 min)]
+    → SELECT ... WHERE needs_reembed = true LIMIT 50
+    → generateRecipeEmbedding(openRouter, row)
+    → UPDATE recipes SET embedding_vector = '[new]', needs_reembed = false
+    → ✅ Fresh vector, recipe visible in semantic search again
 
 [Semantic search runs]
     → WHERE embedding_vector IS NOT NULL filter
-    → Edited recipe excluded
-    → Result: missing from semantic results
+    → Edited recipe included (stale or fresh vector, either is valid)
+    → Result: recipe present in semantic results within ~5 min of edit
 ```
 
 ## RPCs that consume embeddings (all read `recipes.embedding_vector`)
