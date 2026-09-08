@@ -2,8 +2,8 @@
 
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (MOP-0016 Phase 3b shipped; operator smoke pending `recipe-pipeline` deploy)
+**Last reviewed:** 2026-09-07
+**Last updated:** 2026-09-07 (backlog triage: MOP-0010 → complete, MOP-0009/0012 → deferred, MOP-0026 scaffolded)
 
 ---
 
@@ -40,10 +40,10 @@
 | [MOP-0006](MOP-0006.md) | Generated Supabase Types & API Typing | complete | 2026-05-08 | 2026-06-03 | 2026-06-03 | Nick Neal |
 | [MOP-0007](MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
 | [MOP-0008](MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | complete | 2026-06-01 | 2026-06-15 | 2026-06-15 | Nick Neal |
-| [MOP-0009](MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
-| [MOP-0010](MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
+| [MOP-0009](MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | deferred | 2026-06-01 | 2026-09-07 | — | Nick Neal |
+| [MOP-0010](MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | complete | 2026-06-01 | 2026-09-07 | 2026-09-07 | Nick Neal |
 | [MOP-0011](MOP-0011.md) | Normalize `meal_plans` JSONB → Child Tables | draft (deferred) | 2026-06-01 | 2026-06-01 | — | Nick Neal |
-| [MOP-0012](MOP-0012.md) | Recipe-Pipeline Test Fixture Library | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
+| [MOP-0012](MOP-0012.md) | Recipe-Pipeline Test Fixture Library | deferred | 2026-06-01 | 2026-09-07 | — | Nick Neal |
 | [MOP-0013](MOP-0013.md) | Playwright E2E Test Setup | complete | 2026-06-01 | 2026-09-04 | 2026-09-04 | Nick Neal |
 | [MOP-0014](MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | draft | 2026-06-01 | 2026-06-01 | — | surface-reviewer |
 | [MOP-0015](MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle — fix stale embeddings from edited recipes | complete | 2026-06-04 | 2026-09-06 | 2026-09-06 | chat-rag-sme audit |
@@ -57,6 +57,7 @@
 | [MOP-0023](MOP-0023-meal-randomizer.md) | "I Don't Know" Meal Randomizer | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
 | [MOP-0024](MOP-0024-allergy-tagging.md) | Automatic Allergy Tagging on Recipe Import | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
 | [MOP-0025](MOP-0025-dietary-allergy-profiles.md) | Household Dietary & Allergy Profiles UI | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
+| [MOP-0026](MOP-0026-security-auditor-agent.md) | Security Auditor Agent | draft | 2026-09-07 | 2026-09-07 | — | Nick Neal |
 
 > **MOP-0016:** Phases 1–3b shipped 2026-06-16 (`chat-api` deployed). **Outstanding:** deploy `recipe-pipeline`, run §Operator smoke tests, then promote to `verifying`. MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
 
