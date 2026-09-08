@@ -1,0 +1,12 @@
+[
+  { "domain": "cooking.nytimes.com",   "reason": "NYT Cooking — explicit ToS prohibition on scraping" },
+  { "domain": "www.nytimes.com",       "reason": "NYT — explicit ToS prohibition on scraping" },
+  { "domain": "nytimes.com",           "reason": "NYT — explicit ToS prohibition on scraping" },
+  { "domain": "app.ckbk.com",          "reason": "Ckbk — subscription cookbook service, ToS prohibits scraping" },
+  { "domain": "www.epicurious.com",    "reason": "Condé Nast / Epicurious — ToS prohibits automated access" },
+  { "domain": "epicurious.com",        "reason": "Condé Nast / Epicurious — ToS prohibits automated access" },
+  { "domain": "www.bonappetit.com",    "reason": "Condé Nast / Bon Appétit — ToS prohibits automated access" },
+  { "domain": "bonappetit.com",        "reason": "Condé Nast / Bon Appétit — ToS prohibits automated access" },
+  { "domain": "www.saveur.com",        "reason": "Bonnier / Saveur — ToS prohibits scraping" },
+  { "domain": "saveur.com",            "reason": "Bonnier / Saveur — ToS prohibits scraping" }
+]

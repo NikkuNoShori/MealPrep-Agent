@@ -6,9 +6,9 @@
 | **Title** | ToS-Compliant URL Scraping — robots.txt check + domain blocklist |
 | **Date Submitted** | 2026-09-07 |
 | **Date Updated** | 2026-09-07 |
-| **Date Completed** | — |
+| **Date Completed** | 2026-09-07 |
 | **Submitted By** | Nick Neal |
-| **Status** | draft |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md). Valid values: `draft` / `evaluation` / `approved` / `planned` / `in_progress` / `verifying` / `complete` / `blocked` / `cancelled` / `deferred`.
 
