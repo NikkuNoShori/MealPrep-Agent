@@ -299,12 +299,13 @@ const MealPlanner = () => {
   const today = formatDateKey(new Date());
 
   // ── Plan-first navigation ─────────────────────────────────────────────────
-  // Active plans shown in the calendar tab (non-archived, prefer active > draft > completed)
+  // Active plans shown in the calendar selector: only active + draft.
+  // completed and archived plans belong in history only.
   const activePlans = useMemo(() => {
     if (!mealPlans) return [];
-    const priority: Record<string, number> = { active: 0, draft: 1, completed: 2 };
+    const priority: Record<string, number> = { active: 0, draft: 1 };
     return mealPlans
-      .filter((p: any) => p.status !== 'archived')
+      .filter((p: any) => p.status === 'active' || p.status === 'draft')
       .sort((a: any, b: any) => {
         const pa = priority[a.status] ?? 3;
         const pb = priority[b.status] ?? 3;
