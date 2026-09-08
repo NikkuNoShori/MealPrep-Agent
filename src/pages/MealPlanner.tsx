@@ -34,6 +34,7 @@ import {
   LayoutGrid,
   Rows,
   Shuffle,
+  Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { MealPlanStatus, MealSlot, PlannedMealEntry } from '@/types/mealPlan';
@@ -49,6 +50,7 @@ import { usePlanPeriodConfig, useRecipesLight } from '@/services/api';
 import type { PlanPeriodConfigValue } from '@/components/settings/PlanPeriodConfig';
 import { selectRandomMeals, toPlanEntry } from '@/services/randomizer';
 import type { RandomizerPoolRecipe } from '@/services/randomizer';
+import { SuggestWeekModal } from '@/components/meal-planning/SuggestWeekModal';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -178,6 +180,7 @@ const MealPlanner = () => {
   const [isEditingPlanTitle, setIsEditingPlanTitle] = useState(false);
   const [editedPlanTitle, setEditedPlanTitle] = useState('');
   const [bannerMenuOpen, setBannerMenuOpen] = useState(false);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectorSlot, setSelectorSlot] = useState<MealSlot>('dinner');
   const [selectorDate, setSelectorDate] = useState('');
@@ -298,6 +301,17 @@ const MealPlanner = () => {
 
   // Legacy alias so all existing references to weekPlan keep working
   const weekPlan = activePlan;
+
+  // Count unfilled dinner slots in the current week view — used by SuggestWeekModal
+  const emptyDinnerSlotCount = useMemo(() => {
+    if (!weekPlan || !weekDates.length) return 0;
+    const meals = weekPlan.meals || {};
+    return weekDates.filter(d => {
+      const key = formatDateKey(d);
+      const dayMeals: any[] = meals[key]?.dinner ?? [];
+      return dayMeals.length === 0;
+    }).length;
+  }, [weekPlan, weekDates]);
 
   const handleCreatePlan = () => {
     const startDate = formatDateKey(currentWeek);
@@ -756,6 +770,18 @@ const MealPlanner = () => {
                     )}
                   </div>
                 </div>
+              )}
+              {!isLoading && weekPlan && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowSuggestModal(true)}
+                  className="gap-1.5 rounded-xl text-xs"
+                  title="Get scored recipe suggestions for this week"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Suggest meals
+                </Button>
               )}
               {!isLoading && (
                 <Button
@@ -1295,6 +1321,55 @@ const MealPlanner = () => {
         onConfirm={handleAssignmentConfirmed}
         onClose={() => setShowAssignmentModal(false)}
       />
+
+      {/* Suggest Meals Modal (MOP-0007 Phase 4) */}
+      {showSuggestModal && (
+        <SuggestWeekModal
+          emptySlotCount={emptyDinnerSlotCount}
+          onClose={() => setShowSuggestModal(false)}
+          onAssign={(recipe) => {
+            // Route through the existing servings → assignment flow
+            setShowSuggestModal(false);
+            const recipeInfo: SelectedRecipeInfo = {
+              recipeId: recipe.id,
+              recipeName: recipe.title,
+              recipeImage: recipe.imageUrl,
+              servings: recipe.servings ?? 4,
+            };
+            setPendingMultiRecipes([recipeInfo]);
+            setShowServingsModal(true);
+          }}
+          onFillSlots={(recipes) => {
+            // Assign top suggestions to empty dinner slots across the week
+            if (!weekPlan || recipes.length === 0) return;
+            setShowSuggestModal(false);
+            const currentMeals = { ...(weekPlan.meals || {}) };
+            let filled = 0;
+            for (const d of weekDates) {
+              if (filled >= recipes.length) break;
+              const dateStr = formatDateKey(d);
+              const dayMeals: any[] = (currentMeals[dateStr] as any)?.dinner ?? [];
+              if (dayMeals.length === 0) {
+                const recipe = recipes[filled];
+                const day = { ...((currentMeals[dateStr] as any) || {}) };
+                day.dinner = [{
+                  id: crypto.randomUUID(),
+                  recipeId: recipe.id,
+                  recipeName: recipe.title,
+                  recipeImage: recipe.imageUrl,
+                  servings: recipe.servings ?? 4,
+                }];
+                currentMeals[dateStr] = day;
+                filled++;
+              }
+            }
+            updateMealPlan.mutate(
+              { id: weekPlan.id, data: { meals: currentMeals } },
+              { onSuccess: () => toast.success(`${filled} meal${filled !== 1 ? 's' : ''} added to your plan`) }
+            );
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1956,6 +1956,42 @@ export const useRecipeTextSearch = (query: string, limit?: number) => {
   });
 };
 
+/**
+ * MOP-0007 Phase 3/4 — Scored recipe recommendations.
+ *
+ * Calls `get_recipe_recommendations` (migration 035 — now includes reaction
+ * signal as a 5th scoring term). Filters by difficulty, tags, and max prep
+ * time. Returns up to `limit` recipes scored 0–1 (recommendation_score).
+ */
+export const useGetRecipeRecommendations = (
+  params: {
+    preferenceDifficulty?: string;
+    preferenceTags?: string[];
+    maxPrepTimeMinutes?: number;
+    limit?: number;
+  },
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: ["recipes", "recommendations", params],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data, error } = await (supabase.rpc as any)('get_recipe_recommendations', {
+        user_id: user.id, // vestigial post-migration 028; auth.uid() is authoritative
+        preference_difficulty: params.preferenceDifficulty ?? null,
+        preference_tags: params.preferenceTags ?? null,
+        max_prep_time_minutes: params.maxPrepTimeMinutes ?? null,
+        limit_count: params.limit ?? 10,
+      });
+      if (error) throw error;
+      return ((data as any[]) || []).map((r: any) => snakeToCamel(r));
+    },
+    enabled,
+    staleTime: QUERY_STALE_TIME.domain,
+  });
+};
+
 export const useFindSimilarRecipes = (recipeId: string, limit?: number, threshold?: number) => {
   return useQuery({
     queryKey: ["recipes", "similar", recipeId, limit, threshold],
