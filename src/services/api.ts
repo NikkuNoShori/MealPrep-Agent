@@ -435,6 +435,36 @@ class ApiClient {
     return ((data as any[]) || []).map((r: any) => snakeToCamel(r));
   }
 
+  /**
+   * MOP-0007 Phase 2 — Find recipes similar to a given recipe by embedding proximity.
+   *
+   * Calls the `find_similar_recipes` PostgreSQL RPC (migration 004, updated in
+   * migration 028 to use auth.uid() internally). Returns up to `limit` recipes
+   * whose embedding_vector cosine similarity exceeds `threshold` (default 0.6).
+   *
+   * Returns an empty array when:
+   *  - the target recipe has no embedding_vector (recently edited / never embedded)
+   *  - no other recipe crosses the similarity threshold
+   *  - caller is unauthenticated
+   *
+   * ~50-100ms — one vector lookup, no query embedding needed at runtime.
+   * See docs/RAG_AUDIT.md for the per-surface mechanism rationale.
+   */
+  async findSimilarRecipes(recipeId: string, limit: number = 5, threshold: number = 0.6) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase.rpc('find_similar_recipes', {
+      recipe_id: recipeId,
+      user_id: user.id, // vestigial post-migration 028; auth.uid() is authoritative
+      similarity_threshold: threshold,
+      max_results: limit,
+    });
+    if (error) throw error;
+
+    return ((data as any[]) || []).map((r: any) => snakeToCamel(r));
+  }
+
   // Chat endpoints - using Supabase Edge Function (secure, API key protected)
   // The Edge Function handles OpenRouter calls server-side, keeping the API key secure
   async sendMessage(data: SendMessageInput): Promise<ChatMessageResponse> {
@@ -1923,6 +1953,15 @@ export const useRecipeTextSearch = (query: string, limit?: number) => {
     queryFn: () => apiClient.searchRecipesText(query, limit),
     enabled: !!query.trim(),
     staleTime: QUERY_STALE_TIME.search,
+  });
+};
+
+export const useFindSimilarRecipes = (recipeId: string, limit?: number, threshold?: number) => {
+  return useQuery({
+    queryKey: ["recipes", "similar", recipeId, limit, threshold],
+    queryFn: () => apiClient.findSimilarRecipes(recipeId, limit, threshold),
+    enabled: !!recipeId,
+    staleTime: QUERY_STALE_TIME.domain,
   });
 };
 

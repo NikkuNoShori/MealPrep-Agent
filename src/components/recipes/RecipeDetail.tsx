@@ -7,6 +7,7 @@ import { VisibilityPicker, type RecipeVisibility } from '@/components/recipes/Vi
 import { AddToCollectionMenu } from '@/components/recipes/AddToCollectionMenu'
 import AddToPlanButton from '@/components/meal-planning/AddToPlanButton'
 import { useUpdateRecipeVisibility } from '@/services/api'
+import { SimilarRecipesRail } from '@/components/recipes/SimilarRecipesRail'
 import {
   ArrowLeft,
   Edit,
@@ -55,6 +56,7 @@ interface RecipeDetailProps {
   onEdit?: () => void
   onClose?: () => void
   onDelete?: () => void
+  onSelectSimilar?: (recipe: any) => void
 }
 
 export const RecipeDetail: React.FC<RecipeDetailProps> = ({
@@ -62,6 +64,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
   onEdit,
   onClose,
   onDelete,
+  onSelectSimilar,
 }) => {
   const [isImageFullscreen, setIsImageFullscreen] = useState(false)
   const [showAllIngredients, setShowAllIngredients] = useState(false)
@@ -490,6 +493,11 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
         </div>
 
       </div>
+
+      {/* Similar Recipes Rail — hidden when recipe has no embedding or no matches */}
+      {onSelectSimilar && (
+        <SimilarRecipesRail recipeId={recipe.id} onSelect={onSelectSimilar} />
+      )}
     </div>
   )
 }
