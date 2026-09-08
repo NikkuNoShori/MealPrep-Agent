@@ -165,6 +165,76 @@ function configToDays(config: PlanPeriodConfigValue | null | undefined): 7 | 14 
   return 7;
 }
 
+// ── Plan Selector Dropdown ────────────────────────────────────────────────────
+// Replaces the tab strip: shows active plan name + date range as the trigger,
+// lists all plans in a dropdown. Each option shows name + full date range so
+// the user picks by plan identity, not just name.
+
+function formatPlanRange(plan: any): string {
+  const fmt = (d: string) =>
+    new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return plan.startDate === plan.endDate
+    ? fmt(plan.startDate)
+    : `${fmt(plan.startDate)} – ${fmt(plan.endDate)}`;
+}
+
+function PlanSelectorDropdown({
+  plans,
+  activePlan,
+  onSelect,
+}: {
+  plans: any[];
+  activePlan: any;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-stone-50 dark:bg-white/[0.03] hover:bg-stone-100 dark:hover:bg-white/[0.06] transition-all text-xs text-stone-700 dark:text-stone-300"
+      >
+        <span className="font-medium truncate max-w-[120px]">{activePlan.title || 'Untitled'}</span>
+        <span className="text-stone-400 dark:text-stone-500 flex-shrink-0">{formatPlanRange(activePlan)}</span>
+        <ChevronRight className={`h-3 w-3 text-stone-400 flex-shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-9 z-50 min-w-[220px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] shadow-xl p-1 animate-scale-in">
+          {plans.map((p: any) => (
+            <button
+              key={p.id}
+              onClick={() => { onSelect(p.id); setOpen(false); }}
+              className={[
+                'flex flex-col w-full text-left px-3 py-2 rounded-lg transition-colors',
+                p.id === activePlan.id
+                  ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300'
+                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-white/[0.05]',
+              ].join(' ')}
+            >
+              <span className="text-xs font-medium">{p.title || 'Untitled'}</span>
+              <span className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5">{formatPlanRange(p)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const MealPlanner = () => {
   const [activeTab, setActiveTab] = useState('calendar');
   const [calendarView, setCalendarView] = useState<'days' | 'meals'>('days');
@@ -630,29 +700,13 @@ const MealPlanner = () => {
           {/* ── Calendar Tab ── */}
           <TabsContent value="calendar" className="mt-4 space-y-3">
 
-            {/* Plan selector — shown when more than one active/draft plan exists */}
-            {!isLoading && activePlans.length > 1 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-medium text-stone-400 dark:text-stone-500 uppercase tracking-wide shrink-0">Plan:</span>
-                {activePlans.map((p: any) => (
-                  <button
-                    key={p.id}
-                    onClick={() => selectPlan(p.id)}
-                    className={[
-                      'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
-                      activePlan?.id === p.id
-                        ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400'
-                        : 'border-stone-200 dark:border-white/[0.08] text-stone-500 dark:text-stone-400 hover:border-stone-300 dark:hover:border-white/[0.15]',
-                    ].join(' ')}
-                  >
-                    {p.title || 'Untitled'}
-                    <span className="ml-1.5 opacity-50 text-[10px]">
-                      {new Date(p.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      {p.startDate !== p.endDate && ` – ${new Date(p.endDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
-                    </span>
-                  </button>
-                ))}
-              </div>
+            {/* Plan selector — dropdown when more than one active/draft plan exists */}
+            {!isLoading && activePlans.length > 1 && activePlan && (
+              <PlanSelectorDropdown
+                plans={activePlans}
+                activePlan={activePlan}
+                onSelect={selectPlan}
+              />
             )}
 
             {/* Week Navigation + Plan Info — single compact row */}
