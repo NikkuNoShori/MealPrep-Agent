@@ -237,6 +237,34 @@ verification:
     pattern: "// Update invite status"
     expect: absent
 
+  - id: rpc-transfer-authz-check
+    type: grep
+    path: supabase/migrations/*_household_write_atomicity_rpcs.sql
+    pattern: "v_caller_role <> 'owner'"
+    expect: present
+    note: transfer_household_ownership must reject non-owner callers
+
+  - id: rpc-respond-authz-check
+    type: grep
+    path: supabase/migrations/*_household_write_atomicity_rpcs.sql
+    pattern: "caller is not the invitee"
+    expect: present
+    note: respond_to_household_invite must reject non-invitee callers
+
+  - id: rpcs-use-auth-uid
+    type: grep
+    path: supabase/migrations/*_household_write_atomicity_rpcs.sql
+    pattern: "auth\\.uid\\(\\)"
+    expect: present
+    note: both RPCs derive caller from auth.uid() since SECURITY DEFINER bypasses RLS
+
+  - id: rpcs-raise-42501
+    type: grep
+    path: supabase/migrations/*_household_write_atomicity_rpcs.sql
+    pattern: "errcode = '42501'"
+    expect: present
+    note: unauthorized callers receive permission-denied errcode
+
   - id: tests-pass
     type: command
     run: npm test -- src/services/__tests__/api.test.ts
@@ -246,13 +274,14 @@ verification:
     type: command
     run: npm run lint
     expect_exit: 0
-
-  - id: human-rpc-authz-review
-    type: human
-    description: Reviewer confirms each RPC body performs explicit caller authorization (auth.uid() + role check) since SECURITY DEFINER bypasses RLS.
-    target: Both RPCs reject calls from non-owner / non-invitee callers with errcode 42501.
-    hard_gate: true
 ```
+
+## Manual Follow-up (non-blocking)
+
+These items were moved out of the `## Verification` block because they require runtime observation or deployment coordination, not static assertion.
+
+- **`migration-deployed`**: User deploys migration 037 to remote DB before `transferOwnership` / `respondToInvite` RPC callers go live. No automated check — deployment is the user's responsibility per HARD RULE.
+- **`authz-runtime-smoke`**: After migration is deployed, manually confirm that a non-owner calling `transfer_household_ownership` and a non-invitee calling `respond_to_household_invite` each receive a Postgres `42501` error (visible in Supabase logs / client error message).
 
 ---
 

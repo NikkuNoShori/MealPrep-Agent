@@ -1339,31 +1339,18 @@ class ApiClient {
   }
 
   async respondToInvite(inviteId: string, accept: boolean) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    // Single atomic RPC — invite update + optional member insert happen in one
+    // Postgres transaction. Replaces the prior two-step Supabase client writes
+    // (migration 037 / MOP-0014). RPC enforces SECURITY DEFINER auth checks.
+    const { data, error } = await supabase.rpc('respond_to_household_invite', {
+      p_invite_id: inviteId,
+      p_accept: accept,
+    });
 
-    // Update invite status
-    const { data: invite, error: updateError } = await supabase.from("household_invites")
-      .update({ status: accept ? "accepted" : "declined" })
-      .eq("id", inviteId)
-      .select("*, households(id, name)")
-      .single();
-
-    if (updateError) throw updateError;
-
-    // If accepted, add user to household
-    if (accept && invite) {
-      const { error: joinError } = await supabase.from("household_members")
-        .insert({
-          household_id: invite.household_id,
-          user_id: user.id,
-          role: "member",
-        });
-
-      if (joinError) throw joinError;
-    }
-
-    return snakeToCamel(invite);
+    if (error) throw error;
+    // RPC returns table(household_id, household_name, status); callers only
+    // invalidate query cache on success — return shape is not consumed directly.
+    return snakeToCamel((data as any[])?.[0] ?? null);
   }
 
   // ── Household Member Management ──
@@ -1388,23 +1375,15 @@ class ApiClient {
   }
 
   async transferOwnership(memberId: string, householdId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    // Single atomic RPC — promote target + demote caller in one Postgres
+    // transaction. Replaces the prior two-step PATCH sequence that left a
+    // dual-owner window on mid-transfer failure (migration 037 / MOP-0014).
+    const { error } = await supabase.rpc('transfer_household_ownership', {
+      p_member_id: memberId,
+      p_household_id: householdId,
+    });
 
-    // Promote target to owner
-    const { error: promoteError } = await supabase.from("household_members")
-      .update({ role: 'owner' })
-      .eq("id", memberId);
-
-    if (promoteError) throw promoteError;
-
-    // Demote self to admin
-    const { error: demoteError } = await supabase.from("household_members")
-      .update({ role: 'admin' })
-      .eq("household_id", householdId)
-      .eq("user_id", user.id);
-
-    if (demoteError) throw demoteError;
+    if (error) throw error;
   }
 
   // ── Family Members (Dependents) ──
