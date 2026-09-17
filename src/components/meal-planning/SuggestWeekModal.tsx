@@ -26,6 +26,11 @@ interface SuggestWeekModalProps {
   onFillSlots: (recipes: any[]) => void
   /** How many empty dinner slots exist in the current plan week */
   emptySlotCount: number
+  /**
+   * Recipe IDs used in the most recent plan — excluded from suggestions
+   * to avoid repeating last week's meals. Parent derives this from historyPlans[0].
+   */
+  excludeRecipeIds?: Set<string>
 }
 
 type Difficulty = 'easy' | 'medium' | 'hard' | ''
@@ -44,21 +49,54 @@ const difficultyColor: Record<string, string> = {
   hard: 'text-rose-600 dark:text-rose-400',
 }
 
+// Extract all recipe IDs used in a meal plan's meals object
+function extractPlanRecipeIds(meals: Record<string, any> | undefined): Set<string> {
+  const ids = new Set<string>()
+  if (!meals) return ids
+  for (const [key, val] of Object.entries(meals)) {
+    if (!val) continue
+    if (key.startsWith('_') && Array.isArray(val)) {
+      val.forEach((e: any) => e?.recipeId && ids.add(e.recipeId))
+    } else if (typeof val === 'object' && !Array.isArray(val)) {
+      for (const slotEntries of Object.values(val as Record<string, any[]>)) {
+        if (Array.isArray(slotEntries)) {
+          slotEntries.forEach((e: any) => e?.recipeId && ids.add(e.recipeId))
+        }
+      }
+    }
+  }
+  return ids
+}
+
 export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
   onClose,
   onAssign,
   onFillSlots,
   emptySlotCount,
+  excludeRecipeIds,
 }) => {
   const [difficulty, setDifficulty] = useState<Difficulty>('')
   const [maxPrep, setMaxPrep] = useState<number | undefined>(undefined)
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
 
-  const { data: suggestions = [], isLoading } = useGetRecipeRecommendations({
+  // Fetch extra to compensate for excluded recipes — if 5 might be excluded, ask for 15
+  const fetchLimit = excludeRecipeIds && excludeRecipeIds.size > 0 ? 20 : 10
+
+  const { data: rawSuggestions = [], isLoading } = useGetRecipeRecommendations({
     preferenceDifficulty: difficulty || undefined,
     maxPrepTimeMinutes: maxPrep,
-    limit: 10,
+    limit: fetchLimit,
   })
+
+  // Filter out last-plan recipes, keep top 10 of what remains
+  const suggestions = React.useMemo(() => {
+    if (!excludeRecipeIds || excludeRecipeIds.size === 0) return rawSuggestions.slice(0, 10)
+    return rawSuggestions.filter((r: any) => !excludeRecipeIds.has(r.id)).slice(0, 10)
+  }, [rawSuggestions, excludeRecipeIds])
+
+  const excludedCount = rawSuggestions.length - rawSuggestions.filter((r: any) =>
+    !excludeRecipeIds || !excludeRecipeIds.has(r.id)
+  ).length
 
   const handleAssign = (recipe: any) => {
     onAssign(recipe)
@@ -103,6 +141,11 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
 
         {/* Filters */}
         <div className="px-5 py-3 border-b border-stone-100 dark:border-white/[0.06] flex-shrink-0">
+          {excludedCount > 0 && (
+            <p className="text-[10px] text-stone-400 dark:text-stone-500 mb-2">
+              {excludedCount} recipe{excludedCount !== 1 ? 's' : ''} from your last plan hidden to keep things fresh
+            </p>
+          )}
           <div className="flex flex-wrap gap-2 items-center">
             {/* Difficulty */}
             <div className="flex items-center gap-1.5">

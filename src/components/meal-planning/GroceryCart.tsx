@@ -20,14 +20,11 @@ import {
   Package,
   Loader2,
   X,
-  Store,
-  List,
   Undo2,
   Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { GroceryItem, MealPlanMeals } from '@/types/mealPlan';
-import ShoppingMode from '@/components/meal-planning/ShoppingMode';
 
 interface GroceryCartProps {
   plan: any; // The current week's meal plan
@@ -43,7 +40,6 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
   const [manualName, setManualName] = useState('');
   const [manualAmount, setManualAmount] = useState('');
   const [manualUnit, setManualUnit] = useState('');
-  const [shoppingMode, setShoppingMode] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState('');
   const [editUnit, setEditUnit] = useState('');
@@ -336,52 +332,28 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {activeItems.length > 0 && (
-            <Button
-              variant={shoppingMode ? 'default' : 'outline'}
-              size="sm"
-              className="gap-1.5 rounded-xl text-xs"
-              onClick={() => setShoppingMode((v) => !v)}
-            >
-              {shoppingMode ? (
-                <>
-                  <List className="h-3.5 w-3.5" />
-                  List View
-                </>
-              ) : (
-                <>
-                  <Store className="h-3.5 w-3.5" />
-                  Shopping Mode
-                </>
-              )}
-            </Button>
-          )}
-          {!shoppingMode && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 rounded-xl text-xs"
-              onClick={() => setAddingManual(true)}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Item
-            </Button>
-          )}
-          {!shoppingMode && (
-            <Button
-              size="sm"
-              className="gap-1.5 rounded-xl text-xs shadow-lg shadow-primary-500/20"
-              onClick={handleGenerate}
-              disabled={!hasMeals || updateMealPlan.isPending}
-            >
-              {updateMealPlan.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              {activeItems.length > 0 ? 'Regenerate' : 'Generate'}
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 rounded-xl text-xs"
+            onClick={() => setAddingManual(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Item
+          </Button>
+          <Button
+            size="sm"
+            className="gap-1.5 rounded-xl text-xs shadow-lg shadow-primary-500/20"
+            onClick={handleGenerate}
+            disabled={!hasMeals || updateMealPlan.isPending}
+          >
+            {updateMealPlan.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            {activeItems.length > 0 ? 'Regenerate' : 'Generate'}
+          </Button>
         </div>
       </div>
 
@@ -430,10 +402,8 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
         </Card>
       )}
 
-      {/* Shopping mode or standard list */}
-      {shoppingMode && activeItems.length > 0 ? (
-        <ShoppingMode grouped={grouped} onToggleCheck={handleToggleCheck} />
-      ) : activeItems.length === 0 ? (
+      {/* Grocery list */}
+      {activeItems.length === 0 ? (
         <Card className="border-stone-200/60 dark:border-white/[0.06]">
           <CardContent className="p-8">
             <div className="text-center py-4">
@@ -610,7 +580,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
       )}
 
       {/* Removed items — restore panel */}
-      {!shoppingMode && removedItems.length > 0 && (
+      {removedItems.length > 0 && (
         <div className="rounded-xl border border-dashed border-stone-200 dark:border-white/[0.08] p-3 space-y-1">
           <p className="text-xs font-medium text-stone-500 dark:text-gray-400 mb-2">
             Removed items

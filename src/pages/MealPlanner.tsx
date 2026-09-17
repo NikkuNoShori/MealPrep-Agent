@@ -17,12 +17,12 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   ShoppingCart,
   Clock,
   ChefHat,
   Loader2,
   MoreHorizontal,
-  Archive,
   CheckCircle2,
   Sun,
   Coffee,
@@ -30,11 +30,11 @@ import {
   Cookie,
   X,
   Pencil,
-  Play,
   LayoutGrid,
   Rows,
   Shuffle,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { MealPlanStatus, MealSlot, PlannedMealEntry } from '@/types/mealPlan';
@@ -51,6 +51,7 @@ import type { PlanPeriodConfigValue } from '@/components/settings/PlanPeriodConf
 import { selectRandomMeals, toPlanEntry } from '@/services/randomizer';
 import type { RandomizerPoolRecipe } from '@/services/randomizer';
 import { SuggestWeekModal } from '@/components/meal-planning/SuggestWeekModal';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -166,10 +167,6 @@ function configToDays(config: PlanPeriodConfigValue | null | undefined): 7 | 14 
 }
 
 // ── Plan Selector Dropdown ────────────────────────────────────────────────────
-// Replaces the tab strip: shows active plan name + date range as the trigger,
-// lists all plans in a dropdown. Each option shows name + full date range so
-// the user picks by plan identity, not just name.
-
 function formatPlanRange(plan: any): string {
   const fmt = (d: string) =>
     new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -178,55 +175,180 @@ function formatPlanRange(plan: any): string {
     : `${fmt(plan.startDate)} – ${fmt(plan.endDate)}`;
 }
 
-function PlanSelectorDropdown({
+/**
+ * Week label that doubles as a plan-switcher dropdown when multiple plans exist.
+ * Sits between the prev/next arrows in the toolbar — no separate pill needed.
+ */
+function WeekLabelDropdown({
+  weekLabel,
+  weekSubLabel,
   plans,
   activePlan,
   onSelect,
+  onRename,
+  onComplete,
+  onRestore,
+  onDelete,
 }: {
+  weekLabel: string;
+  weekSubLabel?: string;
   plans: any[];
-  activePlan: any;
+  activePlan: any | null;
   onSelect: (id: string) => void;
+  onRename?: () => void;
+  onComplete?: () => void;
+  onRestore?: () => void;
+  onDelete?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [planMenuOpen, setPlanMenuOpen] = useState<string | null>(null); // plan id whose ⋯ is open
   const ref = useRef<HTMLDivElement>(null);
+  const hasActions = !!(onRename || onComplete || onRestore || onDelete);
+  const canOpen = plans.length >= 1 || hasActions;
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setPlanMenuOpen(null);
+      }
     };
     if (open) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative flex flex-col items-center">
       <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-stone-50 dark:bg-white/[0.03] hover:bg-stone-100 dark:hover:bg-white/[0.06] transition-all text-xs text-stone-700 dark:text-stone-300"
+        onClick={() => canOpen && setOpen(o => !o)}
+        className={[
+          'flex items-center gap-1 rounded-lg px-2 py-0.5 transition-colors',
+          canOpen
+            ? 'hover:bg-stone-100 dark:hover:bg-white/[0.06] cursor-pointer'
+            : 'cursor-default',
+        ].join(' ')}
       >
-        <span className="font-medium truncate max-w-[120px]">{activePlan.title || 'Untitled'}</span>
-        <span className="text-stone-400 dark:text-stone-500 flex-shrink-0">{formatPlanRange(activePlan)}</span>
-        <ChevronRight className={`h-3 w-3 text-stone-400 flex-shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+        <h2 className="text-sm font-semibold text-stone-900 dark:text-white whitespace-nowrap">
+          {weekLabel}
+        </h2>
+        {canOpen && (
+          <ChevronDown className={`h-3.5 w-3.5 text-stone-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+        )}
       </button>
+      {weekSubLabel && (
+        <span className="text-[10px] text-stone-400 dark:text-stone-500 -mt-0.5 pointer-events-none">
+          {weekSubLabel}
+        </span>
+      )}
 
       {open && (
-        <div className="absolute left-0 top-9 z-50 min-w-[220px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] shadow-xl p-1 animate-scale-in">
-          {plans.map((p: any) => (
-            <button
-              key={p.id}
-              onClick={() => { onSelect(p.id); setOpen(false); }}
-              className={[
-                'flex flex-col w-full text-left px-3 py-2 rounded-lg transition-colors',
-                p.id === activePlan.id
-                  ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300'
-                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-white/[0.05]',
-              ].join(' ')}
-            >
-              <span className="text-xs font-medium">{p.title || 'Untitled'}</span>
-              <span className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5">{formatPlanRange(p)}</span>
-            </button>
-          ))}
+        <div className="absolute left-1/2 -translate-x-1/2 top-10 z-50 min-w-[240px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] shadow-xl p-1.5 animate-scale-in" style={{ background: 'hsl(var(--popover))' }}>
+
+          {plans.length > 1 && (
+            <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+              Switch plan
+            </p>
+          )}
+
+          {plans.map((p: any) => {
+            const isActive = activePlan && p.id === activePlan.id;
+            const isThisPlanMenuOpen = planMenuOpen === p.id;
+            // Only the active plan has actions wired from the parent
+            const planHasActions = isActive && hasActions;
+
+            return (
+              <div key={p.id} className="relative">
+                <div
+                  className={[
+                    'flex items-center w-full rounded-lg transition-colors group',
+                    isActive
+                      ? 'bg-white/10'
+                      : 'hover:bg-white/[0.06]',
+                  ].join(' ')}
+                >
+                  {/* Plan select area */}
+                  <button
+                    onClick={() => { onSelect(p.id); setPlanMenuOpen(null); setOpen(false); }}
+                    className="flex flex-col flex-1 min-w-0 text-left px-3 py-2"
+                  >
+                    <span className={`text-xs font-medium truncate ${isActive ? 'text-white' : 'text-stone-700 dark:text-stone-300'}`}>
+                      {p.title || 'Untitled'}
+                    </span>
+                    <span className={`text-[10px] mt-0.5 ${isActive ? 'text-white/60' : 'text-stone-400 dark:text-stone-500'}`}>
+                      {formatPlanRange(p)}
+                    </span>
+                  </button>
+
+                  {/* Per-plan ⋯ — only shown when actions are available for this plan */}
+                  {planHasActions && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPlanMenuOpen(isThisPlanMenuOpen ? null : p.id);
+                      }}
+                      className={[
+                        'flex-shrink-0 h-7 w-7 flex items-center justify-center rounded-lg mr-1 transition-colors',
+                        isThisPlanMenuOpen
+                          ? 'bg-white/20 text-white'
+                          : 'text-white/50 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100',
+                      ].join(' ')}
+                      title="Plan actions"
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Per-plan context menu */}
+                {isThisPlanMenuOpen && planHasActions && (
+                  <div
+                    className="absolute right-0 top-full mt-1 z-[60] min-w-[160px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] shadow-xl p-1.5 animate-scale-in"
+                    style={{ background: 'hsl(var(--popover))' }}
+                  >
+                    {onRename && (
+                      <button
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-white/[0.06] transition-colors"
+                        onClick={() => { onRename(); setPlanMenuOpen(null); setOpen(false); }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                        Rename
+                      </button>
+                    )}
+                    {onComplete && (
+                      <button
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-white/[0.06] transition-colors"
+                        onClick={() => { onComplete(); setPlanMenuOpen(null); setOpen(false); }}
+                      >
+                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                        Mark complete
+                      </button>
+                    )}
+                    {onRestore && (
+                      <button
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-white/[0.06] transition-colors"
+                        onClick={() => { onRestore(); setPlanMenuOpen(null); setOpen(false); }}
+                      >
+                        <CheckCircle2 className="h-3 w-3 text-stone-400" />
+                        Restore to active
+                      </button>
+                    )}
+                    {onDelete && (
+                      <>
+                        <div className="my-1 border-t border-stone-100 dark:border-white/[0.06]" />
+                        <button
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-500/[0.06] transition-colors"
+                          onClick={() => { onDelete(); setPlanMenuOpen(null); setOpen(false); }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete plan
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -249,7 +371,8 @@ const MealPlanner = () => {
   const [planMenuOpen, setPlanMenuOpen] = useState<string | null>(null);
   const [isEditingPlanTitle, setIsEditingPlanTitle] = useState(false);
   const [editedPlanTitle, setEditedPlanTitle] = useState('');
-  const [bannerMenuOpen, setBannerMenuOpen] = useState(false);
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectorSlot, setSelectorSlot] = useState<MealSlot>('dinner');
@@ -261,8 +384,6 @@ const MealPlanner = () => {
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const titleEditRef = useRef<HTMLDivElement>(null);
-  const bannerMenuRef = useRef<HTMLDivElement>(null);
-
   // Click-outside to save title
   useEffect(() => {
     if (!isEditingPlanTitle) return;
@@ -274,18 +395,6 @@ const MealPlanner = () => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [isEditingPlanTitle]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Click-outside to close banner menu
-  useEffect(() => {
-    if (!bannerMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (bannerMenuRef.current && !bannerMenuRef.current.contains(e.target as Node)) {
-        setBannerMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [bannerMenuOpen]);
 
   // Queries & mutations
   const { data: mealPlans, isLoading } = useMealPlans();
@@ -299,26 +408,40 @@ const MealPlanner = () => {
   const today = formatDateKey(new Date());
 
   // ── Plan-first navigation ─────────────────────────────────────────────────
-  // Active plans shown in the calendar selector: only active + draft.
-  // completed and archived plans belong in history only.
+  // Calendar selector: active/draft plans whose end_date is today or future.
+  // Stale open plans (end_date in the past) belong in history alongside
+  // completed/archived plans — they just never got formally closed.
   const activePlans = useMemo(() => {
     if (!mealPlans) return [];
+    const todayStr = formatDateKey(new Date());
     const priority: Record<string, number> = { active: 0, draft: 1 };
     return mealPlans
-      .filter((p: any) => p.status === 'active' || p.status === 'draft')
+      .filter((p: any) =>
+        (p.status === 'active' || p.status === 'draft') &&
+        p.endDate >= todayStr
+      )
       .sort((a: any, b: any) => {
         const pa = priority[a.status] ?? 3;
         const pb = priority[b.status] ?? 3;
         if (pa !== pb) return pa - pb;
-        // Within same status, most recent first
         return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
       });
-  }, [mealPlans]);
+  }, [mealPlans, today]);
 
+  // History: completed, archived, OR stale active/draft (end_date in past)
   const historyPlans = useMemo(() => {
     if (!mealPlans) return [];
-    return mealPlans.filter((p: any) => p.status === 'completed' || p.status === 'archived');
-  }, [mealPlans]);
+    const todayStr = formatDateKey(new Date());
+    return mealPlans
+      .filter((p: any) =>
+        p.status === 'completed' ||
+        p.status === 'archived' ||
+        ((p.status === 'active' || p.status === 'draft') && p.endDate < todayStr)
+      )
+      .sort((a: any, b: any) =>
+        new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      );
+  }, [mealPlans, today]);
 
   // The currently-open plan: explicit selection or default to first active plan
   const activePlan = useMemo(() => {
@@ -384,6 +507,28 @@ const MealPlanner = () => {
     }).length;
   }, [weekPlan, weekDates]);
 
+  // Recipe IDs from the most recent history plan — excluded from Suggest results
+  // to avoid recommending what was just cooked.
+  const lastPlanExcludeIds = useMemo(() => {
+    const lastPlan = historyPlans[0];
+    if (!lastPlan?.meals) return new Set<string>();
+    const ids = new Set<string>();
+    const meals = lastPlan.meals as Record<string, any>;
+    for (const [key, val] of Object.entries(meals)) {
+      if (!val) continue;
+      if (key.startsWith('_') && Array.isArray(val)) {
+        val.forEach((e: any) => e?.recipeId && ids.add(e.recipeId));
+      } else if (typeof val === 'object' && !Array.isArray(val)) {
+        for (const slotEntries of Object.values(val as Record<string, any[]>)) {
+          if (Array.isArray(slotEntries)) {
+            slotEntries.forEach((e: any) => e?.recipeId && ids.add(e.recipeId));
+          }
+        }
+      }
+    }
+    return ids;
+  }, [historyPlans]);
+
   const handleCreatePlan = () => {
     const startDate = formatDateKey(currentWeek);
     const endDateObj = new Date(currentWeek);
@@ -434,15 +579,26 @@ const MealPlanner = () => {
   };
 
   const handleCopyPlan = (sourceId: string) => {
-    const startDate = formatDateKey(currentWeek);
-    const endDateObj = new Date(currentWeek);
-    endDateObj.setDate(endDateObj.getDate() + 6);
+    // Start the copy the day after the source plan ends, run for the user's
+    // default plan duration (newPlanDays). Falls back to 7 days if not set.
+    const sourcePlan = mealPlans?.find((p: any) => p.id === sourceId);
+    const duration   = newPlanDays ?? 7;
+    let startDateObj: Date;
+    if (sourcePlan?.endDate) {
+      startDateObj = new Date(sourcePlan.endDate + 'T00:00:00');
+      startDateObj.setDate(startDateObj.getDate() + 1);
+    } else {
+      // Fallback: use the current week start
+      startDateObj = new Date(currentWeek);
+    }
+    const endDateObj = new Date(startDateObj);
+    endDateObj.setDate(endDateObj.getDate() + duration - 1);
 
     copyMealPlan.mutate(
-      { sourceId, newDateRange: { startDate, endDate: formatDateKey(endDateObj) } },
+      { sourceId, newDateRange: { startDate: formatDateKey(startDateObj), endDate: formatDateKey(endDateObj) } },
       {
         onSuccess: () => {
-          toast.success('Plan copied to current week');
+          toast.success('Plan copied — starting ' + startDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
           setPlanMenuOpen(null);
         },
         onError: (err: any) => toast.error(err?.message || 'Failed to copy plan'),
@@ -624,12 +780,13 @@ const MealPlanner = () => {
     <div className="bg-stone-50 dark:bg-[#0e0f13]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 animate-fade-in">
 
-        {/* ── Header: Title + Tabs ── */}
+        {/* ── Header: Title + New Plan + Tabs ── */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
             Meal Planner
           </h1>
+          <div className="flex items-center gap-3">
             <TabsList className="gap-1 p-1 rounded-xl bg-stone-100/80 dark:bg-white/[0.04] border border-stone-200/60 dark:border-white/[0.06]">
               <TabsTrigger value="calendar" className="gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 data-[state=active]:shadow-md">
                 <Calendar className="h-3.5 w-3.5" />
@@ -644,6 +801,22 @@ const MealPlanner = () => {
                 History
               </TabsTrigger>
             </TabsList>
+            {!isLoading && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  const start = nextPlanStart(planPeriodConfig);
+                  setCurrentWeek(start);
+                  setNewPlanDays(configToDays(planPeriodConfig));
+                  setShowCreateForm(true);
+                }}
+                className="gap-1.5 rounded-xl text-xs flex-shrink-0"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New Plan
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* ── Create Plan Form ── */}
@@ -701,19 +874,32 @@ const MealPlanner = () => {
           {/* ── Calendar Tab ── */}
           <TabsContent value="calendar" className="mt-4 space-y-3">
 
-            {/* Plan selector — dropdown when more than one active/draft plan exists */}
-            {!isLoading && activePlans.length > 1 && activePlan && (
-              <PlanSelectorDropdown
-                plans={activePlans}
-                activePlan={activePlan}
-                onSelect={selectPlan}
-              />
+            {/* Inline rename field — replaces toolbar when active */}
+            {isEditingPlanTitle && activePlan && (
+              <div ref={titleEditRef} className="flex items-center gap-2">
+                <Input
+                  ref={titleInputRef}
+                  value={editedPlanTitle}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedPlanTitle(e.target.value)}
+                  onKeyDown={(e: React.KeyboardEvent) => {
+                    if (e.key === 'Enter') handleSavePlanTitle();
+                    if (e.key === 'Escape') setIsEditingPlanTitle(false);
+                  }}
+                  className="h-8 text-sm w-52 rounded-xl"
+                  placeholder="Plan name"
+                  autoFocus
+                />
+                <Button size="sm" className="rounded-xl text-xs h-8" onClick={handleSavePlanTitle}>Save</Button>
+                <Button size="sm" variant="ghost" className="rounded-xl text-xs h-8" onClick={() => setIsEditingPlanTitle(false)}>Cancel</Button>
+              </div>
             )}
 
-            {/* Week Navigation + Plan Info — single compact row */}
+            {/* Toolbar — week nav (with plan switcher) | plan actions | view toggle */}
+            {!isEditingPlanTitle && (isLoading || activePlan) && (
             <div className="flex items-center justify-between gap-2">
-              {/* Left: prev + week label + next */}
-              <div className="flex items-center gap-1.5">
+
+              {/* Week navigation — center label is the plan switcher */}
+              <div className="flex items-center gap-1 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -723,16 +909,17 @@ const MealPlanner = () => {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <div className="flex flex-col items-center">
-                  <h2 className="text-sm font-semibold text-stone-900 dark:text-white whitespace-nowrap">
-                    {weekLabel}
-                  </h2>
-                  {planWeeks.length > 1 && (
-                    <span className="text-[10px] text-stone-400 dark:text-stone-500 -mt-0.5">
-                      Week {safeWeekOffset + 1} of {planWeeks.length}
-                    </span>
-                  )}
-                </div>
+                <WeekLabelDropdown
+                  weekLabel={weekLabel}
+                  weekSubLabel={planWeeks.length > 1 ? `Week ${safeWeekOffset + 1} of ${planWeeks.length}` : undefined}
+                  plans={activePlans}
+                  activePlan={activePlan}
+                  onSelect={selectPlan}
+                  onRename={weekPlan ? () => { setEditedPlanTitle(weekPlan.title || ''); setIsEditingPlanTitle(true); } : undefined}
+                  onComplete={(weekPlan?.status === 'active' || weekPlan?.status === 'draft') ? () => setShowCompleteConfirm(true) : undefined}
+                  onRestore={weekPlan?.status === 'completed' ? () => handleStatusChange(weekPlan.id, 'active') : undefined}
+                  onDelete={weekPlan ? () => setShowDeleteConfirm(true) : undefined}
+                />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -744,120 +931,24 @@ const MealPlanner = () => {
                 </Button>
               </div>
 
-              {/* Center: plan title + status (if plan exists) */}
-              {weekPlan && (
-                <div className="flex items-center gap-2 min-w-0">
-                  {isEditingPlanTitle ? (
-                    <div ref={titleEditRef}>
-                      <Input
-                        ref={titleInputRef}
-                        value={editedPlanTitle}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedPlanTitle(e.target.value)}
-                        onKeyDown={(e: React.KeyboardEvent) => {
-                          if (e.key === 'Enter') handleSavePlanTitle();
-                          if (e.key === 'Escape') setIsEditingPlanTitle(false);
-                        }}
-                        className="h-7 text-xs w-36"
-                        autoFocus
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      className="text-xs font-medium text-stone-600 dark:text-gray-300 hover:text-primary-500 transition-colors truncate max-w-[160px]"
-                      onClick={() => {
-                        setEditedPlanTitle(weekPlan.title || '');
-                        setIsEditingPlanTitle(true);
-                      }}
-                      title="Click to rename"
-                    >
-                      {weekPlan.title || 'Untitled Plan'}
-                    </button>
-                  )}
-                  <span className="text-[10px] text-stone-400 dark:text-stone-500 flex-shrink-0">
-                    {STATUS_CONFIG[weekPlan.status as MealPlanStatus]?.label} · {getWeekMealCount(weekPlan.meals, weekDates)} meals
-                  </span>
-                  {/* Ellipsis menu */}
-                  <div className="relative flex-shrink-0" ref={bannerMenuRef}>
-                    <button
-                      className="p-1 rounded-lg text-stone-400 hover:text-stone-700 dark:text-stone-500 dark:hover:text-stone-200 transition-colors"
-                      onClick={() => setBannerMenuOpen(!bannerMenuOpen)}
-                    >
-                      <MoreHorizontal className="h-3.5 w-3.5" />
-                    </button>
-                    {bannerMenuOpen && (
-                      <div className="absolute right-0 top-7 z-50 min-w-[140px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] p-1 shadow-xl animate-scale-in">
-                        {weekPlan.status === 'draft' && (
-                          <button
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-primary-600/70 dark:text-primary-400/70 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                            onClick={() => { handleStatusChange(weekPlan.id, 'active'); setBannerMenuOpen(false); }}
-                          >
-                            <Play className="h-3.5 w-3.5" />
-                            Start Plan
-                          </button>
-                        )}
-                        {weekPlan.status === 'active' && (
-                          <button
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-primary-600/70 dark:text-primary-400/70 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                            onClick={() => { handleStatusChange(weekPlan.id, 'completed'); setBannerMenuOpen(false); }}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Complete
-                          </button>
-                        )}
-                        {weekPlan.status === 'completed' && (
-                          <button
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
-                            onClick={() => { handleStatusChange(weekPlan.id, 'active'); setBannerMenuOpen(false); }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Modify
-                          </button>
-                        )}
-                        <div className="my-0.5 border-t border-stone-100 dark:border-white/[0.06]" />
-                        <button
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
-                          onClick={() => { handleStatusChange(weekPlan.id, 'archived'); setBannerMenuOpen(false); }}
-                        >
-                          <Archive className="h-3.5 w-3.5" />
-                          Archive
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {!isLoading && weekPlan && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setShowSuggestModal(true)}
-                  className="gap-1.5 rounded-xl text-xs"
-                  title="Get scored recipe suggestions for this week"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Suggest meals
-                </Button>
-              )}
-              {!isLoading && (
-                <Button
-                  size="sm"
-                  variant={weekPlan ? 'ghost' : 'default'}
-                  onClick={() => {
-                    // Pre-fill start date + duration from the user's period config
-                    const start = nextPlanStart(planPeriodConfig);
-                    setCurrentWeek(start);
-                    setNewPlanDays(configToDays(planPeriodConfig));
-                    setShowCreateForm(true);
-                  }}
-                  className="gap-1.5 rounded-xl text-xs"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  New Plan
-                </Button>
-              )}
-
-              {/* Right: view toggle + settings menu */}
+              {/* Right cluster: plan actions + view toggle */}
               <div className="flex items-center gap-1.5 flex-shrink-0">
+
+                {/* Suggest meals */}
+                {!isLoading && weekPlan && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowSuggestModal(true)}
+                    className="gap-1.5 rounded-xl text-xs"
+                    title="Get scored recipe suggestions for this week"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Suggest
+                  </Button>
+                )}
+
+                {/* View toggle */}
                 <div className="flex items-center rounded-lg border border-stone-200/80 dark:border-white/[0.08] bg-stone-100/60 dark:bg-white/[0.03] p-0.5">
                   <button
                     className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'days' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary-500' : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300'}`}
@@ -875,10 +966,10 @@ const MealPlanner = () => {
                   </button>
                 </div>
 
-                {/* Planner settings — extensible option menu (populated by future MOPs) */}
                 <PlannerSettingsMenu options={[]} />
               </div>
             </div>
+            )} {/* end !isEditingPlanTitle */}
 
             {/* Calendar Grid — Days View or Meals View */}
             {isLoading ? (
@@ -1377,10 +1468,37 @@ const MealPlanner = () => {
         onClose={() => setShowAssignmentModal(false)}
       />
 
+      {/* Confirm: mark active plan as complete */}
+      <ConfirmDialog
+        open={showCompleteConfirm}
+        title="Mark plan as complete?"
+        description={`"${weekPlan?.title || 'This plan'}" will be moved to history as a completed plan. You can restore it to active from the history menu if you change your mind.`}
+        confirmLabel="Mark complete"
+        onConfirm={() => {
+          if (weekPlan) handleStatusChange(weekPlan.id, 'completed');
+          setShowCompleteConfirm(false);
+        }}
+        onCancel={() => setShowCompleteConfirm(false)}
+      />
+
+      {/* Confirm: delete active plan */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete this plan?"
+        description={`"${weekPlan?.title || 'This plan'}" and all its meals will be permanently deleted. This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (weekPlan) handleDeletePlan(weekPlan.id);
+          setShowDeleteConfirm(false);
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+
       {/* Suggest Meals Modal (MOP-0007 Phase 4) */}
       {showSuggestModal && (
         <SuggestWeekModal
           emptySlotCount={emptyDinnerSlotCount}
+          excludeRecipeIds={lastPlanExcludeIds}
           onClose={() => setShowSuggestModal(false)}
           onAssign={(recipe) => {
             // Route through the existing servings → assignment flow

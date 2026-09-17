@@ -2076,7 +2076,25 @@ export const useDeleteMealPlan = () => {
 
   return useMutation({
     mutationFn: (id: string) => apiClient.deleteMealPlan(id),
-    onSuccess: () => {
+    // Optimistic: strip the plan from every cached meal-plans query immediately
+    // so the list updates without waiting for a round-trip refetch.
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["meal-plans"] });
+      const snapshots = queryClient.getQueriesData<any[]>({ queryKey: ["meal-plans"] });
+      queryClient.setQueriesData<any[]>({ queryKey: ["meal-plans"] }, (old) =>
+        old ? old.filter((p: any) => p.id !== id) : old
+      );
+      return { snapshots };
+    },
+    onError: (_err, _id, context: any) => {
+      // Roll back on failure
+      if (context?.snapshots) {
+        context.snapshots.forEach(([key, data]: [any, any]) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["meal-plans"] });
     },
   });
