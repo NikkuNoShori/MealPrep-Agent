@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-09-04
-**Last updated:** 2026-09-05 (MOP-0019: batch-extract SSE endpoint added)
+**Last reviewed:** 2026-09-16
+**Last updated:** 2026-09-16 (MOP-0007: reaction scoring term in get_recipe_recommendations; RPC user_id param noted vestigial)
 
 ---
 
@@ -473,7 +473,7 @@ Full-text search using PostgreSQL tsvector.
 ```sql
 search_recipes_text(
   search_query TEXT,
-  user_uuid UUID,
+  user_uuid UUID,   -- VESTIGIAL: ignored; auth.uid() is the source of truth (migration 028)
   max_results INT DEFAULT 10
 )
 ```
@@ -506,7 +506,7 @@ Find recipes similar to a given recipe.
 ```sql
 find_similar_recipes(
   recipe_id UUID,
-  user_id UUID,
+  user_id UUID,   -- VESTIGIAL: ignored; auth.uid() is the source of truth (migration 028)
   similarity_threshold FLOAT DEFAULT 0.6,
   max_results INT DEFAULT 5
 )
@@ -522,7 +522,7 @@ Preference-based recipe recommendations.
 
 ```sql
 get_recipe_recommendations(
-  user_id UUID,
+  user_id UUID,             -- VESTIGIAL: ignored; auth.uid() is the source of truth (migration 028)
   preference_difficulty VARCHAR DEFAULT NULL,
   preference_tags TEXT[] DEFAULT NULL,
   max_prep_time_minutes INT DEFAULT NULL,
@@ -530,9 +530,11 @@ get_recipe_recommendations(
 )
 ```
 
-**Scoring:** difficulty match (1.0/0.5) + tags match (1.0/0.5) + rating/5 + prep_time constraint (1.0/0.3)
+**Scoring (5 terms, migration 035):** (difficulty match + tags match + rating/5 + prep_time fit + reaction signal) / 5.0
+- Reaction signal: avg of `recipe_reactions` for caller's recipes — thumbs-up = +1.0, thumbs-down = −0.7, no reaction = 0; bounded 0–1
+- Previous formula was 4 terms / 4.0 (no reactions)
 
-**Returns:** Ranked recipe recommendations with `recommendation_score`.
+**Returns:** Ranked recipe recommendations with `recommendation_score` (0–1).
 
 ---
 

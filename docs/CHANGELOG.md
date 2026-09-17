@@ -2,8 +2,31 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-09-06
-**Last updated:** 2026-09-06 (MOP-0015 Embedding Refresh Lifecycle complete)
+**Last reviewed:** 2026-09-16
+**Last updated:** 2026-09-16 (MOP-0007 Smart Discovery complete; meal planner UX overhaul)
+
+---
+
+## 2026-09-16 (MOP-0007: Smart Discovery complete) `main`
+
+**Smart Discovery — Recipe Search, Similar Rail, Meal Planner Suggestions (MOP-0007 — complete)**
+
+- **Recipe search bar** now uses full-text PostgreSQL search (`search_recipes_text` RPC) for the user's own recipes. Searches across title, ingredients, and instructions in ~30–80ms. Filter chips (dietary, prep time, difficulty) continue to apply on top of server results. Household/public/collection modes retain client-side title matching (scoping differs).
+- **Similar Recipes Rail** on Recipe Detail: a horizontally-scrollable rail of up to 5 semantically similar recipes (backed by `find_similar_recipes` + pgvector cosine similarity). Rail is hidden entirely when no similar results exist or when the recipe has no embedding.
+- **"Suggest meals" in Meal Planner**: Sparkles button in the planner toolbar opens a modal that fetches scored recipe suggestions via `get_recipe_recommendations`. Supports difficulty and prep-time filters. Recipes from the most recent history plan are excluded to avoid repetition. Individual recipe cards can be assigned to slots; "Fill slots" shortcut bulk-assigns top suggestions.
+- **Reaction scoring in recommendations**: `get_recipe_recommendations` now includes a reaction signal as a fifth scoring term (thumbs-up = +1.0, thumbs-down = −0.7, normalised to 0–1). Score formula updated to divide by 5.0 (migration 035). Previously 4 terms / 4.0.
+- **Security fix**: All five search/recommendation RPCs (`search_recipes_text`, `search_recipes_semantic`, `find_similar_recipes`, `search_recipes_by_ingredients`, `get_recipe_recommendations`) now derive the caller from `auth.uid()` internally. Legacy `user_id` parameters are vestigial — ignored. Migration 028.
+- **Dead code removal**: `apiClient.rag*` methods (`ragSearch`, `ragEmbedding`, `ragSimilar`, `ragIngredients`, `ragRecommendations`), the `searchRecipes()` wrapper, `useSearchRecipes` hook, and the entire `src/services/ragService.ts` file removed. All replaced by the direct Supabase RPC methods added in this MOP.
+
+**Meal Planner UX overhaul** (accompanies MOP-0007 Phase 4)
+
+- **WeekLabelDropdown**: the week date range in the toolbar is now the plan-switcher dropdown. Click it to switch plans, rename, mark complete, restore to active, or delete. Per-plan `⋯` button in the dropdown exposes these actions. Old standalone `⋯` banner removed.
+- **Plan status bucketing**: active/draft plans with `end_date < today` are now routed to History (not the active view). History groups plans into Active (stale) → Completed → Archived sections with newest-first sort within each group.
+- **History redesign**: status icons per group, per-row ellipsis menu (Copy to new plan, Restore, Archive, Mark complete, Delete), wide detail overlay panel (`max-w-2xl`).
+- **Copy to new plan**: starts the day after the source plan's `end_date`, runs for the user's configured default duration.
+- **Delete safeguards**: deleting the sole active plan now works (previously nothing happened). Confirmation dialogs on delete and mark-complete. Optimistic removal — plan disappears immediately from UI without waiting for server round-trip.
+- **Shopping Mode removed**: the toggle and `ShoppingMode` component are gone. Grocery tab is always in its normal state.
+- **`meal_plans.copied_from`**: self-referential FK with `ON DELETE SET NULL` added (migration 036).
 
 ---
 

@@ -2,8 +2,8 @@
 
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
-**Last reviewed:** 2026-09-07
-**Last updated:** 2026-09-07 (backlog triage: MOP-0010 → complete, MOP-0009/0012 → deferred, MOP-0026 scaffolded)
+**Last reviewed:** 2026-09-16
+**Last updated:** 2026-09-16 (MOP-0007 → complete; dead rag* code removed from api.ts)
 
 ---
 
@@ -38,7 +38,7 @@
 | [MOP-0004](MOP-0004.md) | Meal Planner & Grocery Cart | complete | 2026-03-12 | 2026-06-14 | 2026-06-14 | Nick Neal |
 | [MOP-0005](MOP-0005.md) | Test Coverage & Testing Infrastructure | complete | 2026-03-14 | 2026-06-14 | 2026-06-14 | Nick Neal |
 | [MOP-0006](MOP-0006.md) | Generated Supabase Types & API Typing | complete | 2026-05-08 | 2026-06-03 | 2026-06-03 | Nick Neal |
-| [MOP-0007](MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | in_progress | 2026-06-01 | 2026-09-07 | — | Nick Neal |
+| [MOP-0007](MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | complete | 2026-06-01 | 2026-09-16 | 2026-09-16 | Nick Neal |
 | [MOP-0008](MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | complete | 2026-06-01 | 2026-06-15 | 2026-06-15 | Nick Neal |
 | [MOP-0009](MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | deferred | 2026-06-01 | 2026-09-07 | — | Nick Neal |
 | [MOP-0010](MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | complete | 2026-06-01 | 2026-09-07 | 2026-09-07 | Nick Neal |

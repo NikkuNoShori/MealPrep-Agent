@@ -271,3 +271,4 @@ Append to the update log at the bottom of this document:
 | 2026-09-04 | Nick Neal | main (MOP-0013 E2E suite, MOP-0018 tool expansion — commits 5d56fdb..a7e25f2) | ARCHITECTURE, API, CHANGELOG, docs/README, MOP-0013, REGISTRY |
 | 2026-09-05 | Nick Neal | main (MOP-0016 + MOP-0018 verified complete, edge deploys confirmed) | CHANGELOG, docs/README, MOP-0016, MOP-0018, REGISTRY |
 | 2026-09-04 | Nick Neal | main (MOP-0017 SSE streaming complete; arrow-key fix; draftRecipeStore test fix) | ARCHITECTURE, API, CHANGELOG, docs/README, MOP-0017, REGISTRY |
+| 2026-09-16 | Nick Neal | main (MOP-0007 complete — smart discovery, reaction scoring, meal planner UX overhaul, dead rag* code removed) | ARCHITECTURE, DATA_MODEL, API, CHANGELOG, MOP-0007, REGISTRY |

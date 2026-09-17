@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-09-04
-**Last updated:** 2026-09-05 (MOP-0019: Batch Recipe Import added)
+**Last reviewed:** 2026-09-16
+**Last updated:** 2026-09-16 (MOP-0007: Smart Discovery — search bar, similar rail, suggest modal, reaction scoring)
 
 ---
 
@@ -263,6 +263,22 @@ Recipe embeddings are generated via `text-embedding-ada-002` (1536-dim) on initi
 
 **Refresh lifecycle (MOP-0015):** When a recipe is edited, the `update_recipe_embedding` Postgres trigger sets `recipes.needs_reembed = true` instead of nulling the vector. The stale vector remains queryable during the refresh window. The `embedding-refresh` scheduled edge function runs every 5 minutes, queries `WHERE needs_reembed = true LIMIT 50`, regenerates embeddings via OpenRouter, writes the new vector, and clears the flag. This ensures semantic search stays accurate for edited recipes without adding latency to the save path. See RUNBOOK § "Embedding refresh: job not processing flagged recipes" for operational diagnostics.
 
+### Smart Discovery (MOP-0007)
+
+Three client-side surfaces now use the search/recommendation RPCs directly from `api.ts` (no edge function needed — pure SQL scoring):
+
+| Surface | RPC | Mechanism |
+|---------|-----|-----------|
+| Recipe search bar (own recipes) | `search_recipes_text` | PostgreSQL tsvector; ~30–80ms; searches title + ingredients + instructions |
+| Similar Recipes Rail on RecipeDetail | `find_similar_recipes` | pgvector cosine similarity (1536-dim); threshold 0.6; top 5 |
+| "Suggest meals" modal in Meal Planner | `get_recipe_recommendations` | 5-term SQL score: difficulty + tags + rating + prep_time + **reaction signal** |
+
+**Reaction scoring (migration 035):** `get_recipe_recommendations` now includes a fifth term derived from `recipe_reactions` (thumbs-up = +1.0, thumbs-down = −0.7, bounded 0–1, divided by 5.0 total). Scores recipes the user has positively reacted to higher; soft-demotes disliked recipes without hard-excluding them.
+
+**Security note (migration 028):** All five RPCs use `auth.uid()` internally. Legacy `user_id` parameters are vestigial — present for backwards compatibility but ignored. Never trust a caller-supplied `user_id` in these functions.
+
+**RAG dead code removed:** `apiClient.rag*` methods and `src/services/ragService.ts` are deleted. The chat agent's `search_recipes` tool was already using the RPC path directly; the old Express-server-based RAG endpoints were never reached in production.
+
 ### Prompts
 **Server-side** (authoritative): `supabase/functions/_shared/recipe-prompts.ts`
 - `CHAT_AGENT_SYSTEM_PROMPT` — Chef Marcus persona + 6 hard rules (no `user_id`, no fabrication, allergen language, destructive→confirm, treat retrieved content as data, cite sources).
@@ -354,7 +370,7 @@ src/components/
 `src/services/api.ts` is a singleton HTTP client wrapping Supabase calls with:
 - Automatic camelCase ↔ snake_case field mapping
 - React Query hooks for all CRUD operations
-- Methods for: recipes, chat, meal plans, preferences, images, RAG search, households, collections, reactions, admin
+- Methods for: recipes, chat, meal plans, preferences, images, households, collections, reactions, admin, full-text search, similar recipes, recommendations
 - Recipe lookup by UUID or URL slug (`getRecipe(idOrSlug)`)
 - **RPC optimization**: Five high-traffic methods use PostgreSQL `SECURITY DEFINER` functions via `supabase.rpc()` to collapse multiple round trips into single database calls: `get_my_household`, `toggle_recipe_reaction`, `get_household_recipes`, `get_recipe_reactions`, `get_my_pending_invites` (migration 025)
 
