@@ -50,7 +50,8 @@ const difficultyColor: Record<string, string> = {
 }
 
 // Extract all recipe IDs used in a meal plan's meals object
-function extractPlanRecipeIds(meals: Record<string, any> | undefined): Set<string> {
+// (kept for potential future use; parent currently derives IDs and passes excludeRecipeIds)
+function _extractPlanRecipeIds(meals: Record<string, any> | undefined): Set<string> {
   const ids = new Set<string>()
   if (!meals) return ids
   for (const [key, val] of Object.entries(meals)) {

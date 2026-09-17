@@ -147,9 +147,6 @@ export interface SendMessageInput {
   signal?: AbortSignal;
 }
 
-// For local development, use local server for RAG endpoints
-const LOCAL_API_URL = "http://localhost:3000";
-const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
 // API client
 class ApiClient {
@@ -390,15 +387,6 @@ class ApiClient {
     return { success: true };
   }
 
-  async searchRecipes(query: string, limit?: number) {
-    // Use RAG search for recipe search
-    return this.ragSearch({
-      query,
-      userId: (await supabase.auth.getUser()).data.user?.id || "anonymous",
-      limit: limit || 10,
-      searchType: "hybrid",
-    });
-  }
 
   /**
    * MOP-0007 Phase 1 — Full-text search over the caller's own recipes.
@@ -1169,60 +1157,6 @@ class ApiClient {
     }
   }
 
-  // RAG endpoints - using local server for now (can be migrated to Supabase edge function later)
-  async ragSearch(request: any) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost ? "/api/rag/search" : "/rag/search";
-    return this.request(`${baseUrl}${path}`, {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
-  }
-
-  async ragEmbedding(request: any) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost ? "/api/rag/embedding" : "/rag/embedding";
-    return this.request(`${baseUrl}${path}`, {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
-  }
-
-  async ragSimilar(recipeId: string, userId: string, limit: number = 5) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost
-      ? `/api/rag/similar/${recipeId}`
-      : `/rag/similar/${recipeId}`;
-    return this.request(`${baseUrl}${path}?userId=${userId}&limit=${limit}`);
-  }
-
-  async ragIngredients(
-    ingredients: string[],
-    userId: string,
-    limit: number = 10
-  ) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost ? "/api/rag/ingredients" : "/rag/ingredients";
-    return this.request(`${baseUrl}${path}`, {
-      method: "POST",
-      body: JSON.stringify({ ingredients, userId, limit }),
-    });
-  }
-
-  async ragRecommendations(
-    userId: string,
-    preferences?: any,
-    limit: number = 10
-  ) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost
-      ? "/api/rag/recommendations"
-      : "/rag/recommendations";
-    return this.request(`${baseUrl}${path}`, {
-      method: "POST",
-      body: JSON.stringify({ userId, preferences, limit }),
-    });
-  }
 
   // ── Duplicate & Similarity checks ──
 
@@ -1934,13 +1868,6 @@ export const useDeleteRecipe = () => {
   });
 };
 
-export const useSearchRecipes = (query: string, limit?: number) => {
-  return useQuery({
-    queryKey: ["recipes", "search", query, limit],
-    queryFn: () => apiClient.searchRecipes(query, limit),
-    enabled: !!query,
-  });
-};
 
 /**
  * MOP-0007 Phase 1 — React Query hook for full-text search over the caller's

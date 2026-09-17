@@ -70,8 +70,6 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
   const [cards, setCards] = useState<BatchCardEntry[]>([]);
   const [savingIndices, setSavingIndices] = useState<Set<number>>(new Set());
   const [savingAll, setSavingAll] = useState(false);
-  const [doneStats, setDoneStats] = useState<{ total: number; succeeded: number; failed: number } | null>(null);
-
   // Derive counts live from cards so retries and edge-cases stay in sync.
   // "succeeded" = done + saved; "failed" = error; "extracting" not counted yet.
   const succeededCount = cards.filter((c) => c.status === "done" || c.status === "saved").length;
@@ -114,7 +112,6 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
     }));
     setCards(initial);
     setPhase("running");
-    setDoneStats(null);
 
     const abort = new AbortController();
     abortRef.current = abort;
@@ -141,7 +138,6 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
                 break;
 
               case "done":
-                setDoneStats({ total: event.total, succeeded: event.succeeded, failed: event.failed });
                 setPhase("done");
                 break;
             }
@@ -265,7 +261,6 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
     abortRef.current?.abort();
     setCards([]);
     setPhase("idle");
-    setDoneStats(null);
     setUrlInput("");
     setSavingIndices(new Set());
     setSavingAll(false);

@@ -106,7 +106,7 @@ function getPlanListCount(meals: any, key: string): number {
   return meals?.[key]?.length || 0;
 }
 
-function getWeekMealCount(meals: any, weekDates: Date[]): number {
+function _getWeekMealCount(meals: any, weekDates: Date[]): number {
   const dailyCount = weekDates.reduce((sum, d) => sum + getMealCount(meals, formatDateKey(d)), 0);
   const snacksCount = getPlanListCount(meals, '_snacks');
   const nonRecipeCount = getPlanListCount(meals, '_non_recipe');
