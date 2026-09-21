@@ -6,9 +6,9 @@
 | **Title** | Bulk Recipe Actions — Multi-Select Visibility, Folder Assignment, Delete, and Sharing |
 | **Date Submitted** | 2026-09-21 |
 | **Date Updated** | 2026-09-21 |
-| **Date Completed** | — |
+| **Date Completed** | 2026-09-21 |
 | **Submitted By** | Nick Neal |
-| **Status** | draft |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md). Valid values: `draft` / `evaluation` / `approved` / `planned` / `in_progress` / `verifying` / `complete` / `blocked` / `cancelled` / `deferred`.
 

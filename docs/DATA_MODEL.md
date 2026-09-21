@@ -3,7 +3,7 @@
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
 **Last reviewed:** 2026-09-21
-**Last updated:** 2026-09-21 (MOP-0014: two write-atomicity RPCs added — transfer_household_ownership + respond_to_household_invite; migration 037 added to index)
+**Last updated:** 2026-09-21 (MOP-0028: three bulk recipe action RPCs added — migration 038; migration index updated)
 
 ---
 
@@ -433,6 +433,18 @@ Two `SECURITY DEFINER` RPCs that replace non-atomic sequential client writes wit
 
 **Authorization pattern:** Each RPC checks the caller's role/identity via `auth.uid()` before mutating. Non-owner callers on `transfer_household_ownership` and non-invitee callers on `respond_to_household_invite` receive `errcode = '42501'` (permission denied). `SECURITY DEFINER` is required because RLS cannot enforce cross-row role checks atomically.
 
+### Bulk Recipe Action RPCs (Migration 038 — MOP-0028)
+
+Three `SECURITY DEFINER` RPCs for bulk operations on the caller's own recipes. All validate `auth.uid()`, silently skip rows the caller doesn't own, and return the count of affected rows.
+
+| Function | Parameters | Returns | Notes |
+|----------|-----------|---------|-------|
+| `bulk_update_recipe_visibility(p_recipe_ids UUID[], p_visibility TEXT)` | `p_visibility` must be `'private'`, `'household'`, or `'public'`; caller must own the recipes | `INT` (rows updated) | Silently skips IDs not owned by caller. Raises `22023` for invalid visibility value. |
+| `bulk_delete_recipes(p_recipe_ids UUID[])` | Caller must own the recipes | `INT` (rows deleted) | Silently skips IDs not owned by caller. |
+| `bulk_add_to_collection(p_collection_id UUID, p_recipe_ids UUID[])` | Caller must own the collection | `INT` (rows inserted) | Uses `ON CONFLICT DO NOTHING` — re-adding existing recipes is a no-op. Raises `42501` if caller does not own the collection. |
+
+**Authorization pattern:** Each RPC checks `user_id = auth.uid()` at the row level. Unauthenticated callers receive `errcode = '42501'`. `SECURITY DEFINER` is required to perform the delete/update in a single statement bypassing per-row RLS overhead.
+
 ### Helper Functions
 
 | Function | Type | Description |
@@ -499,3 +511,4 @@ Two `SECURITY DEFINER` RPCs that replace non-atomic sequential client writes wit
 | `20260907000001_035_recommendations_with_reactions.sql` | 035 | Add reaction signal (5th term) to `get_recipe_recommendations` scoring formula (MOP-0007 Phase 3) |
 | `20260907000002_036_meal_plans_copied_from_cascade.sql` | 036 | `meal_plans.copied_from` self-referential FK with ON DELETE SET NULL |
 | `20260916000000_037_household_write_atomicity_rpcs.sql` | 037 | Two write-atomicity SECURITY DEFINER RPCs: `transfer_household_ownership` + `respond_to_household_invite` (MOP-0014) |
+| `20260921000000_038_bulk_recipe_actions.sql` | 038 | Three bulk recipe action RPCs: `bulk_update_recipe_visibility`, `bulk_delete_recipes`, `bulk_add_to_collection` (MOP-0028) |

@@ -3,7 +3,7 @@
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
 **Last reviewed:** 2026-09-21
-**Last updated:** 2026-09-21 (MOP-0014: transferOwnership + respondToInvite now use atomic SECURITY DEFINER RPCs; two new RPC entries added)
+**Last updated:** 2026-09-21 (MOP-0028: three bulk recipe action RPCs added; useBulk* hooks added to Recipe Collections section)
 
 ---
 
@@ -770,8 +770,11 @@ respond_to_household_invite(
 | `deleteCollection(collectionId)` | Delete a collection (recipes are not deleted) |
 | `addRecipeToCollection(collectionId, recipeId)` | Add a recipe to a collection |
 | `removeRecipeFromCollection(collectionId, recipeId)` | Remove a recipe from a collection |
+| `bulkUpdateRecipeVisibility(recipeIds, visibility)` | Set visibility on multiple owned recipes in one RPC call (`bulk_update_recipe_visibility`, migration 038) — returns row count |
+| `bulkDeleteRecipes(recipeIds)` | Delete multiple owned recipes in one RPC call (`bulk_delete_recipes`, migration 038) — returns row count |
+| `bulkAddToCollection(collectionId, recipeIds)` | Add multiple recipes to a collection in one RPC call (`bulk_add_to_collection`, migration 038) — returns rows inserted; duplicate-safe via `ON CONFLICT DO NOTHING` |
 
-**React Query hooks:** `useMyCollections`, `useCollection`, `useCollectionRecipes`, `useCreateCollection`, `useUpdateCollection`, `useDeleteCollection`, `useAddRecipeToCollection`, `useRemoveRecipeFromCollection`
+**React Query hooks:** `useMyCollections`, `useCollection`, `useCollectionRecipes`, `useCreateCollection`, `useUpdateCollection`, `useDeleteCollection`, `useAddRecipeToCollection`, `useRemoveRecipeFromCollection`, `useBulkUpdateRecipeVisibility`, `useBulkDeleteRecipes`, `useBulkAddToCollection`
 
 ### Field Mapping
 

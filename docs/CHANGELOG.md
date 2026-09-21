@@ -3,9 +3,19 @@
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
 **Last reviewed:** 2026-09-21
-**Last updated:** 2026-09-21 (MOP-0014 complete; admin delete bug fix; invite email UX fix)
+**Last updated:** 2026-09-21 (MOP-0028 complete — bulk recipe actions)
 
 ---
+
+## 2026-09-21 (MOP-0028: Bulk Recipe Actions) `main`
+
+**Bulk Recipe Actions — Multi-Select Visibility, Folder Assignment, Delete (MOP-0028 — complete)**
+
+- **Multi-select mode** on the recipe library: hover a card on desktop to reveal a checkbox (click to enter select mode); long-press any card on mobile (500ms) to enter select mode. Clicking any card in select mode toggles selection without navigating.
+- **Unified count display** in the toolbar text-swaps between "N recipes" (normal mode) and "N of M selected" (select mode) in the same location — no layout shift.
+- **Bulk toolbar**: Visibility popover (Private / Household / Public), Add to folder dropdown (your collections), Delete with confirmation dialog ("Delete N recipes? This cannot be undone."), × to exit select mode.
+- **Bulk RPCs** (migration 038, three SECURITY DEFINER functions): `bulk_update_recipe_visibility`, `bulk_delete_recipes`, `bulk_add_to_collection` — each issues a single `supabase.rpc()` call; no fan-out. Caller must own the recipes / collection.
+- Maximum 100 recipes selectable at once (enforced with toast). Bulk actions restricted to "My Recipes" feed mode.
 
 ## 2026-09-21 (MOP-0014: Household Write Atomicity + bug fixes) `main`
 
