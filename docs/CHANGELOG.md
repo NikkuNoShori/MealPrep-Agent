@@ -2,10 +2,23 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-09-16
-**Last updated:** 2026-09-16 (MOP-0007 Smart Discovery complete; meal planner UX overhaul)
+**Last reviewed:** 2026-09-21
+**Last updated:** 2026-09-21 (MOP-0014 complete; admin delete bug fix; invite email UX fix)
 
 ---
+
+## 2026-09-21 (MOP-0014: Household Write Atomicity + bug fixes) `main`
+
+**Household Write Atomicity — `transferOwnership` + `respondToInvite` (MOP-0014 — complete)**
+
+- **`transferOwnership`** now uses a single SECURITY DEFINER RPC (`transfer_household_ownership`, migration 037). The prior two sequential PATCHes to `household_members` left a window where two owners could exist simultaneously if the second write failed. Now atomic — any failure rolls back completely.
+- **`respondToInvite`** now uses a single SECURITY DEFINER RPC (`respond_to_household_invite`, migration 037). The prior PATCH + conditional INSERT left a window where an invite could appear accepted with no corresponding membership row. Now atomic.
+- Both RPCs enforce explicit caller authorization via `auth.uid()` (non-owners and non-invitees receive `errcode 42501`).
+
+**Bug fixes**
+
+- **Admin user delete** no longer fails with "Database error deleting user" when the target user created a household or sent invites. The delete handler now removes the user's households (cascading members + invites) and any remaining sent-invite rows before calling the auth delete.
+- **Invite UX**: when inviting an email address that already has an account, the invite row is created and the invitee sees it in-app — but Supabase cannot send an email to an existing user. The inviter now sees an accurate toast ("Invite created — they already have an account and will see it in the app") instead of the misleading "Invite sent" message.
 
 ## 2026-09-16 (MOP-0007: Smart Discovery complete) `main`
 

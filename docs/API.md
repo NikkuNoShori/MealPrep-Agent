@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-09-16
-**Last updated:** 2026-09-16 (MOP-0007: reaction scoring term in get_recipe_recommendations; RPC user_id param noted vestigial)
+**Last reviewed:** 2026-09-21
+**Last updated:** 2026-09-21 (MOP-0014: transferOwnership + respondToInvite now use atomic SECURITY DEFINER RPCs; two new RPC entries added)
 
 ---
 
@@ -611,6 +611,40 @@ get_my_pending_invites()  -- uses auth.uid()
 
 ---
 
+### transfer_household_ownership *(Migration 037 — MOP-0014)*
+
+Atomically promotes target member to `owner` and demotes the caller to `admin` in a single transaction. Replaces the prior two-step PATCH sequence that left a dual-owner window on mid-transfer failure.
+
+```sql
+transfer_household_ownership(
+  p_member_id    UUID,   -- household_members.id of the target
+  p_household_id UUID    -- household to transfer
+)
+```
+
+**Auth:** Caller must be current `owner` of the household. Non-owners receive `errcode 42501`.
+
+**Returns:** `void`
+
+---
+
+### respond_to_household_invite *(Migration 037 — MOP-0014)*
+
+Atomically marks the invite `accepted` or `declined` and (on accept) inserts the caller into `household_members` in a single transaction. Replaces the prior PATCH + conditional INSERT sequence that left an orphaned-member-row window on failure.
+
+```sql
+respond_to_household_invite(
+  p_invite_id UUID,
+  p_accept    BOOLEAN
+)
+```
+
+**Auth:** Caller's email must match `household_invites.invited_email` (case-insensitive). Invite must be `pending`. Non-invitee callers and already-responded invites receive `errcode 42501` / `22023` respectively.
+
+**Returns:** `TABLE(household_id UUID, household_name TEXT, status TEXT)`
+
+---
+
 ## Frontend API Client
 
 `src/services/api.ts` — singleton HTTP client wrapping Supabase calls.
@@ -687,12 +721,13 @@ get_my_pending_invites()  -- uses auth.uid()
 | `getInviteDetails(inviteId)` | Get invite details (valid/invalid, names, expiry) |
 | `acceptInviteById(inviteId)` | Accept an invite (adds user to household) |
 | `getMyPendingInvites()` | Get invites addressed to current user (via RPC) |
-| `respondToInvite(inviteId, accept)` | Accept or decline invite |
+| `respondToInvite(inviteId, accept)` | Accept or decline invite — atomic via `respond_to_household_invite` RPC (migration 037) |
+| `transferOwnership(memberId, householdId)` | Transfer household ownership to another member — atomic via `transfer_household_ownership` RPC (migration 037) |
 | `getHouseholdRecipes(params?)` | Get household-visible recipes with author profiles (via RPC) |
 | `getPublicRecipes(params?)` | Get all public recipes with author profiles |
 | `updateRecipeVisibility(recipeId, visibility)` | Set recipe visibility (private/household/public) |
 
-**React Query hooks:** `useMyHousehold`, `useUpdateHousehold`, `useCreateHouseholdInvite`, `useMyPendingInvites`, `useRespondToInvite`, `useUpdateRecipeVisibility`, `useHouseholdRecipes`, `useAcceptInviteById`
+**React Query hooks:** `useMyHousehold`, `useUpdateHousehold`, `useCreateHouseholdInvite`, `useMyPendingInvites`, `useRespondToInvite`, `useRespondToInvite`, `useTransferOwnership`, `useUpdateRecipeVisibility`, `useHouseholdRecipes`, `useAcceptInviteById`
 
 ### Recipe Reactions
 

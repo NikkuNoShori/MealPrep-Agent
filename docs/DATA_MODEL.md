@@ -2,8 +2,8 @@
 
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
-**Last reviewed:** 2026-09-16
-**Last updated:** 2026-09-16 (meal_plans: copied_from FK + full status enum; migration index extended to 036; reaction scoring term in get_recipe_recommendations)
+**Last reviewed:** 2026-09-21
+**Last updated:** 2026-09-21 (MOP-0014: two write-atomicity RPCs added — transfer_household_ownership + respond_to_household_invite; migration 037 added to index)
 
 ---
 
@@ -422,6 +422,17 @@ All use `SECURITY DEFINER` to bypass RLS for cross-user profile reads, validate 
 | `get_recipe_reactions()` | `p_recipe_ids UUID[]` | `[{ id, recipe_id, user_id, family_member_id, reaction, name }]` | `getRecipeReactions()` (2 queries → 1) |
 | `get_my_pending_invites()` | (none — uses `auth.uid()`) | `[{ id, household_id, ..., households: { id, name } }]` | `getMyPendingInvites()` (2 queries → 1) |
 
+### Write-Atomicity RPCs (Migration 037 — MOP-0014)
+
+Two `SECURITY DEFINER` RPCs that replace non-atomic sequential client writes with single Postgres transactions. Both verify `auth.uid()` and raise `errcode 42501` for unauthorized callers.
+
+| Function | Parameters | Returns | Replaces |
+|----------|-----------|---------|----------|
+| `transfer_household_ownership(p_member_id UUID, p_household_id UUID)` | Caller must be household owner | `void` | Two sequential PATCHes to `household_members` (promote target → demote self). Prior dual-owner window eliminated. |
+| `respond_to_household_invite(p_invite_id UUID, p_accept BOOLEAN)` | Caller email must match `invited_email`; invite must be `pending` | `TABLE(household_id UUID, household_name TEXT, status TEXT)` | PATCH to `household_invites` + conditional INSERT into `household_members`. Prior orphaned-member-row window eliminated. |
+
+**Authorization pattern:** Each RPC checks the caller's role/identity via `auth.uid()` before mutating. Non-owner callers on `transfer_household_ownership` and non-invitee callers on `respond_to_household_invite` receive `errcode = '42501'` (permission denied). `SECURITY DEFINER` is required because RLS cannot enforce cross-row role checks atomically.
+
 ### Helper Functions
 
 | Function | Type | Description |
@@ -487,3 +498,4 @@ All use `SECURITY DEFINER` to bypass RLS for cross-user profile reads, validate 
 | `20260907000000_034_chat_retention_cleanup.sql` | 034 | Chat message retention cleanup |
 | `20260907000001_035_recommendations_with_reactions.sql` | 035 | Add reaction signal (5th term) to `get_recipe_recommendations` scoring formula (MOP-0007 Phase 3) |
 | `20260907000002_036_meal_plans_copied_from_cascade.sql` | 036 | `meal_plans.copied_from` self-referential FK with ON DELETE SET NULL |
+| `20260916000000_037_household_write_atomicity_rpcs.sql` | 037 | Two write-atomicity SECURITY DEFINER RPCs: `transfer_household_ownership` + `respond_to_household_invite` (MOP-0014) |
