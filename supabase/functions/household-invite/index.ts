@@ -119,6 +119,7 @@ async function handleSend(req: Request): Promise<Response> {
   const appUrl = origin || Deno.env.get("APP_URL") || "http://localhost:5173";
   const redirectTo = `${appUrl}/invite/accept?id=${invite.id}`;
 
+  let emailSent = true;
   try {
     const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(
       normalizedEmail,
@@ -132,17 +133,19 @@ async function handleSend(req: Request): Promise<Response> {
     );
 
     if (inviteError) {
-      // User may already exist — invite record is still created
-      // Existing users will see the invite in-app
+      // User already has an account — Supabase won't send an email.
+      // The invite row exists and will appear in-app for the invitee.
       console.warn("Supabase invite email note:", inviteError.message);
+      emailSent = false;
     }
   } catch (emailError) {
     console.warn("Supabase invite call failed:", emailError);
-    // Invite record still exists — user can accept in-app
+    emailSent = false;
   }
 
   return corsResponse({
     success: true,
+    emailSent,
     invite: { id: invite.id, email: normalizedEmail, expiresAt },
   });
 }

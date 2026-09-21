@@ -228,8 +228,15 @@ const Household = () => {
     createInvite.mutate(
       { householdId: householdData.household.id, email: inviteEmail.trim() },
       {
-        onSuccess: () => {
-          toast.success(`Invite sent to ${inviteEmail.trim()}`);
+        onSuccess: (data: any) => {
+          if (data?.emailSent === false) {
+            toast.success(
+              `Invite created for ${inviteEmail.trim()} — they already have an account and will see it in the app.`,
+              { duration: 6000 }
+            );
+          } else {
+            toast.success(`Invite sent to ${inviteEmail.trim()}`);
+          }
           setInviteEmail('');
         },
         onError: (err: any) => {

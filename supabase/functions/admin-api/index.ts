@@ -96,7 +96,35 @@ async function handleDeleteUser(req: Request): Promise<Response> {
   const { data: { user: targetUser } } = await admin.auth.admin.getUserById(userId);
   const userEmail = targetUser?.email?.toLowerCase();
 
-  // Clean up invites for this user's email
+  // ── Pre-delete cleanup (must happen before auth.admin.deleteUser) ──
+  //
+  // Several FK columns reference profiles(id) with no ON DELETE rule, which
+  // means Postgres will block auth.admin.deleteUser if rows exist:
+  //   • households.created_by        — household the user created
+  //   • household_invites.invited_by — invites the user sent
+  //
+  // Strategy:
+  //   1. Delete any households the user created. ON DELETE CASCADE on
+  //      household_members and household_invites means those rows go too.
+  //   2. Delete any remaining household_invites rows where invited_by = userId
+  //      (invites sent on households the user didn't create).
+  //   3. Delete household_invites rows where invited_email = userEmail
+  //      (outstanding invites addressed to this user).
+  // After these three steps the auth delete proceeds cleanly.
+
+  // 1. Delete households created by this user (cascades members + invites)
+  await admin
+    .from("households")
+    .delete()
+    .eq("created_by", userId);
+
+  // 2. Delete remaining invites sent by this user (on other people's households)
+  await admin
+    .from("household_invites")
+    .delete()
+    .eq("invited_by", userId);
+
+  // 3. Delete invites addressed to this user's email
   if (userEmail) {
     await admin
       .from("household_invites")

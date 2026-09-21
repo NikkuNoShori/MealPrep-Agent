@@ -5,10 +5,10 @@
 | **MOP** | MOP-0014 |
 | **Title** | Household Write Atomicity — Convert `transferOwnership` and `respondToInvite` to SECURITY DEFINER RPCs |
 | **Date Submitted** | 2026-06-01 |
-| **Date Updated** | 2026-06-01 |
-| **Date Completed** | — |
+| **Date Updated** | 2026-09-21 |
+| **Date Completed** | 2026-09-16 |
 | **Submitted By** | surface-reviewer (origin: MOP-0005 Phase 1 round-1 agent) |
-| **Status** | draft |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md).
 
