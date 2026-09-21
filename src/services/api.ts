@@ -1342,7 +1342,7 @@ class ApiClient {
     // Single atomic RPC — invite update + optional member insert happen in one
     // Postgres transaction. Replaces the prior two-step Supabase client writes
     // (migration 037 / MOP-0014). RPC enforces SECURITY DEFINER auth checks.
-    const { data, error } = await supabase.rpc('respond_to_household_invite', {
+    const { data, error } = await (supabase as any).rpc('respond_to_household_invite', {
       p_invite_id: inviteId,
       p_accept: accept,
     });
@@ -1378,7 +1378,7 @@ class ApiClient {
     // Single atomic RPC — promote target + demote caller in one Postgres
     // transaction. Replaces the prior two-step PATCH sequence that left a
     // dual-owner window on mid-transfer failure (migration 037 / MOP-0014).
-    const { error } = await supabase.rpc('transfer_household_ownership', {
+    const { error } = await (supabase as any).rpc('transfer_household_ownership', {
       p_member_id: memberId,
       p_household_id: householdId,
     });
@@ -1514,6 +1514,35 @@ class ApiClient {
 
     if (error) throw error;
     return { id: recipeId, visibility };
+  }
+
+  // ── Bulk Recipe Actions (MOP-0028) ──
+  // Cast to `any` — RPCs not yet in generated types until migration 038 is deployed.
+
+  async bulkUpdateRecipeVisibility(recipeIds: string[], visibility: 'private' | 'household' | 'public'): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('bulk_update_recipe_visibility', {
+      p_recipe_ids: recipeIds,
+      p_visibility: visibility,
+    });
+    if (error) throw error;
+    return (data as number) ?? 0;
+  }
+
+  async bulkDeleteRecipes(recipeIds: string[]): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('bulk_delete_recipes', {
+      p_recipe_ids: recipeIds,
+    });
+    if (error) throw error;
+    return (data as number) ?? 0;
+  }
+
+  async bulkAddToCollection(collectionId: string, recipeIds: string[]): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('bulk_add_to_collection', {
+      p_collection_id: collectionId,
+      p_recipe_ids: recipeIds,
+    });
+    if (error) throw error;
+    return (data as number) ?? 0;
   }
 
   // ── Recipe Collections ──
@@ -2550,6 +2579,40 @@ export const useAdminDeleteHousehold = () => {
     mutationFn: (householdId: string) => apiClient.adminDeleteHousehold(householdId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+// ── Bulk Recipe Action Hooks (MOP-0028) ──
+
+export const useBulkUpdateRecipeVisibility = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recipeIds, visibility }: { recipeIds: string[]; visibility: 'private' | 'household' | 'public' }) =>
+      apiClient.bulkUpdateRecipeVisibility(recipeIds, visibility),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+    },
+  });
+};
+
+export const useBulkDeleteRecipes = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (recipeIds: string[]) => apiClient.bulkDeleteRecipes(recipeIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+    },
+  });
+};
+
+export const useBulkAddToCollection = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ collectionId, recipeIds }: { collectionId: string; recipeIds: string[] }) =>
+      apiClient.bulkAddToCollection(collectionId, recipeIds),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["collections", variables.collectionId, "recipes"] });
     },
   });
 };

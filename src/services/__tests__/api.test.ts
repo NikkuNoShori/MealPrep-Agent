@@ -2665,3 +2665,139 @@ describe('apiClient.sendMessage', () => {
     ).rejects.toThrow();
   });
 });
+
+// ── MOP-0028: Bulk Recipe Actions ──
+
+describe('apiClient.bulkUpdateRecipeVisibility', () => {
+  it('calls bulk_update_recipe_visibility RPC and returns row count', async () => {
+    server.use(supabaseRpc('bulk_update_recipe_visibility', 3));
+
+    const result = await apiClient.bulkUpdateRecipeVisibility(
+      ['r-1', 'r-2', 'r-3'],
+      'household'
+    );
+
+    expect(result).toBe(3);
+  });
+
+  it('makes exactly one network call (single RPC, no fan-out)', async () => {
+    let callCount = 0;
+    server.use(
+      supabaseRpc('bulk_update_recipe_visibility', () => {
+        callCount++;
+        return HttpResponse.json(2, { status: 200 });
+      })
+    );
+
+    await apiClient.bulkUpdateRecipeVisibility(['r-1', 'r-2'], 'public');
+
+    expect(callCount).toBe(1);
+  });
+
+  it('throws when caller is unauthenticated', async () => {
+    server.use(
+      supabaseRpc('bulk_update_recipe_visibility', () =>
+        HttpResponse.json(
+          { message: 'not authenticated', code: '42501' },
+          { status: 401 }
+        )
+      )
+    );
+
+    await expect(
+      apiClient.bulkUpdateRecipeVisibility(['r-1'], 'private')
+    ).rejects.toThrow();
+  });
+});
+
+describe('apiClient.bulkDeleteRecipes', () => {
+  it('calls bulk_delete_recipes RPC and returns row count', async () => {
+    server.use(supabaseRpc('bulk_delete_recipes', 2));
+
+    const result = await apiClient.bulkDeleteRecipes(['r-1', 'r-2']);
+
+    expect(result).toBe(2);
+  });
+
+  it('returns 0 for an empty array (no-op)', async () => {
+    server.use(supabaseRpc('bulk_delete_recipes', 0));
+
+    const result = await apiClient.bulkDeleteRecipes([]);
+
+    expect(result).toBe(0);
+  });
+
+  it('makes exactly one network call', async () => {
+    let callCount = 0;
+    server.use(
+      supabaseRpc('bulk_delete_recipes', () => {
+        callCount++;
+        return HttpResponse.json(1, { status: 200 });
+      })
+    );
+
+    await apiClient.bulkDeleteRecipes(['r-1']);
+
+    expect(callCount).toBe(1);
+  });
+
+  it('throws when caller is unauthenticated', async () => {
+    server.use(
+      supabaseRpc('bulk_delete_recipes', () =>
+        HttpResponse.json(
+          { message: 'not authenticated', code: '42501' },
+          { status: 401 }
+        )
+      )
+    );
+
+    await expect(apiClient.bulkDeleteRecipes(['r-1'])).rejects.toThrow();
+  });
+});
+
+describe('apiClient.bulkAddToCollection', () => {
+  it('calls bulk_add_to_collection RPC and returns inserted row count', async () => {
+    server.use(supabaseRpc('bulk_add_to_collection', 3));
+
+    const result = await apiClient.bulkAddToCollection('col-1', ['r-1', 'r-2', 'r-3']);
+
+    expect(result).toBe(3);
+  });
+
+  it('returns 0 when all recipes are already in the collection (ON CONFLICT DO NOTHING)', async () => {
+    server.use(supabaseRpc('bulk_add_to_collection', 0));
+
+    const result = await apiClient.bulkAddToCollection('col-1', ['r-1', 'r-2']);
+
+    expect(result).toBe(0);
+  });
+
+  it('makes exactly one network call', async () => {
+    let callCount = 0;
+    server.use(
+      supabaseRpc('bulk_add_to_collection', () => {
+        callCount++;
+        return HttpResponse.json(2, { status: 200 });
+      })
+    );
+
+    await apiClient.bulkAddToCollection('col-1', ['r-1', 'r-2']);
+
+    expect(callCount).toBe(1);
+  });
+
+  it('throws when caller does not own the collection', async () => {
+    server.use(
+      supabaseRpc('bulk_add_to_collection', () =>
+        HttpResponse.json(
+          { message: 'collection col-99 not found or not owned by caller', code: '42501' },
+          { status: 403 }
+        )
+      )
+    );
+
+    await expect(
+      apiClient.bulkAddToCollection('col-99', ['r-1'])
+    ).rejects.toThrow();
+  });
+});

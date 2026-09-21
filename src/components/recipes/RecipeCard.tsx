@@ -62,6 +62,10 @@ interface RecipeCardProps {
   onEdit?: (recipe: any) => void;
   onDelete?: (recipeId: string) => void;
   previewActions?: undefined;
+  /** Multi-select props (MOP-0028) */
+  isSelected?: boolean;
+  isSelectMode?: boolean;
+  onSelect?: (id: string) => void;
 }
 
 /** Preview mode — id optional, previewActions required. */
@@ -75,6 +79,9 @@ interface RecipeCardPreviewProps {
   onClick?: undefined;
   onEdit?: undefined;
   onDelete?: undefined;
+  isSelected?: undefined;
+  isSelectMode?: undefined;
+  onSelect?: undefined;
 }
 
 type Props = RecipeCardProps | RecipeCardPreviewProps;
@@ -91,8 +98,38 @@ export const RecipeCard: React.FC<Props> = (props) => {
   const onClick = !isPreview ? props.onClick : undefined;
   const onEdit = !isPreview ? props.onEdit : undefined;
   const onDelete = !isPreview ? props.onDelete : undefined;
+  const isSelected = (!isPreview && props.isSelected) || false;
+  const isSelectMode = (!isPreview && props.isSelectMode) || false;
+  const onSelect = !isPreview ? props.onSelect : undefined;
   // recipe.id is only safe to use in non-preview paths
   const recipeId = (recipe as RecipeBase & { id?: string }).id;
+
+  // Long-press timer for mobile select-mode entry
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const handlePointerDown = () => {
+    if (isPreview || !onSelect || isSelectMode) return;
+    longPressFiredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      if (recipeId) onSelect(recipeId);
+    }, 500);
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+  };
+
+  const handlePointerCancel = () => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, []);
 
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
   const hasAllergyWarning = Array.isArray(recipe.tags) && recipe.tags.includes("ALLERGY WARNING");
@@ -386,13 +423,18 @@ export const RecipeCard: React.FC<Props> = (props) => {
   if (viewMode === "list") {
     return (
       <div
-        onClick={!isPreview ? onClick : undefined}
+        onClick={!isPreview ? (isSelectMode && recipeId ? () => onSelect?.(recipeId) : onClick) : undefined}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         className={!isPreview ? "group cursor-pointer" : "group"}
       >
         <div className={[
           "flex items-stretch gap-4 p-3 rounded-2xl border transition-all duration-300 overflow-hidden",
           isPreview && previewActions?.saved
             ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40"
+            : isSelected
+            ? "bg-primary-50/60 dark:bg-primary-900/20 border-primary-300/60 dark:border-primary-500/40 ring-1 ring-primary-400/40 dark:ring-primary-500/30"
             : "bg-white/60 dark:bg-white/[0.03] border-stone-200/60 dark:border-white/[0.06]",
           !isPreview
             ? "hover:bg-white dark:hover:bg-white/[0.05] hover:shadow-lg hover:shadow-black/[0.04] dark:hover:shadow-black/20 hover:border-stone-300/60 dark:hover:border-white/[0.1]"
@@ -421,6 +463,25 @@ export const RecipeCard: React.FC<Props> = (props) => {
               <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm">
                 <Clock className="h-3 w-3 text-white/80" />
                 <span className="text-[11px] font-medium text-white">{totalTime}m</span>
+              </div>
+            )}
+            {/* Select checkbox (list view) */}
+            {!isPreview && onSelect && (
+              <div
+                className={[
+                  "absolute top-1.5 left-1.5 transition-opacity duration-150",
+                  isSelectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                ].join(" ")}
+                onClick={(e) => { e.stopPropagation(); if (recipeId) onSelect(recipeId); }}
+              >
+                <div className={[
+                  "w-5 h-5 rounded-md flex items-center justify-center shadow transition-colors",
+                  isSelected
+                    ? "bg-primary-500 border-2 border-primary-500"
+                    : "bg-white/90 dark:bg-black/50 border-2 border-stone-300 dark:border-white/30",
+                ].join(" ")}>
+                  {isSelected && <Check className="h-3 w-3 text-white" />}
+                </div>
               </div>
             )}
           </div>
@@ -495,10 +556,18 @@ export const RecipeCard: React.FC<Props> = (props) => {
   // ── Grid View ──
   return (
     <div
-      onClick={!isPreview ? onClick : undefined}
+      onClick={!isPreview ? (isSelectMode && recipeId ? () => onSelect?.(recipeId) : onClick) : undefined}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       className={["group h-full", !isPreview ? "cursor-pointer" : ""].join(" ")}
     >
-      <div className="h-full rounded-2xl overflow-hidden bg-white dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/[0.06] hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:border-stone-300/80 dark:hover:border-white/[0.1] hover:-translate-y-1 transition-all duration-300 flex flex-col">
+      <div className={[
+        "h-full rounded-2xl overflow-hidden border hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:-translate-y-1 transition-all duration-300 flex flex-col",
+        isSelected
+          ? "bg-primary-50/60 dark:bg-primary-900/20 border-primary-300/60 dark:border-primary-500/40 ring-1 ring-primary-400/40 dark:ring-primary-500/30"
+          : "bg-white dark:bg-white/[0.03] border-stone-200/60 dark:border-white/[0.06] hover:border-stone-300/80 dark:hover:border-white/[0.1]",
+      ].join(" ")}>
         {/* Image area */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200/80 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700">
           {recipe.imageUrl ? (
@@ -550,19 +619,38 @@ export const RecipeCard: React.FC<Props> = (props) => {
             </div>
           )}
 
-          {/* Top-left: add to plan (normal mode only) */}
+          {/* Top-left: select checkbox (select mode) or add to plan (normal mode) */}
           {!isPreview && recipeId && (
-            <div className="absolute top-2.5 left-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
-              <AddToPlanButton
-                recipeId={recipeId}
-                recipeName={recipe.title}
-                recipeImage={recipe.imageUrl}
-                servings={recipe.servings}
-                prepTime={recipe.prepTime}
-                cookTime={recipe.cookTime}
-                compact
-              />
-            </div>
+            isSelectMode || onSelect ? (
+              <div
+                className={[
+                  "absolute top-2.5 left-2.5 transition-opacity duration-150",
+                  isSelectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                ].join(" ")}
+                onClick={(e) => { e.stopPropagation(); if (recipeId && onSelect) onSelect(recipeId); }}
+              >
+                <div className={[
+                  "w-6 h-6 rounded-lg flex items-center justify-center shadow-md transition-colors",
+                  isSelected
+                    ? "bg-primary-500 border-2 border-primary-500"
+                    : "bg-white/90 dark:bg-black/50 border-2 border-white/70 dark:border-white/30",
+                ].join(" ")}>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
+                </div>
+              </div>
+            ) : (
+              <div className="absolute top-2.5 left-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
+                <AddToPlanButton
+                  recipeId={recipeId}
+                  recipeName={recipe.title}
+                  recipeImage={recipe.imageUrl}
+                  servings={recipe.servings}
+                  prepTime={recipe.prepTime}
+                  cookTime={recipe.cookTime}
+                  compact
+                />
+              </div>
+            )
           )}
         </div>
 
