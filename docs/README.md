@@ -17,6 +17,7 @@ These are the authoritative references for the project. Keep them up to date usi
 | [DATA_MODEL.md](DATA_MODEL.md) | Tables, columns, constraints, relationships, triggers, RLS policies |
 | [API.md](API.md) | Edge functions, RPC contracts, OpenRouter endpoints, request/response shapes |
 | [RUNBOOK.md](RUNBOOK.md) | Operational debugging checklists for known failure modes |
+| [COLOR_SCHEMA.md](COLOR_SCHEMA.md) | **Normative color standard** — token layering, coverage-surface taxonomy, governance rules G1–G8 |
 | [CHANGELOG.md](CHANGELOG.md) | User-visible changes by date (newest first) |
 
 ---

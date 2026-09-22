@@ -3,7 +3,7 @@
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
 **Last reviewed:** 2026-09-21
-**Last updated:** 2026-09-21 (MOP-0014 → complete)
+**Last updated:** 2026-09-21 (MOP-0029 scope expanded — full color-surface audit; `docs/COLOR_SCHEMA.md` standard added)
 
 ---
 
@@ -60,12 +60,15 @@
 | [MOP-0026](MOP-0026-security-auditor-agent.md) | Security Auditor Agent | draft | 2026-09-07 | 2026-09-21 | — | Nick Neal |
 | [MOP-0027](MOP-0027-tos-compliant-url-scraping.md) | ToS-Compliant URL Scraping — robots.txt check + domain blocklist | complete | 2026-09-07 | 2026-09-07 | 2026-09-07 | Nick Neal |
 | [MOP-0028](MOP-0028-bulk-recipe-actions.md) | Bulk Recipe Actions — Multi-Select Visibility, Folder Assignment, Delete, and Sharing | complete | 2026-09-21 | 2026-09-21 | 2026-09-21 | Nick Neal |
+| [MOP-0029](MOP-0029-theme-token-layering-surface-presets.md) | Theme Token Layering & Surface-Aware Presets | deferred | 2026-09-21 | 2026-09-21 | — | surface-reviewer |
+
+> **MOP-0029 (scope expanded 2026-09-21):** Now covers all thirteen color-surface categories, not just backgrounds. Grew from 6 to 10 phases. **Phases 0–3 and 5 are NOT deferred** — Phase 0 publishes [docs/COLOR_SCHEMA.md](../COLOR_SCHEMA.md) (P1, binding on new code immediately); Phases 1, 2, 3, 5 are separable correctness fixes. Only Phases 4, 6, 7, 8, 9 carry the deferral trigger.
 
 > **MOP-0016:** Phases 1–3b shipped 2026-06-16 (`chat-api` deployed). **Outstanding:** deploy `recipe-pipeline`, run §Operator smoke tests, then promote to `verifying`. MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
 
 > **MOP-0017:** Phase 1 shipped 2026-09-03. Phases 2–5 (SSE edge function, agent-loop onDelta, frontend reader, verification) implemented 2026-09-04. Status `verifying` — pending `/verify-mop` and `chat-api` deploy.
 
-> **Deferred-with-trigger MOPs:** MOP-0011 is in `draft` but explicitly deferred — execute only when a documented trigger condition fires (see MOP-0011 §Trigger Conditions). This is a new MOP pattern; if more deferred MOPs accumulate, codify the pattern in MOP_TEMPLATE.md.
+> **Deferred-with-trigger MOPs:** MOP-0011 is in `draft` but explicitly deferred — execute only when a documented trigger condition fires (see MOP-0011 §Trigger Conditions). MOP-0029 follows the same pattern (see MOP-0029 §Trigger Conditions), with the nuance that its Phases 1–2 are separable correctness fixes that may land ahead of the trigger. This pattern now has multiple instances; codify it in MOP_TEMPLATE.md.
 
 ---
 

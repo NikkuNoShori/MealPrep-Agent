@@ -49,6 +49,7 @@ Supabase Edge Functions are deployed separately and run on Deno (not Node).
 
 ## Documentation
 
+- `docs/COLOR_SCHEMA.md` — **Normative color standard.** Token layering, 13-category coverage-surface taxonomy, governance rules G1–G8. Consult before adding *any* color to the UI. No raw hex in `className`/`style`; no new `stone-*`; no raw accent utilities outside the allowlist.
 - `docs/ARCHITECTURE.md` — System design and data flow
 - `docs/DATA_MODEL.md` — Database schema and RLS policies
 - `docs/API.md` — REST API endpoints
@@ -77,6 +78,7 @@ Equivalent user-invoked path: `/surface` slash command.
 |---|---|
 | `doc-adherence` | Documentation compliance audit; supersedes `doc-keeper` |
 | `qa-auditor` | Architectural rule audit |
+| `security-auditor` | Read-only security audit across 7 dimensions (RLS, secrets, edge fn safety, service-role, OWASP LLM, auth.uid(), HARD RULE). Scoped variants: `edge-functions`, `migrations`, `api` |
 | `integrity-orchestrator` | Domain-routed test execution (DOMAIN_TEST_MATRIX) |
 | `data-integrity` | Deep numeric + RLS verification (after orchestrator) |
 | `meal-planning-sme` | Meal planner + grocery cart expert |
@@ -97,3 +99,8 @@ Equivalent user-invoked path: `/surface` slash command.
 | `/integrity-check` | Run domain-routed integrity tests |
 | `/verify-mop` | Verify MOP acceptance block (no human gates) |
 | `/surface` | User-invoked surface review |
+| `/security-audit [scope]` | Invoke `security-auditor` — full or scoped (`edge-functions`, `migrations`, `api`) |
+
+## Security audit rule
+
+Before merging any PR that touches `supabase/functions/`, `supabase/migrations/`, or `src/services/api.ts`, invoke `security-auditor` (or the scoped variant matching the changed surface). See `docs/RUNBOOK.md` for invocation details and how to interpret findings.
