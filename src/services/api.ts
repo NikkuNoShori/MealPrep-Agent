@@ -238,10 +238,9 @@ class ApiClient {
     // Determine if the input is a UUID or a slug
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
 
-    let query = supabase
-      .from("recipes")
-      .select("*")
-      .eq("user_id", user.id);
+    // No user_id filter — RLS handles visibility (public/household/owned).
+    // Filtering by the viewer's user_id breaks shared recipe links from other users.
+    let query = supabase.from("recipes").select("*");
 
     if (isUuid) {
       query = query.eq("id", idOrSlug);
@@ -249,12 +248,10 @@ class ApiClient {
       query = query.eq("slug", idOrSlug);
     }
 
-    const { data, error } = await query.single();
+    const { data, error } = await query.maybeSingle();
 
-    if (error) {
-      if (error.code === "PGRST116") return null;
-      throw error;
-    }
+    if (error) throw error;
+    if (!data) return null;
 
     // Transform snake_case to camelCase
     return snakeToCamel(data);
