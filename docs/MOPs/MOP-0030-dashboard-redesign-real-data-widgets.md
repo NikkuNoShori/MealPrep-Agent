@@ -70,7 +70,7 @@ Extract each widget from the approved mockup into its own component, styled with
 ### Phase 4: Replace `Dashboard.tsx`
 **Files affected:** `src/pages/Dashboard.tsx`
 
-Replace the current stat-row + Recent-Recipes layout with `useDashboardStats()` and the Phase 3 widgets. Remove `useRecipes({ limit: 10 })` / `useMealPlans({ limit: 7 })` from the page — the new RPC replaces both capped fetches. Keep the quick-actions row (Add Recipe / Plan Week / AI Assistant) as-is; it already works correctly and isn't part of the stats problem.
+Replace the current stat-row + Recent-Recipes layout with `useDashboardStats()` and the Phase 3 widgets. This is a deletion, not a parallel build: remove the `useRecipes({ limit: 10 })` / `useMealPlans({ limit: 7 })` calls, the derived `stats` array, and the "Recent Recipes" list section entirely — no old code left behind commented out, flagged, or dormant. `useRecipes`/`useMealPlans` themselves stay in `api.ts` (used by Recipes/MealPlanner elsewhere); only Dashboard's usage of them is removed. Keep the quick-actions row (Add Recipe / Plan Week / AI Assistant) as-is; it already works correctly and isn't part of the stats problem.
 
 ### Phase 5: Documentation
 **Files affected:** `docs/DATA_MODEL.md`, `docs/API.md`
@@ -163,6 +163,12 @@ verification:
     file: src/pages/Dashboard.tsx
     pattern: 'useDashboardStats'
     expect: present
+
+  - id: old-recent-recipes-section-removed
+    type: grep
+    file: src/pages/Dashboard.tsx
+    pattern: 'Recent Recipes'
+    expect: absent
 ```
 
 Allowed assertion types: `file-exists`, `grep`, `command`, `test-passes`. **Not allowed:** `human`.
