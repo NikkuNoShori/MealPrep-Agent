@@ -136,3 +136,4 @@ npm run test:run
 | 0014 | household-sharing |
 | 0015 | chat-rag, recipe-pipeline |
 | 0016 | recipe-pipeline |
+| 0030 | meal-planning, recipes-library, household-sharing (no dedicated dashboard domain — spans all three) |
