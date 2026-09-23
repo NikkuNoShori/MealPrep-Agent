@@ -100,7 +100,16 @@ The cooking-bot-architect agent's KB lives at `.claude/agents/cooking-bot-knowle
 - Edge function paths in API.md match `supabase/functions/<name>/`
 - RPC names in API.md match function definitions in migrations
 
-### 8. CHANGELOG Compliance
+### 8. Security Documentation Drift
+
+- A new edge function not covered in `docs/RUNBOOK.md` with a security-relevant failure mode → flag and suggest `security-auditor edge-functions`
+- A new SECURITY DEFINER RPC in `supabase/migrations/` not audited against `auth.uid()` discipline → flag and suggest `security-auditor migrations`
+- A new callsite using `createServiceClient()` not in the four approved locations → flag as Critical and suggest `security-auditor`
+- `docs/RUNBOOK.md` missing a Security Audit entry (once MOP-0026 ships) → flag as Warning
+
+When security-relevant doc drift is identified, note it in the report and direct the user to invoke `security-auditor` with the appropriate scope rather than reporting the security finding here.
+
+### 9. CHANGELOG Compliance
 
 Per the Documentation Update Procedure:
 - Grouped by date and PR/branch name

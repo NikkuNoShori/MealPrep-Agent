@@ -80,6 +80,7 @@ Produce a single Markdown report:
 - **Do not audit style preferences not in the rule set.** Stick to documented rules.
 - **Do not push, merge, or modify remote anything.** Local read-only audit.
 - **Do not modify migrations or push to Supabase.** This is a hard project rule.
+- **Do not report security-specific findings here.** For RLS gaps, secret exposure, LLM prompt injection, `auth.uid()` discipline, or service-role misuse, invoke `security-auditor` (or the scoped variant matching the changed surface: `security-auditor edge-functions`, `security-auditor migrations`, `security-auditor api`). Note the finding in your report and direct the user to run `security-auditor`.
 
 If you find a violation that's actually a *deliberate exception* documented in the diff itself (e.g., a comment explains why), note it as `acknowledged` in the report rather than `critical`.
 

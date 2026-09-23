@@ -203,7 +203,6 @@ class ApiClient {
     const { data, error } = await supabase
       .from("recipes")
       .select("*")
-      .eq("user_id", user.id) // user_id references profiles(id) = auth.users(id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -223,7 +222,6 @@ class ApiClient {
     const { data, error } = await supabase
       .from("recipes")
       .select("id, title, tags, visibility")
-      .or(`user_id.eq.${user.id},visibility.eq.household,visibility.eq.public`)
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data || []) as Array<{ id: string; title: string; tags: string[] | null; visibility: string }>;

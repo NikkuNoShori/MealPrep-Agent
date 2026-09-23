@@ -23,6 +23,8 @@ const BATCH_SIZE = 50;
 const MAX_DURATION_MS = 25_000; // leave 5s headroom before the 30s edge timeout
 
 Deno.serve(async (_req: Request) => {
+  // Auth: Supabase JWT verification is enabled (verify_jwt: true). The pg_cron
+  // job passes a service-role JWT — Supabase validates it before this code runs.
   const startedAt = Date.now();
 
   const supabase = createServiceClient();

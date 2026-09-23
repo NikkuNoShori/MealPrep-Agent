@@ -17,6 +17,71 @@ import { enrichMessageContent } from "./conversation-context.ts";
 import { handleBatchExtract } from "./batch-extract.ts";
 
 // ═══════════════════════════════════════════════════════════════════
+// CONFIRM-ACTION VERIFICATION
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Before executing a confirmed tool, look up the most recent AI message in
+ * this conversation that carries a `pendingConfirmation` in its metadata and
+ * verify that the client's payload matches exactly. This prevents a crafted
+ * confirmAction from bypassing the agent loop's destructive-tool gate.
+ *
+ * Returns the validated { tool, args } if the check passes, or throws with a
+ * user-safe error message if it fails.
+ */
+async function verifyAndConsumeConfirmation(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  conversationId: string,
+  claimed: { tool: string; args: Record<string, unknown>; idempotencyKey?: string }
+): Promise<{ tool: string; args: Record<string, unknown> }> {
+  // Find the most recent AI message with a pendingConfirmation in this conversation.
+  const { data: rows, error } = await (supabase as any)
+    .from("chat_messages")
+    .select("id, metadata")
+    .eq("conversation_id", conversationId)
+    .eq("sender", "ai")
+    .not("metadata->pendingConfirmation", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error || !rows || rows.length === 0) {
+    throw new Error("No pending confirmation found for this conversation.");
+  }
+
+  const stored = rows[0].metadata?.pendingConfirmation as {
+    tool: string;
+    args: Record<string, unknown>;
+    idempotencyKey?: string;
+  } | null;
+
+  if (!stored) {
+    throw new Error("No pending confirmation found for this conversation.");
+  }
+
+  // Verify tool name, idempotency key, and args all match the stored record.
+  if (stored.tool !== claimed.tool) {
+    throw new Error(`Confirmation mismatch: expected tool '${stored.tool}', got '${claimed.tool}'.`);
+  }
+  if (stored.idempotencyKey && claimed.idempotencyKey &&
+      stored.idempotencyKey !== claimed.idempotencyKey) {
+    throw new Error("Confirmation nonce mismatch — request rejected.");
+  }
+  if (JSON.stringify(stored.args) !== JSON.stringify(claimed.args)) {
+    throw new Error("Confirmation args mismatch — request rejected.");
+  }
+
+  // Consume: clear pendingConfirmation from the message so it cannot be replayed.
+  const updatedMetadata = { ...rows[0].metadata, pendingConfirmation: null };
+  await (supabase as any)
+    .from("chat_messages")
+    .update({ metadata: updatedMetadata })
+    .eq("id", rows[0].id);
+
+  return { tool: stored.tool, args: stored.args };
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // SSE HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
@@ -103,7 +168,7 @@ serve(async (req) => {
     return corsError("Route not found", 404);
   } catch (error) {
     console.error("Server error:", error);
-    return corsError(error.message, 500);
+    return corsError("Internal server error", 500);
   }
 });
 
@@ -193,6 +258,11 @@ async function handleSendMessage(
           const mimeMatch = base64Data.match(/^data:(image\/\w+);base64,/);
           if (!mimeMatch) continue;
           const mimeType = mimeMatch[1];
+          const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+          if (!allowedTypes.includes(mimeType)) {
+            console.warn(`Chat image rejected — disallowed MIME type: ${mimeType}`);
+            continue;
+          }
           const ext = mimeType.split("/")[1] || "jpg";
           const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
           const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
@@ -281,15 +351,18 @@ async function handleSendMessage(
             let confirmActionResult: any = null;
 
             if (confirmAction) {
+              const verified = await verifyAndConsumeConfirmation(
+                supabase, conversationId, confirmAction
+              );
               const result = await executeConfirmedTool(
-                confirmAction.tool, confirmAction.args || {}, toolCtx
+                verified.tool, verified.args, toolCtx
               );
               confirmActionResult = result;
               const r = result as { ok?: boolean; error?: string };
               aiResponse = r?.ok === false
                 ? `That didn't work: ${r.error || "unknown error"}.`
                 : `Done — I applied that change.`;
-              toolCallsTrace = [{ name: confirmAction.tool, args: confirmAction.args, ok: r?.ok !== false, confirmed: true }];
+              toolCallsTrace = [{ name: verified.tool, args: verified.args, ok: r?.ok !== false, confirmed: true }];
               // Emit the short response as a single delta.
               enqueue({ type: "delta", text: aiResponse });
             } else {
@@ -377,11 +450,14 @@ async function handleSendMessage(
     let confirmActionResult: any = null;
 
     if (confirmAction) {
-      // ── Confirmation short-circuit: run the previously-validated tool. ──
+      // ── Confirmation short-circuit: verify against stored record, then run. ──
       console.log("[chat-api] confirmAction received:", confirmAction.tool);
+      const verified = await verifyAndConsumeConfirmation(
+        supabase, conversationId, confirmAction
+      );
       const result = await executeConfirmedTool(
-        confirmAction.tool,
-        confirmAction.args || {},
+        verified.tool,
+        verified.args,
         toolCtx
       );
       confirmActionResult = result;
@@ -393,8 +469,8 @@ async function handleSendMessage(
       }
       toolCallsTrace = [
         {
-          name: confirmAction.tool,
-          args: confirmAction.args,
+          name: verified.tool,
+          args: verified.args,
           ok: r?.ok !== false,
           confirmed: true,
         },
@@ -489,7 +565,7 @@ async function handleSendMessage(
     });
   } catch (error) {
     console.error("handleSendMessage error:", error);
-    return corsError(error.message, 500);
+    return corsError("Internal server error", 500);
   }
 }
 
@@ -562,7 +638,8 @@ async function handleGetHistory(
 
     return corsResponse({ conversations: formattedConversations });
   } catch (error) {
-    return corsError(error.message, 500);
+    console.error("handleGetHistory error:", error);
+    return corsError("Internal server error", 500);
   }
 }
 
@@ -594,7 +671,8 @@ async function handleClearHistory(req: Request, supabase: any, user: any) {
     if (error) throw error;
     return corsResponse({ message: "Chat history cleared successfully" });
   } catch (error) {
-    return corsError(error.message, 500);
+    console.error("handleClearHistory error:", error);
+    return corsError("Internal server error", 500);
   }
 }
 
@@ -716,6 +794,6 @@ async function handlePersistExtraction(
     });
   } catch (error) {
     console.error("persist-extraction error:", error);
-    return corsError(error.message || "Failed to persist extraction", 500);
+    return corsError("Internal server error", 500);
   }
 }

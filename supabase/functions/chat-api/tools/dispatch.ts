@@ -177,15 +177,10 @@ function containsUserIdKey(value: unknown): boolean {
 // Dispatch
 // ─────────────────────────────────────────────────────────────────────
 
-function makeIdempotencyKey(name: string, args: unknown): string {
-  // Cheap deterministic key — not cryptographic. Used by the UI to
-  // deduplicate "confirm" rerequests.
-  const json = JSON.stringify({ name, args });
-  let h = 0;
-  for (let i = 0; i < json.length; i++) {
-    h = (Math.imul(31, h) + json.charCodeAt(i)) | 0;
-  }
-  return `${name}:${Math.abs(h).toString(36)}`;
+function makeIdempotencyKey(): string {
+  // Cryptographically random nonce. Stored in chat_messages.metadata and
+  // verified server-side on the confirmation turn — prevents crafted payloads.
+  return crypto.randomUUID();
 }
 
 function summarizeForConfirmation(
@@ -285,7 +280,7 @@ export async function dispatchTool(
       summary: summarizeForConfirmation(name, args),
       tool: name,
       args,
-      idempotencyKey: makeIdempotencyKey(name, args),
+      idempotencyKey: makeIdempotencyKey(),
     };
   }
 
@@ -336,7 +331,7 @@ export async function dispatchTool(
       summary: r.summary || summarizeForConfirmation(name, args),
       tool: name,
       args: r.args || args,
-      idempotencyKey: makeIdempotencyKey(name, args),
+      idempotencyKey: makeIdempotencyKey(),
     };
   }
 

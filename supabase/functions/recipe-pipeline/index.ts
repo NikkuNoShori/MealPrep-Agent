@@ -125,6 +125,6 @@ serve(async (req) => {
     return corsResponse(result, result.success ? 200 : 422);
   } catch (error) {
     console.error("Pipeline error:", error);
-    return corsError(error.message || "Internal server error", 500);
+    return corsError("Internal server error", 500);
   }
 });
