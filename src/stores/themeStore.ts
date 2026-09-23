@@ -405,26 +405,74 @@ export const useThemeStore = create<ThemeState>()(
   )
 );
 
-// Helper function to apply color scheme to CSS custom properties
-function applyColorSchemeToCSS(scheme: ColorScheme) {
+// Convert hex color to an HSL triplet string (without the hsl() wrapper,
+// just "h s% l%") — the format shadcn's CSS variables expect.
+// Moved here from ThemeProvider.tsx (MOP-0029 Phase 2): this is the single
+// apply path, so the conversion it depends on lives alongside it.
+function hexToHSL(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+// Light/dark-aware lightness adjustment for an HSL triplet string, used so
+// applying a preset doesn't flatten the .dark block's intentionally
+// lightened --primary (previously index.css had a hardcoded lighter value
+// for dark mode that a preset switch would overwrite identically to light).
+function adjustHSLLightness(hsl: string, deltaPercent: number): string {
+  const match = hsl.match(/^(\d+)\s+(\d+)%\s+(\d+)%$/);
+  if (!match) return hsl;
+  const [, h, s, l] = match;
+  const newL = Math.max(0, Math.min(100, parseInt(l, 10) + deltaPercent));
+  return `${h} ${s}% ${newL}%`;
+}
+
+// Helper function to apply color scheme to CSS custom properties.
+// This is the SINGLE apply path (MOP-0029 Phase 2) — ThemeProvider.tsx
+// calls this instead of duplicating the logic itself.
+export function applyColorSchemeToCSS(scheme: ColorScheme) {
   const root = document.documentElement
-  
-  // Apply primary colors
+  const isDark = root.classList.contains('dark')
+
+  // Apply primary colors (numeric ramp)
   Object.entries(scheme.primary).forEach(([shade, color]) => {
     root.style.setProperty(`--primary-${shade}`, color)
   })
-  
-  // Apply secondary colors
+
+  // Apply secondary colors (numeric ramp)
   Object.entries(scheme.secondary).forEach(([shade, color]) => {
     root.style.setProperty(`--secondary-${shade}`, color)
   })
-  
+
   // Apply neutral colors
   Object.entries(scheme.neutral).forEach(([shade, color]) => {
     root.style.setProperty(`--gray-${shade}`, color)
   })
-  
-  // Apply semantic colors
+
+  // HSL-derived tokens consumed by shadcn primitives (bg-primary, ring, etc).
+  // Dark mode gets a lightened variant so presets don't flatten the .dark
+  // block's intentionally brighter --primary (index.css previously hardcoded
+  // "160 67% 52%" vs light's "158 70% 37%" — roughly +15% lightness).
+  const primaryHSL = hexToHSL(scheme.primary[500])
+  const secondaryHSL = hexToHSL(scheme.secondary[500])
+  root.style.setProperty('--primary', isDark ? adjustHSLLightness(primaryHSL, 15) : primaryHSL)
+  root.style.setProperty('--ring', isDark ? adjustHSLLightness(primaryHSL, 15) : primaryHSL)
+  root.style.setProperty('--secondary', isDark ? adjustHSLLightness(secondaryHSL, 15) : secondaryHSL)
+
+  // Apply semantic colors (numeric ramp)
   root.style.setProperty('--success-100', scheme.semantic.success[100])
   root.style.setProperty('--success-800', scheme.semantic.success[800])
   root.style.setProperty('--success-900', scheme.semantic.success[900])
@@ -432,6 +480,19 @@ function applyColorSchemeToCSS(scheme: ColorScheme) {
   root.style.setProperty('--error-600', scheme.semantic.error[600])
   root.style.setProperty('--warning-100', scheme.semantic.warning[100])
   root.style.setProperty('--warning-800', scheme.semantic.warning[800])
+
+  // Derive shadcn's --destructive from semantic.error (MOP-0029 Phase 3)
+  // so the 19 existing text-destructive/bg-destructive usages become
+  // preset-aware instead of pinned to the static index.css value.
+  // Dark mode uses the lighter error[500] shade against the dark surface
+  // (matches the existing hardcoded dark --destructive being a distinct,
+  // muted treatment from light rather than a uniform lightness bump).
+  root.style.setProperty('--destructive', hexToHSL(isDark ? scheme.semantic.error[500] : scheme.semantic.error[600]))
+
+  // Status tokens (success/warning) as HSL, for the alert.tsx status-*
+  // Tailwind utilities wired in tailwind.config.js.
+  root.style.setProperty('--status-success', hexToHSL(scheme.semantic.success[800]))
+  root.style.setProperty('--status-warning', hexToHSL(scheme.semantic.warning[800]))
 }
 
 // Initialize theme on store creation

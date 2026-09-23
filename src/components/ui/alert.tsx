@@ -6,10 +6,16 @@ interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'destructive' | 'success' | 'info'
 }
 
+// Success/info variants point at semantic status tokens instead of hardcoded
+// green-*/primary-* Tailwind classes (MOP-0029 Phase 3 / COLOR_SCHEMA.md §5.4).
+// `info` intentionally keeps using the brand ramp per COLOR_SCHEMA.md §5.1's
+// four status roles (success/error/warning/info) — info has no dedicated
+// --status-info token yet (not introduced by this phase), so it stays on
+// primary, which is itself preset-aware.
 const alertVariants = {
   default: 'border bg-background text-foreground',
   destructive: 'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
-  success: 'border-green-500/50 text-green-600 dark:text-green-400 [&>svg]:text-green-600 dark:[&>svg]:text-green-400',
+  success: 'border-status-success/50 text-status-success [&>svg]:text-status-success',
   info: 'border-primary-500/50 text-primary-600 dark:text-primary-400 [&>svg]:text-primary-600 dark:[&>svg]:text-primary-400'
 }
 

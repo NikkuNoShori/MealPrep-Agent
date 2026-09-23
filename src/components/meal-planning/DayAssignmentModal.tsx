@@ -1,10 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Coffee,
-  Sun,
-  Moon,
-  Cookie,
   X,
   Check,
   Calendar,
@@ -12,6 +8,7 @@ import {
 import RecipeImage from './RecipeImage';
 import type { SelectedRecipeInfo } from './recipeTypes';
 import type { MealSlot } from '@/types/mealPlan';
+import { ALL_MEAL_SLOTS } from '@/theme/accentCategories';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -38,12 +35,10 @@ interface DayAssignmentModalProps {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const SLOT_CONFIG: { key: MealSlot; label: string; icon: React.ElementType; color: string; bg: string; activeBg: string }[] = [
-  { key: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'text-amber-500', bg: 'bg-amber-500/10', activeBg: 'bg-amber-500' },
-  { key: 'lunch', label: 'Lunch', icon: Sun, color: 'text-orange-500', bg: 'bg-orange-500/10', activeBg: 'bg-orange-500' },
-  { key: 'dinner', label: 'Dinner', icon: Moon, color: 'text-indigo-500', bg: 'bg-indigo-500/10', activeBg: 'bg-indigo-500' },
-  { key: 'snacks', label: 'Snacks', icon: Cookie, color: 'text-pink-500', bg: 'bg-pink-500/10', activeBg: 'bg-pink-500' },
-];
+// Sourced from the single accent-category module (MOP-0029 Phase 5 /
+// COLOR_SCHEMA.md §6). Was previously a verbatim copy of MealPlanner.tsx's
+// DAILY_SLOTS + inline snacks entry.
+const SLOT_CONFIG = ALL_MEAL_SLOTS;
 
 function formatDateKey(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -275,7 +270,7 @@ const DayAssignmentModal = ({
 
           <div className="flex items-center gap-3">
             {!allAssigned && (
-              <span className="text-[10px] text-amber-500">
+              <span className="text-[10px] text-status-warning">
                 {recipes.length - assignedCount} unassigned
               </span>
             )}

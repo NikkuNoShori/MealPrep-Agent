@@ -24,9 +24,6 @@ import {
   Loader2,
   MoreHorizontal,
   CheckCircle2,
-  Sun,
-  Coffee,
-  Moon,
   Cookie,
   X,
   Pencil,
@@ -38,6 +35,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { MealPlanStatus, MealSlot, PlannedMealEntry } from '@/types/mealPlan';
+import { DAILY_MEAL_SLOTS, ALL_MEAL_SLOTS, PLAN_LEVEL_LIST_ACCENTS } from '@/theme/accentCategories';
 import type { SelectedRecipeInfo } from '@/components/meal-planning/recipeTypes';
 import RecipeSelectorModal from '@/components/grocery/RecipeSelectorModal';
 import ServingsModal from '@/components/meal-planning/ServingsModal';
@@ -55,18 +53,12 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// Daily meal slots (shown per-day in the calendar grid)
-const DAILY_SLOTS: { key: MealSlot; label: string; icon: React.ElementType; color: string }[] = [
-  { key: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'text-amber-500' },
-  { key: 'lunch', label: 'Lunch', icon: Sun, color: 'text-orange-500' },
-  { key: 'dinner', label: 'Dinner', icon: Moon, color: 'text-indigo-500' },
-];
-
-// Plan-level lists (shown below the calendar as weekly lists)
-const PLAN_LISTS: { key: string; label: string; icon: React.ElementType; color: string; description: string }[] = [
-  { key: '_snacks', label: 'Snacks', icon: Cookie, color: 'text-pink-500', description: 'Weekly snacks — not tied to a specific day' },
-  { key: '_non_recipe', label: 'Non-Recipe Items', icon: ShoppingCart, color: 'text-teal-500', description: 'Extras like paper towels, foil, etc.' },
-];
+// Daily meal slots (shown per-day in the calendar grid) and plan-level
+// lists (shown below the calendar as weekly lists) — sourced from the
+// single accent-category module (MOP-0029 Phase 5 / COLOR_SCHEMA.md §6).
+// Was previously a verbatim copy of DayAssignmentModal.tsx's SLOT_CONFIG.
+const DAILY_SLOTS = DAILY_MEAL_SLOTS;
+const PLAN_LISTS = PLAN_LEVEL_LIST_ACCENTS;
 
 const STATUS_CONFIG: Record<MealPlanStatus, { label: string; color: string; bg: string }> = {
   draft: { label: 'Draft', color: 'text-stone-600 dark:text-stone-400', bg: 'bg-stone-100 dark:bg-white/[0.04]' },
@@ -1094,7 +1086,7 @@ const MealPlanner = () => {
             ) : (
               /* ── Meals View: rows by meal type, multi-week rows of 7 ── */
               <div className="space-y-3 animate-fade-in">
-                {[...DAILY_SLOTS, { key: 'snacks' as MealSlot, label: 'Snacks', icon: Cookie, color: 'text-pink-500' }].map((slot) => {
+                {ALL_MEAL_SLOTS.map((slot) => {
                   const isSnacks = slot.key === 'snacks';
                   const snackItems: PlannedMealEntry[] = isSnacks ? (weekPlan?.meals?.['_snacks'] || []) as PlannedMealEntry[] : [];
                   // Count across entire plan date range (not just viewed week)
@@ -1115,12 +1107,7 @@ const MealPlanner = () => {
                     >
                       {/* Slot header */}
                       <div className="flex items-center gap-3 px-4 py-3 border-b border-stone-100 dark:border-white/[0.04]">
-                        <div className={`p-2 rounded-xl bg-gradient-to-br ${
-                          slot.key === 'breakfast' ? 'from-amber-500/10 to-amber-500/5' :
-                          slot.key === 'lunch' ? 'from-orange-500/10 to-orange-500/5' :
-                          slot.key === 'dinner' ? 'from-indigo-500/10 to-indigo-500/5' :
-                          'from-pink-500/10 to-pink-500/5'
-                        }`}>
+                        <div className={`p-2 rounded-xl bg-gradient-to-br ${slot.gradientFrom} ${slot.gradientTo}`}>
                           <slot.icon className={`h-4 w-4 ${slot.color}`} />
                         </div>
                         <div className="flex-1">

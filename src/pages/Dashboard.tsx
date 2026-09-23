@@ -14,6 +14,7 @@ import {
   Users,
   ShoppingCart,
 } from 'lucide-react'
+import { DASHBOARD_STAT_ACCENTS } from '@/theme/accentCategories'
 
 const Dashboard = () => {
   const { data: recipesData, isLoading: recipesLoading } = useRecipes({ limit: 10 })
@@ -35,10 +36,10 @@ const Dashboard = () => {
   const familyCount = householdData?.members?.length || 0
 
   const stats = [
-    { label: 'Recipes', value: recipes.length, icon: BookOpen, color: 'text-primary-600 dark:text-primary-400', loading: recipesLoading },
-    { label: 'This week', value: thisWeekMeals, icon: Calendar, color: 'text-amber-600 dark:text-amber-400', loading: mealPlansLoading },
-    { label: 'Family', value: familyCount, icon: Users, color: 'text-rose-500 dark:text-rose-400', loading: householdLoading },
-    { label: 'Grocery', value: groceryCount, icon: ShoppingCart, color: 'text-teal-600 dark:text-teal-400', loading: mealPlansLoading },
+    { label: 'Recipes', value: recipes.length, icon: BookOpen, color: DASHBOARD_STAT_ACCENTS.recipes, loading: recipesLoading },
+    { label: 'This week', value: thisWeekMeals, icon: Calendar, color: DASHBOARD_STAT_ACCENTS.thisWeek, loading: mealPlansLoading },
+    { label: 'Family', value: familyCount, icon: Users, color: DASHBOARD_STAT_ACCENTS.family, loading: householdLoading },
+    { label: 'Grocery', value: groceryCount, icon: ShoppingCart, color: DASHBOARD_STAT_ACCENTS.grocery, loading: mealPlansLoading },
   ]
 
   return (

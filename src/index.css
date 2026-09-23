@@ -18,12 +18,20 @@
     --muted-foreground: 25 5% 45%;
     --accent: 40 20% 95%;
     --accent-foreground: 25 20% 10%;
-    --destructive: 0 84% 60%;
+    /* --destructive fallback matches hexToHSL(defaultColorScheme.semantic.error[600])
+       from themeStore.ts so applyColorSchemeToCSS() (MOP-0029 Phase 3) does not
+       cause a visible flash on first paint. */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 30 10% 90%;
     --input: 30 10% 90%;
     --ring: 158 70% 37%;
     --radius: 0.75rem;
+
+    /* Status tokens (MOP-0029 Phase 3) — fallbacks match
+       hexToHSL(defaultColorScheme.semantic.{success,warning}[800]). */
+    --status-success: 143 64% 24%;
+    --status-warning: 23 83% 31%;
 
     /* Design system tokens */
     --rs-bg: #ffffff;
@@ -44,6 +52,51 @@
     --rs-toggle-active-bg: #1c1917;
     --rs-toggle-active-fg: #ffffff;
     --rs-search-bg: #fafaf9;
+
+    /* Layer 1 primitive scales — static fallbacks for JS-driven ColorScheme.
+       Seeded from defaultColorScheme (Evergreen) in src/stores/themeStore.ts.
+       JS overwrites these at runtime via applyColorSchemeToCSS(); these values
+       only govern the first paint before that JS executes (MOP-0029 Phase 1). */
+    --primary-50: #ecfdf5;
+    --primary-100: #d1fae5;
+    --primary-200: #a7f3d0;
+    --primary-300: #6ee7b7;
+    --primary-400: #34d399;
+    --primary-500: #1D9E75;
+    --primary-600: #178c66;
+    --primary-700: #15754f;
+    --primary-800: #115e3e;
+    --primary-900: #064e3b;
+
+    --secondary-50: #fffbeb;
+    --secondary-100: #fef3c7;
+    --secondary-200: #fde68a;
+    --secondary-300: #fcd34d;
+    --secondary-400: #fbbf24;
+    --secondary-500: #f59e0b;
+    --secondary-600: #d97706;
+    --secondary-700: #b45309;
+    --secondary-800: #92400e;
+    --secondary-900: #78350f;
+
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+
+    --success-100: #dcfce7;
+    --success-800: #166534;
+    --success-900: #14532d;
+    --error-500: #ef4444;
+    --error-600: #dc2626;
+    --warning-100: #fef3c7;
+    --warning-800: #92400e;
   }
 
   .dark {
@@ -61,10 +114,17 @@
     --muted-foreground: 30 8% 60%;
     --accent: 240 4% 16%;
     --accent-foreground: 30 10% 96%;
-    --destructive: 0 63% 31%;
+    /* --destructive fallback matches hexToHSL(defaultColorScheme.semantic.error[500])
+       — dark mode derives from the lighter error shade (MOP-0029 Phase 3). */
+    --destructive: 0 84% 60%;
     --destructive-foreground: 30 10% 96%;
     --border: 240 4% 16%;
     --input: 240 4% 16%;
+
+    /* Status tokens (MOP-0029 Phase 3) — dark fallback, same seed as :root
+       (applyColorSchemeToCSS does not vary success/warning shades by mode). */
+    --status-success: 143 64% 24%;
+    --status-warning: 23 83% 31%;
     --ring: 160 67% 70%;
 
     /* Design system tokens — dark */
@@ -86,6 +146,50 @@
     --rs-toggle-active-bg: #f0efe9;
     --rs-toggle-active-fg: #16171c;
     --rs-search-bg: #1e1f26;
+
+    /* Layer 1 primitive scales — static fallbacks (dark mode).
+       Same Evergreen seed as :root; applyColorSchemeToCSS() does not
+       currently vary the numeric ramps by mode (MOP-0029 Phase 1). */
+    --primary-50: #ecfdf5;
+    --primary-100: #d1fae5;
+    --primary-200: #a7f3d0;
+    --primary-300: #6ee7b7;
+    --primary-400: #34d399;
+    --primary-500: #1D9E75;
+    --primary-600: #178c66;
+    --primary-700: #15754f;
+    --primary-800: #115e3e;
+    --primary-900: #064e3b;
+
+    --secondary-50: #fffbeb;
+    --secondary-100: #fef3c7;
+    --secondary-200: #fde68a;
+    --secondary-300: #fcd34d;
+    --secondary-400: #fbbf24;
+    --secondary-500: #f59e0b;
+    --secondary-600: #d97706;
+    --secondary-700: #b45309;
+    --secondary-800: #92400e;
+    --secondary-900: #78350f;
+
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+
+    --success-100: #dcfce7;
+    --success-800: #166534;
+    --success-900: #14532d;
+    --error-500: #ef4444;
+    --error-600: #dc2626;
+    --warning-100: #fef3c7;
+    --warning-800: #92400e;
   }
 
   html, body, #root {

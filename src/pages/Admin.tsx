@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { Loader2, Users, Mail, Home, Trash2, CheckCircle, XCircle, Clock, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import toast from 'react-hot-toast'
+import { INVITE_STATUS_ACCENTS, type InviteStatusKey } from '@/theme/accentCategories'
 
 type Tab = 'users' | 'invites' | 'households'
 
@@ -190,11 +191,20 @@ const InvitesTab: React.FC = () => {
     })
   }
 
-  const statusConfig: Record<string, { icon: React.ElementType; color: string }> = {
-    pending: { icon: Clock, color: 'text-amber-500' },
-    accepted: { icon: CheckCircle, color: 'text-primary-500' },
-    declined: { icon: XCircle, color: 'text-red-500' },
-    expired: { icon: XCircle, color: 'text-gray-400' },
+  // Icons stay local (not a duplicated-color concern); colors and badge
+  // backgrounds come from the single accent-category module (MOP-0029
+  // Phase 5 / COLOR_SCHEMA.md §6).
+  const statusIcons: Record<InviteStatusKey, React.ElementType> = {
+    pending: Clock,
+    accepted: CheckCircle,
+    declined: XCircle,
+    expired: XCircle,
+  }
+  const statusConfig: Record<InviteStatusKey, { icon: React.ElementType; color: string }> = {
+    pending: { icon: statusIcons.pending, color: INVITE_STATUS_ACCENTS.pending.color },
+    accepted: { icon: statusIcons.accepted, color: INVITE_STATUS_ACCENTS.accepted.color },
+    declined: { icon: statusIcons.declined, color: INVITE_STATUS_ACCENTS.declined.color },
+    expired: { icon: statusIcons.expired, color: INVITE_STATUS_ACCENTS.expired.color },
   }
 
   if (isLoading) return <LoadingState />
@@ -209,7 +219,8 @@ const InvitesTab: React.FC = () => {
           <div className="px-6 py-12 text-center text-sm text-gray-400">No invites found</div>
         )}
         {(invites || []).map((inv: any) => {
-          const cfg = statusConfig[inv.status] || statusConfig.expired
+          const statusKey: InviteStatusKey = inv.status in statusConfig ? inv.status : 'expired'
+          const cfg = statusConfig[statusKey]
           const StatusIcon = cfg.icon
           return (
             <div key={inv.id} className="px-6 py-4 flex items-center gap-4">
@@ -222,11 +233,7 @@ const InvitesTab: React.FC = () => {
                   Invited by {inv.inviterName || 'Unknown'} to {inv.households?.name || 'Unknown household'}
                 </p>
               </div>
-              <span className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize ${
-                inv.status === 'pending' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' :
-                inv.status === 'accepted' ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400' :
-                'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400'
-              }`}>
+              <span className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize ${INVITE_STATUS_ACCENTS[statusKey].badgeBg}`}>
                 {inv.status}
               </span>
               <span className="text-xs text-gray-400 hidden sm:block">

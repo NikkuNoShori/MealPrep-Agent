@@ -16,19 +16,22 @@ import {
   PackageOpen,
 } from 'lucide-react';
 import type { MealPlan, MealPlanStatus } from '@/types/mealPlan';
+import { MEAL_PLAN_STATUS_ACCENTS } from '@/theme/accentCategories';
 
 // ── Status display config ─────────────────────────────────────────────────────
-// Icon component is separate so it can be sized at the call site.
+// Colors/labels/backgrounds come from the single accent-category module
+// (MOP-0029 Phase 5 / COLOR_SCHEMA.md §6). Icon component is separate so it
+// can be sized at the call site.
 const STATUS_CONFIG: Record<MealPlanStatus, {
   label: string;
   color: string;
   bg: string;
   Icon: React.ElementType;
 }> = {
-  draft:     { label: 'Draft',    color: 'text-stone-500 dark:text-stone-400',    bg: 'bg-stone-100 dark:bg-white/[0.04]',       Icon: Clock         },
-  active:    { label: 'Active',   color: 'text-primary-600 dark:text-primary-400', bg: 'bg-primary-50 dark:bg-primary-500/10',   Icon: CalendarCheck },
-  completed: { label: 'Done',     color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10',   Icon: CheckCircle2  },
-  archived:  { label: 'Archived', color: 'text-stone-400 dark:text-stone-500',    bg: 'bg-stone-100 dark:bg-stone-800/60',       Icon: PackageOpen   },
+  draft:     { ...MEAL_PLAN_STATUS_ACCENTS.draft,     Icon: Clock         },
+  active:    { ...MEAL_PLAN_STATUS_ACCENTS.active,    Icon: CalendarCheck },
+  completed: { ...MEAL_PLAN_STATUS_ACCENTS.completed, Icon: CheckCircle2  },
+  archived:  { ...MEAL_PLAN_STATUS_ACCENTS.archived,  Icon: PackageOpen   },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -151,8 +151,10 @@ function App() {
           },
           success: {
             iconTheme: {
-              primary: 'hsl(var(--primary))',
-              secondary: 'hsl(var(--primary-foreground))',
+              // Success is a semantic/status color, not brand — do not use
+              // --primary here (MOP-0029 Phase 3 / COLOR_SCHEMA.md §5.3).
+              primary: 'hsl(var(--status-success))',
+              secondary: 'hsl(var(--card))',
             },
           },
           error: {
