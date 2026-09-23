@@ -2,10 +2,24 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-09-21
-**Last updated:** 2026-09-21 (MOP-0028 complete — bulk recipe actions)
+**Last reviewed:** 2026-09-22
+**Last updated:** 2026-09-22 (MOP-0026 complete — security auditor agent + security hardening)
 
 ---
+
+## 2026-09-22 (MOP-0026: Security Auditor Agent + Security Hardening) `main`
+
+**Security Auditor Agent (MOP-0026 — complete)**
+
+- **`security-auditor` subagent** — read-only, structured audit across seven dimensions (RLS, edge function safety, service-role discipline, OWASP LLM Top 10, `auth.uid()` enforcement, secret hygiene, scheduled function exposure). Invocable via `/security-audit [scope]` slash command. Produces Critical/Warning/Suggestion report with `file:line` citations.
+- **Risk sign-off workflow** — findings staged in `pending-risks.md` require human `Approved by` + `Approval date` before suppression. Approved risks live in `accepted-risks.md`; fixed findings in `fixed-findings.md`.
+- **`confirmAction` server-side verification** — `chat-api` now verifies `tool + args + idempotencyKey` against the stored `pendingConfirmation` in `chat_messages.metadata` before executing destructive tools. Idempotency keys are cryptographically random UUIDs (not deterministic hashes). Confirmation record is consumed on use (replay prevention).
+- **`embedding-refresh` JWT gate** — function now runs with `verify_jwt: true`; scheduled via pg_cron job that passes a service-role JWT from Vault. Removes the previously-unauthenticated public endpoint.
+- **Image MIME type whitelist** — `chat-api` now rejects images with types outside `image/jpeg`, `image/png`, `image/gif`, `image/webp` (SVG XSS vector closed).
+- **Error response sanitization** — all `chat-api` and `recipe-pipeline` 5xx error handlers now return `"Internal server error"` instead of raw `error.message`. Internal details logged server-side only.
+- **Redundant `user_id` client filters removed** — `getRecipes()` and `getRecipesLight()` in `api.ts` no longer filter by `user_id` on SELECT; RLS handles ownership exclusively.
+- **`search_similar_recipes` orphan RPC dropped** — migration 039 drops the 384-dim RPC that accepted a caller-supplied `user_uuid` and had no active callers. Superseded by `find_similar_recipes` / `search_recipes_semantic` (migration 028).
+- **Broken btree embedding index dropped** — migration 041 drops `idx_recipes_with_embeddings`, a btree index on `(user_id, embedding_vector)` that caused all embedding writes to fail with "index row size 6176 exceeds btree version 4 maximum 2704". Vector search uses the ivfflat index (`idx_recipes_embedding_l2`).
 
 ## 2026-09-21 (MOP-0028: Bulk Recipe Actions) `main`
 

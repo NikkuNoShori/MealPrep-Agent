@@ -5,10 +5,10 @@
 | **MOP** | MOP-0026 |
 | **Title** | Security Auditor Agent |
 | **Date Submitted** | 2026-09-07 |
-| **Date Updated** | 2026-09-21 |
-| **Date Completed** | — |
+| **Date Updated** | 2026-09-22 (complete — all findings fixed, KB populated, cron wired) |
+| **Date Completed** | 2026-09-22 |
 | **Submitted By** | Nick Neal |
-| **Status** | draft |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md). Valid values: `draft` / `evaluation` / `approved` / `planned` / `in_progress` / `verifying` / `complete` / `blocked` / `cancelled` / `deferred`.
 
@@ -24,7 +24,9 @@ Author a `security-auditor` subagent that performs a read-only, structured audit
 
 MealPrep Agent uses **RLS as the primary authorization layer**. The authenticated Supabase client (built from the user's JWT via `getUserFromToken`) runs every query with RLS active and `auth.uid()` resolving automatically — no `user_id` parameter is passed. The service-role client (`createServiceClient`) bypasses RLS and is reserved for admin operations, scheduled jobs, and invite-email sending. SECURITY DEFINER RPCs enforce `auth.uid()` internally rather than accepting a caller-supplied `user_id`. The auditor must enforce this discipline and flag any deviation.
 
-**Known accepted risks (document in knowledge base, not findings):**
+**Known accepted risks (require sign-off before suppression):**
+No risk may be suppressed by the agent until it has been reviewed and approved by a human. Candidate risks are staged in `pending-risks.md` first. Only after explicit sign-off (filling in `Approved by` + `Approval date`) are they promoted to `accepted-risks.md`. The three risks listed below are pre-staged in `pending-risks.md` at Phase 0 scaffold time — they require review before the first audit run is considered clean.
+
 - `cors.ts` wildcard `Access-Control-Allow-Origin: *` — intentional for a Supabase-hosted edge function; client enforces auth via JWT, not origin.
 - `household-invite/details` route is intentionally unauthenticated — invite preview must be readable before login.
 - `embedding-refresh` has no inbound auth gate — intended to be called only by Supabase internal cron scheduler; URL is not publicly advertised.
@@ -35,8 +37,10 @@ MealPrep Agent uses **RLS as the primary authorization layer**. The authenticate
 
 ```
 .claude/agents/security-auditor.md              (new — agent definition)
+.claude/commands/security-audit.md             (new — /security-audit slash command)
 .claude/agents/security-auditor-knowledge/      (new — accepted-risk KB)
   README.md
+  pending-risks.md
   accepted-risks.md
   fixed-findings.md
 supabase/functions/chat-api/index.ts
@@ -62,18 +66,42 @@ docs/RUNBOOK.md                                 (Phase 2 — add security audit 
 ## Scope of Work
 
 ### Phase 0: Knowledge base scaffold
-**Files affected:** `.claude/agents/security-auditor-knowledge/README.md`, `accepted-risks.md`, `fixed-findings.md`
+**Files affected:** `.claude/agents/security-auditor-knowledge/README.md`, `pending-risks.md`, `accepted-risks.md`, `fixed-findings.md`
 
-Create the knowledge base directory. Pre-populate `accepted-risks.md` with the three known accepted risks listed in the Security Stance section above (wildcard CORS, unauthenticated invite details, unauthenticated embedding-refresh). Pre-populate `fixed-findings.md` with the `getRecipe` user_id client-filter bug fixed in commit `3a6715a` (2026-09-21). These entries prevent re-reporting on every run.
+Create the knowledge base directory with four files. Pre-populate `pending-risks.md` with the three known candidate risks listed in the Security Stance section (wildcard CORS, unauthenticated invite details, unauthenticated embedding-refresh) — they are staged here, not in `accepted-risks.md`, because they require explicit human sign-off before they suppress audit findings. Pre-populate `fixed-findings.md` with the `getRecipe` user_id client-filter bug fixed in commit `3a6715a` (2026-09-21). `accepted-risks.md` starts empty; entries are promoted from `pending-risks.md` only after approval.
+
+**Promotion workflow:**
+1. Agent finds a potential accepted-risk candidate → writes it to `pending-risks.md` (agent may write here)
+2. Human reviews the entry, fills in `Approved by` + `Approval date`, and moves it to `accepted-risks.md` (human-only step)
+3. Agent reads `accepted-risks.md` on every run and suppresses matching findings
+4. Agent reads `pending-risks.md` on every run and reports those entries as `⚠ PENDING APPROVAL` — they are not suppressed
+
+`pending-risks.md` schema per entry:
+```
+## <short-title>
+- **Risk ID:** RISK-NNNN
+- **File:** <path:line>
+- **Risk:** <what it is>
+- **Severity:** Critical / Warning / Suggestion
+- **Impact if exploited:** <concrete harm — what an attacker could do>
+- **Nominated because:** <why this is a candidate for acceptance rather than a fix>
+- **Revisit trigger:** <condition that would close or reopen this>
+- **Date nominated:** YYYY-MM-DD
+```
 
 `accepted-risks.md` schema per entry:
 ```
 ## <short-title>
+- **Risk ID:** RISK-NNNN
 - **File:** <path:line>
 - **Risk:** <what it is>
+- **Severity:** Critical / Warning / Suggestion
+- **Impact if exploited:** <concrete harm — what an attacker could do>
 - **Accepted because:** <rationale>
 - **Revisit trigger:** <condition that would reopen this>
-- **Date accepted:** YYYY-MM-DD
+- **Approved by:** <name>
+- **Approval date:** YYYY-MM-DD
+- **First surfaced:** YYYY-MM-DD
 ```
 
 `fixed-findings.md` schema per entry:
@@ -88,7 +116,7 @@ Create the knowledge base directory. Pre-populate `accepted-risks.md` with the t
 ### Phase 1: Author the security-auditor agent definition
 **Files affected:** `.claude/agents/security-auditor.md` (new)
 
-The agent is **read-only and audit-first** — it never modifies files. It reads its knowledge base on every run to suppress accepted-risk noise and avoid re-reporting fixed findings. It cites `file:line` evidence for every finding and appends a run-log entry on completion.
+The agent is **read-only and audit-first** — it never modifies source files. The one exception: it may append new candidate entries to `pending-risks.md` when it identifies something that warrants human review for potential acceptance. It reads `accepted-risks.md` on every run to suppress approved risks, reads `pending-risks.md` to surface any unapproved candidates as `⚠ PENDING APPROVAL`, and reads `fixed-findings.md` to skip closed issues. It cites `file:line` evidence for every finding and appends a run-log entry on completion.
 
 **Seven audit dimensions:**
 
@@ -145,6 +173,7 @@ The agent is **read-only and audit-first** — it never modifies files. It reads
 ### Summary
 - Dimensions audited: N
 - Findings: N (critical: X, warning: Y, suggestion: Z)
+- Pending-approval risks (not suppressed): N
 - Accepted-risk items suppressed: N
 - Fixed findings skipped: N
 
@@ -155,8 +184,11 @@ The agent is **read-only and audit-first** — it never modifies files. It reads
 | Critical | RLS | src/services/api.ts:244 | user_id client filter substituting for RLS on getRecipe | Remove .eq("user_id"...) — let RLS authorize |
 | Warning  | Edge Fn   | supabase/functions/chat-api/index.ts:493 | Raw error.message in corsError() | Sanitize to generic message; log detail server-side |
 
-### Accepted Risks (not findings)
-- <title> — <one-line rationale> (see accepted-risks.md)
+### Pending Approval (staged in pending-risks.md — not suppressed)
+- RISK-NNNN: <title> — <one-line description> — **ACTION REQUIRED: review and approve or fix**
+
+### Accepted Risks (suppressed — approved in accepted-risks.md)
+- RISK-NNNN: <title> — <one-line rationale> (approved by <name> on YYYY-MM-DD)
 
 ### Notes
 - Any dimension where no findings were found is listed here as "clean"
@@ -174,6 +206,7 @@ The agent is **read-only and audit-first** — it never modifies files. It reads
 2. **`doc-adherence.md`** — add a note in check category 8 (or a new category): "Security-relevant doc drift (e.g. a new edge function not covered in RUNBOOK, a new RPC not audited against `auth.uid()` discipline) should trigger `security-auditor`."
 3. **`CLAUDE.md`** — add `security-auditor` to the agent inventory table, and add a rule: "Before merging any PR that touches `supabase/functions/`, `supabase/migrations/`, or `src/services/api.ts`, invoke `security-auditor` (or the scoped variant matching the changed surface)."
 4. **`docs/RUNBOOK.md`** — add a "Security Audit" runbook entry with: how to invoke the agent, how to interpret findings, how to add an accepted-risk entry to the KB, and the run-log location.
+5. **`.claude/commands/security-audit.md`** — wire `/security-audit` as a slash command that invokes the `security-auditor` subagent with the optional scope argument.
 
 ---
 
@@ -194,6 +227,10 @@ verification:
   - id: agent-file-exists
     type: file-exists
     path: .claude/agents/security-auditor.md
+
+  - id: kb-pending-risks-exists
+    type: file-exists
+    path: .claude/agents/security-auditor-knowledge/pending-risks.md
 
   - id: kb-accepted-risks-exists
     type: file-exists
@@ -227,16 +264,40 @@ verification:
     pattern: 'agents-log'
     expect: present
 
-  - id: kb-has-accepted-cors-risk
+  - id: kb-pending-has-cors-risk
     type: grep
-    path: .claude/agents/security-auditor-knowledge/accepted-risks.md
+    path: .claude/agents/security-auditor-knowledge/pending-risks.md
     pattern: 'CORS|cors'
     expect: present
 
-  - id: kb-has-accepted-embedding-refresh-risk
+  - id: kb-pending-has-embedding-refresh-risk
+    type: grep
+    path: .claude/agents/security-auditor-knowledge/pending-risks.md
+    pattern: 'embedding.refresh|embedding_refresh'
+    expect: present
+
+  - id: kb-accepted-starts-empty
     type: grep
     path: .claude/agents/security-auditor-knowledge/accepted-risks.md
-    pattern: 'embedding.refresh|embedding_refresh'
+    pattern: 'Approved by:'
+    expect: absent
+
+  - id: kb-pending-has-risk-id-field
+    type: grep
+    path: .claude/agents/security-auditor-knowledge/pending-risks.md
+    pattern: 'Risk ID|RISK-'
+    expect: present
+
+  - id: agent-references-pending-risks
+    type: grep
+    path: .claude/agents/security-auditor.md
+    pattern: 'pending.risks|PENDING APPROVAL'
+    expect: present
+
+  - id: agent-references-approved-by
+    type: grep
+    path: .claude/agents/security-auditor.md
+    pattern: 'Approved by|approved-by'
     expect: present
 
   - id: kb-has-fixed-getrecipe-finding
@@ -257,6 +318,10 @@ verification:
     pattern: 'security-auditor'
     expect: present
 
+  - id: security-audit-command-exists
+    type: file-exists
+    path: .claude/commands/security-audit.md
+
   - id: lint-clean
     type: command
     run: npm run lint
@@ -270,6 +335,7 @@ verification:
 
 ## Manual Follow-up (non-blocking)
 
+- [ ] Review the three pre-staged entries in `pending-risks.md` (wildcard CORS, unauthenticated invite details, unauthenticated embedding-refresh) — approve each or decide to fix; promote approved entries to `accepted-risks.md` with `Approved by` + `Approval date` filled in
 - [ ] Run `security-auditor` against the current codebase after shipping and triage any findings
 - [ ] Verify the scoped invocations (`security-auditor edge-functions`, `security-auditor migrations`) produce narrowed output
 - [ ] Confirm run-log entry appears in `.claude/agents/agents-log.md` after first run
@@ -281,7 +347,9 @@ verification:
 - [ ] All `verification` block items pass (`/verify-mop`)
 - [ ] `.claude/agents/security-auditor.md` exists and follows audit-first, read-only protocol
 - [ ] Agent covers all seven audit dimensions with project-specific callsites named
-- [ ] Knowledge base scaffolded with three accepted risks and one fixed finding pre-populated
+- [ ] Knowledge base scaffolded: three candidate risks in `pending-risks.md` (with Risk IDs), `accepted-risks.md` starts empty, one fixed finding in `fixed-findings.md`
+- [ ] Agent reports `pending-risks.md` entries as `⚠ PENDING APPROVAL` — does not suppress them
+- [ ] `accepted-risks.md` schema requires `Risk ID`, `Approved by`, and `Approval date` fields
 - [ ] Agent accepts scoped invocation (`edge-functions`, `migrations`, `api`)
 - [ ] Run-log format defined and agent appends to `.claude/agents/agents-log.md`
 - [ ] Cross-references added to `qa-auditor`, `doc-adherence`, `CLAUDE.md`, and `RUNBOOK.md`

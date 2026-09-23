@@ -274,3 +274,4 @@ Append to the update log at the bottom of this document:
 | 2026-09-16 | Nick Neal | main (MOP-0007 complete — smart discovery, reaction scoring, meal planner UX overhaul, dead rag* code removed) | ARCHITECTURE, DATA_MODEL, API, CHANGELOG, MOP-0007, REGISTRY |
 | 2026-09-21 | Nick Neal | main (MOP-0014 complete — household write atomicity RPCs; admin delete bug fix; invite email UX fix) | DATA_MODEL, API, CHANGELOG, MOP-0014, REGISTRY |
 | 2026-09-21 | Nick Neal | main (MOP-0028 complete — bulk recipe actions: multi-select UI, bulk RPCs, migration 038) | DATA_MODEL, API, CHANGELOG, MOP-0028, REGISTRY |
+| 2026-09-22 | Nick | main (MOP-0026 complete — security auditor agent, confirmAction verification, embedding-refresh JWT gate, MIME whitelist, error sanitization, migrations 039–041) | ARCHITECTURE, API, RUNBOOK, CHANGELOG, MOP-0026, REGISTRY |

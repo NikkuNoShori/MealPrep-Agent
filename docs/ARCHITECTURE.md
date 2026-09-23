@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-09-16
-**Last updated:** 2026-09-16 (MOP-0007: Smart Discovery — search bar, similar rail, suggest modal, reaction scoring)
+**Last reviewed:** 2026-09-22
+**Last updated:** 2026-09-22 (MOP-0026: security auditor agent; embedding-refresh cron + JWT gate; confirmAction server-side verification)
 
 ---
 
@@ -59,6 +59,7 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
   - `recipe-pipeline` — adapter → extract → transform → load stages (URL, text, video).
   - `household-invite` — invite creation + email.
   - `admin-api` — admin operations.
+  - `embedding-refresh` — scheduled job (pg_cron, every 5 min) that generates embeddings for recipes with `needs_reembed = true`. Uses service-role client; gated by Supabase JWT verification (`verify_jwt: true`) — cron job passes a service-role JWT stored in Vault.
   - All accessible via Supabase Functions invoke.
 - **Storage**: Recipe images stored in Supabase Storage bucket `recipe-images`, accessed via signed URLs.
 

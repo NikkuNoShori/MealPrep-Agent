@@ -2,8 +2,8 @@
 
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (video intake history, persist-extraction deploy, thumbnail CORS, chat stop/queue troubleshooting)
+**Last reviewed:** 2026-09-22
+**Last updated:** 2026-09-22 (MOP-0026: security audit runbook entry; embedding-refresh CRON_SECRET troubleshooting; btree embedding index drop)
 
 ---
 
@@ -561,7 +561,7 @@ SELECT policyname, qual, with_check FROM pg_policies WHERE tablename = 'recipes'
 1. In the migration, DROP all RLS policies that reference the column **before** the ALTER TABLE DROP COLUMN
 2. Recreate the policies without the dropped column reference after the column is removed
 3. If the migration already partially ran, repair it first: `supabase migration repair --status reverted <version>`
-4. Then push again: `supabase db push`
+4. Run the corrected migration SQL directly in the Supabase SQL Editor (Nick handles all deployments — do not use `supabase db push`)
 
 **Added:** 2026-03-12
 
@@ -690,7 +690,7 @@ WHERE proname IN (
 ```
 
 ### Fix steps
-1. Apply migration 025: `supabase db push` or run the SQL in Supabase SQL Editor
+1. Apply migration 025: run the SQL from `supabase/migrations/20260314000000_025_rpc_functions.sql` directly in the Supabase SQL Editor
 2. Verify all 5 functions exist with the query above
 3. Verify grants: `SELECT * FROM information_schema.routine_privileges WHERE routine_name = 'get_my_household';`
 
@@ -831,3 +831,93 @@ Check `supabase/functions/chat-api/agent-loop.ts` — default should be `qwen/qw
 2. If Stop does not abort video pipeline, deploy latest `chat-api` + `recipe-pipeline` and confirm `extractRecipeOnly` receives client abort signal
 
 **Added:** 2026-06-16
+
+---
+
+## Security: Running a security audit
+
+### When to run
+
+- Before merging any PR that touches `supabase/functions/`, `supabase/migrations/`, or `src/services/api.ts`
+- After a new edge function or RPC is added
+- Periodically (quarterly recommended) as a full-surface check
+- Any time `qa-auditor` or `doc-adherence` flags a security-relevant finding
+
+### How to invoke
+
+```
+# Full audit (all 7 dimensions)
+security-auditor
+
+# Scoped — only edge function security (dimensions 3, 4, 5)
+security-auditor edge-functions
+
+# Scoped — only RLS + auth.uid() (dimensions 2, 6) against migrations
+security-auditor migrations
+
+# Scoped — only client-side RLS substitution check against api.ts
+security-auditor api
+```
+
+### Interpreting findings
+
+| Severity | Meaning | Default action |
+|----------|---------|----------------|
+| Critical | Exploitable or rule-violating — must fix before merge | Block merge; file bug |
+| Warning | Elevated risk or degraded defense-in-depth | Fix before next release |
+| Suggestion | Low-risk improvement | Backlog or accept |
+| ⚠ PENDING APPROVAL | Staged in `pending-risks.md` — not yet approved | Review and approve or fix |
+
+### Adding an accepted-risk entry
+
+1. Run `security-auditor` — a candidate risk appears in the **Pending Approval** section with a Risk ID
+2. Review the entry in `.claude/agents/security-auditor-knowledge/pending-risks.md`
+3. If you accept the risk: copy the entry to `accepted-risks.md`, fill in `Approved by: <your name>` and `Approval date: YYYY-MM-DD`, and remove it from `pending-risks.md`
+4. If you decide to fix it instead: fix the code, then add a `fixed-findings.md` entry and remove it from `pending-risks.md`
+
+**Never move an entry to `accepted-risks.md` without filling in `Approved by` and `Approval date`.** The agent treats a missing `Approved by` as unapproved and will continue to surface the item.
+
+### Run log location
+
+`.claude/agents/agents-log.md` — every audit run appends one row with date, scope, finding counts, and pending-approval count.
+
+### Knowledge base location
+
+`.claude/agents/security-auditor-knowledge/` — `README.md`, `pending-risks.md`, `accepted-risks.md`, `fixed-findings.md`
+
+**Added:** 2026-09-21
+
+---
+
+## Embedding Refresh: Function returns 401 / cron job not running
+
+### Symptom
+- Recipes edited by users never get re-embedded (stale semantic search results)
+- Supabase cron logs show `401 Unauthorized` for `embedding-refresh`
+- `needs_reembed = true` rows accumulate in `recipes` table
+
+### Likely causes
+- `CRON_SECRET` secret not set in the Supabase project
+- Supabase cron scheduler not configured to pass the `Authorization: Bearer <CRON_SECRET>` header
+- Secret value mismatch between the function secret and the cron header
+
+### Verification steps
+```sql
+-- Check for stale rows
+SELECT count(*) FROM recipes WHERE needs_reembed = true;
+```
+```bash
+# Check function logs
+supabase functions logs embedding-refresh --project-ref <project-ref>
+# Look for: "Unauthorized" or missing CRON_SECRET log lines
+```
+
+### Fix steps
+1. Generate a secret: `openssl rand -hex 32`
+2. Set it in Supabase: `supabase secrets set CRON_SECRET=<value>`
+3. In Supabase Dashboard → Edge Functions → embedding-refresh → Cron schedule:
+   - Add header: `Authorization: Bearer <same-value>`
+4. Redeploy the function to pick up the new env var
+5. Verify next cron run succeeds in function logs
+
+**Added:** 2026-09-22

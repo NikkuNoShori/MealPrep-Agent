@@ -57,11 +57,11 @@
 | [MOP-0023](MOP-0023-meal-randomizer.md) | "I Don't Know" Meal Randomizer | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
 | [MOP-0024](MOP-0024-allergy-tagging.md) | Automatic Allergy Tagging on Recipe Import | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
 | [MOP-0025](MOP-0025-dietary-allergy-profiles.md) | Household Dietary & Allergy Profiles UI | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
-| [MOP-0026](MOP-0026-security-auditor-agent.md) | Security Auditor Agent | draft | 2026-09-07 | 2026-09-21 | — | Nick Neal |
+| [MOP-0026](MOP-0026-security-auditor-agent.md) | Security Auditor Agent | complete | 2026-09-07 | 2026-09-22 | 2026-09-22 | Nick Neal |
 | [MOP-0027](MOP-0027-tos-compliant-url-scraping.md) | ToS-Compliant URL Scraping — robots.txt check + domain blocklist | complete | 2026-09-07 | 2026-09-07 | 2026-09-07 | Nick Neal |
 | [MOP-0028](MOP-0028-bulk-recipe-actions.md) | Bulk Recipe Actions — Multi-Select Visibility, Folder Assignment, Delete, and Sharing | complete | 2026-09-21 | 2026-09-21 | 2026-09-21 | Nick Neal |
 | [MOP-0029](MOP-0029-theme-token-layering-surface-presets.md) | Theme Token Layering & Surface-Aware Presets | deferred | 2026-09-21 | 2026-09-22 | — | surface-reviewer |
-| [MOP-0030](MOP-0030-dashboard-redesign-real-data-widgets.md) | Dashboard Redesign — Real-Data Widgets | draft | 2026-09-22 | 2026-09-22 | — | Nick Neal |
+| [MOP-0030](MOP-0030-dashboard-redesign-real-data-widgets.md) | Dashboard Redesign — Real-Data Widgets | evaluation | 2026-09-22 | 2026-09-22 | — | Nick Neal |
 
 > **MOP-0029 (scope expanded 2026-09-21):** Now covers all thirteen color-surface categories, not just backgrounds. Grew from 6 to 10 phases. **Phases 0, 1, 2, 3, and 5 are implemented** (commits `48d965f`, `aeb2457`). Phase 9's palette-design blocker cleared 2026-09-22 — full hex specs for all five presets approved. Only Phases 4, 6, 7, 8, 9 remain, gated on **MOP-0030 shipping first** (see MOP-0030 §Summary).
 

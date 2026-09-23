@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-09-21
-**Last updated:** 2026-09-21 (MOP-0028: three bulk recipe action RPCs added; useBulk* hooks added to Recipe Collections section)
+**Last reviewed:** 2026-09-22
+**Last updated:** 2026-09-22 (MOP-0026: confirmAction server-side verification; image MIME whitelist; error response sanitization)
 
 ---
 
@@ -42,7 +42,11 @@ apikey: <supabase-anon-key>
 }
 ```
 
-`context.confirmAction` short-circuits the agent loop: the previously-validated tool runs directly under the user's session, no model call is made. Submit it after the user clicks "Confirm" on a `pendingConfirmation` envelope (see below).
+`context.confirmAction` short-circuits the agent loop: the server verifies the claimed `tool + args + idempotencyKey` against the stored `pendingConfirmation` in `chat_messages.metadata` before executing — the client cannot craft an arbitrary tool execution. The confirmation record is consumed on use (replay prevention). Submit it after the user clicks "Confirm" on a `pendingConfirmation` envelope (see below).
+
+**Image notes:** `images` must be base64 data URIs. Accepted MIME types: `image/jpeg`, `image/png`, `image/gif`, `image/webp`. Other types (e.g. SVG) are silently dropped server-side.
+
+**Error responses:** All 5xx errors return `{"error": "Internal server error"}`. Internal details are logged server-side only and never returned to callers.
 
 **Response:**
 ```json
