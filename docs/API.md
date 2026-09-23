@@ -615,6 +615,42 @@ get_my_pending_invites()  -- uses auth.uid()
 
 ---
 
+### get_dashboard_stats *(Migration 042 — MOP-0030)*
+
+Single-round-trip aggregation for the dashboard widgets: recipe counts, this week's meals, active plan count, grocery progress, reactions given, most-cooked this month, and top cuisines. Replaces the old pattern of fetching capped/paginated recipe and meal-plan lists client-side just to read `.length`.
+
+```sql
+get_dashboard_stats()  -- uses auth.uid()
+```
+
+**Returns:**
+
+```json
+{
+  "recipe_counts": { "own_count": 0, "household_count": 0, "public_visible_count": 0 },
+  "this_week": { "plan_id": "uuid | null", "today_meals": { "breakfast": [...], "lunch": [...], "dinner": [...], "snacks": [...] } },
+  "active_plan_count": 0,
+  "grocery_progress": {
+    "plan_id": "uuid | null",
+    "checked": 0,
+    "total": 0,
+    "categories": [{ "category": "Produce", "checked": 0, "total": 0 }]
+  },
+  "reactions_given": 0,
+  "most_cooked_this_month": [{ "recipe_id": "uuid", "title": "...", "count": 0 }],
+  "top_cuisines": [{ "cuisine": "italian", "count": 0 }]
+}
+```
+
+Notes:
+- Recipe counts and top-cuisines use the same own/household/public visibility OR-filter as the recipes RLS SELECT policy, expressed as `COUNT(*)`/`GROUP BY` rather than a row fetch.
+- `today_meals` comes from the plan overlapping `CURRENT_DATE` (falls back to the most-recently-created plan if none overlaps).
+- `grocery_progress` excludes `isRemoved` items and is computed via `jsonb_array_elements` server-side.
+- `most_cooked_this_month` is bounded to plans with `start_date >= date_trunc('month', CURRENT_DATE)` — not an all-time scan.
+- `top_cuisines` normalizes via `lower(trim(cuisine))`; free-text cuisine entry can still fragment counts across spelling/casing variants.
+
+---
+
 ### transfer_household_ownership *(Migration 037 — MOP-0014)*
 
 Atomically promotes target member to `owner` and demotes the caller to `admin` in a single transaction. Replaces the prior two-step PATCH sequence that left a dual-owner window on mid-transfer failure.
@@ -691,6 +727,14 @@ respond_to_household_invite(
 |--------|-------------|
 | `getMealPlans()` | List all meal plans |
 | `createMealPlan(data)` | Create new meal plan |
+
+### Dashboard
+
+| Method | Description |
+|--------|-------------|
+| `getDashboardStats()` | Single-round-trip dashboard aggregation — recipe counts, this week's meals, active plan count, grocery progress, reactions given, most-cooked this month, top cuisines (via `get_dashboard_stats` RPC, migration 042) |
+
+**React Query hooks:** `useDashboardStats`
 
 ### Preferences
 

@@ -422,6 +422,21 @@ All use `SECURITY DEFINER` to bypass RLS for cross-user profile reads, validate 
 | `get_recipe_reactions()` | `p_recipe_ids UUID[]` | `[{ id, recipe_id, user_id, family_member_id, reaction, name }]` | `getRecipeReactions()` (2 queries → 1) |
 | `get_my_pending_invites()` | (none — uses `auth.uid()`) | `[{ id, household_id, ..., households: { id, name } }]` | `getMyPendingInvites()` (2 queries → 1) |
 
+### Dashboard Aggregation RPC (Migration 042 — MOP-0030)
+
+`SECURITY DEFINER`, `RETURNS JSON`, validates `auth.uid()` internally. Aggregates all dashboard-widget data in one round trip, replacing the old pattern of fetching capped/paginated lists client-side just to read `.length`.
+
+| Function | Parameters | Returns | Replaces |
+|----------|-----------|---------|----------|
+| `get_dashboard_stats()` | (none — uses `auth.uid()`) | `{ recipe_counts: { own_count, household_count, public_visible_count }, this_week: { plan_id, today_meals }, active_plan_count, grocery_progress: { plan_id, checked, total, categories: [{ category, checked, total }] }, reactions_given, most_cooked_this_month: [{ recipe_id, title, count }], top_cuisines: [{ cuisine, count }] }` | `useRecipes({ limit: 10 })` + `useMealPlans({ limit: 7 })` fetches previously used just to derive counts on `Dashboard.tsx` |
+
+Notes:
+- Recipe counts mirror the "Users can view accessible recipes" RLS OR-filter (own / household-shared / public) as true `COUNT(*)` totals, not page-limited fetches.
+- `this_week.today_meals` is the overlapping plan's `meals->>CURRENT_DATE` slots (falls back to the most-recently-created plan if none overlaps today).
+- `grocery_progress` is computed server-side via `jsonb_array_elements` over the active (or most-recent) plan's `grocery_list->'items'`, excluding `isRemoved` items — checked/total plus a per-category breakdown.
+- `most_cooked_this_month` aggregates `recipeId` occurrences across `meal_plans.meals` JSONB (via `jsonb_each` + `jsonb_array_elements`), **bounded to plans with `start_date >= date_trunc('month', CURRENT_DATE)`** to keep the scan bounded rather than scanning all-time history. Plan-level list keys (e.g. `_snacks`, `_non_recipe`) are excluded from the date-keyed iteration.
+- `top_cuisines` groups by `lower(trim(cuisine))` over the caller's visible recipes (same OR-filter as the recipe counts), excluding `NULL`/empty cuisine. **Known data-quality caveat:** `cuisine` is free-text (`VARCHAR(100)`, no enum), so casing/spelling variants can still bucket separately after normalization — not a bug this RPC fixes.
+
 ### Write-Atomicity RPCs (Migration 037 — MOP-0014)
 
 Two `SECURITY DEFINER` RPCs that replace non-atomic sequential client writes with single Postgres transactions. Both verify `auth.uid()` and raise `errcode 42501` for unauthorized callers.
@@ -512,3 +527,4 @@ Three `SECURITY DEFINER` RPCs for bulk operations on the caller's own recipes. A
 | `20260907000002_036_meal_plans_copied_from_cascade.sql` | 036 | `meal_plans.copied_from` self-referential FK with ON DELETE SET NULL |
 | `20260916000000_037_household_write_atomicity_rpcs.sql` | 037 | Two write-atomicity SECURITY DEFINER RPCs: `transfer_household_ownership` + `respond_to_household_invite` (MOP-0014) |
 | `20260921000000_038_bulk_recipe_actions.sql` | 038 | Three bulk recipe action RPCs: `bulk_update_recipe_visibility`, `bulk_delete_recipes`, `bulk_add_to_collection` (MOP-0028) |
+| `20260922000005_042_get_dashboard_stats.sql` | 042 | `get_dashboard_stats()` SECURITY DEFINER RPC: recipe counts, this week's meals, active plan count, grocery progress, reactions given, most-cooked this month, top cuisines (MOP-0030) |

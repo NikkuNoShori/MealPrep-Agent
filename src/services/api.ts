@@ -1284,6 +1284,20 @@ class ApiClient {
     return snakeToCamel(data);
   }
 
+  // ── Dashboard endpoints ──
+
+  /** Single-round-trip aggregation for the dashboard widgets (MOP-0030):
+   *  recipe counts, this week's meals, active plan count, grocery progress,
+   *  reactions given, most-cooked this month, and top cuisines. Replaces
+   *  the old pattern of fetching capped/paginated lists client-side just
+   *  to read `.length`. */
+  async getDashboardStats() {
+    const { data, error } = await supabase.rpc('get_dashboard_stats');
+    if (error) throw error;
+    if (!data) return null;
+    return snakeToCamel(data);
+  }
+
   async updateHousehold(householdId: string, data: { name?: string; allowMemberEdits?: boolean; allowMemberChildEdits?: boolean }) {
     const payload: Record<string, any> = {};
     if (data.name !== undefined) payload.name = data.name;
@@ -2076,6 +2090,19 @@ export const useMyHousehold = () => {
     queryFn: () => apiClient.getMyHousehold(),
     enabled: !authLoading && !!user,
     retry: false,
+  });
+};
+
+// ── Dashboard hooks ──
+
+export const useDashboardStats = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+
+  return useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: () => apiClient.getDashboardStats(),
+    enabled: !authLoading && !!user,
+    staleTime: QUERY_STALE_TIME.domain,
   });
 };
 

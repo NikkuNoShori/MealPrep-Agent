@@ -877,6 +877,7 @@ export type Database = {
         Args: { p_household_id: string; p_user_id: string }
         Returns: string
       }
+      get_dashboard_stats: { Args: never; Returns: Json }
       get_my_household: { Args: never; Returns: Json }
       get_my_pending_invites: { Args: never; Returns: Json }
       get_recipe_reactions: { Args: { p_recipe_ids: string[] }; Returns: Json }
