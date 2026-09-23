@@ -5,7 +5,7 @@
 | **MOP** | MOP-0029 |
 | **Title** | Theme Token Layering & Surface-Aware Presets |
 | **Date Submitted** | 2026-09-21 |
-| **Date Updated** | 2026-09-21 (scope expanded — full color-surface audit) |
+| **Date Updated** | 2026-09-22 (Phase 9 palette specs approved) |
 | **Date Completed** | — |
 | **Submitted By** | surface-reviewer |
 | **Status** | deferred |
@@ -14,7 +14,7 @@
 
 > **Reason (deferred):** The **migration and preset-authoring phases (4–9)** are sequenced deliberately *after* the dashboard redesign ships on the current live palette. This is cross-cutting work touching 44+ files; running it concurrently with an in-design redesign would entangle two independent change sets. See §Trigger Conditions.
 >
-> **Phases 0–3 are NOT deferred** — they are the governance standard plus separable correctness fixes with no user-visible change and no dependency on preset design work.
+> **Phases 0–3 are NOT deferred** — they are the governance standard plus separable correctness fixes with no user-visible change and no dependency on preset design work. **Phases 0, 1, 2, 3, and 5 are implemented** (see commits `48d965f`, `aeb2457`). The only remaining deferral condition is the dashboard redesign shipping — the palette-design blocker on Phase 9 is cleared (see §Approved Phase 9 palette specs).
 
 > **Scope expanded 2026-09-21.** This MOP originally covered page background + card surface only. A full audit of every color surface found the same root cause across thirteen categories. Phases 0, 3, 6, 7, 8 are new; Phase 5 (migration) and Phase 9 (preset) are widened. See ADR-0006 §Full-audit findings and [docs/COLOR_SCHEMA.md](../COLOR_SCHEMA.md).
 
@@ -185,7 +185,60 @@ Author the terracotta/olive botanical preset as a fifth curated preset, and back
 
 **A preset is complete only when it specifies every L1 ramp** (surface, accent-category, gradient, status) for **both** light and dark.
 
-> **Planning gap — blocks this phase.** The mockup exists only as an HTML artifact from the design session. No hex ramps are specified for any preset across any of the new families, in either mode. Per ADR-0006, **this design work is the gating constraint on the visible payoff, not the wiring.** Budget it explicitly: 5 presets × 4 ramp families × 2 modes. Under-resourcing here produces presets that switch mechanically but look unprofessional — the opposite of the stated goal.
+> **Planning gap cleared 2026-09-22.** Full hex ramps for all five presets (Evergreen, Forest, Ocean, Sunset, Botanical) × 4 ramp families × 2 modes were drafted, reviewed as a swatch mockup, and approved by the user. See **§Approved Phase 9 palette specs** below. Phase 9 is unblocked; it still requires this exact review-before-implement workflow for any *future* preset added after this MOP, since preset authoring is design-bound, not engineering-bound (ADR-0006).
+
+### Approved Phase 9 palette specs (2026-09-22)
+
+Source of truth for the `surface`, `accentCategory`, `gradient`, and `status` ramps to encode in `src/stores/themeStore.ts`. Status intentionally stays near-identical across all five presets (semantic color does not reskin — "red = error" must hold regardless of active preset).
+
+**Evergreen** — live default. `surface` is an unchanged transcription of today's `stone-*` Tailwind values (pixel-identical requirement, both modes) — do not alter. `accentCategory`/`gradient` shift earthier (ochre/rust/sage/clay) so the preset reads warmer via icons, badges, and decorative fills without touching page backgrounds or card surfaces.
+
+| Family | Light | Dark |
+|---|---|---|
+| `surface` 50→900 | `#fafaf9 #f5f5f4 #e7e5e4 #d6d3d1 #a8a29e #78716c #57534e #44403c #292524 #1c1917` (= current `stone-*`) | `#1c1917 #292524 #3a352e #44403c #57534e #78716c #a8a29e #d6d3d1 #e7e5e4 #f5f5f4` |
+| `accentCategory` | Ochre `#b8860b` · Rust `#a44a2e` · Sage `#6c8560` · Clay `#c2703f` · Teal `#0d9488` · Plum `#7a4a6b` | same |
+| `gradient` | Brand `#1D9E75→#34d399` · Warm `#b8860b→#c2703f` · Subtle `#e7e5e4→#f5f5f4` | same |
+| `status` | Success `#178c66` · Warning `#b45309` · Error `#dc2626` · Info `#2563eb` | same |
+
+**Forest** — sage-tinted surface (green undertone vs. Evergreen's warm stone).
+
+| Family | Light | Dark |
+|---|---|---|
+| `surface` 50→900 | `#f7f9f4 #eef2e7 #dfe6d2 #c7d1b3 #9fab84 #767f5c #5a6146 #434833 #2b2e20 #1a1c14` | `#14150f #1e2116 #282c1d #363b27 #4a5136 #6b734f #8f9871 #b6bd9d #d5dac0 #eef1e3` |
+| `accentCategory` | Gold `#ca8a04` · Amber `#d97706` · Teal `#0f766e` · Plum `#7e22ce` · Clay `#c2410c` · Sky `#0284c7` | same |
+| `gradient` | Brand `#22c55e→#86efac` · Warm `#ca8a04→#facc15` · Subtle `#dfe6d2→#eef2e7` | same |
+| `status` | Success `#178c66` · Warning `#b45309` · Error `#dc2626` · Info `#2563eb` | same |
+
+**Ocean** — cool slate-blue surface.
+
+| Family | Light | Dark |
+|---|---|---|
+| `surface` 50→900 | `#f6f8fb #eaeef5 #d7deea #b9c5da #8b9bbb #647391 #4c5975 #38435a #242b3b #161a24` | `#0e1016 #161a24 #1e2330 #2a3142 #3c465c #576382 #7d89a8 #a9b2c9 #ced4e2 #e9ecf2` |
+| `accentCategory` | Teal `#0d9488` · Violet `#7c3aed` · Amber `#d97706` · Rose `#e11d48` · Cyan `#0891b2` · Slate `#475569` | same |
+| `gradient` | Brand `#3b82f6→#5eead4` · Warm `#0d9488→#2dd4bf` · Subtle `#d7deea→#eaeef5` | same |
+| `status` | Success `#178c66` · Warning `#b45309` · Error `#dc2626` · Info `#2563eb` | same |
+
+**Sunset** — warm peachy surface (close in temperature to Evergreen's stone, shifted enough to read distinct side-by-side).
+
+| Family | Light | Dark |
+|---|---|---|
+| `surface` 50→900 | `#fdf8f5 #faeee6 #f3d9c8 #e7bc9e #d29a6f #b3774c #8f5c39 #6d452c #492e1d #2c1c12` | `#1a120c #291d13 #382719 #4f3722 #6f4c2d #96683c #c08a55 #d9ab7c #eaccae #f7e6d6` |
+| `accentCategory` | Pink `#db2777` · Purple `#9333ea` · Teal `#0d9488` · Gold `#ca8a04` · Rose `#e11d48` · Indigo `#4f46e5` | same |
+| `gradient` | Brand `#f97316→#ec4899` · Warm `#fb923c→#f472b6` · Subtle `#f3d9c8→#faeee6` | same |
+| `status` | Success `#178c66` · Warning `#b45309` · Error `#dc2626` · Info `#2563eb` | same |
+
+**Botanical** — new 5th preset. The only preset introducing new `primary`/`secondary` brand ramps (terracotta / olive) — Evergreen/Forest/Ocean/Sunset keep their existing brand colors and only gain the four new L1 families.
+
+| Family | Light | Dark |
+|---|---|---|
+| `primary` 50→900 (terracotta) | `#fdf1ec #fbe0d3 #f4bda2 #e89a6e #d67744 #b5542f #963f22 #77301a #582212 #3a160b` | same |
+| `secondary` 50→900 (olive) | `#f3f5ee #e4e9d8 #c9d3ae #aabb85 #8a9c66 #5b6b3f #485631 #374225 #262f19 #161c0e` | same |
+| `surface` 50→900 | `#faf6ee #f4ecdd #e8dcc5 #d9cbb0 #c2b092 #a3936f #7d7053 #5c5340 #3a352a #241f18` | `#161310 #1d1811 #241d15 #332a1e #453a29 #6c5c45 #a8987e #c9bda6 #e1d7c5 #f4ecdd` |
+| `accentCategory` | Ochre `#b8860b` · Rust `#a44a2e` · Sage `#6c8560` · Plum `#7a4a6b` · Teal `#3d7a6e` · Clay `#c2703f` | same |
+| `gradient` | Brand `#b5542f→#d67744` · Warm `#5b6b3f→#8a9c66` · Subtle `#e8dcc5→#f4ecdd` | same |
+| `status` | Success `#178c66` · Warning `#b45309` · Error `#dc2626` · Info `#2563eb` | same |
+
+> Reference mockup: [Preset Palette Specs artifact](https://claude.ai/artifact/CyznK8Y8xVNW2VCcGV6UeG), approved 2026-09-22. Values above are the durable record — the artifact is a working reference, not the source of truth.
 
 ---
 
@@ -215,10 +268,11 @@ Author the terracotta/olive botanical preset as a fifth curated preset, and back
 - **Phase 0** (standard) — deferring it is self-defeating; it governs code written *while the rest waits*.
 - **Phases 1, 2, 3, 5** — separable correctness fixes and deduplication. No user-visible change, no dependency on preset design work.
 
-### Deferred — execute Phases 4, 6, 7, 8, 9 when **both** hold
+### Deferred — execute Phases 4, 6, 7, 8, 9 when this holds
 
 1. The dashboard redesign has shipped on the current live palette (avoids entangling two cross-cutting change sets).
-2. A surface-differentiated preset is still wanted in product — i.e. the botanical palette is confirmed **with hex ramps specified across all four ramp families in both modes** (per Phase 9's planning gap).
+
+~~2. A surface-differentiated preset is still wanted in product...~~ — **Satisfied 2026-09-22.** All five presets have approved hex ramps across all four L1 families in both modes (see §Approved Phase 9 palette specs). The remaining trigger is condition 1 only.
 
 ### Pull forward early if any of these fire
 
