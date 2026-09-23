@@ -1044,16 +1044,12 @@ describe('apiClient.getRecipe', () => {
     expect(result).toMatchObject({ id: 'r-1', title: 'Stew' });
   });
 
-  it('returns null on PGRST116 (row not found) instead of throwing', async () => {
+  it('returns null when no row matches, instead of throwing', async () => {
+    // getRecipe uses .maybeSingle() (not .single()), so PostgREST never
+    // returns a PGRST116/406 error for zero rows — it returns 200 with no
+    // body, which the Supabase client surfaces as `data: null, error: null`.
     mockCurrentUser({ id: 'u-current' });
-    server.use(
-      supabaseSelect('recipes', () =>
-        HttpResponse.json(
-          { message: 'no rows', code: 'PGRST116' },
-          { status: 406 }
-        )
-      )
-    );
+    server.use(supabaseSelect('recipes', null));
 
     const result = await apiClient.getRecipe('does-not-exist');
 
