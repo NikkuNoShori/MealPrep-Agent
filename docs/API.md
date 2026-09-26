@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-09-22
-**Last updated:** 2026-09-22 (MOP-0026: confirmAction server-side verification; image MIME whitelist; error response sanitization)
+**Last reviewed:** 2026-09-25
+**Last updated:** 2026-09-25 (MOP-0031: 5 direct recipe sharing RPCs added)
 
 ---
 
@@ -446,6 +446,96 @@ All AI behavior is controlled by system prompts. Edit these files to customize t
 | `INTENT_DETECTION_PROMPT` | (`@deprecated`) | Classified user messages pre-MOP-0008. Kept exported during the migration window; remove in post-rollout cleanup. |
 
 > **Note:** Legacy frontend prompts that previously lived in `src/prompts/` have been removed. All prompt configuration is in the single backend file above.
+
+---
+
+## Direct Recipe Sharing RPCs (Migration 043 — MOP-0031)
+
+All called via `supabase.rpc('function_name', params)`. All are `SECURITY DEFINER set search_path = public`; `auth.uid()` is the authorization source of truth — no `user_id` parameters.
+
+### share_recipe
+
+```sql
+share_recipe(
+  p_recipe_id       UUID,
+  p_target_identifier TEXT   -- username or email (case-insensitive)
+)
+RETURNS UUID  -- the share id
+```
+
+Shares the recipe with the first profile matching `p_target_identifier` by username or email. The caller must own the recipe. Upserts on re-share: resets `shared_at` and clears `seen_at`. Raises `SQLSTATE P0001` with `"user not found"` if the identifier matches no profile.
+
+**Client:** `apiClient.shareRecipe(recipeId, targetIdentifier)` → React Query mutation `useShareRecipe()`. Invalidates `["shared-with-me", "unseen-share-count"]`.
+
+---
+
+### unshare_recipe
+
+```sql
+unshare_recipe(
+  p_recipe_id            UUID,
+  p_shared_with_user_id  UUID
+)
+RETURNS void
+```
+
+Removes the share. Caller must be the original sharer.
+
+**Client:** `apiClient.unshareRecipe(recipeId, sharedWithUserId)` → React Query mutation `useUnshareRecipe()`. Invalidates `["shared-with-me", "unseen-share-count"]`.
+
+---
+
+### get_shared_with_me
+
+```sql
+get_shared_with_me()
+RETURNS TABLE(
+  share_id             UUID,
+  recipe_id            UUID,
+  shared_at            TIMESTAMPTZ,
+  seen_at              TIMESTAMPTZ,
+  sharer_user_id       UUID,
+  sharer_display_name  TEXT,
+  sharer_username      TEXT,
+  title                VARCHAR(255),
+  description          TEXT,
+  image_url            TEXT,
+  tags                 TEXT[],
+  visibility           TEXT
+)
+```
+
+Returns all recipes shared with the caller, ordered by `shared_at DESC`.
+
+**Client:** `apiClient.getSharedWithMe()` → React Query query `useSharedWithMe()`. Query key: `["shared-with-me"]`, staleTime: `QUERY_STALE_TIME.domain`.
+
+---
+
+### mark_share_seen
+
+```sql
+mark_share_seen(
+  p_share_id UUID
+)
+RETURNS void
+```
+
+Sets `seen_at = now()` on the share row where `shared_with_user_id = auth.uid()`. No-op if already seen.
+
+**Client:** `apiClient.markShareSeen(shareId)` → React Query mutation `useMarkShareSeen()`. Invalidates `["shared-with-me", "unseen-share-count"]`.
+
+---
+
+### get_unseen_share_count
+
+```sql
+get_unseen_share_count()
+RETURNS INT
+```
+
+Count of `recipe_shares` rows where `shared_with_user_id = auth.uid() AND seen_at IS NULL`. Used for the "Shared with me" badge in the recipe library sidebar.
+
+**Client:** `apiClient.getUnseenShareCount()` → React Query query `useUnseenShareCount()`. Query key: `["unseen-share-count"]`, staleTime: `30_000` ms.
 
 ---
 

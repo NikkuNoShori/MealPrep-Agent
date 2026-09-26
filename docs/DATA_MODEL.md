@@ -2,8 +2,8 @@
 
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
-**Last reviewed:** 2026-09-21
-**Last updated:** 2026-09-21 (MOP-0028: three bulk recipe action RPCs added — migration 038; migration index updated)
+**Last reviewed:** 2026-09-25
+**Last updated:** 2026-09-25 (MOP-0031: recipe_shares table + 5 sharing RPCs — migration 043)
 
 ---
 
@@ -362,6 +362,31 @@ Thumbs up/down reactions on recipes from authenticated users or dependents (fami
 
 ---
 
+### recipe_shares
+
+Direct user-to-user recipe sharing. Tracks which recipes have been shared with which users, when, and whether the recipient has seen the share. No social graph (follows/friends) is required — recipients are looked up by username or email at share time via a SECURITY DEFINER RPC.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `recipe_id` | UUID | NOT NULL, FK → `recipes(id)` ON DELETE CASCADE | |
+| `shared_by_user_id` | UUID | NOT NULL, FK → `profiles(id)` ON DELETE CASCADE | The user who shared the recipe |
+| `shared_with_user_id` | UUID | NOT NULL, FK → `profiles(id)` ON DELETE CASCADE | The recipient |
+| `shared_at` | TIMESTAMPTZ | DEFAULT now() | Reset on re-share (upsert) |
+| `seen_at` | TIMESTAMPTZ | | NULL = unseen; set by `mark_share_seen()` RPC |
+
+**Constraints:** UNIQUE (recipe_id, shared_with_user_id) — re-sharing the same recipe resets `shared_at` and clears `seen_at`
+**Indexes:** `idx_recipe_shares_shared_with(shared_with_user_id)`, `idx_recipe_shares_recipe(recipe_id)`
+**RLS:**
+- INSERT: sharer must own the recipe (`shared_by_user_id = auth.uid()` + ownership check)
+- DELETE (sharer): `shared_by_user_id = auth.uid()`
+- DELETE (recipient): `shared_with_user_id = auth.uid()`
+- SELECT: `shared_by_user_id = auth.uid() OR shared_with_user_id = auth.uid()`
+- UPDATE (`seen_at` only): `shared_with_user_id = auth.uid()`
+**Migration:** 043 (MOP-0031)
+
+---
+
 ## Supporting Tables
 
 ### ingredients
@@ -460,6 +485,18 @@ Three `SECURITY DEFINER` RPCs for bulk operations on the caller's own recipes. A
 
 **Authorization pattern:** Each RPC checks `user_id = auth.uid()` at the row level. Unauthenticated callers receive `errcode = '42501'`. `SECURITY DEFINER` is required to perform the delete/update in a single statement bypassing per-row RLS overhead.
 
+### Direct Recipe Sharing RPCs (Migration 043 — MOP-0031)
+
+Five `SECURITY DEFINER set search_path = public` RPCs for user-to-user recipe sharing. All validate `auth.uid()` internally and raise `42501` for unauthorized callers. Recipient lookup accepts either a `username` or `email` (case-insensitive) via the `share_recipe` RPC.
+
+| Function | Parameters | Returns | Notes |
+|----------|-----------|---------|-------|
+| `share_recipe(p_recipe_id UUID, p_target_identifier TEXT)` | Caller must own the recipe | `UUID` (share id) | Looks up recipient by `username` or `email`. Upserts on re-share (resets `shared_at`, clears `seen_at`). Raises `P0001` with "user not found" if identifier resolves to no profile. |
+| `unshare_recipe(p_recipe_id UUID, p_shared_with_user_id UUID)` | Caller must be the sharer | `void` | |
+| `get_shared_with_me()` | (none — uses `auth.uid()`) | TABLE row per share | Columns: `share_id`, `recipe_id`, `shared_at`, `seen_at`, `sharer_user_id`, `sharer_display_name`, `sharer_username`, plus recipe columns (`title`, `description`, `image_url`, `tags`, `visibility`). Ordered by `shared_at DESC`. |
+| `mark_share_seen(p_share_id UUID)` | Caller must be the recipient | `void` | Sets `seen_at = now()` where `id = p_share_id AND shared_with_user_id = auth.uid()`. No-op if already seen. |
+| `get_unseen_share_count()` | (none — uses `auth.uid()`) | `INT` | Count of `recipe_shares` rows where `shared_with_user_id = auth.uid() AND seen_at IS NULL`. |
+
 ### Helper Functions
 
 | Function | Type | Description |
@@ -528,3 +565,4 @@ Three `SECURITY DEFINER` RPCs for bulk operations on the caller's own recipes. A
 | `20260916000000_037_household_write_atomicity_rpcs.sql` | 037 | Two write-atomicity SECURITY DEFINER RPCs: `transfer_household_ownership` + `respond_to_household_invite` (MOP-0014) |
 | `20260921000000_038_bulk_recipe_actions.sql` | 038 | Three bulk recipe action RPCs: `bulk_update_recipe_visibility`, `bulk_delete_recipes`, `bulk_add_to_collection` (MOP-0028) |
 | `20260922000005_042_get_dashboard_stats.sql` | 042 | `get_dashboard_stats()` SECURITY DEFINER RPC: recipe counts, this week's meals, active plan count, grocery progress, reactions given, most-cooked this month, top cuisines (MOP-0030) |
+| `20260922000006_043_recipe_shares.sql` | 043 | `recipe_shares` table + 5 RLS policies + 5 SECURITY DEFINER RPCs for direct user-to-user recipe sharing (MOP-0031) |

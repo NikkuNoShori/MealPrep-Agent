@@ -2,10 +2,21 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-09-22
-**Last updated:** 2026-09-22 (MOP-0026 complete — security auditor agent + security hardening)
+**Last reviewed:** 2026-09-25
+**Last updated:** 2026-09-25 (MOP-0031 complete — direct recipe sharing)
 
 ---
+
+## 2026-09-25 (MOP-0031: Direct Recipe Sharing) `main`
+
+**Direct Recipe Sharing (MOP-0031 — complete)**
+
+- **Share any owned recipe** directly with another user by typing their username or email in a new Share dialog (share icon on the recipe detail page, owner-only).
+- **`recipe_shares` junction table** — `(recipe_id, shared_by_user_id, shared_with_user_id, shared_at, seen_at)` with UNIQUE constraint on `(recipe_id, shared_with_user_id)`. RLS: sharer can insert/delete; recipient can select and update `seen_at`.
+- **Five SECURITY DEFINER RPCs** — `share_recipe(recipe_id, target_identifier)`, `unshare_recipe(recipe_id, shared_with_user_id)`, `get_shared_with_me()`, `mark_share_seen(share_id)`, `get_unseen_share_count()`. Lookup accepts username or email (case-insensitive).
+- **"Shared with me" feed tab** in the recipe library sidebar, alongside My Recipes / Household / Public. Shows an unseen-count badge; clicking a recipe marks the share as seen.
+- **Per-card sharer attribution** in the Shared with me feed — displays sharer's display name and `@username` with an unseen dot for new items.
+- No social graph (friends/follows) required — sharing is lookup-based at share time only.
 
 ## 2026-09-22 (MOP-0026: Security Auditor Agent + Security Hardening) `main`
 

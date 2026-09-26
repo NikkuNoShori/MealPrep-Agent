@@ -2,8 +2,8 @@
 
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
-**Last reviewed:** 2026-09-22
-**Last updated:** 2026-09-22 (MOP-0026: security audit runbook entry; embedding-refresh CRON_SECRET troubleshooting; btree embedding index drop)
+**Last reviewed:** 2026-09-25
+**Last updated:** 2026-09-25 (MOP-0031: recipe sharing troubleshooting entry)
 
 ---
 
@@ -921,3 +921,38 @@ supabase functions logs embedding-refresh --project-ref <project-ref>
 5. Verify next cron run succeeds in function logs
 
 **Added:** 2026-09-22
+
+---
+
+## Sharing: Shared recipe not appearing in recipient's "Shared with me" feed
+
+### Symptom
+- User reports they shared a recipe but the recipient sees nothing in "Shared with me"
+- Badge count does not change for the recipient
+- `share_recipe` RPC returned successfully (no error)
+
+### Likely causes
+1. Migration 043 not deployed to production
+2. Recipient looking at wrong feed tab (not "Shared with me")
+3. React Query cache stale — badge/feed not yet refreshed
+4. `recipe_shares` RLS policy blocking the recipient's SELECT
+
+### Verification steps
+```sql
+-- Confirm the share row exists
+SELECT * FROM recipe_shares WHERE recipe_id = '<recipe-uuid>';
+
+-- Confirm RLS allows the recipient to see it
+SET request.jwt.claim.sub = '<recipient-user-id>';
+SELECT * FROM recipe_shares WHERE shared_with_user_id = auth.uid();
+
+-- Confirm migration 043 is applied
+SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'recipe_shares');
+```
+
+### Fix steps
+1. If `recipe_shares` table does not exist → migration 043 has not been deployed. Deploy migration 043 (`20260922000006_043_recipe_shares.sql`).
+2. If the row exists but is not visible to the recipient → inspect the five RLS policies on `recipe_shares`. The SELECT policy should be: `shared_by_user_id = auth.uid() OR shared_with_user_id = auth.uid()`.
+3. If rows and RLS are correct → the client cache may be stale. `invalidateQueries(["shared-with-me", "unseen-share-count"])` resolves on next page load.
+
+**Added:** 2026-09-25
