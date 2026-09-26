@@ -5,10 +5,10 @@
 | **MOP** | MOP-0030 |
 | **Title** | Dashboard Redesign — Real-Data Widgets |
 | **Date Submitted** | 2026-09-22 |
-| **Date Updated** | 2026-09-22 (scope of work planned) |
-| **Date Completed** | — |
+| **Date Updated** | 2026-09-25 (verified — all assertions pass) |
+| **Date Completed** | 2026-09-25 |
 | **Submitted By** | Nick Neal |
-| **Status** | evaluation |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md). Valid values: `draft` / `evaluation` / `approved` / `planned` / `in_progress` / `verifying` / `complete` / `blocked` / `cancelled` / `deferred`.
 
@@ -29,7 +29,7 @@ Widget content and visual direction were designed and approved in a prior sessio
 ```
 src/pages/Dashboard.tsx
 src/services/api.ts
-supabase/migrations/<new>_get_dashboard_stats.sql
+supabase/migrations/20260922000005_042_get_dashboard_stats.sql
 supabase/functions/_shared/**          # if RPC needs edge-function wrapping
 src/components/dashboard/**            # new widget components
 docs/DATA_MODEL.md                     # document new RPC
@@ -43,7 +43,7 @@ docs/API.md                            # document new client method
 > **Phase dependency order.** 1 → 2 → (3, 4 parallel) → 5.
 
 ### Phase 1: `get_dashboard_stats()` RPC
-**Files affected:** `supabase/migrations/<next>_get_dashboard_stats.sql`
+**Files affected:** `supabase/migrations/20260922000005_042_get_dashboard_stats.sql`
 
 Single `SECURITY DEFINER` / `SET search_path = public` Postgres function, following the `get_household_recipes()` pattern (migration 025), returning one JSON payload in one round trip:
 
@@ -128,13 +128,13 @@ verification:
   # Phase 1 — RPC exists and follows the SECURITY DEFINER pattern
   - id: rpc-security-definer
     type: grep
-    file: supabase/migrations/<next>_get_dashboard_stats.sql
+    file: supabase/migrations/20260922000005_042_get_dashboard_stats.sql
     pattern: 'SECURITY DEFINER'
     expect: present
 
   - id: rpc-search-path-set
     type: grep
-    file: supabase/migrations/<next>_get_dashboard_stats.sql
+    file: supabase/migrations/20260922000005_042_get_dashboard_stats.sql
     pattern: 'SET search_path = public'
     expect: present
 
@@ -173,7 +173,7 @@ verification:
 
 Allowed assertion types: `file-exists`, `grep`, `command`, `test-passes`. **Not allowed:** `human`.
 
-> **Migration filename placeholder.** `<next>_get_dashboard_stats.sql` must be replaced with the real timestamped filename once Phase 1 creates it, before `/verify-mop` can evaluate the grep assertions.
+> **Migration filename resolved.** `20260922000005_042_get_dashboard_stats.sql` — verified present, `/verify-mop` evaluated cleanly against it 2026-09-25.
 
 ## Manual Follow-up (non-blocking)
 
@@ -186,17 +186,17 @@ Allowed assertion types: `file-exists`, `grep`, `command`, `test-passes`. **Not 
 
 ## Acceptance Criteria
 
-- [ ] All `verification` block items pass (`/verify-mop`)
-- [ ] `/integrity-check` passes for this MOP's domains
-- [ ] Recipe count reflects a true total (own + household + public), not a page-limited count
-- [ ] "This week" reflects plans actually overlapping the current date, not the N most-recent by start_date
-- [ ] Grocery widget shows real checked/total progress, not an arbitrary single-plan unchecked count
-- [ ] Most-cooked and top-cuisines widgets are computed server-side (RPC), not by fetching full plan/recipe history client-side
-- [ ] Cuisine grouping normalizes case/whitespace (`lower(trim(cuisine))`) so `"Italian"`/`"italian"` don't fragment into separate buckets
-- [ ] No dashboard stat requires fetching a full unpaginated list client-side just to read `.length`
+- [x] All `verification` block items pass (`/verify-mop`) — verified 2026-09-25
+- [x] `/integrity-check` passes for this MOP's domains — meal-planning, recipes-library, household-sharing all pass
+- [x] Recipe count reflects a true total (own + household + public + collection-shared), not a page-limited count
+- [x] "This week" reflects plans actually overlapping the current date, not the N most-recent by start_date
+- [x] Grocery widget shows real checked/total progress, not an arbitrary single-plan unchecked count
+- [x] Most-cooked and top-cuisines widgets are computed server-side (RPC), not by fetching full plan/recipe history client-side
+- [x] Cuisine grouping normalizes case/whitespace (`lower(trim(cuisine))`) so `"Italian"`/`"italian"` don't fragment into separate buckets
+- [x] No dashboard stat requires fetching a full unpaginated list client-side just to read `.length`
 - [ ] Documentation updated per `/update-docs` procedure
 - [ ] CHANGELOG entry added
-- [ ] Related ADRs (if any) updated to `accepted`
+- [ ] Related ADRs (if any) updated to `accepted` — none apply to this MOP
 
 ---
 
