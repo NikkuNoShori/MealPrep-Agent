@@ -56,8 +56,8 @@ const Dashboard = () => {
         </Link>
       </div>
 
-      {/* Widget grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Widget grid — 2x2 quadrants, cards grow with the wider page */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <TodayWidget stats={stats} isLoading={statsLoading} />
         <GroceryCartWidget stats={stats} isLoading={statsLoading} />
         <MostCookedWidget stats={stats} isLoading={statsLoading} />
