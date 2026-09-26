@@ -627,7 +627,7 @@ get_dashboard_stats()  -- uses auth.uid()
 
 ```json
 {
-  "recipe_counts": { "own_count": 0, "household_count": 0, "public_visible_count": 0 },
+  "recipe_counts": { "own_count": 0, "household_count": 0, "public_visible_count": 0, "collection_shared_count": 0 },
   "this_week": { "plan_id": "uuid | null", "today_meals": { "breakfast": [...], "lunch": [...], "dinner": [...], "snacks": [...] } },
   "active_plan_count": 0,
   "grocery_progress": {
@@ -643,7 +643,7 @@ get_dashboard_stats()  -- uses auth.uid()
 ```
 
 Notes:
-- Recipe counts and top-cuisines use the same own/household/public visibility OR-filter as the recipes RLS SELECT policy, expressed as `COUNT(*)`/`GROUP BY` rather than a row fetch.
+- Recipe counts and top-cuisines mirror the **live** recipes RLS SELECT policy (migration 012, not the superseded migration 009): own, household-visible, public, OR shared via a visible collection (collection visibility acts as a floor regardless of the recipe's own visibility flag). `collection_shared_count` is the 4th bucket — recipes visible only through collection membership, not already counted in own/household/public.
 - `today_meals` comes from the plan overlapping `CURRENT_DATE` (falls back to the most-recently-created plan if none overlaps).
 - `grocery_progress` excludes `isRemoved` items and is computed via `jsonb_array_elements` server-side.
 - `most_cooked_this_month` is bounded to plans with `start_date >= date_trunc('month', CURRENT_DATE)` — not an all-time scan.

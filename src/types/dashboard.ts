@@ -8,6 +8,12 @@ export interface DashboardRecipeCounts {
   ownCount: number
   householdCount: number
   publicVisibleCount: number
+  /** Recipes of any visibility (incl. private) made visible via a shared
+   *  collection — the RLS policy's 4th OR-branch (migration 012). Distinct
+   *  from householdCount/publicVisibleCount, which check the recipe's OWN
+   *  visibility flag; this counts recipes visible only through collection
+   *  membership. */
+  collectionSharedCount: number
 }
 
 export interface DashboardThisWeek {

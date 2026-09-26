@@ -8,6 +8,7 @@ import { AddToCollectionMenu } from '@/components/recipes/AddToCollectionMenu'
 import AddToPlanButton from '@/components/meal-planning/AddToPlanButton'
 import { useUpdateRecipeVisibility } from '@/services/api'
 import { SimilarRecipesRail } from '@/components/recipes/SimilarRecipesRail'
+import { ShareRecipeDialog } from '@/components/recipes/ShareRecipeDialog'
 import {
   ArrowLeft,
   Edit,
@@ -20,7 +21,8 @@ import {
   X,
   ChevronDown,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Share2,
 } from 'lucide-react'
 
 interface RecipeDetailProps {
@@ -69,6 +71,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
   const [isImageFullscreen, setIsImageFullscreen] = useState(false)
   const [showAllIngredients, setShowAllIngredients] = useState(false)
   const [localVisibility, setLocalVisibility] = useState<RecipeVisibility>(recipe.visibility || 'private')
+  const [showShareDialog, setShowShareDialog] = useState(false)
   const { system } = useMeasurementSystem()
   const updateVisibility = useUpdateRecipeVisibility()
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0)
@@ -99,6 +102,14 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
+      {showShareDialog && (
+        <ShareRecipeDialog
+          recipeId={recipe.id}
+          recipeTitle={recipe.title}
+          onClose={() => setShowShareDialog(false)}
+        />
+      )}
+
       {/* ── Top Bar ── */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -123,6 +134,17 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
               title="Delete recipe"
             >
               <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+          {onEdit && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowShareDialog(true)}
+              className="rounded-xl border-border/60 text-stone-400 hover:text-primary-500 dark:hover:text-primary-400 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
+              title="Share recipe"
+            >
+              <Share2 className="h-4 w-4" />
             </Button>
           )}
           {onEdit && (

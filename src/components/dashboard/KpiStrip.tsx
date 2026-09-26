@@ -14,7 +14,9 @@ interface KpiStripProps {
  *  independently — the strip never blocks on a single slow source. */
 const KpiStrip = ({ stats, isLoading, householdSize, householdLoading }: KpiStripProps) => {
   const totalRecipes = stats
-    ? stats.recipeCounts.ownCount + stats.recipeCounts.householdCount
+    ? stats.recipeCounts.ownCount +
+      stats.recipeCounts.householdCount +
+      stats.recipeCounts.collectionSharedCount
     : undefined
 
   const items = [

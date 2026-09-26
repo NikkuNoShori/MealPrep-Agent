@@ -5,6 +5,7 @@ import {
   useCreateCollection,
   useDeleteCollection,
   useUpdateCollection,
+  useUnseenShareCount,
 } from '@/services/api'
 import {
   BookOpen,
@@ -29,8 +30,8 @@ interface CollectionsSidebarProps {
   selectedCollectionId: string | null
   onSelectCollection: (collectionId: string | null) => void
   onCollectionNameChange?: (name: string | null) => void
-  onViewModeChange?: (mode: 'public' | 'mine' | 'household' | 'collection') => void
-  viewMode?: 'public' | 'mine' | 'household' | 'collection'
+  onViewModeChange?: (mode: 'public' | 'mine' | 'household' | 'shared' | 'collection') => void
+  viewMode?: 'public' | 'mine' | 'household' | 'shared' | 'collection'
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -58,6 +59,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
   viewMode = 'mine',
 }) => {
   const { data: collections, isLoading } = useMyCollections()
+  const { data: unseenCount = 0 } = useUnseenShareCount()
   const createCollection = useCreateCollection()
   const deleteCollection = useDeleteCollection()
   const updateCollection = useUpdateCollection()
@@ -195,10 +197,17 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     onViewModeChange?.('household')
   }
 
+  const handleSelectShared = () => {
+    onSelectCollection(null)
+    onCollectionNameChange?.('Shared with me')
+    onViewModeChange?.('shared')
+  }
+
   const feedItems = [
-    { key: 'public' as const, label: 'Public', icon: Globe, handler: handleSelectPublic },
-    { key: 'mine' as const, label: 'My Recipes', icon: FolderOpen, handler: handleSelectMine },
-    { key: 'household' as const, label: 'Household', icon: Home, handler: handleSelectHousehold },
+    { key: 'public' as const, label: 'Public', icon: Globe, handler: handleSelectPublic, badge: 0 },
+    { key: 'mine' as const, label: 'My Recipes', icon: FolderOpen, handler: handleSelectMine, badge: 0 },
+    { key: 'household' as const, label: 'Household', icon: Home, handler: handleSelectHousehold, badge: 0 },
+    { key: 'shared' as const, label: 'Shared with me', icon: Share2, handler: handleSelectShared, badge: unseenCount as number },
   ]
 
   return (
@@ -222,8 +231,13 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
               }`}
             >
               <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
-              <span className="truncate">{item.label}</span>
-              {isActive && (
+              <span className="truncate flex-1 text-left">{item.label}</span>
+              {item.badge > 0 && (
+                <span className="shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary-500 text-white text-[10px] font-semibold px-1">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              )}
+              {isActive && item.badge === 0 && (
                 <div className="ml-auto w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400" />
               )}
             </button>

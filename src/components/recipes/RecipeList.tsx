@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useMemo } from 'react'
-import { useRecipes, useDeleteRecipe, useRemoveRecipeFromCollection, useCollectionRecipes, usePublicRecipes, useHouseholdRecipes, useRecipeReactions, useToggleRecipeReaction, useMyHousehold, useRecipeTextSearch, useMyCollections, useBulkDeleteRecipes, useBulkUpdateRecipeVisibility, useBulkAddToCollection } from '@/services/api'
+import { useRecipes, useDeleteRecipe, useRemoveRecipeFromCollection, useCollectionRecipes, usePublicRecipes, useHouseholdRecipes, useRecipeReactions, useToggleRecipeReaction, useMyHousehold, useRecipeTextSearch, useMyCollections, useBulkDeleteRecipes, useBulkUpdateRecipeVisibility, useBulkAddToCollection, useSharedWithMe, useMarkShareSeen } from '@/services/api'
 import { RecipeCard, RecipeReaction } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
 import { useAuthStore } from '@/stores/authStore'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Plus, Grid, List, X, Trash2, Eye, FolderOpen, ChevronDown } from "lucide-react";
+import { Plus, Grid, List, X, Trash2, Eye, FolderOpen, ChevronDown, Share2 } from "lucide-react";
 import toast from 'react-hot-toast';
 
 const MAX_SELECTION = 100;
@@ -18,7 +18,7 @@ interface RecipeListProps {
   onEditRecipe?: (recipe: any) => void;
   collectionId?: string | null;
   collectionName?: string | null;
-  feedMode?: 'public' | 'mine' | 'household' | 'collection';
+  feedMode?: 'public' | 'mine' | 'household' | 'shared' | 'collection';
 }
 
 export const RecipeList: React.FC<RecipeListProps> = ({
@@ -29,6 +29,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   collectionName: _collectionName,
   feedMode = 'mine',
 }) => {
+  const markShareSeen = useMarkShareSeen();
   const { user } = useAuthStore();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,6 +147,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   const { data: publicRecipesData, isLoading: publicLoading } = usePublicRecipes({ limit: 50 });
   const { data: householdRecipesData } = useHouseholdRecipes({ limit: 50 });
   const { data: collectionRecipes, isLoading: collectionLoading } = useCollectionRecipes(collectionId || '');
+  const { data: sharedWithMeData, isLoading: sharedLoading } = useSharedWithMe();
   const deleteRecipeMutation = useDeleteRecipe();
   const removeFromCollectionMutation = useRemoveRecipeFromCollection();
   const toggleReaction = useToggleRecipeReaction();
@@ -156,15 +158,31 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   }, [householdData]);
 
   // Determine which recipes to show based on feed mode
+  const sharedItems: any[] = (sharedWithMeData as any[]) || [];
+
   const baseRecipes = feedMode === 'collection' && collectionId
     ? (collectionRecipes || []).map((cr: any) => cr.recipes).filter(Boolean)
     : feedMode === 'household'
     ? (householdRecipesData as any)?.recipes || []
     : feedMode === 'public'
     ? (publicRecipesData as any)?.recipes || []
+    : feedMode === 'shared'
+    ? sharedItems.map((s: any) => ({
+        id: s.recipeId,
+        title: s.title,
+        description: s.description,
+        imageUrl: s.imageUrl,
+        tags: s.tags,
+        visibility: s.visibility,
+        // Attach sharer info for display
+        _shareId: s.shareId,
+        _seenAt: s.seenAt,
+        _sharerDisplayName: s.sharerDisplayName,
+        _sharerUsername: s.sharerUsername,
+      }))
     : (recipes as any)?.recipes || [];
 
-  const useServerSearch = !!debouncedQuery.trim() && feedMode !== 'collection' && feedMode !== 'household' && feedMode !== 'public';
+  const useServerSearch = !!debouncedQuery.trim() && feedMode !== 'collection' && feedMode !== 'household' && feedMode !== 'public' && feedMode !== 'shared';
   const { data: serverSearchResults } = useRecipeTextSearch(useServerSearch ? debouncedQuery : "");
   const recipesAfterSearch = useServerSearch
     ? (serverSearchResults || [])
@@ -251,7 +269,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   // Bulk actions are only available in 'mine' feed mode (user owns the recipes)
   const canBulkSelect = feedMode === 'mine';
 
-  if (isLoading || publicLoading || (collectionId && collectionLoading)) {
+  if (isLoading || publicLoading || (collectionId && collectionLoading) || (feedMode === 'shared' && sharedLoading)) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
@@ -437,15 +455,17 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             </div>
 
             <h3 className="text-2xl font-bold text-stone-900 dark:text-white mb-3">
-              {searchQuery ||
-              Object.values(filters).some((f) => f && f.length > 0)
+              {searchQuery || Object.values(filters).some((f) => f && f.length > 0)
                 ? "No recipes match your search"
+                : feedMode === 'shared'
+                ? "Nothing shared with you yet"
                 : "Start building your recipe collection"}
             </h3>
             <p className="text-stone-600 dark:text-stone-400 mb-8 text-lg leading-relaxed">
-              {searchQuery ||
-              Object.values(filters).some((f) => f && f.length > 0)
+              {searchQuery || Object.values(filters).some((f) => f && f.length > 0)
                 ? "Try adjusting your search terms or filters to find what you're looking for."
+                : feedMode === 'shared'
+                ? "When someone shares a recipe with you by username or email, it will appear here."
                 : "Add your first recipe to get started with meal planning and cooking inspiration."}
             </p>
 
@@ -480,13 +500,30 @@ export const RecipeList: React.FC<RecipeListProps> = ({
               className="animate-fade-in"
               style={{ animationDelay: `${index * 100}ms` }}
             >
+              {feedMode === 'shared' && recipe._sharerDisplayName && (
+                <div className="flex items-center gap-1.5 mb-1.5 px-0.5">
+                  <Share2 className="h-3 w-3 text-stone-400 dark:text-stone-500 shrink-0" />
+                  <span className="text-[11px] text-stone-400 dark:text-stone-500 truncate">
+                    {recipe._sharerDisplayName}
+                    {recipe._sharerUsername && ` · @${recipe._sharerUsername}`}
+                  </span>
+                  {!recipe._seenAt && (
+                    <span className="ml-auto shrink-0 w-1.5 h-1.5 rounded-full bg-primary-500" />
+                  )}
+                </div>
+              )}
               <RecipeCard
                 recipe={recipe}
                 viewMode={viewMode}
                 reactions={reactionsByRecipe[recipe.id] || []}
                 dependents={dependents}
                 onReact={handleReact}
-                onClick={isSelectMode ? undefined : () => onRecipeSelect?.(recipe)}
+                onClick={isSelectMode ? undefined : () => {
+                  if (feedMode === 'shared' && recipe._shareId && !recipe._seenAt) {
+                    markShareSeen.mutate(recipe._shareId);
+                  }
+                  onRecipeSelect?.(recipe);
+                }}
                 onEdit={(!isSelectMode && recipe.userId === user?.id) ? onEditRecipe : undefined}
                 onDelete={(!isSelectMode && (recipe.userId === user?.id || (feedMode === 'collection' && collectionId))) ? handleDeleteRecipe : undefined}
                 isSelected={selectedIds.has(recipe.id)}

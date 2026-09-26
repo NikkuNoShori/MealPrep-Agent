@@ -17,7 +17,7 @@ const Recipes = () => {
   const [editingRecipe, setEditingRecipe] = useState<any>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'collection'>('mine');
+  const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'shared' | 'collection'>('mine');
   const [mobileCollectionsOpen, setMobileCollectionsOpen] = useState(false);
   const { user } = useAuthStore();
   const deleteRecipeMutation = useDeleteRecipe();
@@ -171,7 +171,15 @@ const Recipes = () => {
             {/* Recipe List */}
             <div className="flex-1 min-w-0 space-y-4">
               <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
-                {viewMode === 'collection' && selectedCollectionName ? selectedCollectionName : viewMode === 'household' ? 'Household Recipes' : viewMode === 'public' ? 'Public Recipes' : 'My Recipes'}
+                {viewMode === 'collection' && selectedCollectionName
+                  ? selectedCollectionName
+                  : viewMode === 'household'
+                  ? 'Household Recipes'
+                  : viewMode === 'public'
+                  ? 'Public Recipes'
+                  : viewMode === 'shared'
+                  ? 'Shared with me'
+                  : 'My Recipes'}
               </h1>
               {/* Mobile Collections Toggle */}
               <div className="lg:hidden">

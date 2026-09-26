@@ -428,7 +428,7 @@ All use `SECURITY DEFINER` to bypass RLS for cross-user profile reads, validate 
 
 | Function | Parameters | Returns | Replaces |
 |----------|-----------|---------|----------|
-| `get_dashboard_stats()` | (none — uses `auth.uid()`) | `{ recipe_counts: { own_count, household_count, public_visible_count }, this_week: { plan_id, today_meals }, active_plan_count, grocery_progress: { plan_id, checked, total, categories: [{ category, checked, total }] }, reactions_given, most_cooked_this_month: [{ recipe_id, title, count }], top_cuisines: [{ cuisine, count }] }` | `useRecipes({ limit: 10 })` + `useMealPlans({ limit: 7 })` fetches previously used just to derive counts on `Dashboard.tsx` |
+| `get_dashboard_stats()` | (none — uses `auth.uid()`) | `{ recipe_counts: { own_count, household_count, public_visible_count, collection_shared_count }, this_week: { plan_id, today_meals }, active_plan_count, grocery_progress: { plan_id, checked, total, categories: [{ category, checked, total }] }, reactions_given, most_cooked_this_month: [{ recipe_id, title, count }], top_cuisines: [{ cuisine, count }] }` | `useRecipes({ limit: 10 })` + `useMealPlans({ limit: 7 })` fetches previously used just to derive counts on `Dashboard.tsx` |
 
 Notes:
 - Recipe counts mirror the "Users can view accessible recipes" RLS OR-filter (own / household-shared / public) as true `COUNT(*)` totals, not page-limited fetches.

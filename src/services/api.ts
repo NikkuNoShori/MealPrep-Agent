@@ -1791,6 +1791,58 @@ class ApiClient {
     });
   }
 
+  // ── Direct Recipe Sharing (MOP-0031) ──
+
+  async shareRecipe(recipeId: string, targetIdentifier: string): Promise<string> {
+    const { data, error } = await (supabase as any).rpc('share_recipe', {
+      p_recipe_id: recipeId,
+      p_target_identifier: targetIdentifier,
+    });
+    if (error) throw error;
+    return data as string;
+  }
+
+  async unshareRecipe(recipeId: string, sharedWithUserId: string): Promise<void> {
+    const { error } = await (supabase as any).rpc('unshare_recipe', {
+      p_recipe_id: recipeId,
+      p_shared_with_user_id: sharedWithUserId,
+    });
+    if (error) throw error;
+  }
+
+  async getSharedWithMe(): Promise<any[]> {
+    const { data, error } = await (supabase as any).rpc('get_shared_with_me');
+    if (error) throw error;
+    return ((data as any[]) || []).map((row: any) => ({
+      shareId: row.share_id,
+      recipeId: row.recipe_id,
+      title: row.title,
+      description: row.description,
+      imageUrl: row.image_url,
+      tags: row.tags,
+      visibility: row.visibility,
+      sharedAt: row.shared_at,
+      seenAt: row.seen_at,
+      sharedByUserId: row.shared_by_user_id,
+      sharerDisplayName: row.sharer_display_name,
+      sharerUsername: row.sharer_username,
+      sharerAvatarUrl: row.sharer_avatar_url,
+    }));
+  }
+
+  async markShareSeen(shareId: string): Promise<void> {
+    const { error } = await (supabase as any).rpc('mark_share_seen', {
+      p_share_id: shareId,
+    });
+    if (error) throw error;
+  }
+
+  async getUnseenShareCount(): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('get_unseen_share_count');
+    if (error) return 0;
+    return (data as number) ?? 0;
+  }
+
   async updateUsername(username: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
@@ -2635,6 +2687,63 @@ export const useBulkAddToCollection = () => {
       apiClient.bulkAddToCollection(collectionId, recipeIds),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["collections", variables.collectionId, "recipes"] });
+    },
+  });
+};
+
+// ── Direct Recipe Sharing Hooks (MOP-0031) ──
+
+export const useSharedWithMe = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["shared-with-me"],
+    queryFn: () => apiClient.getSharedWithMe(),
+    enabled: !authLoading && !!user,
+    staleTime: QUERY_STALE_TIME.domain,
+  });
+};
+
+export const useUnseenShareCount = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["unseen-share-count"],
+    queryFn: () => apiClient.getUnseenShareCount(),
+    enabled: !authLoading && !!user,
+    staleTime: 30_000,
+  });
+};
+
+export const useShareRecipe = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recipeId, targetIdentifier }: { recipeId: string; targetIdentifier: string }) =>
+      apiClient.shareRecipe(recipeId, targetIdentifier),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shared-with-me"] });
+      queryClient.invalidateQueries({ queryKey: ["unseen-share-count"] });
+    },
+  });
+};
+
+export const useUnshareRecipe = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recipeId, sharedWithUserId }: { recipeId: string; sharedWithUserId: string }) =>
+      apiClient.unshareRecipe(recipeId, sharedWithUserId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shared-with-me"] });
+      queryClient.invalidateQueries({ queryKey: ["unseen-share-count"] });
+    },
+  });
+};
+
+export const useMarkShareSeen = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (shareId: string) => apiClient.markShareSeen(shareId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["unseen-share-count"] });
+      queryClient.invalidateQueries({ queryKey: ["shared-with-me"] });
     },
   });
 };
