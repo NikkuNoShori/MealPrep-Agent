@@ -127,7 +127,7 @@ Resolve the three competing "error" representations into one (ADR-0006 Decision 
 **Files affected:** `src/stores/themeStore.ts`, `tailwind.config.js`, `src/index.css`
 
 - Add required ramps to the `ColorScheme` interface: `surface` (50–900), `accentCategory` (1–6), `gradient` (brand/warm/subtle), plus the reconciled `status` roles from Phase 3. Reserve `viz` (1–8) — declared, not yet consumed.
-- Author these ramps for each of the four existing presets. **Evergreen's `surface` must equal today's `stone` hex values exactly**, so the live palette is pixel-identical after migration.
+- Author these ramps for each of the five presets (Evergreen, Forest, Ocean, Sunset, Botanical) using the exact hex values recorded in §Approved Phase 9 palette specs. **Evergreen's `surface` must equal today's `stone` hex values exactly**, so the live palette is pixel-identical after migration.
 - Bump the `persist` config `version` and add a `migrate` function backfilling every new ramp for hydrated state. **Required** — without it, existing localStorage yields `undefined` ramps.
 - Map `surface-*`, `status-*`, `accent-cat-*` utilities to their `var(--*)`.
 - Retain `stone` as a **deprecated alias** resolving to `--surface-*` (keeps all 878 usages working — no big-bang rewrite).
