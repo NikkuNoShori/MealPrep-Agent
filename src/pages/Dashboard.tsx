@@ -14,7 +14,7 @@ const Dashboard = () => {
   const householdSize = householdData?.members?.length || 0
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
@@ -57,7 +57,7 @@ const Dashboard = () => {
       </div>
 
       {/* Widget grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <TodayWidget stats={stats} isLoading={statsLoading} />
         <GroceryCartWidget stats={stats} isLoading={statsLoading} />
         <MostCookedWidget stats={stats} isLoading={statsLoading} />
