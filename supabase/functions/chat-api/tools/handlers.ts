@@ -468,7 +468,7 @@ async function getMealPlan(
 
   let query = ctx.supabase
     .from("meal_plans")
-    .select("id, title, start_date, end_date, meals, grocery_list, status")
+    .select("id, title, start_date, end_date, status")
     .eq("user_id", ctx.user.id)
     .gte("end_date", startDate)
     .lte("start_date", endDate)
@@ -481,9 +481,32 @@ async function getMealPlan(
   const { data, error } = await query;
   if (error) return { ok: false, error: error.message, retryable: true };
 
+  const plans = data || [];
+
+  // Enrich each plan with child-table entry counts.
+  const enriched = await Promise.all(plans.map(async (p: any) => {
+    const { data: entries } = await ctx.supabase
+      .from("meal_plan_entries" as any)
+      .select("id, date, slot, recipe_name, list_key")
+      .eq("meal_plan_id", p.id);
+    const { data: groceries } = await ctx.supabase
+      .from("grocery_list_items" as any)
+      .select("id, name, is_checked, is_removed")
+      .eq("meal_plan_id", p.id)
+      .eq("is_removed", false);
+    return {
+      ...p,
+      meal_count: (entries || []).length,
+      grocery_count: (groceries || []).length,
+      meals_summary: (entries || []).map((e: any) =>
+        e.date ? `${e.date} ${e.slot}: ${e.recipe_name}` : `${e.list_key}: ${e.recipe_name}`
+      ),
+    };
+  }));
+
   return {
     ok: true,
-    data: { count: (data || []).length, meal_plans: data || [] },
+    data: { count: enriched.length, meal_plans: enriched },
   };
 }
 
@@ -507,23 +530,17 @@ async function assignRecipeToMealPlanSlot(
   if (mealPlanId) {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, meals")
+      .select("id")
       .eq("id", mealPlanId)
       .eq("user_id", ctx.user.id)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    if (!data) {
-      return {
-        ok: false,
-        error: "Meal plan not found",
-        retryable: false,
-      };
-    }
+    if (!data) return { ok: false, error: "Meal plan not found", retryable: false };
     plan = data as { id: string; meals: any };
   } else {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, meals")
+      .select("id")
       .eq("user_id", ctx.user.id)
       .lte("start_date", date)
       .gte("end_date", date)
@@ -537,26 +554,21 @@ async function assignRecipeToMealPlanSlot(
   // Verify recipe belongs to user.
   const { data: recipe, error: recErr } = await ctx.supabase
     .from("recipes")
-    .select("id, title")
+    .select("id, title, servings")
     .eq("id", recipeId)
     .maybeSingle();
   if (recErr || !recipe) {
-    return {
-      ok: false,
-      error: "Recipe not found or you don't have access to it.",
-      retryable: false,
-    };
+    return { ok: false, error: "Recipe not found or you don't have access to it.", retryable: false };
   }
+  const recipeTitle = (recipe as { title: string }).title;
+  const recipeServings = (recipe as { servings?: number }).servings ?? 1;
 
-  // No plan covering the date — create one (7-day window centered on date).
+  // No plan covering the date — create one (7-day window starting on date).
   if (!plan) {
-    const startDate = date;
+    const planStart = date;
     const endDateObj = new Date(date);
     endDateObj.setDate(endDateObj.getDate() + 6);
-    const endDate = endDateObj.toISOString().split("T")[0];
-
-    const meals: Record<string, Record<string, string>> = {};
-    meals[date] = { [slot]: recipeId };
+    const planEnd = endDateObj.toISOString().split("T")[0];
 
     const { data: created, error: createErr } = await ctx.supabase
       .from("meal_plans")
@@ -564,78 +576,90 @@ async function assignRecipeToMealPlanSlot(
         user_id: ctx.user.id,
         created_by: ctx.user.id,
         last_edited_by: ctx.user.id,
-        start_date: startDate,
-        end_date: endDate,
-        meals,
+        start_date: planStart,
+        end_date: planEnd,
+        meals: {},
         status: "draft",
       })
       .select("id")
       .single();
-    if (createErr) {
-      return { ok: false, error: createErr.message, retryable: true };
-    }
-    return {
-      ok: true,
-      data: {
-        meal_plan_id: (created as { id: string }).id,
+    if (createErr) return { ok: false, error: createErr.message, retryable: true };
+
+    const newPlanId = (created as { id: string }).id;
+    const { error: entryErr } = await ctx.supabase
+      .from("meal_plan_entries" as any)
+      .insert({
+        meal_plan_id: newPlanId,
         date,
         slot,
         recipe_id: recipeId,
-        recipe_title: (recipe as { title: string }).title,
-        created_plan: true,
-      },
+        recipe_name: recipeTitle,
+        servings: recipeServings,
+        position: 0,
+      });
+    if (entryErr) return { ok: false, error: entryErr.message, retryable: true };
+
+    return {
+      ok: true,
+      data: { meal_plan_id: newPlanId, date, slot, recipe_id: recipeId, recipe_title: recipeTitle, created_plan: true },
     };
   }
 
-  // Plan exists — check if slot occupied.
-  const currentMeals = (plan.meals && typeof plan.meals === "object"
-    ? { ...(plan.meals as Record<string, unknown>) }
-    : {}) as Record<string, Record<string, string>>;
+  // Plan exists — check if slot already has a different recipe.
+  const { data: existingEntry } = await ctx.supabase
+    .from("meal_plan_entries" as any)
+    .select("id, recipe_id, recipe_name")
+    .eq("meal_plan_id", plan.id)
+    .eq("date", date)
+    .eq("slot", slot)
+    .limit(1)
+    .maybeSingle();
 
-  const daySlots: Record<string, string> = currentMeals[date]
-    ? { ...currentMeals[date] }
-    : {};
-  const existing = daySlots[slot];
-
-  if (existing && existing !== recipeId) {
-    // Conditionally destructive — surface confirmation.
+  if (existingEntry && (existingEntry as any).recipe_id !== recipeId) {
     return {
       requiresConfirmation: true,
-      summary: `That ${slot} slot on ${date} already has a recipe. Overwrite it with "${
-        (recipe as { title: string }).title
-      }"?`,
-      args: {
+      summary: `That ${slot} slot on ${date} already has "${(existingEntry as any).recipe_name}". Overwrite it with "${recipeTitle}"?`,
+      args: { meal_plan_id: plan.id, date, slot, recipe_id: recipeId, confirmed_overwrite: true },
+    };
+  }
+
+  // Insert or update the entry.
+  if (existingEntry) {
+    // Same recipe already in slot — idempotent, no write needed.
+  } else {
+    const { error: entryErr } = await ctx.supabase
+      .from("meal_plan_entries" as any)
+      .insert({
         meal_plan_id: plan.id,
         date,
         slot,
         recipe_id: recipeId,
-        confirmed_overwrite: true,
-      },
-    };
+        recipe_name: recipeTitle,
+        servings: recipeServings,
+        position: 0,
+      });
+    if (entryErr) return { ok: false, error: entryErr.message, retryable: true };
   }
 
-  // Write.
-  daySlots[slot] = recipeId;
-  currentMeals[date] = daySlots;
-
-  const { error: updErr } = await ctx.supabase
+  // Dual-write: keep JSONB meals in sync during transition window.
+  const { data: allEntries } = await ctx.supabase
+    .from("meal_plan_entries" as any)
+    .select("date, slot, recipe_id")
+    .eq("meal_plan_id", plan.id)
+    .not("date", "is", null);
+  const rebuiltMeals: Record<string, Record<string, string>> = {};
+  for (const e of (allEntries || []) as any[]) {
+    if (!rebuiltMeals[e.date]) rebuiltMeals[e.date] = {};
+    rebuiltMeals[e.date][e.slot] = e.recipe_id;
+  }
+  await ctx.supabase
     .from("meal_plans")
-    .update({ meals: currentMeals, last_edited_by: ctx.user.id })
+    .update({ meals: rebuiltMeals, last_edited_by: ctx.user.id })
     .eq("id", plan.id);
-  if (updErr) {
-    return { ok: false, error: updErr.message, retryable: true };
-  }
 
   return {
     ok: true,
-    data: {
-      meal_plan_id: plan.id,
-      date,
-      slot,
-      recipe_id: recipeId,
-      recipe_title: (recipe as { title: string }).title,
-      created_plan: false,
-    },
+    data: { meal_plan_id: plan.id, date, slot, recipe_id: recipeId, recipe_title: recipeTitle, created_plan: false },
   };
 }
 
@@ -651,59 +675,59 @@ async function addToGroceryList(
   const mealPlanId = args.meal_plan_id as string | undefined;
 
   // Find target plan.
-  let plan: { id: string; grocery_list: any } | null;
+  let planId: string | null = null;
   if (mealPlanId) {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, grocery_list")
+      .select("id")
       .eq("id", mealPlanId)
       .eq("user_id", ctx.user.id)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = (data as { id: string; grocery_list: any } | null) || null;
+    planId = (data as { id: string } | null)?.id || null;
   } else {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, grocery_list")
+      .select("id")
       .eq("user_id", ctx.user.id)
       .eq("status", "active")
       .order("start_date", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = (data as { id: string; grocery_list: any } | null) || null;
+    planId = (data as { id: string } | null)?.id || null;
   }
 
-  if (!plan) {
-    return {
-      ok: false,
-      error: "No active meal plan found to add the item to.",
-      retryable: false,
-    };
+  if (!planId) {
+    return { ok: false, error: "No active meal plan found to add the item to.", retryable: false };
   }
 
-  const newItem = {
-    item,
-    amount: args.amount,
-    unit: args.unit,
-    category: args.category || "other",
-    added_at: new Date().toISOString(),
-  };
+  // Get current count for position ordering.
+  const { count: currentCount } = await ctx.supabase
+    .from("grocery_list_items" as any)
+    .select("id", { count: "exact", head: true })
+    .eq("meal_plan_id", planId)
+    .eq("is_removed", false);
 
-  const currentList = Array.isArray(plan.grocery_list)
-    ? [...(plan.grocery_list as unknown[])]
-    : [];
-  currentList.push(newItem);
-
-  const { error: updErr } = await ctx.supabase
-    .from("meal_plans")
-    .update({ grocery_list: currentList, last_edited_by: ctx.user.id })
-    .eq("id", plan.id);
-  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+  const amount = args.amount != null ? Number(args.amount) : null;
+  const { data: newRow, error: insErr } = await ctx.supabase
+    .from("grocery_list_items" as any)
+    .insert({
+      meal_plan_id: planId,
+      name:         item,
+      amount:       amount && !isNaN(amount) ? amount : null,
+      unit:         (args.unit as string) || "",
+      category:     (args.category as string) || "other",
+      is_manual:    true,
+      position:     currentCount ?? 0,
+    })
+    .select()
+    .single();
+  if (insErr) return { ok: false, error: insErr.message, retryable: true };
 
   return {
     ok: true,
-    data: { meal_plan_id: plan.id, item: newItem, total_items: currentList.length },
+    data: { meal_plan_id: planId, item: (newRow as any), total_items: (currentCount ?? 0) + 1 },
   };
 }
 
@@ -1032,22 +1056,21 @@ async function getGroceryList(
 ): Promise<ToolHandlerResult> {
   const mealPlanId = args.meal_plan_id as string | undefined;
 
-  let plan: { id: string; title: string; grocery_list: unknown } | null = null;
+  let planRow: { id: string; title: string } | null = null;
 
   if (mealPlanId) {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, title, grocery_list")
+      .select("id, title")
       .eq("id", mealPlanId)
       .eq("user_id", ctx.user.id)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = data as typeof plan;
+    planRow = data as typeof planRow;
   } else {
-    // Default to the most recent active plan, then any draft.
     const { data: activePlan } = await ctx.supabase
       .from("meal_plans")
-      .select("id, title, grocery_list")
+      .select("id, title")
       .eq("user_id", ctx.user.id)
       .eq("status", "active")
       .order("start_date", { ascending: false })
@@ -1055,37 +1078,36 @@ async function getGroceryList(
       .maybeSingle();
 
     if (activePlan) {
-      plan = activePlan as typeof plan;
+      planRow = activePlan as typeof planRow;
     } else {
       const { data: draftPlan, error } = await ctx.supabase
         .from("meal_plans")
-        .select("id, title, grocery_list")
+        .select("id, title")
         .eq("user_id", ctx.user.id)
         .eq("status", "draft")
         .order("start_date", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) return { ok: false, error: error.message, retryable: true };
-      plan = draftPlan as typeof plan;
+      planRow = draftPlan as typeof planRow;
     }
   }
 
-  if (!plan) {
-    return {
-      ok: true,
-      data: { items: [], count: 0, message: "No meal plan found with a grocery list." },
-    };
+  if (!planRow) {
+    return { ok: true, data: { items: [], count: 0, message: "No meal plan found with a grocery list." } };
   }
 
-  const items = Array.isArray(plan.grocery_list) ? plan.grocery_list : [];
+  const { data: items, error: itemsErr } = await ctx.supabase
+    .from("grocery_list_items" as any)
+    .select("id, name, amount, unit, category, is_checked, is_removed, is_manual, notes")
+    .eq("meal_plan_id", planRow.id)
+    .eq("is_removed", false)
+    .order("position", { ascending: true });
+  if (itemsErr) return { ok: false, error: itemsErr.message, retryable: true };
+
   return {
     ok: true,
-    data: {
-      meal_plan_id: plan.id,
-      meal_plan_title: plan.title,
-      count: items.length,
-      items,
-    },
+    data: { meal_plan_id: planRow.id, meal_plan_title: planRow.title, count: (items || []).length, items: items || [] },
   };
 }
 
@@ -1101,65 +1123,61 @@ async function markGroceryItemPurchased(
   const purchased = (args.purchased as boolean | undefined) ?? true;
   const mealPlanId = args.meal_plan_id as string | undefined;
 
-  // Find the plan.
-  let plan: { id: string; grocery_list: unknown } | null = null;
+  // Resolve the target plan id.
+  let resolvedPlanId: string | null = null;
   if (mealPlanId) {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, grocery_list")
+      .select("id")
       .eq("id", mealPlanId)
       .eq("user_id", ctx.user.id)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = data as typeof plan;
+    resolvedPlanId = (data as { id: string } | null)?.id || null;
   } else {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, grocery_list")
+      .select("id")
       .eq("user_id", ctx.user.id)
       .eq("status", "active")
       .order("start_date", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = data as typeof plan;
+    resolvedPlanId = (data as { id: string } | null)?.id || null;
   }
 
-  if (!plan) {
+  if (!resolvedPlanId) {
     return { ok: false, error: "No active meal plan found.", retryable: false };
   }
 
-  const items = Array.isArray(plan.grocery_list)
-    ? [...(plan.grocery_list as Record<string, unknown>[])]
-    : [];
+  // Find matching items by name (case-insensitive contains).
+  const { data: items, error: fetchErr } = await ctx.supabase
+    .from("grocery_list_items" as any)
+    .select("id, name")
+    .eq("meal_plan_id", resolvedPlanId)
+    .eq("is_removed", false);
+  if (fetchErr) return { ok: false, error: fetchErr.message, retryable: true };
 
-  let updated = false;
-  const updatedItems = items.map((i) => {
-    const name = ((i as { item?: string }).item || "").toLowerCase();
-    if (name.includes(itemName) || itemName.includes(name)) {
-      updated = true;
-      return { ...i, purchased, purchased_at: purchased ? new Date().toISOString() : null };
-    }
-    return i;
+  const matched = ((items || []) as { id: string; name: string }[]).filter((i) => {
+    const n = i.name.toLowerCase();
+    return n.includes(itemName) || itemName.includes(n);
   });
 
-  if (!updated) {
-    return {
-      ok: false,
-      error: `No item matching "${itemName}" found in the grocery list.`,
-      retryable: false,
-    };
+  if (matched.length === 0) {
+    return { ok: false, error: `No item matching "${itemName}" found in the grocery list.`, retryable: false };
   }
 
+  const matchedIds = matched.map((i) => i.id);
   const { error: updErr } = await ctx.supabase
-    .from("meal_plans")
-    .update({ grocery_list: updatedItems, last_edited_by: ctx.user.id })
-    .eq("id", plan.id);
+    .from("grocery_list_items" as any)
+    .update({ is_checked: purchased })
+    .in("id", matchedIds);
   if (updErr) return { ok: false, error: updErr.message, retryable: true };
 
   return {
     ok: true,
-    data: { updated: true, item_name: itemName, purchased, meal_plan_id: plan.id },
+    data: { updated: true, item_name: itemName, purchased, matched_items: matched.map((i) => i.name), meal_plan_id: resolvedPlanId },
   };
 }
 
@@ -1234,60 +1252,60 @@ async function removeGroceryItem(
   const itemName = (args.item_name as string).toLowerCase();
   const mealPlanId = args.meal_plan_id as string | undefined;
 
-  let plan: { id: string; grocery_list: unknown } | null = null;
+  let resolvedPlanId: string | null = null;
   if (mealPlanId) {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, grocery_list")
+      .select("id")
       .eq("id", mealPlanId)
       .eq("user_id", ctx.user.id)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = data as typeof plan;
+    resolvedPlanId = (data as { id: string } | null)?.id || null;
   } else {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, grocery_list")
+      .select("id")
       .eq("user_id", ctx.user.id)
       .eq("status", "active")
       .order("start_date", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = data as typeof plan;
+    resolvedPlanId = (data as { id: string } | null)?.id || null;
   }
 
-  if (!plan) {
+  if (!resolvedPlanId) {
     return { ok: false, error: "No active meal plan found.", retryable: false };
   }
 
-  const items = Array.isArray(plan.grocery_list)
-    ? [...(plan.grocery_list as Record<string, unknown>[])]
-    : [];
+  const { data: items, error: fetchErr } = await ctx.supabase
+    .from("grocery_list_items" as any)
+    .select("id, name")
+    .eq("meal_plan_id", resolvedPlanId)
+    .eq("is_removed", false);
+  if (fetchErr) return { ok: false, error: fetchErr.message, retryable: true };
 
-  const filtered = items.filter((i) => {
-    const name = ((i as { item?: string }).item || "").toLowerCase();
-    return !(name.includes(itemName) || itemName.includes(name));
+  const matched = ((items || []) as { id: string; name: string }[]).filter((i) => {
+    const n = i.name.toLowerCase();
+    return n.includes(itemName) || itemName.includes(n);
   });
 
-  const removed = items.length - filtered.length;
-  if (removed === 0) {
-    return {
-      ok: false,
-      error: `No item matching "${itemName}" found in the grocery list.`,
-      retryable: false,
-    };
+  if (matched.length === 0) {
+    return { ok: false, error: `No item matching "${itemName}" found in the grocery list.`, retryable: false };
   }
 
+  const matchedIds = matched.map((i) => i.id);
   const { error: updErr } = await ctx.supabase
-    .from("meal_plans")
-    .update({ grocery_list: filtered, last_edited_by: ctx.user.id })
-    .eq("id", plan.id);
+    .from("grocery_list_items" as any)
+    .update({ is_removed: true })
+    .in("id", matchedIds);
   if (updErr) return { ok: false, error: updErr.message, retryable: true };
 
+  const remaining = ((items || []) as { id: string }[]).length - matched.length;
   return {
     ok: true,
-    data: { removed_count: removed, item_name: itemName, remaining: filtered.length, meal_plan_id: plan.id },
+    data: { removed_count: matched.length, item_name: itemName, remaining, meal_plan_id: resolvedPlanId },
   };
 }
 
@@ -1315,7 +1333,6 @@ async function createMealPlan(
       start_date: startDate,
       end_date: endDate,
       meals: {},
-      grocery_list: [],
       status: "draft",
     })
     .select("id, title, start_date, end_date, status")
@@ -1348,20 +1365,20 @@ async function clearMealPlanSlot(
   const slot = args.slot as string;
   const mealPlanId = args.meal_plan_id as string | undefined;
 
-  let plan: { id: string; meals: unknown } | null = null;
+  let resolvedPlanId: string | null = null;
   if (mealPlanId) {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, meals")
+      .select("id")
       .eq("id", mealPlanId)
       .eq("user_id", ctx.user.id)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = data as typeof plan;
+    resolvedPlanId = (data as { id: string } | null)?.id || null;
   } else {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
-      .select("id, meals")
+      .select("id")
       .eq("user_id", ctx.user.id)
       .lte("start_date", date)
       .gte("end_date", date)
@@ -1369,44 +1386,50 @@ async function clearMealPlanSlot(
       .limit(1)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = data as typeof plan;
+    resolvedPlanId = (data as { id: string } | null)?.id || null;
   }
 
-  if (!plan) {
+  if (!resolvedPlanId) {
     return { ok: false, error: `No meal plan found covering ${date}.`, retryable: false };
   }
 
-  const currentMeals = (
-    plan.meals && typeof plan.meals === "object"
-      ? { ...(plan.meals as Record<string, Record<string, string>>) }
-      : {}
-  ) as Record<string, Record<string, string>>;
+  // Check if any entries exist in this slot.
+  const { data: existing } = await ctx.supabase
+    .from("meal_plan_entries" as any)
+    .select("id")
+    .eq("meal_plan_id", resolvedPlanId)
+    .eq("date", date)
+    .eq("slot", slot);
 
-  const daySlots = currentMeals[date] ? { ...currentMeals[date] } : {};
-  if (!daySlots[slot]) {
-    return {
-      ok: true,
-      data: { message: `The ${slot} slot on ${date} was already empty.`, meal_plan_id: plan.id },
-    };
+  if (!existing || (existing as any[]).length === 0) {
+    return { ok: true, data: { message: `The ${slot} slot on ${date} was already empty.`, meal_plan_id: resolvedPlanId } };
   }
 
-  delete daySlots[slot];
-  if (Object.keys(daySlots).length === 0) {
-    delete currentMeals[date];
-  } else {
-    currentMeals[date] = daySlots;
-  }
+  const { error: delErr } = await ctx.supabase
+    .from("meal_plan_entries" as any)
+    .delete()
+    .eq("meal_plan_id", resolvedPlanId)
+    .eq("date", date)
+    .eq("slot", slot);
+  if (delErr) return { ok: false, error: delErr.message, retryable: true };
 
-  const { error: updErr } = await ctx.supabase
+  // Dual-write: rebuild JSONB meals from remaining entries.
+  const { data: allEntries } = await ctx.supabase
+    .from("meal_plan_entries" as any)
+    .select("date, slot, recipe_id")
+    .eq("meal_plan_id", resolvedPlanId)
+    .not("date", "is", null);
+  const rebuiltMeals: Record<string, Record<string, string>> = {};
+  for (const e of (allEntries || []) as any[]) {
+    if (!rebuiltMeals[e.date]) rebuiltMeals[e.date] = {};
+    rebuiltMeals[e.date][e.slot] = e.recipe_id;
+  }
+  await ctx.supabase
     .from("meal_plans")
-    .update({ meals: currentMeals, last_edited_by: ctx.user.id })
-    .eq("id", plan.id);
-  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+    .update({ meals: rebuiltMeals, last_edited_by: ctx.user.id })
+    .eq("id", resolvedPlanId);
 
-  return {
-    ok: true,
-    data: { cleared: true, date, slot, meal_plan_id: plan.id },
-  };
+  return { ok: true, data: { cleared: true, date, slot, meal_plan_id: resolvedPlanId } };
 }
 
 // ─────────────────────────────────────────────────────────────────────
