@@ -746,6 +746,65 @@ class ApiClient {
 
   // ── Meal Planning ──
 
+  // Reconstruct MealPlanMeals + GroceryList from child-table rows.
+  // Called by getMealPlan / getMealPlans to keep all consumers shape-compatible.
+  private async _assembleMealPlanShape(planRow: any) {
+    const plan = snakeToCamel(planRow);
+
+    const [entries, groceryRows] = await Promise.all([
+      this.getMealPlanEntries(plan.id).catch(() => [] as any[]),
+      this.getGroceryItems(plan.id).catch(() => [] as any[]),
+    ]);
+
+    // Rebuild meals: MealPlanMeals from child table entries
+    const meals: Record<string, any> = {};
+    for (const e of entries) {
+      const entry = {
+        id:          e.id,
+        recipeId:    e.recipeId    || '',
+        recipeName:  e.recipeName  || '',
+        recipeImage: e.recipeImage || undefined,
+        servings:    e.servings    ?? 1,
+        prepTime:    e.prepTime    ?? undefined,
+        cookTime:    e.cookTime    ?? undefined,
+        notes:       e.notes       || undefined,
+      };
+      if (e.date && e.slot) {
+        if (!meals[e.date]) meals[e.date] = {};
+        if (!meals[e.date][e.slot]) meals[e.date][e.slot] = [];
+        meals[e.date][e.slot].push(entry);
+      } else if (e.listKey) {
+        const key = `_${e.listKey}`;
+        if (!meals[key]) meals[key] = [];
+        meals[key].push(entry);
+      }
+    }
+
+    // Rebuild groceryList: { items, lastGenerated } from child table rows
+    let groceryList: { items: any[]; lastGenerated: string } | null = null;
+    if (groceryRows.length > 0) {
+      const lastGenerated = groceryRows[0].lastGenerated || new Date().toISOString();
+      groceryList = {
+        items: groceryRows.map((r: any) => ({
+          id:            r.id,
+          name:          r.name,
+          amount:        r.amount    ?? null,
+          unit:          r.unit      || '',
+          category:      r.category  || 'other',
+          sourceRecipes: r.sourceRecipes || [],
+          isManual:      r.isManual  ?? false,
+          isChecked:     r.isChecked ?? false,
+          isRemoved:     r.isRemoved ?? false,
+          notes:         r.notes     || undefined,
+          rawAmount:     r.rawAmount ?? undefined,
+        })),
+        lastGenerated,
+      };
+    }
+
+    return { ...plan, meals, groceryList };
+  }
+
   async getMealPlans(params?: { limit?: number; status?: string }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
@@ -764,7 +823,9 @@ class ApiClient {
 
     const { data, error } = await query;
     if (error) throw error;
-    return (data || []).map((p: any) => snakeToCamel(p));
+
+    // Assemble child-table data for each plan in parallel.
+    return Promise.all((data || []).map((p: any) => this._assembleMealPlanShape(p)));
   }
 
   async getMealPlan(id: string) {
@@ -774,7 +835,7 @@ class ApiClient {
       .single();
 
     if (error) throw error;
-    return snakeToCamel(data);
+    return this._assembleMealPlanShape(data);
   }
 
   async createMealPlan(data: {
@@ -835,6 +896,14 @@ class ApiClient {
       .single();
 
     if (error) throw error;
+
+    // Dual-write Phase (MOP-0011): mirror meals to child table when caller
+    // replaces the full meals JSONB (MealPlanner read-modify-write path).
+    if (data.meals !== undefined) {
+      await this.replaceMealPlanEntries(id, data.meals).catch(() => {
+        // Non-fatal during dual-write window.
+      });
+    }
 
     // Dual-write Phase (MOP-0011): mirror grocery list to child table when caller
     // replaces the full grocery_list JSONB (GroceryCart.handleGenerate path).
@@ -1084,6 +1153,68 @@ class ApiClient {
       .single();
     if (error) throw error;
     return snakeToCamel(data);
+  }
+
+  async replaceMealPlanEntries(planId: string, meals: Record<string, any>) {
+    // Delete all existing entries for the plan, then bulk-insert from the
+    // MealPlanMeals JSONB shape. Used by updateMealPlan dual-write path.
+    const { error: delError } = await (supabase as any)
+      .from("meal_plan_entries")
+      .delete()
+      .eq("meal_plan_id", planId);
+    if (delError) throw delError;
+
+    const rows: any[] = [];
+    for (const [key, val] of Object.entries(meals)) {
+      if (!val) continue;
+      if (key.startsWith('_') && Array.isArray(val)) {
+        // Plan-level list: _snacks, etc.
+        const listKey = key.slice(1); // strip leading _
+        (val as any[]).forEach((e: any, idx: number) => {
+          rows.push({
+            meal_plan_id: planId,
+            list_key:     listKey,
+            recipe_id:    e.recipeId   || null,
+            recipe_name:  e.recipeName || '',
+            recipe_image: e.recipeImage || null,
+            servings:     e.servings   ?? 1,
+            prep_time:    e.prepTime   ?? null,
+            cook_time:    e.cookTime   ?? null,
+            notes:        e.notes      || null,
+            position:     idx,
+          });
+        });
+      } else if (typeof val === 'object' && !Array.isArray(val)) {
+        // Date-keyed: meals[date][slot] = PlannedMealEntry[]
+        for (const [slot, entries] of Object.entries(val as Record<string, any[]>)) {
+          if (!Array.isArray(entries)) continue;
+          entries.forEach((e: any, idx: number) => {
+            rows.push({
+              meal_plan_id: planId,
+              date:         key,
+              slot,
+              recipe_id:    e.recipeId   || null,
+              recipe_name:  e.recipeName || '',
+              recipe_image: e.recipeImage || null,
+              servings:     e.servings   ?? 1,
+              prep_time:    e.prepTime   ?? null,
+              cook_time:    e.cookTime   ?? null,
+              notes:        e.notes      || null,
+              position:     idx,
+            });
+          });
+        }
+      }
+    }
+
+    if (rows.length === 0) return [];
+
+    const { data, error } = await (supabase as any)
+      .from("meal_plan_entries")
+      .insert(rows)
+      .select();
+    if (error) throw error;
+    return (data || []).map((r: any) => snakeToCamel(r));
   }
 
   async replaceGroceryItems(planId: string, items: Array<{
