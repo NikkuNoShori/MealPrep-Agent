@@ -195,9 +195,9 @@ npx supabase functions deploy chat-api
 
 - [x] Set OpenRouter secrets (`OPENROUTER_API_KEY_CHAT` / `_MEDIA` or fallback)
 - [x] Deploy `chat-api` (2026-06-16)
-- [ ] Deploy `recipe-pipeline` (extract fix + thumbnail metadata)
-- [ ] Run smoke tests in §Operator Requirements
-- [ ] Confirm Whisper transcriptions endpoint works (check edge logs; Gemini fallback if not)
+- [x] Deploy `recipe-pipeline` (extract fix + thumbnail metadata)
+- [x] Run smoke tests in §Operator Requirements
+- [x] Confirm Whisper transcriptions endpoint works (check edge logs; Gemini fallback if not)
 
 ### Phase 5: UX polish — **deferred**
 
@@ -312,9 +312,9 @@ verification:
 - [x] User-uploaded video path: frames + STT + extract (no TikTok CDN download)
 - [x] `pinned_comment_text` accepted on pipeline request
 - [x] Chat accepts video file attachment and shows extract preview
-- [ ] `OPENROUTER_API_KEY` set in Supabase secrets (operator)
-- [ ] `recipe-pipeline` + `chat-api` deployed (operator)
-- [ ] Smoke tests pass with real TikTok URL + saved video (operator)
+- [x] `OPENROUTER_API_KEY` set in Supabase secrets (operator)
+- [x] `recipe-pipeline` + `chat-api` deployed (operator)
+- [x] Smoke tests pass with real TikTok URL + saved video (operator)
 - [ ] All `verification` block items pass (`/verify-mop MOP-0016`)
 
 ---
