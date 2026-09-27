@@ -848,7 +848,7 @@ class ApiClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data: mealPlan, error } = await (supabase as any).from("meal_plans")
+    const { data: mealPlan, error } = await supabase.from("meal_plans")
       .insert({
         user_id: user.id,
         created_by: user.id,
@@ -939,7 +939,7 @@ class ApiClient {
     const newStart = new Date(newDateRange.startDate);
     const dayOffset = Math.round((newStart.getTime() - sourceStart.getTime()) / (1000 * 60 * 60 * 24));
 
-    const { data: mealPlan, error } = await (supabase as any).from("meal_plans")
+    const { data: mealPlan, error } = await supabase.from("meal_plans")
       .insert({
         user_id: user.id,
         created_by: user.id,
@@ -994,7 +994,7 @@ class ApiClient {
   // meal_plans.meals and meal_plans.grocery_list JSONB columns dropped in migration 046.
 
   async getMealPlanEntries(planId: string) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("meal_plan_entries")
       .select("*")
       .eq("meal_plan_id", planId)
@@ -1017,7 +1017,7 @@ class ApiClient {
     notes?: string;
     position?: number;
   }) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("meal_plan_entries")
       .insert({
         meal_plan_id: planId,
@@ -1040,7 +1040,7 @@ class ApiClient {
   }
 
   async removeMealPlanEntry(entryId: string) {
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("meal_plan_entries")
       .delete()
       .eq("id", entryId);
@@ -1048,7 +1048,7 @@ class ApiClient {
   }
 
   async getGroceryItems(planId: string) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("grocery_list_items")
       .select("*")
       .eq("meal_plan_id", planId)
@@ -1070,7 +1070,7 @@ class ApiClient {
     lastGenerated?: string;
     position?: number;
   }) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("grocery_list_items")
       .insert({
         meal_plan_id:     planId,
@@ -1106,7 +1106,7 @@ class ApiClient {
     if (patch.unit       !== undefined) payload.unit       = patch.unit;
     if (patch.notes      !== undefined) payload.notes      = patch.notes;
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("grocery_list_items")
       .update(payload)
       .eq("id", itemId)
@@ -1119,7 +1119,7 @@ class ApiClient {
   async replaceMealPlanEntries(planId: string, meals: Record<string, any>) {
     // Delete all existing entries for the plan, then bulk-insert from the
     // MealPlanMeals JSONB shape. Used by updateMealPlan dual-write path.
-    const { error: delError } = await (supabase as any)
+    const { error: delError } = await supabase
       .from("meal_plan_entries")
       .delete()
       .eq("meal_plan_id", planId);
@@ -1170,7 +1170,7 @@ class ApiClient {
 
     if (rows.length === 0) return [];
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("meal_plan_entries")
       .insert(rows)
       .select();
@@ -1193,7 +1193,7 @@ class ApiClient {
   }>) {
     // Delete all existing items for the plan, then bulk-insert the new set.
     // Used by GroceryCart.handleGenerate which rebuilds the list from scratch.
-    const { error: delError } = await (supabase as any)
+    const { error: delError } = await supabase
       .from("grocery_list_items")
       .delete()
       .eq("meal_plan_id", planId);
@@ -1220,7 +1220,7 @@ class ApiClient {
       position:         idx,
     }));
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("grocery_list_items")
       .insert(rows)
       .select();

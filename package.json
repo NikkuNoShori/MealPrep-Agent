@@ -17,7 +17,7 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:golden-routing": "deno test --config supabase/functions/deno.json --allow-env --allow-net supabase/functions/chat-api/__tests__/golden-routing.test.ts",
-    "types:supabase": "supabase gen types typescript --linked | sed -n '/^export type Json/,/^} as const$/p' > src/types/database.ts",
+    "types:supabase": "supabase gen types typescript --linked > src/types/database.ts",
     "deploy:edge": "vercel --prod",
     "server": "node server.js",
     "server:env": "node start-server-with-env.js",

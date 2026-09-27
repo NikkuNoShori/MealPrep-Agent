@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -10,7 +11,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   graphql_public: {
     Tables: {
@@ -165,7 +166,9 @@ export type Database = {
           age: number | null
           allergies: string[] | null
           created_at: string | null
+          dietary_flags: string[] | null
           dietary_restrictions: string[] | null
+          dislikes: string[] | null
           household_id: string
           id: string
           is_active: boolean | null
@@ -179,7 +182,9 @@ export type Database = {
           age?: number | null
           allergies?: string[] | null
           created_at?: string | null
+          dietary_flags?: string[] | null
           dietary_restrictions?: string[] | null
+          dislikes?: string[] | null
           household_id: string
           id?: string
           is_active?: boolean | null
@@ -193,7 +198,9 @@ export type Database = {
           age?: number | null
           allergies?: string[] | null
           created_at?: string | null
+          dietary_flags?: string[] | null
           dietary_restrictions?: string[] | null
+          dislikes?: string[] | null
           household_id?: string
           id?: string
           is_active?: boolean | null
@@ -216,6 +223,81 @@ export type Database = {
             columns: ["managed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grocery_list_items: {
+        Row: {
+          amount: number | null
+          category: string
+          created_at: string
+          id: string
+          is_checked: boolean
+          is_manual: boolean
+          is_removed: boolean
+          last_generated: string | null
+          meal_plan_id: string
+          name: string
+          notes: string | null
+          position: number
+          raw_amount: number | null
+          source_recipe_id: string | null
+          source_recipes: string[]
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          category?: string
+          created_at?: string
+          id?: string
+          is_checked?: boolean
+          is_manual?: boolean
+          is_removed?: boolean
+          last_generated?: string | null
+          meal_plan_id: string
+          name: string
+          notes?: string | null
+          position?: number
+          raw_amount?: number | null
+          source_recipe_id?: string | null
+          source_recipes?: string[]
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          category?: string
+          created_at?: string
+          id?: string
+          is_checked?: boolean
+          is_manual?: boolean
+          is_removed?: boolean
+          last_generated?: string | null
+          meal_plan_id?: string
+          name?: string
+          notes?: string | null
+          position?: number
+          raw_amount?: number | null
+          source_recipe_id?: string | null
+          source_recipes?: string[]
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grocery_list_items_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grocery_list_items_source_recipe_id_fkey"
+            columns: ["source_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
         ]
@@ -309,6 +391,8 @@ export type Database = {
       }
       households: {
         Row: {
+          allow_member_child_edits: boolean
+          allow_member_edits: boolean
           created_at: string | null
           created_by: string
           id: string
@@ -316,6 +400,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          allow_member_child_edits?: boolean
+          allow_member_edits?: boolean
           created_at?: string | null
           created_by: string
           id?: string
@@ -323,6 +409,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          allow_member_child_edits?: boolean
+          allow_member_edits?: boolean
           created_at?: string | null
           created_by?: string
           id?: string
@@ -381,16 +469,83 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_plan_entries: {
+        Row: {
+          cook_time: number | null
+          created_at: string
+          date: string | null
+          id: string
+          list_key: string | null
+          meal_plan_id: string
+          notes: string | null
+          position: number
+          prep_time: number | null
+          recipe_id: string | null
+          recipe_image: string | null
+          recipe_name: string | null
+          servings: number | null
+          slot: string | null
+          updated_at: string
+        }
+        Insert: {
+          cook_time?: number | null
+          created_at?: string
+          date?: string | null
+          id?: string
+          list_key?: string | null
+          meal_plan_id: string
+          notes?: string | null
+          position?: number
+          prep_time?: number | null
+          recipe_id?: string | null
+          recipe_image?: string | null
+          recipe_name?: string | null
+          servings?: number | null
+          slot?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cook_time?: number | null
+          created_at?: string
+          date?: string | null
+          id?: string
+          list_key?: string | null
+          meal_plan_id?: string
+          notes?: string | null
+          position?: number
+          prep_time?: number | null
+          recipe_id?: string | null
+          recipe_image?: string | null
+          recipe_name?: string | null
+          servings?: number | null
+          slot?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plan_entries_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_entries_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meal_plans: {
         Row: {
           copied_from: string | null
           created_at: string | null
           created_by: string | null
           end_date: string
-          grocery_list: Json | null
           id: string
           last_edited_by: string | null
-          meals: Json
           notes: string | null
           start_date: string
           status: string | null
@@ -404,10 +559,8 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           end_date: string
-          grocery_list?: Json | null
           id?: string
           last_edited_by?: string | null
-          meals: Json
           notes?: string | null
           start_date: string
           status?: string | null
@@ -421,10 +574,8 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           end_date?: string
-          grocery_list?: Json | null
           id?: string
           last_edited_by?: string | null
-          meals?: Json
           notes?: string | null
           start_date?: string
           status?: string | null
@@ -466,42 +617,54 @@ export type Database = {
       }
       profiles: {
         Row: {
+          allergies: string[] | null
           avatar_url: string | null
           created_at: string | null
+          dietary_restrictions: string[] | null
           display_name: string
           email: string
           first_name: string | null
           household_size: number | null
           id: string
           last_name: string | null
+          plan_period_config: Json | null
+          randomizer_config: Json | null
           setup_completed: boolean
           timezone: string | null
           updated_at: string | null
           username: string
         }
         Insert: {
+          allergies?: string[] | null
           avatar_url?: string | null
           created_at?: string | null
+          dietary_restrictions?: string[] | null
           display_name: string
           email: string
           first_name?: string | null
           household_size?: number | null
           id: string
           last_name?: string | null
+          plan_period_config?: Json | null
+          randomizer_config?: Json | null
           setup_completed?: boolean
           timezone?: string | null
           updated_at?: string | null
           username: string
         }
         Update: {
+          allergies?: string[] | null
           avatar_url?: string | null
           created_at?: string | null
+          dietary_restrictions?: string[] | null
           display_name?: string
           email?: string
           first_name?: string | null
           household_size?: number | null
           id?: string
           last_name?: string | null
+          plan_period_config?: Json | null
+          randomizer_config?: Json | null
           setup_completed?: boolean
           timezone?: string | null
           updated_at?: string | null
@@ -636,6 +799,55 @@ export type Database = {
           },
         ]
       }
+      recipe_shares: {
+        Row: {
+          id: string
+          recipe_id: string
+          seen_at: string | null
+          shared_at: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+        }
+        Insert: {
+          id?: string
+          recipe_id: string
+          seen_at?: string | null
+          shared_at?: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+        }
+        Update: {
+          id?: string
+          recipe_id?: string
+          seen_at?: string | null
+          shared_at?: string
+          shared_by_user_id?: string
+          shared_with_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_shares_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_shares_shared_by_user_id_fkey"
+            columns: ["shared_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_shares_shared_with_user_id_fkey"
+            columns: ["shared_with_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
           cook_time: number | null
@@ -650,6 +862,7 @@ export type Database = {
           ingredients: Json
           instructions: Json
           is_favorite: boolean | null
+          needs_reembed: boolean
           nutrition_info: Json | null
           prep_time: number | null
           rating: number | null
@@ -678,6 +891,7 @@ export type Database = {
           ingredients: Json
           instructions: Json
           is_favorite?: boolean | null
+          needs_reembed?: boolean
           nutrition_info?: Json | null
           prep_time?: number | null
           rating?: number | null
@@ -706,6 +920,7 @@ export type Database = {
           ingredients?: Json
           instructions?: Json
           is_favorite?: boolean | null
+          needs_reembed?: boolean
           nutrition_info?: Json | null
           prep_time?: number | null
           rating?: number | null
@@ -841,6 +1056,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bulk_add_to_collection: {
+        Args: { p_collection_id: string; p_recipe_ids: string[] }
+        Returns: number
+      }
+      bulk_delete_recipes: { Args: { p_recipe_ids: string[] }; Returns: number }
+      bulk_update_recipe_visibility: {
+        Args: { p_recipe_ids: string[]; p_visibility: string }
+        Returns: number
+      }
       find_similar_recipes: {
         Args: {
           max_results?: number
@@ -869,6 +1093,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_dashboard_stats: { Args: never; Returns: Json }
       get_household_recipes: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: Json
@@ -877,7 +1102,6 @@ export type Database = {
         Args: { p_household_id: string; p_user_id: string }
         Returns: string
       }
-      get_dashboard_stats: { Args: never; Returns: Json }
       get_my_household: { Args: never; Returns: Json }
       get_my_pending_invites: { Args: never; Returns: Json }
       get_recipe_reactions: { Args: { p_recipe_ids: string[] }; Returns: Json }
@@ -910,10 +1134,40 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_shared_with_me: {
+        Args: never
+        Returns: {
+          description: string
+          image_url: string
+          recipe_id: string
+          seen_at: string
+          share_id: string
+          shared_at: string
+          shared_by_user_id: string
+          sharer_avatar_url: string
+          sharer_display_name: string
+          sharer_username: string
+          tags: string[]
+          title: string
+          visibility: string
+        }[]
+      }
+      get_unseen_share_count: { Args: never; Returns: number }
       is_admin: { Args: never; Returns: boolean }
       is_household_member: {
         Args: { p_household_id: string; p_user_id: string }
         Returns: boolean
+      }
+      is_meal_plan_owner: { Args: { p_meal_plan_id: string }; Returns: boolean }
+      mark_share_seen: { Args: { p_share_id: string }; Returns: undefined }
+      purge_old_chat_conversations: { Args: never; Returns: undefined }
+      respond_to_household_invite: {
+        Args: { p_accept: boolean; p_invite_id: string }
+        Returns: {
+          household_id: string
+          household_name: string
+          status: string
+        }[]
       }
       search_recipes_by_ingredients: {
         Args: {
@@ -982,23 +1236,11 @@ export type Database = {
           title: string
         }[]
       }
-      search_similar_recipes: {
-        Args: {
-          max_results?: number
-          query_embedding: string
-          similarity_threshold?: number
-          user_uuid: string
-        }
-        Returns: {
-          description: string
-          ingredients: Json
-          instructions: Json
-          recipe_id: string
-          similarity_score: number
-          title: string
-        }[]
-      }
       set_user_id: { Args: { user_uuid: string }; Returns: undefined }
+      share_recipe: {
+        Args: { p_recipe_id: string; p_target_identifier: string }
+        Returns: string
+      }
       toggle_recipe_reaction: {
         Args: {
           p_family_member_id?: string
@@ -1006,6 +1248,14 @@ export type Database = {
           p_recipe_id: string
         }
         Returns: Json
+      }
+      transfer_household_ownership: {
+        Args: { p_household_id: string; p_member_id: string }
+        Returns: undefined
+      }
+      unshare_recipe: {
+        Args: { p_recipe_id: string; p_shared_with_user_id: string }
+        Returns: undefined
       }
     }
     Enums: {
@@ -1025,12 +1275,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1054,11 +1304,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1079,11 +1329,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1104,11 +1354,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1121,11 +1371,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
