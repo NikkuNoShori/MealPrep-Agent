@@ -80,7 +80,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
     switch (preference) {
       case 'love': return <Heart className="h-4 w-4 fill-red-500 text-red-500" />
       case 'like': return <ThumbsUp className="h-4 w-4 fill-green-500 text-green-500" />
-      case 'neutral': return <Minus className="h-4 w-4 text-stone-500" />
+      case 'neutral': return <Minus className="h-4 w-4 text-surface-500" />
       case 'dislike': return <ThumbsDown className="h-4 w-4 fill-red-500 text-red-500" />
       default: return null
     }
@@ -118,7 +118,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
               variant="outline"
               size="icon"
               onClick={onClose}
-              className="rounded-xl border-border/60 bg-background/80 backdrop-blur-sm hover:text-stone-900 dark:hover:text-white hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
+              className="rounded-xl border-border/60 bg-background/80 backdrop-blur-sm hover:text-surface-900 dark:hover:text-white hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -130,7 +130,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
               variant="outline"
               size="icon"
               onClick={onDelete}
-              className="rounded-xl border-border/60 text-stone-400 hover:text-rose-500 dark:hover:text-rose-400 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
+              className="rounded-xl border-border/60 text-surface-400 hover:text-rose-500 dark:hover:text-rose-400 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
               title="Delete recipe"
             >
               <Trash2 className="h-4 w-4" />
@@ -141,7 +141,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
               variant="outline"
               size="icon"
               onClick={() => setShowShareDialog(true)}
-              className="rounded-xl border-border/60 text-stone-400 hover:text-primary-500 dark:hover:text-primary-400 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
+              className="rounded-xl border-border/60 text-surface-400 hover:text-primary-500 dark:hover:text-primary-400 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
               title="Share recipe"
             >
               <Share2 className="h-4 w-4" />
@@ -268,7 +268,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
 
       {/* ── Quick Stats ── */}
       {(totalTime > 0 || recipe.servings || recipe.difficulty) && (
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-6 text-sm text-stone-500 dark:text-stone-400">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-6 text-sm text-surface-500 dark:text-surface-400">
           {totalTime > 0 && (
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" />
@@ -299,7 +299,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           {recipe.tags.map((tag, index) => (
             <span
               key={index}
-              className="px-2.5 py-0.5 rounded-md text-xs font-medium text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-white/[0.05]"
+              className="px-2.5 py-0.5 rounded-md text-xs font-medium text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-white/[0.05]"
             >
               {tag}
             </span>
@@ -309,7 +309,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
 
       {/* ── Source Attribution ── */}
       {recipe.sourceUrl && (
-        <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400 mb-6">
+        <div className="flex items-center gap-2 text-sm text-surface-500 dark:text-surface-400 mb-6">
           <span>Source:</span>
           <a
             href={recipe.sourceUrl}
@@ -331,8 +331,8 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           {recipe.ingredients && recipe.ingredients.length > 0 && (
             <div className="rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">Ingredients</h2>
-                <span className="text-xs text-stone-400 dark:text-stone-500">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">Ingredients</h2>
+                <span className="text-xs text-surface-400 dark:text-surface-500">
                   {recipe.ingredients.length}
                 </span>
               </div>
@@ -402,15 +402,15 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           {hasNutrition && (
             <div className="rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">Nutrition</h2>
-                <span className="text-xs text-stone-400 dark:text-stone-500">per serving</span>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">Nutrition</h2>
+                <span className="text-xs text-surface-400 dark:text-surface-500">per serving</span>
               </div>
 
               <div className="space-y-3">
                 {recipe.nutritionInfo!.calories !== undefined && recipe.nutritionInfo!.calories > 0 && (
                   <div className="flex items-baseline justify-between pb-3 border-b border-border/30">
-                    <span className="text-sm text-stone-500 dark:text-stone-400">Calories</span>
-                    <span className="text-2xl font-bold text-stone-900 dark:text-white tabular-nums">
+                    <span className="text-sm text-surface-500 dark:text-surface-400">Calories</span>
+                    <span className="text-2xl font-bold text-surface-900 dark:text-white tabular-nums">
                       {recipe.nutritionInfo!.calories}
                     </span>
                   </div>
@@ -419,12 +419,12 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                 {recipe.nutritionInfo!.protein !== undefined && recipe.nutritionInfo!.protein > 0 && (
                   <div>
                     <div className="flex justify-between text-sm mb-1.5">
-                      <span className="text-stone-500 dark:text-stone-400">Protein</span>
-                      <span className="font-medium text-stone-700 dark:text-stone-300 font-mono tabular-nums">{recipe.nutritionInfo!.protein}g</span>
+                      <span className="text-surface-500 dark:text-surface-400">Protein</span>
+                      <span className="font-medium text-surface-700 dark:text-surface-300 font-mono tabular-nums">{recipe.nutritionInfo!.protein}g</span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-stone-100 dark:bg-white/[0.06] overflow-hidden">
+                    <div className="h-1.5 rounded-full bg-surface-100 dark:bg-white/[0.06] overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-stone-400 dark:bg-stone-500 transition-all duration-700"
+                        className="h-full rounded-full bg-surface-400 dark:bg-surface-500 transition-all duration-700"
                         style={{ width: maxNutrient > 0 ? `${(recipe.nutritionInfo!.protein! / maxNutrient) * 100}%` : '0%' }}
                       />
                     </div>
@@ -434,12 +434,12 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                 {recipe.nutritionInfo!.carbs !== undefined && recipe.nutritionInfo!.carbs > 0 && (
                   <div>
                     <div className="flex justify-between text-sm mb-1.5">
-                      <span className="text-stone-500 dark:text-stone-400">Carbs</span>
-                      <span className="font-medium text-stone-700 dark:text-stone-300 font-mono tabular-nums">{recipe.nutritionInfo!.carbs}g</span>
+                      <span className="text-surface-500 dark:text-surface-400">Carbs</span>
+                      <span className="font-medium text-surface-700 dark:text-surface-300 font-mono tabular-nums">{recipe.nutritionInfo!.carbs}g</span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-stone-100 dark:bg-white/[0.06] overflow-hidden">
+                    <div className="h-1.5 rounded-full bg-surface-100 dark:bg-white/[0.06] overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-stone-400 dark:bg-stone-500 transition-all duration-700"
+                        className="h-full rounded-full bg-surface-400 dark:bg-surface-500 transition-all duration-700"
                         style={{ width: maxNutrient > 0 ? `${(recipe.nutritionInfo!.carbs! / maxNutrient) * 100}%` : '0%' }}
                       />
                     </div>
@@ -449,12 +449,12 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                 {recipe.nutritionInfo!.fat !== undefined && recipe.nutritionInfo!.fat > 0 && (
                   <div>
                     <div className="flex justify-between text-sm mb-1.5">
-                      <span className="text-stone-500 dark:text-stone-400">Fat</span>
-                      <span className="font-medium text-stone-700 dark:text-stone-300 font-mono tabular-nums">{recipe.nutritionInfo!.fat}g</span>
+                      <span className="text-surface-500 dark:text-surface-400">Fat</span>
+                      <span className="font-medium text-surface-700 dark:text-surface-300 font-mono tabular-nums">{recipe.nutritionInfo!.fat}g</span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-stone-100 dark:bg-white/[0.06] overflow-hidden">
+                    <div className="h-1.5 rounded-full bg-surface-100 dark:bg-white/[0.06] overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-stone-400 dark:bg-stone-500 transition-all duration-700"
+                        className="h-full rounded-full bg-surface-400 dark:bg-surface-500 transition-all duration-700"
                         style={{ width: maxNutrient > 0 ? `${(recipe.nutritionInfo!.fat! / maxNutrient) * 100}%` : '0%' }}
                       />
                     </div>
@@ -468,7 +468,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           {recipe.familyPreferences && Object.keys(recipe.familyPreferences).length > 0 && (
             <div className="rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">Family</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">Family</h2>
               </div>
               <div className="space-y-2">
                 {Object.entries(recipe.familyPreferences).map(([memberId, preference]) => (
@@ -493,19 +493,19 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
           {recipe.instructions && recipe.instructions.length > 0 && (
             <div className="rounded-2xl border border-border/60 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">Instructions</h2>
-                <span className="text-xs text-stone-400 dark:text-stone-500">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">Instructions</h2>
+                <span className="text-xs text-surface-400 dark:text-surface-500">
                   {recipe.instructions.length} steps
                 </span>
               </div>
               <div className="space-y-5">
                 {recipe.instructions.map((instruction, index) => (
                   <div key={index} className="flex gap-4">
-                    <div className="flex-shrink-0 text-xs font-semibold text-stone-400 dark:text-stone-500 w-6 pt-0.5 text-right">
+                    <div className="flex-shrink-0 text-xs font-semibold text-surface-400 dark:text-surface-500 w-6 pt-0.5 text-right">
                       {index + 1}.
                     </div>
                     <div className="flex-1 pt-0.5">
-                      <p className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">{instruction}</p>
+                      <p className="text-sm leading-relaxed text-surface-700 dark:text-surface-300">{instruction}</p>
                     </div>
                   </div>
                 ))}

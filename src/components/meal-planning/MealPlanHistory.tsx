@@ -130,9 +130,9 @@ const MealPlanHistory = ({
   if (plans.length === 0) {
     return (
       <div className="text-center py-12">
-        <Clock className="h-10 w-10 text-stone-300 dark:text-gray-600 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-stone-800 dark:text-gray-200 mb-1">No history yet</h3>
-        <p className="text-sm text-stone-500 dark:text-gray-400">
+        <Clock className="h-10 w-10 text-surface-300 dark:text-gray-600 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-surface-800 dark:text-gray-200 mb-1">No history yet</h3>
+        <p className="text-sm text-surface-500 dark:text-gray-400">
           Completed and archived plans will appear here.
         </p>
       </div>
@@ -159,17 +159,17 @@ const MealPlanHistory = ({
               {/* Section divider between groups */}
               {showDivider && (
                 <div className="flex items-center gap-3 py-3">
-                  <div className="flex-1 border-t border-stone-100 dark:border-white/[0.05]" />
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+                  <div className="flex-1 border-t border-surface-100 dark:border-white/[0.05]" />
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400 dark:text-surface-600">
                     {group === 'completed' ? 'Completed' : 'Archived'}
                   </span>
-                  <div className="flex-1 border-t border-stone-100 dark:border-white/[0.05]" />
+                  <div className="flex-1 border-t border-surface-100 dark:border-white/[0.05]" />
                 </div>
               )}
 
               {/* Plan row */}
               <div
-                className="group flex items-center justify-between px-4 py-3.5 rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] hover:shadow-md hover:-translate-y-px transition-all duration-300 cursor-pointer mb-2"
+                className="group flex items-center justify-between px-4 py-3.5 rounded-2xl border border-surface-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] hover:shadow-md hover:-translate-y-px transition-all duration-300 cursor-pointer mb-2"
                 onClick={() => setDetailPlan(plan)}
               >
                 {/* Left: status icon + info */}
@@ -178,20 +178,20 @@ const MealPlanHistory = ({
                     <Icon className={`h-4.5 w-4.5 ${cfg.color}`} style={{ width: '1.125rem', height: '1.125rem' }} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-stone-800 dark:text-gray-200 leading-snug">
+                    <p className="text-sm font-semibold text-surface-800 dark:text-gray-200 leading-snug">
                       {plan.title || 'Untitled Plan'}
                     </p>
-                    <p className="text-xs text-stone-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-surface-500 dark:text-gray-400 mt-0.5">
                       {formatDateRange(plan.startDate, plan.endDate)}
                       {mealCount > 0 && (
                         <>
-                          <span className="mx-1.5 text-stone-300 dark:text-gray-600">·</span>
+                          <span className="mx-1.5 text-surface-300 dark:text-gray-600">·</span>
                           {mealCount} meals
                         </>
                       )}
                       {groceryCount > 0 && (
                         <>
-                          <span className="mx-1.5 text-stone-300 dark:text-gray-600">·</span>
+                          <span className="mx-1.5 text-surface-300 dark:text-gray-600">·</span>
                           {groceryCount} grocery items
                         </>
                       )}
@@ -205,18 +205,18 @@ const MealPlanHistory = ({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
-                    className="h-8 w-8 flex items-center justify-center rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/[0.06] transition-colors"
+                    className="h-8 w-8 flex items-center justify-center rounded-xl text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                     onClick={() => onPlanMenuToggle(planMenuOpen === plan.id ? null : plan.id)}
                   >
                     <MoreHorizontal className="h-4 w-4" />
                   </button>
 
                   {planMenuOpen === plan.id && (
-                    <div className="absolute right-0 top-9 z-50 min-w-[180px] rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] p-1.5 shadow-xl animate-scale-in">
+                    <div className="absolute right-0 top-9 z-50 min-w-[180px] rounded-xl border border-surface-200/80 dark:border-white/[0.08] bg-white dark:bg-[var(--rs-bg)] p-1.5 shadow-xl animate-scale-in">
 
                       {/* Copy to new plan */}
                       <button
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                         onClick={() => { onCopy(plan.id); onPlanMenuToggle(null); }}
                         disabled={copyPending}
                       >
@@ -227,7 +227,7 @@ const MealPlanHistory = ({
                       {/* Restore to active */}
                       {(plan.status === 'completed' || plan.status === 'archived') && (
                         <button
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                           onClick={() => { onStatusChange(plan.id, 'active'); onPlanMenuToggle(null); }}
                         >
                           <RotateCcw className="h-3.5 w-3.5 flex-shrink-0" />
@@ -238,7 +238,7 @@ const MealPlanHistory = ({
                       {/* Archive (completed plans only) */}
                       {plan.status === 'completed' && (
                         <button
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                           onClick={() => { onStatusChange(plan.id, 'archived'); onPlanMenuToggle(null); }}
                         >
                           <Archive className="h-3.5 w-3.5 flex-shrink-0" />
@@ -249,7 +249,7 @@ const MealPlanHistory = ({
                       {/* Mark as complete (stale active/draft) */}
                       {(plan.status === 'draft' || plan.status === 'active') && (
                         <button
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                           onClick={() => { setCompleteTarget(plan); onPlanMenuToggle(null); }}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
@@ -257,11 +257,11 @@ const MealPlanHistory = ({
                         </button>
                       )}
 
-                      <div className="my-1 border-t border-stone-100 dark:border-white/[0.06]" />
+                      <div className="my-1 border-t border-surface-100 dark:border-white/[0.06]" />
 
                       {/* Delete */}
                       <button
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/5 transition-colors"
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-400 dark:text-surface-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/5 transition-colors"
                         onClick={() => { onPlanMenuToggle(null); setDeleteTarget(plan); }}
                       >
                         <Trash2 className="h-3.5 w-3.5 flex-shrink-0" />
@@ -311,20 +311,20 @@ const MealPlanHistory = ({
 
             {/* Panel */}
             <div
-              className="relative w-full max-w-2xl bg-white dark:bg-[#16171c] rounded-2xl shadow-2xl border border-stone-200/80 dark:border-white/[0.08] flex flex-col max-h-[88vh]"
+              className="relative w-full max-w-2xl bg-white dark:bg-[var(--rs-bg)] rounded-2xl shadow-2xl border border-surface-200/80 dark:border-white/[0.08] flex flex-col max-h-[88vh]"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4 border-b border-stone-100 dark:border-white/[0.06] flex-shrink-0">
+              <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4 border-b border-surface-100 dark:border-white/[0.06] flex-shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`p-2.5 rounded-xl ${cfg.bg} flex-shrink-0`}>
                     <Icon className={`h-5 w-5 ${cfg.color}`} />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-stone-900 dark:text-white truncate">
+                    <h2 className="text-base font-semibold text-surface-900 dark:text-white truncate">
                       {detailPlan.title || 'Untitled Plan'}
                     </h2>
-                    <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                       {formatDateRange(detailPlan.startDate, detailPlan.endDate)}
                     </p>
                   </div>
@@ -332,7 +332,7 @@ const MealPlanHistory = ({
 
                 {/* Stats + close */}
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <div className="hidden sm:flex items-center gap-3 text-xs text-stone-500 dark:text-stone-400">
+                  <div className="hidden sm:flex items-center gap-3 text-xs text-surface-500 dark:text-surface-400">
                     <span className="flex items-center gap-1">
                       <ChefHat className="h-3.5 w-3.5" />
                       {mealCount} meal{mealCount !== 1 ? 's' : ''}
@@ -348,7 +348,7 @@ const MealPlanHistory = ({
                     </span>
                   </div>
                   <button
-                    className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/[0.06] transition-colors"
+                    className="p-1.5 rounded-lg text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                     onClick={() => setDetailPlan(null)}
                     aria-label="Close"
                   >
@@ -359,21 +359,21 @@ const MealPlanHistory = ({
 
               {/* Body — two columns on sm+, stacked on mobile */}
               <div className="flex-1 overflow-y-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-stone-100 dark:divide-white/[0.06]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-surface-100 dark:divide-white/[0.06]">
 
                   {/* Meals column */}
                   <div className="p-6">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-3 flex items-center gap-1.5">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3 flex items-center gap-1.5">
                       <ChefHat className="h-3.5 w-3.5" />
                       Meals
                     </h3>
                     {mealRows.length === 0 ? (
-                      <p className="text-sm text-stone-400 dark:text-stone-500 italic">No meals recorded.</p>
+                      <p className="text-sm text-surface-400 dark:text-surface-500 italic">No meals recorded.</p>
                     ) : (
                       <div className="space-y-1.5">
                         {mealRows.map((row) => (
-                          <div key={row.key} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-50 dark:bg-white/[0.03] border border-stone-100 dark:border-white/[0.04]">
-                            <span className="text-sm text-stone-700 dark:text-stone-200 leading-snug">{row.name}</span>
+                          <div key={row.key} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 dark:bg-white/[0.03] border border-surface-100 dark:border-white/[0.04]">
+                            <span className="text-sm text-surface-700 dark:text-surface-200 leading-snug">{row.name}</span>
                           </div>
                         ))}
                       </div>
@@ -382,12 +382,12 @@ const MealPlanHistory = ({
 
                   {/* Grocery column */}
                   <div className="p-6">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-3 flex items-center gap-1.5">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3 flex items-center gap-1.5">
                       <ShoppingCart className="h-3.5 w-3.5" />
                       Grocery list
                     </h3>
                     {groceryItems.length === 0 ? (
-                      <p className="text-sm text-stone-400 dark:text-stone-500 italic">No grocery list.</p>
+                      <p className="text-sm text-surface-400 dark:text-surface-500 italic">No grocery list.</p>
                     ) : (
                       <div className="space-y-1.5">
                         {groceryItems.map((item) => (
@@ -395,14 +395,14 @@ const MealPlanHistory = ({
                             key={item.id}
                             className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${
                               item.isChecked
-                                ? 'bg-stone-50 dark:bg-white/[0.02] border-stone-100 dark:border-white/[0.03] opacity-50'
-                                : 'bg-stone-50 dark:bg-white/[0.03] border-stone-100 dark:border-white/[0.04]'
+                                ? 'bg-surface-50 dark:bg-white/[0.02] border-surface-100 dark:border-white/[0.03] opacity-50'
+                                : 'bg-surface-50 dark:bg-white/[0.03] border-surface-100 dark:border-white/[0.04]'
                             }`}
                           >
                             {item.isChecked && (
                               <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
                             )}
-                            <span className={`text-sm leading-snug ${item.isChecked ? 'line-through text-stone-400 dark:text-stone-500' : 'text-stone-700 dark:text-stone-200'}`}>
+                            <span className={`text-sm leading-snug ${item.isChecked ? 'line-through text-surface-400 dark:text-surface-500' : 'text-surface-700 dark:text-surface-200'}`}>
                               {item.amount != null ? `${item.amount} ` : ''}
                               {item.unit ? `${item.unit} ` : ''}
                               {item.name}
@@ -416,11 +416,11 @@ const MealPlanHistory = ({
               </div>
 
               {/* Footer actions */}
-              <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-stone-100 dark:border-white/[0.06] flex-shrink-0">
+              <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-surface-100 dark:border-white/[0.06] flex-shrink-0">
                 <div className="flex items-center gap-2">
                   {(detailPlan.status === 'completed' || detailPlan.status === 'archived') && (
                     <button
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-white/[0.08] hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-surface-600 dark:text-surface-300 border border-surface-200 dark:border-white/[0.08] hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                       onClick={() => { onStatusChange(detailPlan.id, 'active'); setDetailPlan(null); }}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -429,7 +429,7 @@ const MealPlanHistory = ({
                   )}
                   {(detailPlan.status === 'draft' || detailPlan.status === 'active') && (
                     <button
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-white/[0.08] hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-surface-600 dark:text-surface-300 border border-surface-200 dark:border-white/[0.08] hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                       onClick={() => { setCompleteTarget(detailPlan); setDetailPlan(null); }}
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
