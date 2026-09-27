@@ -532,7 +532,6 @@ const MealPlanner = () => {
         title: newPlanTitle.trim() || `${durationLabel} — ${currentWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
         startDate,
         endDate: formatDateKey(endDateObj),
-        meals: {},
         status: 'draft',
       },
       {
@@ -890,20 +889,23 @@ const MealPlanner = () => {
             {!isEditingPlanTitle && (isLoading || activePlan) && (
             <div className="flex items-center justify-between gap-2">
 
-              {/* Week navigation — center label is the plan switcher */}
+              {/* Week navigation — center label is the plan switcher.
+                  Arrows only shown in meals view (days view shows all weeks stacked). */}
               <div className="flex items-center gap-1 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigateWeek('prev')}
-                  disabled={safeWeekOffset === 0}
-                  className="h-8 w-8 p-0 rounded-lg disabled:opacity-30"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
+                {calendarView === 'meals' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateWeek('prev')}
+                    disabled={safeWeekOffset === 0}
+                    className="h-8 w-8 p-0 rounded-lg disabled:opacity-30"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                )}
                 <WeekLabelDropdown
-                  weekLabel={weekLabel}
-                  weekSubLabel={planWeeks.length > 1 ? `Week ${safeWeekOffset + 1} of ${planWeeks.length}` : undefined}
+                  weekLabel={calendarView === 'meals' ? weekLabel : (activePlan?.title || weekLabel)}
+                  weekSubLabel={calendarView === 'meals' && planWeeks.length > 1 ? `Week ${safeWeekOffset + 1} of ${planWeeks.length}` : undefined}
                   plans={activePlans}
                   activePlan={activePlan}
                   onSelect={selectPlan}
@@ -912,15 +914,17 @@ const MealPlanner = () => {
                   onRestore={weekPlan?.status === 'completed' ? () => handleStatusChange(weekPlan.id, 'active') : undefined}
                   onDelete={weekPlan ? () => setShowDeleteConfirm(true) : undefined}
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigateWeek('next')}
-                  disabled={safeWeekOffset >= planWeeks.length - 1}
-                  className="h-8 w-8 p-0 rounded-lg disabled:opacity-30"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                {calendarView === 'meals' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateWeek('next')}
+                    disabled={safeWeekOffset >= planWeeks.length - 1}
+                    className="h-8 w-8 p-0 rounded-lg disabled:opacity-30"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
 
               {/* Right cluster: plan actions + view toggle */}
@@ -969,119 +973,128 @@ const MealPlanner = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-primary-500/50" />
               </div>
             ) : calendarView === 'days' ? (
-              /* Mobile: horizontally-swipeable day cards (7 columns squeezed
-                 to ~50px each was unreadable). Desktop (md+): unchanged
-                 7-column grid. Each day's header + card are one unit now so
-                 they scroll together. */
-              <div className="overflow-x-auto -mx-4 px-4 pb-1 snap-x snap-mandatory md:overflow-visible md:mx-0 md:px-0 md:pb-0 md:snap-none">
-                <div className="flex gap-2 md:grid md:grid-cols-7">
-                  {weekDates.map((date, i) => {
-                    const dateStr = formatDateKey(date);
-                    const isToday = dateStr === today;
-                    const dayMeals = weekPlan?.meals?.[dateStr];
+              /* Days view: all weeks stacked, each week is a 7-column row.
+                 Mobile: horizontally-swipeable within each week row. */
+              <div className="space-y-6">
+                {planWeeks.map((weekRow, weekIdx) => (
+                  <div key={weekIdx}>
+                    {planWeeks.length > 1 && (
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-2">
+                        Week {weekIdx + 1}
+                      </p>
+                    )}
+                    <div className="overflow-x-auto -mx-4 px-4 pb-1 snap-x snap-mandatory md:overflow-visible md:mx-0 md:px-0 md:pb-0 md:snap-none">
+                      <div className="flex gap-2 md:grid md:grid-cols-7">
+                        {weekRow.map((date, i) => {
+                          const dateStr = formatDateKey(date);
+                          const isToday = dateStr === today;
+                          const dayMeals = weekPlan?.meals?.[dateStr];
 
-                    return (
-                      <div
-                        key={dateStr}
-                        className="flex-shrink-0 w-[82%] sm:w-[45%] md:w-auto snap-center md:snap-align-none"
-                      >
-                        {/* Day header */}
-                        <div className="text-center pb-1">
-                          <p className="text-xs font-medium text-surface-400 dark:text-gray-500 uppercase tracking-widest">
-                            {DAYS_SHORT[i]}
-                          </p>
-                          <p className={`text-lg font-bold mt-0.5 transition-colors ${
-                            isToday
-                              ? 'text-primary-500'
-                              : 'text-surface-700 dark:text-gray-300'
-                          }`}>
-                            {date.getDate()}
-                          </p>
-                        </div>
+                          return (
+                            <div
+                              key={dateStr}
+                              className="flex-shrink-0 w-[82%] sm:w-[45%] md:w-auto snap-center md:snap-align-none"
+                            >
+                              {/* Day header */}
+                              <div className="text-center pb-1">
+                                <p className="text-xs font-medium text-surface-400 dark:text-gray-500 uppercase tracking-widest">
+                                  {DAYS_SHORT[i]}
+                                </p>
+                                <p className={`text-lg font-bold mt-0.5 transition-colors ${
+                                  isToday
+                                    ? 'text-primary-500'
+                                    : 'text-surface-700 dark:text-gray-300'
+                                }`}>
+                                  {date.getDate()}
+                                </p>
+                              </div>
 
-                        <div
-                          className={`group relative rounded-2xl border p-2.5 min-h-[220px] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
-                            isToday
-                              ? 'border-primary-500/30 bg-primary-500/[0.03] dark:bg-primary-500/[0.05] shadow-md shadow-primary-500/10 ring-1 ring-primary-500/20'
-                              : 'border-surface-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] hover:border-surface-300 dark:hover:border-white/[0.12]'
-                          }`}
-                        >
-                          {/* Today indicator dot */}
-                          {isToday && (
-                            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500 animate-pulse-slow" />
-                          )}
+                              <div
+                                className={`group relative rounded-2xl border p-2.5 min-h-[220px] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
+                                  isToday
+                                    ? 'border-primary-500/30 bg-primary-500/[0.03] dark:bg-primary-500/[0.05] shadow-md shadow-primary-500/10 ring-1 ring-primary-500/20'
+                                    : 'border-surface-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] hover:border-surface-300 dark:hover:border-white/[0.12]'
+                                }`}
+                              >
+                                {/* Today indicator dot */}
+                                {isToday && (
+                                  <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500 animate-pulse-slow" />
+                                )}
 
-                          <div className="space-y-1.5">
-                            {DAILY_SLOTS.map((slot) => {
-                              const slotMeals = dayMeals?.[slot.key] || [];
-                              return (
-                                <div key={slot.key} className="group/slot">
-                                  <div className="flex items-center gap-1 mb-0.5">
-                                    <slot.icon className={`h-3 w-3 ${slot.color} opacity-60`} />
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-gray-500">
-                                      {slot.label}
-                                    </span>
-                                  </div>
-                                  {slotMeals.length > 0 ? (
-                                    <>
-                                      {slotMeals.map((meal: any) => (
-                                        <div
-                                          key={meal.id}
-                                          className="group/meal flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-surface-700 dark:text-gray-300 transition-all duration-200 hover:bg-surface-100 dark:hover:bg-white/[0.08] hover:shadow-sm"
-                                          title={meal.recipeName}
-                                        >
-                                          <span className="truncate flex-1">{meal.recipeName}</span>
-                                          <button
-                                            className="flex-shrink-0 opacity-70 md:opacity-0 md:group-hover/meal:opacity-100 text-surface-400 hover:text-destructive transition-all"
-                                            onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
-                                            title="Remove"
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </button>
+                                <div className="space-y-1.5">
+                                  {DAILY_SLOTS.map((slot) => {
+                                    const slotMeals = dayMeals?.[slot.key] || [];
+                                    return (
+                                      <div key={slot.key} className="group/slot">
+                                        <div className="flex items-center gap-1 mb-0.5">
+                                          <slot.icon className={`h-3 w-3 ${slot.color} opacity-60`} />
+                                          <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-gray-500">
+                                            {slot.label}
+                                          </span>
                                         </div>
-                                      ))}
-                                      <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 transition-all duration-200">
-                                        <button
-                                          className="flex-1 px-2 py-0.5 rounded-lg text-[10px] text-surface-300 dark:text-gray-600 hover:text-primary-500/60 transition-colors"
-                                          onClick={() => openRecipeSelector(dateStr, slot.key)}
-                                        >
-                                          + Add more
-                                        </button>
-                                        <button
-                                          className="px-1.5 py-0.5 rounded-lg text-[10px] text-surface-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
-                                          onClick={() => handleRandomizeSlot(dateStr, slot.key)}
-                                          title="I Don't Know"
-                                        >
-                                          <Shuffle className="h-2.5 w-2.5" />
-                                        </button>
+                                        {slotMeals.length > 0 ? (
+                                          <>
+                                            {slotMeals.map((meal: any) => (
+                                              <div
+                                                key={meal.id}
+                                                className="group/meal flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-surface-700 dark:text-gray-300 transition-all duration-200 hover:bg-surface-100 dark:hover:bg-white/[0.08] hover:shadow-sm"
+                                                title={meal.recipeName}
+                                              >
+                                                <span className="truncate flex-1">{meal.recipeName}</span>
+                                                <button
+                                                  className="flex-shrink-0 opacity-70 md:opacity-0 md:group-hover/meal:opacity-100 text-surface-400 hover:text-destructive transition-all"
+                                                  onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
+                                                  title="Remove"
+                                                >
+                                                  <X className="h-3 w-3" />
+                                                </button>
+                                              </div>
+                                            ))}
+                                            <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 transition-all duration-200">
+                                              <button
+                                                className="flex-1 px-2 py-0.5 rounded-lg text-[10px] text-surface-300 dark:text-gray-600 hover:text-primary-500/60 transition-colors"
+                                                onClick={() => openRecipeSelector(dateStr, slot.key)}
+                                              >
+                                                + Add more
+                                              </button>
+                                              <button
+                                                className="px-1.5 py-0.5 rounded-lg text-[10px] text-surface-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
+                                                onClick={() => handleRandomizeSlot(dateStr, slot.key)}
+                                                title="I Don't Know"
+                                              >
+                                                <Shuffle className="h-2.5 w-2.5" />
+                                              </button>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 md:group-hover:opacity-60 transition-all duration-200">
+                                            <button
+                                              className="flex-1 px-2 py-1 rounded-lg border border-dashed border-surface-200/60 dark:border-white/[0.06] text-[10px] text-surface-300 dark:text-gray-600 hover:border-primary-500/40 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-colors"
+                                              onClick={() => openRecipeSelector(dateStr, slot.key)}
+                                            >
+                                              + Add
+                                            </button>
+                                            <button
+                                              className="px-1.5 py-1 rounded-lg border border-dashed border-surface-200/60 dark:border-white/[0.06] text-[10px] text-surface-300 dark:text-gray-600 hover:border-amber-400/40 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
+                                              onClick={() => handleRandomizeSlot(dateStr, slot.key)}
+                                              title="I Don't Know"
+                                            >
+                                              <Shuffle className="h-2.5 w-2.5" />
+                                            </button>
+                                          </div>
+                                        )}
                                       </div>
-                                    </>
-                                  ) : (
-                                    <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 md:group-hover:opacity-60 transition-all duration-200">
-                                      <button
-                                        className="flex-1 px-2 py-1 rounded-lg border border-dashed border-surface-200/60 dark:border-white/[0.06] text-[10px] text-surface-300 dark:text-gray-600 hover:border-primary-500/40 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-colors"
-                                        onClick={() => openRecipeSelector(dateStr, slot.key)}
-                                      >
-                                        + Add
-                                      </button>
-                                      <button
-                                        className="px-1.5 py-1 rounded-lg border border-dashed border-surface-200/60 dark:border-white/[0.06] text-[10px] text-surface-300 dark:text-gray-600 hover:border-amber-400/40 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
-                                        onClick={() => handleRandomizeSlot(dateStr, slot.key)}
-                                        title="I Don't Know"
-                                      >
-                                        <Shuffle className="h-2.5 w-2.5" />
-                                      </button>
-                                    </div>
-                                  )}
+                                    );
+                                  })}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               /* ── Meals View: rows by meal type, multi-week rows of 7 ── */
@@ -1393,14 +1406,21 @@ const MealPlanner = () => {
                   </div>
                 </div>
                 <h3 className="text-lg font-semibold text-surface-800 dark:text-gray-200 mb-1.5">
-                  No meal plans yet
+                  {historyPlans.length > 0 ? 'No active plan' : 'No meal plans yet'}
                 </h3>
                 <p className="text-sm text-surface-500 dark:text-gray-400 max-w-sm mx-auto mb-5">
-                  Create a meal plan to start assigning recipes and building your grocery list.
+                  {historyPlans.length > 0
+                    ? 'Create a new plan to start scheduling meals for the week.'
+                    : 'Create a meal plan to start assigning recipes and building your grocery list.'}
                 </p>
-                <Button onClick={() => setShowCreateForm(true)} className="gap-2">
+                <Button onClick={() => {
+                  const start = nextPlanStart(planPeriodConfig);
+                  setCurrentWeek(start);
+                  setNewPlanDays(configToDays(planPeriodConfig));
+                  setShowCreateForm(true);
+                }} className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Create Your First Plan
+                  {historyPlans.length > 0 ? 'Create a Plan' : 'Create Your First Plan'}
                 </Button>
               </div>
             )}
