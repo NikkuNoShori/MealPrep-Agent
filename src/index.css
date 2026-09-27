@@ -4,6 +4,22 @@
 
 @layer base {
   :root {
+    /* MOP-0029 Phase 4 evaluation: should --background/--card/--muted/--border
+       (below) derive from `surface` the way --destructive derives from
+       semantic.error (Phase 3)? Decision: NOT this phase. hexToHSL() in
+       themeStore.ts is a one-way hex->HSL converter with no inverse; deriving
+       these cleanly would require picking which surface step maps to which
+       shadcn role AND confirming the round-trip reproduces today's exact HSL
+       triplets (--background: 40 20% 98%, --card: 0 0% 100%, etc., none of
+       which are simply hexToHSL of a stone/surface step — --card is pure
+       white, --background has a warm cream tint neither ramp encodes). Doing
+       this properly is a deliberate design pass (which shadcn roles should
+       even track surface vs. stay independent design decisions), not a
+       mechanical wiring task — over-engineering it here risks an accidental
+       Evergreen visual shift, the one thing this phase must not do. Left
+       static; revisit alongside Phase 6/7 component work once there's reason
+       to make shadcn primitives preset-reactive beyond --primary/--secondary/
+       --destructive (already wired in Phase 2/3). */
     --background: 40 20% 98%;
     --foreground: 25 20% 10%;
     --card: 0 0% 100%;
@@ -33,11 +49,24 @@
     --status-success: 143 64% 24%;
     --status-warning: 23 83% 31%;
 
-    /* Design system tokens */
+    /* Design system tokens.
+       MOP-0029 Phase 4: --rs-border / --rs-border-subtle / --rs-search-bg
+       (below) are redefined in terms of var(--surface-*) because their
+       current light-mode hex is an EXACT match for a surface-ramp step
+       (surface-200 / surface-100 / surface-50 respectively) — redefining
+       them changes nothing visually for Evergreen but makes them preset-
+       aware. --rs-bg (#ffffff) and --rs-bg-elevated (#f9fafb, a cool gray
+       matching the old --gray-50, not the warm stone ramp) do NOT correspond
+       to any surface-ramp value in EITHER mode (dark --rs-bg/#16171c etc. are
+       a distinct cool-near-black system, not derivable from the warm
+       surface-dark ramp without changing the rendered color) — kept static
+       here per this phase's explicit non-goal of forcing a derivation that
+       would alter Evergreen's pixels. Revisit in a later phase if chrome/page
+       background should visually shift with `surface` too. */
     --rs-bg: #ffffff;
     --rs-bg-elevated: #f9fafb;
-    --rs-border: #e7e5e4;
-    --rs-border-subtle: #f5f5f4;
+    --rs-border: var(--surface-200);
+    --rs-border-subtle: var(--surface-100);
     --rs-text-primary: #1c1917;
     --rs-text-secondary: #78716c;
     --rs-text-tertiary: #a8a29e;
@@ -51,7 +80,7 @@
     --rs-toggle-bg: #f5f5f4;
     --rs-toggle-active-bg: #1c1917;
     --rs-toggle-active-fg: #ffffff;
-    --rs-search-bg: #fafaf9;
+    --rs-search-bg: var(--surface-50);
 
     /* Layer 1 primitive scales — static fallbacks for JS-driven ColorScheme.
        Seeded from defaultColorScheme (Evergreen) in src/stores/themeStore.ts.
@@ -97,6 +126,68 @@
     --error-600: #dc2626;
     --warning-100: #fef3c7;
     --warning-800: #92400e;
+
+    /* MOP-0029 Phase 4 — surface ramp static fallback (Evergreen light,
+       == current stone-* values exactly — pixel-identical requirement).
+       JS overwrites at runtime via applyColorSchemeToCSS(); this only
+       governs first paint. */
+    --surface-50: #fafaf9;
+    --surface-100: #f5f5f4;
+    --surface-200: #e7e5e4;
+    --surface-300: #d6d3d1;
+    --surface-400: #a8a29e;
+    --surface-500: #78716c;
+    --surface-600: #57534e;
+    --surface-700: #44403c;
+    --surface-800: #292524;
+    --surface-900: #1c1917;
+
+    /* "-rgb" channel-triplet twins of the surface ramp above, consumed by the
+       surface / stone Tailwind color functions (rgb(var(...) / <alpha-value>))
+       so opacity modifiers like `border-stone-200/80` resolve correctly —
+       Tailwind's @apply pipeline cannot derive an alpha channel from a plain
+       hex-string CSS var. Values are hexToRGBTriplet() of the hex above. */
+    --surface-50-rgb: 250 250 249;
+    --surface-100-rgb: 245 245 244;
+    --surface-200-rgb: 231 229 228;
+    --surface-300-rgb: 214 211 209;
+    --surface-400-rgb: 168 162 158;
+    --surface-500-rgb: 120 113 108;
+    --surface-600-rgb: 87 83 78;
+    --surface-700-rgb: 68 64 60;
+    --surface-800-rgb: 41 37 36;
+    --surface-900-rgb: 28 25 23;
+
+    /* MOP-0029 Phase 4 — accent-category ramp static fallback (Evergreen). */
+    --accent-cat-1: #b8860b;
+    --accent-cat-2: #a44a2e;
+    --accent-cat-3: #6c8560;
+    --accent-cat-4: #c2703f;
+    --accent-cat-5: #0d9488;
+    --accent-cat-6: #7a4a6b;
+
+    /* MOP-0029 Phase 4 — named gradient fallbacks (Evergreen). */
+    --gradient-brand-from: #1D9E75;
+    --gradient-brand-to: #34d399;
+    --gradient-warm-from: #b8860b;
+    --gradient-warm-to: #c2703f;
+    --gradient-subtle-from: #e7e5e4;
+    --gradient-subtle-to: #f5f5f4;
+    /* Composite shorthand kept for MOP-0029 verification (`--gradient-brand`)
+       and for any component that wants a single css `linear-gradient()`
+       value rather than separate from/to stops. */
+    --gradient-brand: linear-gradient(135deg, var(--gradient-brand-from), var(--gradient-brand-to));
+    --gradient-warm: linear-gradient(135deg, var(--gradient-warm-from), var(--gradient-warm-to));
+    --gradient-subtle: linear-gradient(135deg, var(--gradient-subtle-from), var(--gradient-subtle-to));
+
+    /* MOP-0029 Phase 4 — chrome/header surface (COLOR_SCHEMA.md §3 category 3).
+       Structurally distinct from card surface. Seeded from Header.tsx's
+       current bg-white/80 (light) — dark mode below matches its
+       dark:bg-[#16171c]/80 (== --rs-bg dark), the existing token it should
+       have used per the ADR-0006 have-a-token-didn't-use-it finding. Header.tsx
+       itself is NOT touched here (Phase 7 migrates components); this only
+       declares the token. */
+    --chrome-bg: #ffffff;
   }
 
   .dark {
@@ -127,7 +218,17 @@
     --status-warning: 23 83% 31%;
     --ring: 160 67% 70%;
 
-    /* Design system tokens — dark */
+    /* Design system tokens — dark.
+       MOP-0029 Phase 4: unlike light mode, NONE of --rs-bg / --rs-bg-elevated
+       / --rs-border / --rs-border-subtle / --rs-search-bg have an exact
+       match in Evergreen's surface-dark ramp (#1c1917 #292524 #3a352e ...) —
+       the current dark --rs-* values are a distinct cool near-black system
+       (#16171c, #1e1f26, #28292f, #212229), not the warm stone-derived
+       surface ramp. Redefining them to var(--surface-*) here would change
+       Evergreen's rendered dark-mode colors, violating this phase's
+       pixel-identical constraint. Left static, matching the light-mode
+       treatment of --rs-bg/--rs-bg-elevated. Revisit in a later phase if
+       dark chrome/page background should visually shift with `surface`. */
     --rs-bg: #16171c;
     --rs-bg-elevated: #1e1f26;
     --rs-border: #28292f;
@@ -190,6 +291,55 @@
     --error-600: #dc2626;
     --warning-100: #fef3c7;
     --warning-800: #92400e;
+
+    /* MOP-0029 Phase 4 — surface ramp static fallback (Evergreen dark). */
+    --surface-50: #1c1917;
+    --surface-100: #292524;
+    --surface-200: #3a352e;
+    --surface-300: #44403c;
+    --surface-400: #57534e;
+    --surface-500: #78716c;
+    --surface-600: #a8a29e;
+    --surface-700: #d6d3d1;
+    --surface-800: #e7e5e4;
+    --surface-900: #f5f5f4;
+
+    /* "-rgb" channel-triplet twins — see :root comment above for why these
+       exist (opacity-modifier support in @apply / Tailwind color functions). */
+    --surface-50-rgb: 28 25 23;
+    --surface-100-rgb: 41 37 36;
+    --surface-200-rgb: 58 53 46;
+    --surface-300-rgb: 68 64 60;
+    --surface-400-rgb: 87 83 78;
+    --surface-500-rgb: 120 113 108;
+    --surface-600-rgb: 168 162 158;
+    --surface-700-rgb: 214 211 209;
+    --surface-800-rgb: 231 229 228;
+    --surface-900-rgb: 245 245 244;
+
+    /* MOP-0029 Phase 4 — accent-category / gradient fallbacks. Same values
+       as :root — these two families do not vary by mode per the approved spec. */
+    --accent-cat-1: #b8860b;
+    --accent-cat-2: #a44a2e;
+    --accent-cat-3: #6c8560;
+    --accent-cat-4: #c2703f;
+    --accent-cat-5: #0d9488;
+    --accent-cat-6: #7a4a6b;
+
+    --gradient-brand-from: #1D9E75;
+    --gradient-brand-to: #34d399;
+    --gradient-warm-from: #b8860b;
+    --gradient-warm-to: #c2703f;
+    --gradient-subtle-from: #e7e5e4;
+    --gradient-subtle-to: #f5f5f4;
+    --gradient-brand: linear-gradient(135deg, var(--gradient-brand-from), var(--gradient-brand-to));
+    --gradient-warm: linear-gradient(135deg, var(--gradient-warm-from), var(--gradient-warm-to));
+    --gradient-subtle: linear-gradient(135deg, var(--gradient-subtle-from), var(--gradient-subtle-to));
+
+    /* MOP-0029 Phase 4 — chrome/header surface (dark). Matches Header.tsx's
+       existing dark:bg-[#16171c]/80 literal (== --rs-bg dark) — same value,
+       just also exposed as its own taxonomy-category-3 token. */
+    --chrome-bg: #16171c;
   }
 
   html, body, #root {

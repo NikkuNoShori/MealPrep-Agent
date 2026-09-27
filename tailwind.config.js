@@ -85,18 +85,62 @@ export default {
           800: 'var(--gray-800)',
           900: 'var(--gray-900)',
         },
-        // Warm stone colors for light mode
+        // MOP-0029 Phase 4 — surface ramp (page background / card surface /
+        // borders). Maps to --surface-* CSS vars, which applyColorSchemeToCSS()
+        // in themeStore.ts sets per-preset and per light/dark mode.
+        //
+        // Uses the `rgb(var(--x-rgb) / <alpha-value>)` function form (each
+        // "-rgb" var holds a space-separated R G B channel triplet, e.g.
+        // "231 229 228"), NOT a plain `var(--surface-200)` hex reference.
+        // Reason: `.card` in index.css does `@apply border-stone-200/80` —
+        // Tailwind's @apply pipeline cannot compute an opacity-modified
+        // utility from a CSS var holding a hex string (its color parser
+        // can't split an alpha channel out of an opaque var() reference) and
+        // throws a build error. The rgb()-function form is Tailwind's
+        // documented pattern for var-driven colors that must support `/NN`
+        // opacity modifiers, and 13 existing stone-*/NN usages need exactly
+        // that support.
+        surface: {
+          50: 'rgb(var(--surface-50-rgb) / <alpha-value>)',
+          100: 'rgb(var(--surface-100-rgb) / <alpha-value>)',
+          200: 'rgb(var(--surface-200-rgb) / <alpha-value>)',
+          300: 'rgb(var(--surface-300-rgb) / <alpha-value>)',
+          400: 'rgb(var(--surface-400-rgb) / <alpha-value>)',
+          500: 'rgb(var(--surface-500-rgb) / <alpha-value>)',
+          600: 'rgb(var(--surface-600-rgb) / <alpha-value>)',
+          700: 'rgb(var(--surface-700-rgb) / <alpha-value>)',
+          800: 'rgb(var(--surface-800-rgb) / <alpha-value>)',
+          900: 'rgb(var(--surface-900-rgb) / <alpha-value>)',
+        },
+        // Deprecated alias (MOP-0029 Phase 4) — `stone` now resolves to the
+        // SAME --surface-*-rgb vars as the `surface` key above, so all
+        // existing stone-* usages (878 occurrences / 44 files, including the
+        // 13 that use an opacity modifier via `.card`'s `@apply`) keep
+        // working unchanged, while new code is expected to use `surface-*`
+        // (COLOR_SCHEMA.md G2). Do NOT hardcode hex here again — that would
+        // break preset switching for every un-migrated stone-* usage
+        // (ADR-0006 alias strategy).
         stone: {
-          50: '#fafaf9',
-          100: '#f5f5f4',
-          200: '#e7e5e4',
-          300: '#d6d3d1',
-          400: '#a8a29e',
-          500: '#78716c',
-          600: '#57534e',
-          700: '#44403c',
-          800: '#292524',
-          900: '#1c1917',
+          50: 'rgb(var(--surface-50-rgb) / <alpha-value>)',
+          100: 'rgb(var(--surface-100-rgb) / <alpha-value>)',
+          200: 'rgb(var(--surface-200-rgb) / <alpha-value>)',
+          300: 'rgb(var(--surface-300-rgb) / <alpha-value>)',
+          400: 'rgb(var(--surface-400-rgb) / <alpha-value>)',
+          500: 'rgb(var(--surface-500-rgb) / <alpha-value>)',
+          600: 'rgb(var(--surface-600-rgb) / <alpha-value>)',
+          700: 'rgb(var(--surface-700-rgb) / <alpha-value>)',
+          800: 'rgb(var(--surface-800-rgb) / <alpha-value>)',
+          900: 'rgb(var(--surface-900-rgb) / <alpha-value>)',
+        },
+        // MOP-0029 Phase 4 — accent-category ramp (COLOR_SCHEMA.md §6).
+        // Numeric slots 1-6, matching ColorScheme.accentCategory.
+        'accent-cat': {
+          1: 'var(--accent-cat-1)',
+          2: 'var(--accent-cat-2)',
+          3: 'var(--accent-cat-3)',
+          4: 'var(--accent-cat-4)',
+          5: 'var(--accent-cat-5)',
+          6: 'var(--accent-cat-6)',
         },
       },
       fontFamily: {

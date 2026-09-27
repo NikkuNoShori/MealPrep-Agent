@@ -56,6 +56,72 @@ export interface ColorScheme {
       800: string
     }
   }
+  // MOP-0029 Phase 4 — surface ramp. Supersedes the hardcoded `stone` palette
+  // as the semantic owner of page background / card surface / border colors.
+  // Same 10-key shape as primary/secondary, PLUS a `dark` sub-ramp: unlike
+  // primary/secondary/neutral (whose dark-mode CSS variants are today
+  // identical to light, with dark-mode brand tokens instead derived
+  // algorithmically via adjustHSLLightness), the approved Phase 9 spec gives
+  // surface a genuinely distinct, curated dark ramp per preset — not a
+  // formulaic lightness shift — so it must be authored explicitly rather
+  // than derived. See COLOR_SCHEMA.md §3 categories 1-2, 5.
+  surface: {
+    50: string
+    100: string
+    200: string
+    300: string
+    400: string
+    500: string
+    600: string
+    700: string
+    800: string
+    900: string
+    dark: {
+      50: string
+      100: string
+      200: string
+      300: string
+      400: string
+      500: string
+      600: string
+      700: string
+      800: string
+      900: string
+    }
+  }
+  // MOP-0029 Phase 4 — accent-category ramp (COLOR_SCHEMA.md §6). Six
+  // visually-distinct-but-coordinated accents used for meal slots, dashboard
+  // stats, status icons, etc. Numeric slots 1-6 in per-preset ramp order —
+  // NOT named keys. (The MOP's prose names them e.g. Ochre/Rust/Sage/Clay/
+  // Teal/Plum for Evergreen; those names are documentation only, not schema.)
+  accentCategory: {
+    1: string
+    2: string
+    3: string
+    4: string
+    5: string
+    6: string
+  }
+  // MOP-0029 Phase 4 — named decorative gradients (COLOR_SCHEMA.md §9).
+  gradient: {
+    brand: { from: string; to: string }
+    warm: { from: string; to: string }
+    subtle: { from: string; to: string }
+  }
+  // MOP-0029 Phase 4 — reserved data-viz categorical ramp (COLOR_SCHEMA.md
+  // §10). Not consumed anywhere yet; declared now so the first chart doesn't
+  // have to retrofit a palette. Populated with a colorblind-conscious
+  // categorical sequence derived from each preset's accent/brand colors.
+  viz: {
+    1: string
+    2: string
+    3: string
+    4: string
+    5: string
+    6: string
+    7: string
+    8: string
+  }
 }
 
 export interface ThemeState {
@@ -134,6 +200,58 @@ const defaultColorScheme: ColorScheme = {
       800: '#92400e',
     },
   },
+  // Surface = unchanged transcription of today's stone-* Tailwind values
+  // (MOP-0029 Phase 4 pixel-identical requirement). Do not alter.
+  surface: {
+    50: '#fafaf9',
+    100: '#f5f5f4',
+    200: '#e7e5e4',
+    300: '#d6d3d1',
+    400: '#a8a29e',
+    500: '#78716c',
+    600: '#57534e',
+    700: '#44403c',
+    800: '#292524',
+    900: '#1c1917',
+    dark: {
+      50: '#1c1917',
+      100: '#292524',
+      200: '#3a352e',
+      300: '#44403c',
+      400: '#57534e',
+      500: '#78716c',
+      600: '#a8a29e',
+      700: '#d6d3d1',
+      800: '#e7e5e4',
+      900: '#f5f5f4',
+    },
+  },
+  accentCategory: {
+    1: '#b8860b', // Ochre
+    2: '#a44a2e', // Rust
+    3: '#6c8560', // Sage
+    4: '#c2703f', // Clay
+    5: '#0d9488', // Teal
+    6: '#7a4a6b', // Plum
+  },
+  gradient: {
+    brand: { from: '#1D9E75', to: '#34d399' },
+    warm: { from: '#b8860b', to: '#c2703f' },
+    subtle: { from: '#e7e5e4', to: '#f5f5f4' },
+  },
+  // Reserved (Phase 4) — not consumed yet. Categorical sequence derived from
+  // this preset's accent-category ramp + brand primary/secondary for extra
+  // headroom past 6 series.
+  viz: {
+    1: '#b8860b',
+    2: '#a44a2e',
+    3: '#6c8560',
+    4: '#c2703f',
+    5: '#0d9488',
+    6: '#7a4a6b',
+    7: '#1D9E75',
+    8: '#f59e0b',
+  },
 }
 
 // Alternative color schemes
@@ -191,6 +309,53 @@ const alternativeSchemes: Record<string, ColorScheme> = {
         800: '#92400e',
       },
     },
+    surface: {
+      50: '#f7f9f4',
+      100: '#eef2e7',
+      200: '#dfe6d2',
+      300: '#c7d1b3',
+      400: '#9fab84',
+      500: '#767f5c',
+      600: '#5a6146',
+      700: '#434833',
+      800: '#2b2e20',
+      900: '#1a1c14',
+      dark: {
+        50: '#14150f',
+        100: '#1e2116',
+        200: '#282c1d',
+        300: '#363b27',
+        400: '#4a5136',
+        500: '#6b734f',
+        600: '#8f9871',
+        700: '#b6bd9d',
+        800: '#d5dac0',
+        900: '#eef1e3',
+      },
+    },
+    accentCategory: {
+      1: '#ca8a04', // Gold
+      2: '#d97706', // Amber
+      3: '#0f766e', // Teal
+      4: '#7e22ce', // Plum
+      5: '#c2410c', // Clay
+      6: '#0284c7', // Sky
+    },
+    gradient: {
+      brand: { from: '#22c55e', to: '#86efac' },
+      warm: { from: '#ca8a04', to: '#facc15' },
+      subtle: { from: '#dfe6d2', to: '#eef2e7' },
+    },
+    viz: {
+      1: '#ca8a04',
+      2: '#d97706',
+      3: '#0f766e',
+      4: '#7e22ce',
+      5: '#c2410c',
+      6: '#0284c7',
+      7: '#22c55e',
+      8: '#eab308',
+    },
   },
   'Ocean': {
     name: 'Ocean',
@@ -244,6 +409,53 @@ const alternativeSchemes: Record<string, ColorScheme> = {
         100: '#fef3c7',
         800: '#92400e',
       },
+    },
+    surface: {
+      50: '#f6f8fb',
+      100: '#eaeef5',
+      200: '#d7deea',
+      300: '#b9c5da',
+      400: '#8b9bbb',
+      500: '#647391',
+      600: '#4c5975',
+      700: '#38435a',
+      800: '#242b3b',
+      900: '#161a24',
+      dark: {
+        50: '#0e1016',
+        100: '#161a24',
+        200: '#1e2330',
+        300: '#2a3142',
+        400: '#3c465c',
+        500: '#576382',
+        600: '#7d89a8',
+        700: '#a9b2c9',
+        800: '#ced4e2',
+        900: '#e9ecf2',
+      },
+    },
+    accentCategory: {
+      1: '#0d9488', // Teal
+      2: '#7c3aed', // Violet
+      3: '#d97706', // Amber
+      4: '#e11d48', // Rose
+      5: '#0891b2', // Cyan
+      6: '#475569', // Slate
+    },
+    gradient: {
+      brand: { from: '#3b82f6', to: '#5eead4' },
+      warm: { from: '#0d9488', to: '#2dd4bf' },
+      subtle: { from: '#d7deea', to: '#eaeef5' },
+    },
+    viz: {
+      1: '#0d9488',
+      2: '#7c3aed',
+      3: '#d97706',
+      4: '#e11d48',
+      5: '#0891b2',
+      6: '#475569',
+      7: '#3b82f6',
+      8: '#14b8a6',
     },
   },
   'Sunset': {
@@ -299,7 +511,217 @@ const alternativeSchemes: Record<string, ColorScheme> = {
         800: '#92400e',
       },
     },
+    surface: {
+      50: '#fdf8f5',
+      100: '#faeee6',
+      200: '#f3d9c8',
+      300: '#e7bc9e',
+      400: '#d29a6f',
+      500: '#b3774c',
+      600: '#8f5c39',
+      700: '#6d452c',
+      800: '#492e1d',
+      900: '#2c1c12',
+      dark: {
+        50: '#1a120c',
+        100: '#291d13',
+        200: '#382719',
+        300: '#4f3722',
+        400: '#6f4c2d',
+        500: '#96683c',
+        600: '#c08a55',
+        700: '#d9ab7c',
+        800: '#eaccae',
+        900: '#f7e6d6',
+      },
+    },
+    accentCategory: {
+      1: '#db2777', // Pink
+      2: '#9333ea', // Purple
+      3: '#0d9488', // Teal
+      4: '#ca8a04', // Gold
+      5: '#e11d48', // Rose
+      6: '#4f46e5', // Indigo
+    },
+    gradient: {
+      brand: { from: '#f97316', to: '#ec4899' },
+      warm: { from: '#fb923c', to: '#f472b6' },
+      subtle: { from: '#f3d9c8', to: '#faeee6' },
+    },
+    viz: {
+      1: '#db2777',
+      2: '#9333ea',
+      3: '#0d9488',
+      4: '#ca8a04',
+      5: '#e11d48',
+      6: '#4f46e5',
+      7: '#f97316',
+      8: '#ec4899',
+    },
   },
+  'Botanical': {
+    name: 'Botanical',
+    // Only preset that introduces new primary/secondary brand ramps
+    // (terracotta / olive) — MOP-0029 Phase 4. Dark mode is "same" per the
+    // approved spec; no separate dark ramp for primary/secondary/accentCategory/gradient.
+    primary: {
+      50: '#fdf1ec',
+      100: '#fbe0d3',
+      200: '#f4bda2',
+      300: '#e89a6e',
+      400: '#d67744',
+      500: '#b5542f',
+      600: '#963f22',
+      700: '#77301a',
+      800: '#582212',
+      900: '#3a160b',
+    },
+    secondary: {
+      50: '#f3f5ee',
+      100: '#e4e9d8',
+      200: '#c9d3ae',
+      300: '#aabb85',
+      400: '#8a9c66',
+      500: '#5b6b3f',
+      600: '#485631',
+      700: '#374225',
+      800: '#262f19',
+      900: '#161c0e',
+    },
+    // Not specified by the MOP for Botanical — derived as a warm-neutral gray
+    // consistent with the terracotta/olive palette rather than reusing
+    // Evergreen's cool gray verbatim (judgment call; see final report).
+    neutral: {
+      50: '#faf8f6',
+      100: '#f2ede8',
+      200: '#e3dad2',
+      300: '#cfc0b3',
+      400: '#a89684',
+      500: '#867a6b',
+      600: '#5c4f43',
+      700: '#463c33',
+      800: '#2e2822',
+      900: '#1c1815',
+    },
+    semantic: {
+      success: {
+        100: '#dcfce7',
+        800: '#166534',
+        900: '#14532d',
+      },
+      error: {
+        500: '#ef4444',
+        600: '#dc2626',
+      },
+      warning: {
+        100: '#fef3c7',
+        800: '#92400e',
+      },
+    },
+    surface: {
+      50: '#faf6ee',
+      100: '#f4ecdd',
+      200: '#e8dcc5',
+      300: '#d9cbb0',
+      400: '#c2b092',
+      500: '#a3936f',
+      600: '#7d7053',
+      700: '#5c5340',
+      800: '#3a352a',
+      900: '#241f18',
+      dark: {
+        50: '#161310',
+        100: '#1d1811',
+        200: '#241d15',
+        300: '#332a1e',
+        400: '#453a29',
+        500: '#6c5c45',
+        600: '#a8987e',
+        700: '#c9bda6',
+        800: '#e1d7c5',
+        900: '#f4ecdd',
+      },
+    },
+    accentCategory: {
+      1: '#b8860b', // Ochre
+      2: '#a44a2e', // Rust
+      3: '#6c8560', // Sage
+      4: '#7a4a6b', // Plum
+      5: '#3d7a6e', // Teal
+      6: '#c2703f', // Clay
+    },
+    gradient: {
+      brand: { from: '#b5542f', to: '#d67744' },
+      warm: { from: '#5b6b3f', to: '#8a9c66' },
+      subtle: { from: '#e8dcc5', to: '#f4ecdd' },
+    },
+    viz: {
+      1: '#b8860b',
+      2: '#a44a2e',
+      3: '#6c8560',
+      4: '#7a4a6b',
+      5: '#3d7a6e',
+      6: '#c2703f',
+      7: '#b5542f',
+      8: '#5b6b3f',
+    },
+  },
+}
+
+// MOP-0029 Phase 4 — persisted-state migration for the v0 -> v1 schema
+// change (ColorScheme gained required surface/accentCategory/gradient/viz
+// fields). Extracted as a standalone, exported, pure function (rather than
+// staying inline in the `persist` config) so it's directly unit-testable
+// without driving it through zustand's actual localStorage rehydration
+// machinery. Backfills every persisted scheme using its own built-in
+// preset's new ramps where the name matches (Evergreen/Forest/Ocean/Sunset),
+// or falls back to Evergreen's ramps for an unrecognized custom name.
+export function migrateThemeStoreState(
+  persistedState: unknown,
+  version: number
+): ThemeState {
+  const state = persistedState as {
+    theme?: Theme
+    colorScheme?: ColorScheme
+    availableColorSchemes?: Record<string, ColorScheme>
+  }
+
+  if (version >= 1) {
+    return state as ThemeState
+  }
+
+  const backfillScheme = (scheme: ColorScheme | undefined): ColorScheme | undefined => {
+    if (!scheme) return scheme
+    const currentByName =
+      scheme.name === defaultColorScheme.name
+        ? defaultColorScheme
+        : alternativeSchemes[scheme.name]
+    const source = currentByName ?? defaultColorScheme
+    return {
+      ...scheme,
+      surface: scheme.surface ?? source.surface,
+      accentCategory: scheme.accentCategory ?? source.accentCategory,
+      gradient: scheme.gradient ?? source.gradient,
+      viz: scheme.viz ?? source.viz,
+    }
+  }
+
+  const migratedAvailable: Record<string, ColorScheme> = {}
+  if (state.availableColorSchemes) {
+    for (const [key, scheme] of Object.entries(state.availableColorSchemes)) {
+      const backfilled = backfillScheme(scheme)
+      if (backfilled) migratedAvailable[key] = backfilled
+    }
+  }
+
+  return {
+    ...state,
+    colorScheme: backfillScheme(state.colorScheme) ?? defaultColorScheme,
+    availableColorSchemes:
+      Object.keys(migratedAvailable).length > 0
+        ? migratedAvailable
+        : { Evergreen: defaultColorScheme, ...alternativeSchemes },
+  } as ThemeState
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -396,6 +818,12 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: "theme-store",
+      // MOP-0029 Phase 4 — bumped from the implicit v0 because ColorScheme
+      // gained required `surface` / `accentCategory` / `gradient` / `viz`
+      // fields. Without a migration, persisted state from before this change
+      // would hydrate with those ramps `undefined`.
+      version: 1,
+      migrate: migrateThemeStoreState,
       partialize: (state) => ({
         theme: state.theme,
         colorScheme: state.colorScheme,
@@ -426,6 +854,23 @@ function hexToHSL(hex: string): string {
     }
   }
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+// Convert hex to a space-separated "R G B" channel triplet (0-255 each),
+// the format Tailwind's `rgb(var(--x) / <alpha-value>)` color functions
+// expect (MOP-0029 Phase 4). Needed because Tailwind cannot resolve an
+// opacity modifier (e.g. `border-stone-200/80`, used today by `.card` in
+// index.css via `@apply`) against a CSS var holding a plain hex string —
+// its color parser can't combine an arbitrary var() with an alpha channel,
+// and `@apply` throws a build error rather than degrading silently. Wrapping
+// the var in `rgb(... / <alpha-value>)` and feeding it R/G/B channel numbers
+// is Tailwind's documented pattern for CSS-var-driven colors that must
+// support opacity modifiers.
+function hexToRGBTriplet(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `${r} ${g} ${b}`
 }
 
 // Light/dark-aware lightness adjustment for an HSL triplet string, used so
@@ -493,6 +938,38 @@ export function applyColorSchemeToCSS(scheme: ColorScheme) {
   // Tailwind utilities wired in tailwind.config.js.
   root.style.setProperty('--status-success', hexToHSL(scheme.semantic.success[800]))
   root.style.setProperty('--status-warning', hexToHSL(scheme.semantic.warning[800]))
+
+  // MOP-0029 Phase 4 — surface ramp. Genuinely distinct light/dark ramps
+  // (not a formulaic derivation), so pick the ramp matching the current
+  // .dark class state rather than adjusting lightness.
+  // Sets both the plain-hex var (consumed by --rs-* aliases, gradient
+  // composites, and anywhere a raw color is needed) and the "-rgb" channel
+  // triplet var (consumed by the surface-*/stone-* Tailwind color functions
+  // so opacity modifiers like `border-stone-200/80` keep working — see
+  // hexToRGBTriplet()).
+  const surfaceRamp = isDark ? scheme.surface.dark : scheme.surface
+  ;([50, 100, 200, 300, 400, 500, 600, 700, 800, 900] as const).forEach((shade) => {
+    const hex = surfaceRamp[shade]
+    root.style.setProperty(`--surface-${shade}`, hex)
+    root.style.setProperty(`--surface-${shade}-rgb`, hexToRGBTriplet(hex))
+  })
+
+  // MOP-0029 Phase 4 — accent-category ramp. Same in light and dark per the
+  // approved spec ("same" in every preset's row) — no isDark branching.
+  root.style.setProperty('--accent-cat-1', scheme.accentCategory[1])
+  root.style.setProperty('--accent-cat-2', scheme.accentCategory[2])
+  root.style.setProperty('--accent-cat-3', scheme.accentCategory[3])
+  root.style.setProperty('--accent-cat-4', scheme.accentCategory[4])
+  root.style.setProperty('--accent-cat-5', scheme.accentCategory[5])
+  root.style.setProperty('--accent-cat-6', scheme.accentCategory[6])
+
+  // MOP-0029 Phase 4 — named gradients. Same in light and dark per spec.
+  root.style.setProperty('--gradient-brand-from', scheme.gradient.brand.from)
+  root.style.setProperty('--gradient-brand-to', scheme.gradient.brand.to)
+  root.style.setProperty('--gradient-warm-from', scheme.gradient.warm.from)
+  root.style.setProperty('--gradient-warm-to', scheme.gradient.warm.to)
+  root.style.setProperty('--gradient-subtle-from', scheme.gradient.subtle.from)
+  root.style.setProperty('--gradient-subtle-to', scheme.gradient.subtle.to)
 }
 
 // Initialize theme on store creation
