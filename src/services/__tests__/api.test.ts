@@ -1377,16 +1377,6 @@ describe('apiClient.getMealPlans', () => {
       startDate: '2026-06-01',
       endDate: '2026-06-07',
       status: 'draft',
-      // JSONB column → object remains intact (keys with dashes/dates
-      // aren't transformed since snakeToCamel only operates on
-      // identifier-like keys via _([a-z]) pattern). Verify the inner
-      // structure round-trips.
-      meals: {
-        '2026-06-01': { breakfast: 'r-1' },
-        '2026-06-02': { dinner: 'r-2' },
-      },
-      // grocery_list → groceryList
-      groceryList: { items: [{ name: 'eggs', qty: 12 }] },
     });
   });
 
@@ -1459,8 +1449,6 @@ describe('apiClient.getMealPlan', () => {
       title: 'Week 1',
       startDate: '2026-06-01',
       endDate: '2026-06-07',
-      meals: { '2026-06-01': { breakfast: 'r-1' } },
-      groceryList: null,
     });
   });
 
@@ -1516,10 +1504,11 @@ describe('apiClient.createMealPlan', () => {
       title: 'Week 2',
       start_date: '2026-06-08',
       end_date: '2026-06-14',
-      meals: {},
       notes: null,
       status: 'draft',
     });
+    expect(insertBody).not.toHaveProperty('meals');
+    expect(insertBody).not.toHaveProperty('grocery_list');
     expect(result).toMatchObject({
       id: 'mp-new',
       userId: 'u-current',
@@ -1579,31 +1568,21 @@ describe('apiClient.updateMealPlan', () => {
     });
   });
 
-  it('maps groceryList → grocery_list in the PATCH body', async () => {
+  it('does not include meals or grocery_list in the PATCH body (child tables only)', async () => {
     mockCurrentUser({ id: 'u-current' });
 
     let patchBody: any = null;
-    const groceryList = { items: [{ name: 'milk', qty: 1 }] };
     server.use(
       supabasePatch('meal_plans', async ({ request }) => {
         patchBody = await request.json();
-        return HttpResponse.json({
-          id: 'mp-1',
-          grocery_list: groceryList,
-        });
+        return HttpResponse.json({ id: 'mp-1', status: 'active' });
       })
     );
 
-    const result = await apiClient.updateMealPlan('mp-1', { groceryList });
+    await apiClient.updateMealPlan('mp-1', { status: 'active' });
 
-    expect(patchBody).toMatchObject({
-      grocery_list: groceryList,
-      last_edited_by: 'u-current',
-    });
-    expect(result).toMatchObject({
-      id: 'mp-1',
-      groceryList,
-    });
+    expect(patchBody).not.toHaveProperty('meals');
+    expect(patchBody).not.toHaveProperty('grocery_list');
   });
 
   it('throws when the update errors', async () => {
@@ -1656,13 +1635,9 @@ describe('apiClient.copyMealPlan', () => {
   // The source's meals JSONB is shifted by the day offset between
   // newStart and sourceStart and deep-copied (not referenced) into the
   // new row. Title becomes "<source title> (copy)" and status='draft'.
-  it('deep-copies and date-shifts the source meals JSONB into the new plan', async () => {
+  it('inserts the copy with correct metadata without JSONB meals column', async () => {
     mockCurrentUser({ id: 'u-current' });
 
-    const sourceMeals = {
-      '2026-06-01': { breakfast: 'r-1', dinner: 'r-2' },
-      '2026-06-02': { breakfast: 'r-3' },
-    };
     let insertBody: any = null;
 
     server.use(
@@ -1673,7 +1648,6 @@ describe('apiClient.copyMealPlan', () => {
         title: 'Original Week',
         start_date: '2026-06-01',
         end_date: '2026-06-07',
-        meals: sourceMeals,
         notes: 'eat well',
       }),
       // Second call: INSERT the copy
@@ -1702,16 +1676,7 @@ describe('apiClient.copyMealPlan', () => {
       notes: 'eat well',
       status: 'draft',
     });
-
-    // Meals are date-shifted by +7 days, with identical inner content.
-    expect(insertBody.meals).toEqual({
-      '2026-06-08': { breakfast: 'r-1', dinner: 'r-2' },
-      '2026-06-09': { breakfast: 'r-3' },
-    });
-
-    // The shifted object is NOT the same reference as the source. Mutating
-    // the response object should not retroactively change the source.
-    expect(insertBody.meals).not.toBe(sourceMeals);
+    expect(insertBody).not.toHaveProperty('meals');
     expect(result).toMatchObject({ id: 'mp-copy', copiedFrom: 'mp-source' });
   });
 
