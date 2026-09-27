@@ -149,17 +149,17 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   if (status === "extracting") {
     return (
       <div data-testid={`batch-card-${entry.index}`} className="min-w-0">
-        <div className="flex items-stretch gap-4 p-3 rounded-2xl bg-white/60 dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/[0.06] animate-pulse">
+        <div className="flex items-stretch gap-4 p-3 rounded-2xl bg-white/60 dark:bg-white/[0.03] border border-surface-200/60 dark:border-white/[0.06] animate-pulse">
           <div className="relative w-28 h-28 rounded-xl flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-200/80 dark:from-gray-800 dark:to-gray-700" />
           <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
             <div>
-              <div className="h-4 w-48 rounded bg-stone-200 dark:bg-white/10" />
-              <div className="h-3 w-32 rounded bg-stone-100 dark:bg-white/[0.06] mt-2" />
-              <div className="h-3 w-40 rounded bg-stone-100 dark:bg-white/[0.06] mt-1.5" />
+              <div className="h-4 w-48 rounded bg-surface-200 dark:bg-white/10" />
+              <div className="h-3 w-32 rounded bg-surface-100 dark:bg-white/[0.06] mt-2" />
+              <div className="h-3 w-40 rounded bg-surface-100 dark:bg-white/[0.06] mt-1.5" />
             </div>
             <div className="flex gap-2 mt-auto">
-              <div className="h-3 w-10 rounded bg-stone-100 dark:bg-white/[0.06]" />
-              <div className="h-3 w-12 rounded bg-stone-100 dark:bg-white/[0.06]" />
+              <div className="h-3 w-10 rounded bg-surface-100 dark:bg-white/[0.06]" />
+              <div className="h-3 w-12 rounded bg-surface-100 dark:bg-white/[0.06]" />
             </div>
           </div>
         </div>
@@ -180,7 +180,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
               <h3 className="font-semibold text-[15px] text-destructive leading-snug truncate">
                 {displayUrl}
               </h3>
-              <p className="text-[13px] text-stone-500 dark:text-stone-400 line-clamp-2 mt-1 leading-relaxed">
+              <p className="text-[13px] text-surface-500 dark:text-surface-400 line-clamp-2 mt-1 leading-relaxed">
                 {cleanError(error)}
               </p>
             </div>
@@ -214,7 +214,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
           <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
             <div>
               <h3 className="font-semibold text-[15px] leading-snug truncate">{editedTitle}</h3>
-              <p className="text-[13px] text-stone-500 dark:text-stone-400 mt-0.5">{displayUrl}</p>
+              <p className="text-[13px] text-surface-500 dark:text-surface-400 mt-0.5">{displayUrl}</p>
             </div>
             <p className="text-[12px] text-green-600 dark:text-green-400 font-medium mt-auto">Saved to library</p>
           </div>
@@ -228,7 +228,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   // min-height:auto collapse inside a bounded scroll container, collapsing the
   // card to a thin line. Corner clipping is handled per-element instead.
   return (
-    <div data-testid={`batch-card-${entry.index}`} className="min-w-0 rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03]">
+    <div data-testid={`batch-card-${entry.index}`} className="min-w-0 rounded-2xl border border-surface-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03]">
 
       {/* Image — rounded top corners to match card border-radius */}
       {imageUrl && (
@@ -257,7 +257,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
           </button>
         )}
 
-        <p className="text-[12px] text-stone-400 dark:text-stone-500 -mt-1">{displayUrl}</p>
+        <p className="text-[12px] text-surface-400 dark:text-surface-500 -mt-1">{displayUrl}</p>
 
         {/* Metadata badges — editable */}
         <div className="flex flex-wrap gap-1.5 items-center">
@@ -417,13 +417,13 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
           </button>
         )}
         {expanded && hasDetails && (
-          <div className="rounded-xl border border-stone-200/60 dark:border-white/[0.06] overflow-hidden">
+          <div className="rounded-xl border border-surface-200/60 dark:border-white/[0.06] overflow-hidden">
             <RecipeDetails ingredients={ingredients} instructions={instructions} />
           </div>
         )}
 
         {/* Visibility + Save */}
-        <div className="flex items-center justify-between pt-1 border-t border-stone-100 dark:border-white/[0.04]">
+        <div className="flex items-center justify-between pt-1 border-t border-surface-100 dark:border-white/[0.04]">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Visibility:</span>
             <VisibilityPicker value={visibility} onChange={setVisibility} size="sm" />
@@ -455,10 +455,10 @@ function RecipeDetails({
   instructions: string[];
 }) {
   return (
-    <div className="px-3 pb-3 pt-2.5 space-y-3 bg-stone-50 dark:bg-white/[0.02]">
+    <div className="px-3 pb-3 pt-2.5 space-y-3 bg-surface-50 dark:bg-white/[0.02]">
       {ingredients.length > 0 && (
         <div>
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500 mb-1.5">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500 mb-1.5">
             <BookOpen className="h-3 w-3" />
             Ingredients
           </p>
@@ -469,9 +469,9 @@ function RecipeDetails({
               const unit = ing.unit ?? "";
               const label = [amount, unit].filter(Boolean).join(" ");
               return (
-                <li key={i} className="text-[13px] flex gap-2 text-stone-700 dark:text-stone-300">
+                <li key={i} className="text-[13px] flex gap-2 text-surface-700 dark:text-surface-300">
                   {label && (
-                    <span className="shrink-0 text-stone-400 dark:text-stone-500 tabular-nums w-16 text-right">{label}</span>
+                    <span className="shrink-0 text-surface-400 dark:text-surface-500 tabular-nums w-16 text-right">{label}</span>
                   )}
                   <span className="min-w-0">{name}</span>
                 </li>
@@ -483,14 +483,14 @@ function RecipeDetails({
 
       {instructions.length > 0 && (
         <div>
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500 mb-1.5">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500 mb-1.5">
             <ListOrdered className="h-3 w-3" />
             Instructions
           </p>
           <ol className="space-y-1.5">
             {instructions.map((step, i) => (
-              <li key={i} className="text-[13px] flex gap-2 text-stone-700 dark:text-stone-300">
-                <span className="shrink-0 text-stone-400 dark:text-stone-500 tabular-nums font-medium w-4 text-right">{i + 1}.</span>
+              <li key={i} className="text-[13px] flex gap-2 text-surface-700 dark:text-surface-300">
+                <span className="shrink-0 text-surface-400 dark:text-surface-500 tabular-nums font-medium w-4 text-right">{i + 1}.</span>
                 <span className="min-w-0 leading-relaxed">{step}</span>
               </li>
             ))}

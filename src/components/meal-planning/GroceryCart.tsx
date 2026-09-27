@@ -290,7 +290,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
   // Empty state: no plan or no meals
   if (!plan) {
     return (
-      <Card className="border-stone-200/60 dark:border-white/[0.06]">
+      <Card className="border-surface-200/60 dark:border-white/[0.06]">
         <CardContent className="p-8">
           <div className="text-center py-8">
             <div className="relative inline-flex mb-5">
@@ -298,10 +298,10 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                 <ShoppingCart className="w-8 h-8 text-amber-500/60" />
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-stone-800 dark:text-gray-200 mb-1.5">
+            <h3 className="text-lg font-semibold text-surface-800 dark:text-gray-200 mb-1.5">
               Grocery Cart
             </h3>
-            <p className="text-sm text-stone-500 dark:text-gray-400 max-w-md mx-auto">
+            <p className="text-sm text-surface-500 dark:text-gray-400 max-w-md mx-auto">
               Create a meal plan first, then add recipes to generate your grocery list.
             </p>
           </div>
@@ -319,10 +319,10 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
             <ShoppingCart className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
+            <h3 className="text-sm font-semibold text-surface-900 dark:text-white">
               Grocery List
             </h3>
-            <p className="text-xs text-stone-500 dark:text-gray-400">
+            <p className="text-xs text-surface-500 dark:text-gray-400">
               {activeItems.length > 0
                 ? `${checkedCount}/${activeItems.length} items checked`
                 : hasMeals
@@ -363,7 +363,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
           <CardContent className="p-4">
             <div className="flex items-end gap-2">
               <div className="flex-1">
-                <label className="text-xs font-medium text-stone-600 dark:text-gray-400">Item Name</label>
+                <label className="text-xs font-medium text-surface-600 dark:text-gray-400">Item Name</label>
                 <Input
                   value={manualName}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualName(e.target.value)}
@@ -374,7 +374,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                 />
               </div>
               <div className="w-20">
-                <label className="text-xs font-medium text-stone-600 dark:text-gray-400">Amount</label>
+                <label className="text-xs font-medium text-surface-600 dark:text-gray-400">Amount</label>
                 <Input
                   value={manualAmount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualAmount(e.target.value)}
@@ -383,7 +383,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                 />
               </div>
               <div className="w-20">
-                <label className="text-xs font-medium text-stone-600 dark:text-gray-400">Unit</label>
+                <label className="text-xs font-medium text-surface-600 dark:text-gray-400">Unit</label>
                 <Input
                   value={manualUnit}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualUnit(e.target.value)}
@@ -404,11 +404,11 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
 
       {/* Grocery list */}
       {activeItems.length === 0 ? (
-        <Card className="border-stone-200/60 dark:border-white/[0.06]">
+        <Card className="border-surface-200/60 dark:border-white/[0.06]">
           <CardContent className="p-8">
             <div className="text-center py-4">
-              <Package className="h-10 w-10 text-stone-300 dark:text-gray-600 mx-auto mb-3" />
-              <p className="text-sm text-stone-500 dark:text-gray-400">
+              <Package className="h-10 w-10 text-surface-300 dark:text-gray-600 mx-auto mb-3" />
+              <p className="text-sm text-surface-500 dark:text-gray-400">
                 {hasMeals
                   ? 'Click "Generate" to create your grocery list from planned meals.'
                   : 'Add recipes to your meal plan, then generate the grocery list.'}
@@ -424,18 +424,18 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
             const allChecked = catChecked === items.length;
 
             return (
-              <Card key={category} className="border-stone-200/60 dark:border-white/[0.06] overflow-hidden">
+              <Card key={category} className="border-surface-200/60 dark:border-white/[0.06] overflow-hidden">
                 <button
                   className="w-full flex items-center justify-between px-4 py-3 transition-colors"
                   onClick={() => toggleCategory(category)}
                 >
                   <div className="flex items-center gap-2">
                     {isCollapsed ? (
-                      <ChevronRight className="h-4 w-4 text-stone-400" />
+                      <ChevronRight className="h-4 w-4 text-surface-400" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-stone-400" />
+                      <ChevronDown className="h-4 w-4 text-surface-400" />
                     )}
-                    <span className={`text-sm font-semibold ${allChecked ? 'text-stone-400 line-through' : 'text-stone-800 dark:text-gray-200'}`}>
+                    <span className={`text-sm font-semibold ${allChecked ? 'text-surface-400 line-through' : 'text-surface-800 dark:text-gray-200'}`}>
                       {CATEGORY_LABELS[category] || category}
                     </span>
                     <Badge variant="secondary" className="text-[10px] h-5">
@@ -451,7 +451,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                         key={item.id}
                         className={`group flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 ${
                           item.isChecked
-                            ? 'bg-stone-50 dark:bg-white/[0.02] opacity-60'
+                            ? 'bg-surface-50 dark:bg-white/[0.02] opacity-60'
                             : ''
                         }`}
                       >
@@ -459,7 +459,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                           className={`flex-shrink-0 w-5 h-5 rounded-md border-2 transition-all duration-200 flex items-center justify-center ${
                             item.isChecked
                               ? 'bg-primary-500 border-primary-500 text-white'
-                              : 'border-stone-300 dark:border-gray-600 hover:border-primary-400'
+                              : 'border-surface-300 dark:border-gray-600 hover:border-primary-400'
                           }`}
                           onClick={() => handleToggleCheck(item.id)}
                         >
@@ -491,7 +491,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                                   e.key === 'Enter' && handleSaveQuantity(item.id)
                                 }
                               />
-                              <span className="text-xs text-stone-600 dark:text-gray-400 truncate">
+                              <span className="text-xs text-surface-600 dark:text-gray-400 truncate">
                                 {item.name}
                               </span>
                               <Button
@@ -507,8 +507,8 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                             <>
                               <div className={`flex items-baseline justify-between gap-3 text-sm ${
                                 item.isChecked
-                                  ? 'line-through text-stone-400 dark:text-gray-500'
-                                  : 'text-stone-700 dark:text-gray-300'
+                                  ? 'line-through text-surface-400 dark:text-gray-500'
+                                  : 'text-surface-700 dark:text-gray-300'
                               }`}>
                                 <span className="min-w-0 truncate">{item.name}</span>
                                 {(item.amount !== null || item.unit) && (
@@ -516,7 +516,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                                     {item.amount !== null && item.amount}
                                     {item.unit && (item.amount !== null ? ` ${item.unit}` : item.unit)}
                                     {item.rawAmount !== undefined && (
-                                      <span className="ml-1 font-normal text-[10px] text-stone-400 dark:text-gray-500">
+                                      <span className="ml-1 font-normal text-[10px] text-surface-400 dark:text-gray-500">
                                         (need {item.rawAmount})
                                       </span>
                                     )}
@@ -524,7 +524,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                                 )}
                               </div>
                               {item.sourceRecipes.length > 0 && (
-                                <p className="text-[10px] text-stone-400 dark:text-gray-500 mt-0.5 truncate">
+                                <p className="text-[10px] text-surface-400 dark:text-gray-500 mt-0.5 truncate">
                                   From: {item.sourceRecipes.join(', ')}
                                 </p>
                               )}
@@ -540,14 +540,14 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                         {editingItemId !== item.id && (
                           <>
                             <button
-                              className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-stone-400 hover:text-primary-500 transition-all"
+                              className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-surface-400 hover:text-primary-500 transition-all"
                               onClick={() => startEditingItem(item)}
                               title="Adjust quantity"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button
-                              className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-stone-400 hover:text-destructive transition-all"
+                              className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-surface-400 hover:text-destructive transition-all"
                               onClick={() => handleRemoveItem(item.id)}
                               title="Remove"
                             >
@@ -565,12 +565,12 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
 
           {/* Summary */}
           <div className="flex items-center justify-between px-2 pt-2">
-            <p className="text-xs text-stone-400 dark:text-gray-500">
+            <p className="text-xs text-surface-400 dark:text-gray-500">
               {plan.groceryList?.lastGenerated && (
                 <>Last generated: {new Date(plan.groceryList.lastGenerated).toLocaleString()}</>
               )}
             </p>
-            <p className="text-xs font-medium text-stone-600 dark:text-gray-400">
+            <p className="text-xs font-medium text-surface-600 dark:text-gray-400">
               {checkedCount === activeItems.length
                 ? 'All items checked!'
                 : `${activeItems.length - checkedCount} items remaining`}
@@ -581,14 +581,14 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
 
       {/* Removed items — restore panel */}
       {removedItems.length > 0 && (
-        <div className="rounded-xl border border-dashed border-stone-200 dark:border-white/[0.08] p-3 space-y-1">
-          <p className="text-xs font-medium text-stone-500 dark:text-gray-400 mb-2">
+        <div className="rounded-xl border border-dashed border-surface-200 dark:border-white/[0.08] p-3 space-y-1">
+          <p className="text-xs font-medium text-surface-500 dark:text-gray-400 mb-2">
             Removed items
           </p>
           {removedItems.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between px-2 py-1 text-xs text-stone-500 dark:text-gray-400"
+              className="flex items-center justify-between px-2 py-1 text-xs text-surface-500 dark:text-gray-400"
             >
               <span className="line-through">{item.name}</span>
               <button

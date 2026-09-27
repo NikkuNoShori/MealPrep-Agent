@@ -135,7 +135,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-stone-900 dark:text-stone-100">
+        <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
           Meal Planning Calendar
         </h2>
         <div className="flex gap-2">
@@ -187,7 +187,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
         {DAYS_OF_WEEK.map((day) => (
           <div
             key={day}
-            className="text-center font-semibold text-stone-700 dark:text-stone-300 py-2"
+            className="text-center font-semibold text-surface-700 dark:text-surface-300 py-2"
           >
             {day}
           </div>
@@ -220,7 +220,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
               </CardHeader>
               <CardContent className="space-y-2">
                 {/* Meal Summary */}
-                <div className="text-xs text-stone-600 dark:text-stone-400 space-y-1">
+                <div className="text-xs text-surface-600 dark:text-surface-400 space-y-1">
                   <div className="flex items-center gap-1">
                     <Utensils className="h-3 w-3" />
                     <span>{mealCount} meals</span>
@@ -265,7 +265,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-4 w-4 p-0 text-stone-400 hover:text-stone-600"
+                            className="h-4 w-4 p-0 text-surface-400 hover:text-surface-600"
                             onClick={() => handleAddMeal(dateString, mealType)}
                           >
                             <Plus className="h-3 w-3" />
@@ -283,7 +283,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-4 w-4 p-0 text-stone-400 hover:text-stone-600"
+                      className="h-4 w-4 p-0 text-surface-400 hover:text-surface-600"
                       onClick={() => handleAddMeal(dateString, "snacks")}
                     >
                       <Plus className="h-3 w-3" />
@@ -310,7 +310,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
 
                 {/* Notes */}
                 {mealPlan?.notes && (
-                  <div className="text-xs text-stone-600 dark:text-stone-400 mt-2 p-1 bg-stone-50 dark:bg-white/[0.04] rounded">
+                  <div className="text-xs text-surface-600 dark:text-surface-400 mt-2 p-1 bg-surface-50 dark:bg-white/[0.04] rounded">
                     {mealPlan.notes}
                   </div>
                 )}
@@ -334,7 +334,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                   0
                 )}
               </div>
-              <div className="text-sm text-stone-600 dark:text-stone-400">
+              <div className="text-sm text-surface-600 dark:text-surface-400">
                 Total Meals
               </div>
             </div>
@@ -345,7 +345,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                   0
                 )}
               </div>
-              <div className="text-sm text-stone-600 dark:text-stone-400">
+              <div className="text-sm text-surface-600 dark:text-surface-400">
                 Total Prep Time (min)
               </div>
             </div>
@@ -357,12 +357,12 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                   ).length
                 }
               </div>
-              <div className="text-sm text-stone-600 dark:text-stone-400">
+              <div className="text-sm text-surface-600 dark:text-surface-400">
                 Days Planned
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-stone-600">
+              <div className="text-2xl font-bold text-surface-600">
                 {
                   mealPlans.filter((plan) => {
                     const planDate = new Date(plan.date);
@@ -373,7 +373,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
                   }).length
                 }
               </div>
-              <div className="text-sm text-stone-600 dark:text-stone-400">
+              <div className="text-sm text-surface-600 dark:text-surface-400">
                 Meal Plans
               </div>
             </div>
@@ -389,7 +389,7 @@ export const MealPlanCalendar: React.FC<MealPlanCalendarProps> = ({
               <CardTitle>Add Meal for {selectedDate}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-stone-600 dark:text-stone-400 mb-4">
+              <p className="text-surface-600 dark:text-surface-400 mb-4">
                 Select a recipe for {selectedMealType} on {selectedDate}
               </p>
               <div className="flex gap-2">

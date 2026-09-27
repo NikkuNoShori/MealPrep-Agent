@@ -297,7 +297,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
           /* ── Select mode toolbar ── */
           <div className="flex-1 flex flex-wrap items-center gap-2">
             {/* Unified count — text-swaps to "N of M selected" */}
-            <span className="text-sm font-semibold text-stone-700 dark:text-stone-200 shrink-0">
+            <span className="text-sm font-semibold text-surface-700 dark:text-surface-200 shrink-0">
               {selectedIds.size} of {totalCount} selected
             </span>
 
@@ -314,12 +314,12 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                 <ChevronDown className="h-3 w-3 opacity-60" />
               </Button>
               {showVisibilityPopover && (
-                <div className="absolute top-full left-0 mt-1.5 z-[200] bg-white dark:bg-[#1e1f26] border border-stone-200/60 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 py-1 min-w-[160px] animate-scale-in origin-top-left">
+                <div className="absolute top-full left-0 mt-1.5 z-[200] bg-white dark:bg-[var(--rs-bg-elevated)] border border-surface-200/60 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 py-1 min-w-[160px] animate-scale-in origin-top-left">
                   {(['private', 'household', 'public'] as const).map(v => (
                     <button
                       key={v}
                       onClick={() => handleBulkVisibility(v)}
-                      className="w-full text-left px-3 py-1.5 text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-white/[0.05] capitalize transition-colors"
+                      className="w-full text-left px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] capitalize transition-colors"
                     >
                       {v}
                     </button>
@@ -342,12 +342,12 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                   <ChevronDown className="h-3 w-3 opacity-60" />
                 </Button>
                 {showFolderPopover && (
-                  <div className="absolute top-full left-0 mt-1.5 z-[200] bg-white dark:bg-[#1e1f26] border border-stone-200/60 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 py-1 min-w-[180px] animate-scale-in origin-top-left max-h-48 overflow-y-auto">
+                  <div className="absolute top-full left-0 mt-1.5 z-[200] bg-white dark:bg-[var(--rs-bg-elevated)] border border-surface-200/60 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 py-1 min-w-[180px] animate-scale-in origin-top-left max-h-48 overflow-y-auto">
                     {collections.map((c: any) => (
                       <button
                         key={c.id}
                         onClick={() => handleBulkAddToCollection(c.id, c.name)}
-                        className="w-full text-left px-3 py-1.5 text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors truncate"
+                        className="w-full text-left px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors truncate"
                       >
                         {c.icon && <span className="mr-1.5">{c.icon}</span>}{c.name}
                       </button>
@@ -371,7 +371,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             {/* Exit select mode */}
             <button
               onClick={exitSelectMode}
-              className="ml-auto p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-white/[0.06] text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+              className="ml-auto p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-white/[0.06] text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
               title="Exit selection"
             >
               <X className="h-4 w-4" />
@@ -392,13 +392,13 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             <div className="flex items-center gap-3">
               {/* Unified count — "N recipes" in normal mode */}
               {totalCount > 0 && (
-                <span className="text-sm text-stone-400 dark:text-stone-500 shrink-0 tabular-nums">
+                <span className="text-sm text-surface-400 dark:text-surface-500 shrink-0 tabular-nums">
                   {totalCount} {totalCount === 1 ? 'recipe' : 'recipes'}
                 </span>
               )}
 
               {/* View Toggle */}
-              <div className="flex items-center bg-stone-100 dark:bg-white/[0.04] rounded-xl p-1 shrink-0">
+              <div className="flex items-center bg-surface-100 dark:bg-white/[0.04] rounded-xl p-1 shrink-0">
                 <Button
                   variant={viewMode === "grid" ? "default" : "ghost"}
                   size="sm"
@@ -454,14 +454,14 @@ export const RecipeList: React.FC<RecipeListProps> = ({
               </div>
             </div>
 
-            <h3 className="text-2xl font-bold text-stone-900 dark:text-white mb-3">
+            <h3 className="text-2xl font-bold text-surface-900 dark:text-white mb-3">
               {searchQuery || Object.values(filters).some((f) => f && f.length > 0)
                 ? "No recipes match your search"
                 : feedMode === 'shared'
                 ? "Nothing shared with you yet"
                 : "Start building your recipe collection"}
             </h3>
-            <p className="text-stone-600 dark:text-stone-400 mb-8 text-lg leading-relaxed">
+            <p className="text-surface-600 dark:text-surface-400 mb-8 text-lg leading-relaxed">
               {searchQuery || Object.values(filters).some((f) => f && f.length > 0)
                 ? "Try adjusting your search terms or filters to find what you're looking for."
                 : feedMode === 'shared'
@@ -502,8 +502,8 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             >
               {feedMode === 'shared' && recipe._sharerDisplayName && (
                 <div className="flex items-center gap-1.5 mb-1.5 px-0.5">
-                  <Share2 className="h-3 w-3 text-stone-400 dark:text-stone-500 shrink-0" />
-                  <span className="text-[11px] text-stone-400 dark:text-stone-500 truncate">
+                  <Share2 className="h-3 w-3 text-surface-400 dark:text-surface-500 shrink-0" />
+                  <span className="text-[11px] text-surface-400 dark:text-surface-500 truncate">
                     {recipe._sharerDisplayName}
                     {recipe._sharerUsername && ` · @${recipe._sharerUsername}`}
                   </span>

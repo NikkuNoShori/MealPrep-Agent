@@ -70,7 +70,7 @@ const Header = () => {
   const isActive = (href: string) => location.pathname === href;
 
   return (
-    <header className="relative z-20 border-b border-stone-200/60 dark:border-white/[0.06] bg-white/80 dark:bg-[#16171c]/80 backdrop-blur-xl">
+    <header className="relative z-20 border-b border-surface-200/60 dark:border-white/[0.06] bg-white/80 dark:bg-[#16171c]/80 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14">
           {/* Logo */}
@@ -78,7 +78,7 @@ const Header = () => {
             <div className="w-8 h-8 bg-primary-500 dark:bg-primary-400 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow duration-200">
               <span className="text-white font-bold text-xs" style={{ fontFamily: "'Fraunces', serif" }}>M</span>
             </div>
-            <span className="text-base font-semibold text-stone-900 dark:text-white tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <span className="text-base font-semibold text-surface-900 dark:text-white tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               MealPrep
             </span>
           </Link>
@@ -91,7 +91,7 @@ const Header = () => {
                 const baseClasses = `relative px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 ${
                   active
                     ? "text-primary-500 dark:text-primary-400"
-                    : "text-stone-500 dark:text-gray-400 hover:text-stone-900 dark:hover:text-white"
+                    : "text-surface-500 dark:text-gray-400 hover:text-surface-900 dark:hover:text-white"
                 }`;
 
                 const indicator = active ? <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary-500 dark:bg-primary-400" /> : null;
@@ -128,7 +128,7 @@ const Header = () => {
                     <img
                       src={user.avatar_url}
                       alt={getFirstName()}
-                      className="w-7 h-7 rounded-full object-cover ring-1 ring-stone-200/50 dark:ring-white/10"
+                      className="w-7 h-7 rounded-full object-cover ring-1 ring-surface-200/50 dark:ring-white/10"
                       crossOrigin="anonymous"
                       referrerPolicy="no-referrer"
                       onError={() => setAvatarError(true)}
@@ -141,23 +141,23 @@ const Header = () => {
                       </span>
                     </div>
                   )}
-                  <span className="hidden sm:block text-sm font-medium text-stone-600 dark:text-gray-300" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                  <span className="hidden sm:block text-sm font-medium text-surface-600 dark:text-gray-300" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {getFirstName()}
                   </span>
-                  <ChevronDown className={`w-3 h-3 text-stone-400 transition-transform duration-150 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3 h-3 text-surface-400 transition-transform duration-150 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-1.5 w-48 bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-stone-200/50 dark:border-white/[0.08] py-1 z-50 animate-scale-in origin-top-right">
-                    <div className="px-3.5 py-2 border-b border-stone-100 dark:border-white/[0.06]">
-                      <p className="text-sm font-medium text-stone-900 dark:text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>{user?.display_name || getFirstName()}</p>
-                      <p className="text-xs text-stone-400 dark:text-gray-500 truncate">{user?.email}</p>
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-surface-200/50 dark:border-white/[0.08] py-1 z-50 animate-scale-in origin-top-right">
+                    <div className="px-3.5 py-2 border-b border-surface-100 dark:border-white/[0.06]">
+                      <p className="text-sm font-medium text-surface-900 dark:text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>{user?.display_name || getFirstName()}</p>
+                      <p className="text-xs text-surface-400 dark:text-gray-500 truncate">{user?.email}</p>
                     </div>
                     <div className="py-0.5">
                       <Link
                         to="/household"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full px-3.5 py-2 text-left text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white flex items-center gap-2.5 transition-colors"
+                        className="w-full px-3.5 py-2 text-left text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white flex items-center gap-2.5 transition-colors"
                         style={{ fontFamily: "'DM Sans', sans-serif" }}
                       >
                         <Home className="w-3.5 h-3.5" />
@@ -166,7 +166,7 @@ const Header = () => {
                       <Link
                         to="/settings"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full px-3.5 py-2 text-left text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white flex items-center gap-2.5 transition-colors"
+                        className="w-full px-3.5 py-2 text-left text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white flex items-center gap-2.5 transition-colors"
                         style={{ fontFamily: "'DM Sans', sans-serif" }}
                       >
                         <Settings className="w-3.5 h-3.5" />
@@ -183,10 +183,10 @@ const Header = () => {
                           <span>Admin</span>
                         </Link>
                       )}
-                      <div className="my-0.5 mx-3 border-t border-stone-100 dark:border-white/[0.06]" />
+                      <div className="my-0.5 mx-3 border-t border-surface-100 dark:border-white/[0.06]" />
                       <button
                         onClick={() => { setIsUserMenuOpen(false); signOut(); }}
-                        className="w-full px-3.5 py-2 text-left text-[13px] text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 flex items-center gap-2.5 transition-colors"
+                        className="w-full px-3.5 py-2 text-left text-[13px] text-surface-400 dark:text-surface-500 hover:text-rose-500 dark:hover:text-rose-400 flex items-center gap-2.5 transition-colors"
                         style={{ fontFamily: "'DM Sans', sans-serif" }}
                       >
                         <LogOut className="w-3.5 h-3.5" />
@@ -200,13 +200,13 @@ const Header = () => {
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+              className="md:hidden p-2 rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
               aria-label="Toggle mobile menu"
             >
               {isMobileMenuOpen ? (
-                <X className="w-4.5 h-4.5 text-stone-600 dark:text-gray-300" />
+                <X className="w-4.5 h-4.5 text-surface-600 dark:text-gray-300" />
               ) : (
-                <Menu className="w-4.5 h-4.5 text-stone-600 dark:text-gray-300" />
+                <Menu className="w-4.5 h-4.5 text-surface-600 dark:text-gray-300" />
               )}
             </button>
           </div>
@@ -214,14 +214,14 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-3 border-t border-stone-200/60 dark:border-white/[0.06] animate-slide-up">
+          <div className="md:hidden py-3 border-t border-surface-200/60 dark:border-white/[0.06] animate-slide-up">
             <nav className="flex flex-col gap-0.5">
               {navigation.map((item) => {
                 const active = isActive(item.href);
                 const classes = `relative px-3.5 py-2 text-sm font-medium rounded-lg transition-all duration-150 ${
                   active
                     ? "text-primary-500 dark:text-primary-400"
-                    : "text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                    : "text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white"
                 }`;
                 const mobileIndicator = active ? <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full bg-primary-500 dark:bg-primary-400" /> : null;
 

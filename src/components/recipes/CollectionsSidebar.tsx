@@ -214,7 +214,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     <div className="w-full space-y-4">
       {/* Feed Filters */}
       <div className="space-y-0.5">
-        <p className="text-[11px] font-medium uppercase tracking-widest text-stone-400 dark:text-stone-500 px-2 mb-2">
+        <p className="text-[11px] font-medium uppercase tracking-widest text-surface-400 dark:text-surface-500 px-2 mb-2">
           Browse
         </p>
         {feedItems.map((item) => {
@@ -227,7 +227,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
               className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
                 isActive
                   ? 'text-primary-500 dark:text-primary-400'
-                  : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
+                  : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white'
               }`}
             >
               <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
@@ -246,18 +246,18 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
       </div>
 
       {/* Divider */}
-      <div className="border-t border-stone-200/60 dark:border-white/[0.06]" />
+      <div className="border-t border-surface-200/60 dark:border-white/[0.06]" />
 
       {/* Collections */}
       <div className="space-y-0.5">
         <div className="flex items-center justify-between px-2 mb-2">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-stone-400 dark:text-stone-500">
+          <p className="text-[11px] font-medium uppercase tracking-widest text-surface-400 dark:text-surface-500">
             Collections
           </p>
           <button
             type="button"
             onClick={() => setIsCreating(!isCreating)}
-            className="text-stone-400 dark:text-stone-500 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+            className="text-surface-400 dark:text-surface-500 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -270,7 +270,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Name..."
-              className="h-7 text-xs border-stone-200/60 dark:border-white/[0.08] bg-transparent"
+              className="h-7 text-xs border-surface-200/60 dark:border-white/[0.08] bg-transparent"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleCreate()
                 if (e.key === 'Escape') setIsCreating(false)
@@ -280,7 +280,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             <button
               onClick={handleCreate}
               disabled={createCollection.isPending || !newName.trim()}
-              className="shrink-0 text-primary-500 hover:text-primary-600 disabled:text-stone-300 dark:disabled:text-stone-600 transition-colors"
+              className="shrink-0 text-primary-500 hover:text-primary-600 disabled:text-surface-300 dark:disabled:text-surface-600 transition-colors"
             >
               {createCollection.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -290,7 +290,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             </button>
             <button
               onClick={() => { setIsCreating(false); setNewName('') }}
-              className="shrink-0 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors"
+              className="shrink-0 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -299,7 +299,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
 
         {isLoading ? (
           <div className="flex justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin text-stone-400" />
+            <Loader2 className="h-4 w-4 animate-spin text-surface-400" />
           </div>
         ) : (
           (collections || []).map((collection: any) => {
@@ -316,7 +316,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="h-7 text-xs flex-1 border-stone-200/60 dark:border-white/[0.08] bg-transparent"
+                    className="h-7 text-xs flex-1 border-surface-200/60 dark:border-white/[0.08] bg-transparent"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSaveRename(collection.id)
                       if (e.key === 'Escape') setEditingId(null)
@@ -332,7 +332,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                   </button>
                   <button
                     onClick={() => setEditingId(null)}
-                    className="shrink-0 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors"
+                    className="shrink-0 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -351,12 +351,12 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                   className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
                     isActive
                       ? 'text-primary-500 dark:text-primary-400'
-                      : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
+                      : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white'
                   }`}
                 >
                   <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
                   <span className="truncate flex-1 text-left">{collection.name}</span>
-                  <VisIcon className="h-3 w-3 shrink-0 text-stone-300 dark:text-stone-600" />
+                  <VisIcon className="h-3 w-3 shrink-0 text-surface-300 dark:text-surface-600" />
                   {isActive && (
                     <div className="w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400 shrink-0" />
                   )}
@@ -370,25 +370,25 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                       onClick={(e) => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : collection.id) }}
                       className={`w-5 h-5 flex items-center justify-center rounded transition-colors ${
                         isMenuOpen
-                          ? 'text-stone-700 dark:text-stone-200'
-                          : 'text-stone-300 dark:text-stone-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-stone-500 dark:hover:text-stone-400'
+                          ? 'text-surface-700 dark:text-surface-200'
+                          : 'text-surface-300 dark:text-surface-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-surface-500 dark:hover:text-surface-400'
                       }`}
                     >
                       <MoreVertical className="h-3.5 w-3.5" />
                     </button>
 
                     {isMenuOpen && (
-                      <div className="absolute z-[100] top-full right-0 mt-1 origin-top-right animate-scale-in bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-stone-200/50 dark:border-white/[0.08] py-1 min-w-[150px]">
+                      <div className="absolute z-[100] top-full right-0 mt-1 origin-top-right animate-scale-in bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-surface-200/50 dark:border-white/[0.08] py-1 min-w-[150px]">
                         <button
                           onClick={() => handleStartRename(collection)}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                           Rename
                         </button>
                         <button
                           onClick={() => handleCycleVisibility(collection)}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           {visibilityLabels[collection.visibility || 'private']}
@@ -396,7 +396,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                         {collection.visibility === 'public' && (
                           <button
                             onClick={() => handleCopyLink(collection.id)}
-                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
                           >
                             <Share2 className="h-3.5 w-3.5" />
                             Copy link
@@ -404,7 +404,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                         )}
                         <button
                           onClick={() => handleDelete(collection.id, collection.name)}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-surface-400 dark:text-surface-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Delete

@@ -124,8 +124,8 @@ export function PlanPeriodConfig({ value, onSave }: PlanPeriodConfigProps) {
     <div className="space-y-4">
       {/* Duration picker */}
       <div>
-        <Label className="text-sm text-stone-600 dark:text-stone-300">Default duration</Label>
-        <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5 mb-2">
+        <Label className="text-sm text-surface-600 dark:text-surface-300">Default duration</Label>
+        <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5 mb-2">
           Pre-fills the "New Plan" date range each time you create a plan.
         </p>
         <div className="flex gap-2 flex-wrap">
@@ -137,7 +137,7 @@ export function PlanPeriodConfig({ value, onSave }: PlanPeriodConfigProps) {
                 'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
                 staged.count === opt.count && staged.unit === opt.unit
                   ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400'
-                  : 'border-stone-200 dark:border-white/[0.08] text-stone-500 dark:text-stone-400 hover:border-stone-300',
+                  : 'border-surface-200 dark:border-white/[0.08] text-surface-500 dark:text-surface-400 hover:border-surface-300',
               ].join(' ')}
             >
               {opt.label}
@@ -149,8 +149,8 @@ export function PlanPeriodConfig({ value, onSave }: PlanPeriodConfigProps) {
       {/* Start-on picker */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Label className="text-sm text-stone-600 dark:text-stone-300">Starting on</Label>
-          <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+          <Label className="text-sm text-surface-600 dark:text-surface-300">Starting on</Label>
+          <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
             Which day each new plan begins
           </p>
         </div>
@@ -170,10 +170,10 @@ export function PlanPeriodConfig({ value, onSave }: PlanPeriodConfigProps) {
       </div>
 
       {/* Live preview */}
-      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-50 dark:bg-white/[0.03] border border-stone-100 dark:border-white/[0.06]">
-        <CalendarDays className="h-3.5 w-3.5 text-stone-400 dark:text-stone-500 shrink-0" />
-        <span className="text-xs text-stone-500 dark:text-stone-400">
-          Next plan: <span className="font-medium text-stone-700 dark:text-stone-300">{preview}</span>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 dark:bg-white/[0.03] border border-surface-100 dark:border-white/[0.06]">
+        <CalendarDays className="h-3.5 w-3.5 text-surface-400 dark:text-surface-500 shrink-0" />
+        <span className="text-xs text-surface-500 dark:text-surface-400">
+          Next plan: <span className="font-medium text-surface-700 dark:text-surface-300">{preview}</span>
         </span>
       </div>
 
