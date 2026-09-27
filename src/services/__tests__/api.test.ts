@@ -1528,33 +1528,6 @@ describe('apiClient.createMealPlan', () => {
     });
   });
 
-  it('passes the supplied meals JSONB through unchanged', async () => {
-    mockCurrentUser({ id: 'u-current' });
-
-    let insertBody: any = null;
-    const meals = {
-      '2026-06-08': { breakfast: 'r-1', dinner: 'r-2' },
-      '2026-06-09': { lunch: 'r-3' },
-    };
-    server.use(
-      supabaseInsert('meal_plans', async ({ request }) => {
-        insertBody = await request.json();
-        return HttpResponse.json({
-          id: 'mp-new',
-          user_id: 'u-current',
-          meals,
-        });
-      })
-    );
-
-    await apiClient.createMealPlan({
-      startDate: '2026-06-08',
-      endDate: '2026-06-14',
-      meals,
-    });
-
-    expect(insertBody.meals).toEqual(meals);
-  });
 
   it('throws when the insert errors', async () => {
     mockCurrentUser({ id: 'u-current' });

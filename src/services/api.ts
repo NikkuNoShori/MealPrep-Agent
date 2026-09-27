@@ -842,14 +842,13 @@ class ApiClient {
     title?: string;
     startDate: string;
     endDate: string;
-    meals?: any;
     notes?: string;
     status?: string;
   }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data: mealPlan, error } = await supabase.from("meal_plans")
+    const { data: mealPlan, error } = await (supabase as any).from("meal_plans")
       .insert({
         user_id: user.id,
         created_by: user.id,
@@ -857,7 +856,6 @@ class ApiClient {
         title: data.title || null,
         start_date: data.startDate,
         end_date: data.endDate,
-        meals: data.meals || {},
         notes: data.notes || null,
         status: data.status || 'draft',
       })
@@ -884,8 +882,6 @@ class ApiClient {
     if (data.title !== undefined) payload.title = data.title;
     if (data.startDate !== undefined) payload.start_date = data.startDate;
     if (data.endDate !== undefined) payload.end_date = data.endDate;
-    if (data.meals !== undefined) payload.meals = data.meals;
-    if (data.groceryList !== undefined) payload.grocery_list = data.groceryList;
     if (data.notes !== undefined) payload.notes = data.notes;
     if (data.status !== undefined) payload.status = data.status;
 
@@ -897,16 +893,10 @@ class ApiClient {
 
     if (error) throw error;
 
-    // Dual-write Phase (MOP-0011): mirror meals to child table when caller
-    // replaces the full meals JSONB (MealPlanner read-modify-write path).
     if (data.meals !== undefined) {
-      await this.replaceMealPlanEntries(id, data.meals).catch(() => {
-        // Non-fatal during dual-write window.
-      });
+      await this.replaceMealPlanEntries(id, data.meals);
     }
 
-    // Dual-write Phase (MOP-0011): mirror grocery list to child table when caller
-    // replaces the full grocery_list JSONB (GroceryCart.handleGenerate path).
     if (data.groceryList !== undefined && data.groceryList?.items) {
       const items = (data.groceryList.items as any[]).map((item: any, idx: number) => ({
         name:           item.name,
@@ -922,10 +912,7 @@ class ApiClient {
         lastGenerated:  data.groceryList.lastGenerated || undefined,
         position:       idx,
       }));
-      await this.replaceGroceryItems(id, items).catch(() => {
-        // Non-fatal: JSONB write already succeeded; child-table write will be
-        // retried on next full save or caught during Phase 5 cleanup.
-      });
+      await this.replaceGroceryItems(id, items);
     }
 
     return snakeToCamel(mealPlan);
@@ -952,27 +939,7 @@ class ApiClient {
     const newStart = new Date(newDateRange.startDate);
     const dayOffset = Math.round((newStart.getTime() - sourceStart.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Typed as `Json`-compatible because it's destined for the
-    // meal_plans.meals JSONB column (per ADR-0001).
-    const shiftedMeals: Record<string, unknown> = {};
-    // Cast to Json at insert site (line below) — see line ~571.
-    if (source.meals && typeof source.meals === 'object') {
-      for (const [dateStr, slots] of Object.entries(source.meals)) {
-        // Plan-level lists (e.g. "_snacks", "_non_recipe" — see MealPlanner.tsx
-        // PLAN_LISTS) aren't tied to a calendar date and must not go through
-        // the date-shift below; carry them over unchanged instead.
-        if (dateStr.startsWith('_')) {
-          shiftedMeals[dateStr] = slots;
-          continue;
-        }
-        const oldDate = new Date(dateStr);
-        oldDate.setDate(oldDate.getDate() + dayOffset);
-        const newDateStr = oldDate.toISOString().split('T')[0];
-        shiftedMeals[newDateStr] = slots;
-      }
-    }
-
-    const { data: mealPlan, error } = await supabase.from("meal_plans")
+    const { data: mealPlan, error } = await (supabase as any).from("meal_plans")
       .insert({
         user_id: user.id,
         created_by: user.id,
@@ -981,7 +948,6 @@ class ApiClient {
         title: source.title ? `${source.title} (copy)` : null,
         start_date: newDateRange.startDate,
         end_date: newDateRange.endDate,
-        meals: shiftedMeals as any, // Json column; runtime shape matches MealPlanMeals
         notes: source.notes || null,
         status: 'draft',
       })
@@ -991,8 +957,7 @@ class ApiClient {
     if (error) throw error;
     const newPlan = snakeToCamel(mealPlan);
 
-    // Dual-write Phase (MOP-0011): copy source entries into child tables for the
-    // new plan, with dates shifted by the same dayOffset applied to shiftedMeals.
+    // Copy source entries into child tables with dates shifted by dayOffset.
     const sourceEntries = await this.getMealPlanEntries(sourceId).catch(() => []);
     if (sourceEntries.length > 0) {
       const shiftedEntries = sourceEntries.map((e: any) => {
@@ -1018,19 +983,15 @@ class ApiClient {
       });
       await Promise.all(
         shiftedEntries.map((entry: any) => this.addMealPlanEntry(newPlan.id, entry))
-      ).catch(() => {
-        // Non-fatal: JSONB write succeeded; child-table drift caught in Phase 5.
-      });
+      );
     }
 
     return newPlan;
   }
 
   // ── Meal Plan Child Tables (MOP-0011) ──
-  // These methods write directly to meal_plan_entries / grocery_list_items.
-  // During the dual-write phase createMealPlan/updateMealPlan/copyMealPlan
-  // also write to the JSONB columns; once reads switch to child tables the
-  // JSONB writes and these methods are the sole source of truth.
+  // These methods are the sole source of truth for meal entries and grocery items.
+  // meal_plans.meals and meal_plans.grocery_list JSONB columns dropped in migration 046.
 
   async getMealPlanEntries(planId: string) {
     const { data, error } = await (supabase as any)
