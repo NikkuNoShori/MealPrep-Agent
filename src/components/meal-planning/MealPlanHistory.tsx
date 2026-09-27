@@ -307,7 +307,7 @@ const MealPlanHistory = ({
             onClick={() => setDetailPlan(null)}
           >
             {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <div className="absolute inset-0 modal-backdrop backdrop-blur-sm" />
 
             {/* Panel */}
             <div

@@ -74,6 +74,14 @@
     --rs-accent-light: #d1fae5;
     --rs-accent-hover: #178c66;
     --rs-overlay: rgba(0, 0, 0, 0.4);
+    /* MOP-0029 Phase 6 fix — a standard modal backdrop and a fullscreen
+       image lightbox are not the same thing: the lightbox wants the image
+       to be the sole focus, so it was always meaningfully darker (80%/90%
+       in the two usages this token replaces) than a dialog backdrop (40%).
+       Flattening both onto --rs-overlay (40%) washed the lightboxes out
+       visibly. 0.85 sits between the two original values (80%/90%) closely
+       enough that neither lightbox reads as changed. */
+    --rs-overlay-heavy: rgba(0, 0, 0, 0.85);
     --rs-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     --rs-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
     --rs-selected-bg: #f0fdf8;
@@ -188,6 +196,23 @@
        itself is NOT touched here (Phase 7 migrates components); this only
        declares the token. */
     --chrome-bg: #ffffff;
+
+    /* MOP-0029 Phase 6 — card surface background (COLOR_SCHEMA.md §3
+       category 2). Static per-mode value, not a `--surface-*` ramp step —
+       see the `.card` comment below for why (no ramp slot sits "above"
+       surface-50 in light mode). Declared as its own named L2 token so
+       `.card` has zero raw hex literals, matching the --rs-bg-elevated /
+       --chrome-bg precedent for values without a ramp equivalent. */
+    --surface-card: #ffffff;
+
+    /* MOP-0029 Phase 6 / G4 — .btn-secondary base token + its hover
+       shade-step. Same "no exact ramp match for this literal" situation as
+       --surface-card. Declaring the base as its own token, with hover
+       expressed as an alpha adjustment of it, is what satisfies G4 — the
+       important property is that hover has no literal of its OWN, not that
+       the base must itself be a `--surface-*` ramp value. */
+    --btn-secondary-bg: rgba(255, 255, 255, 0.8);
+    --btn-secondary-bg-hover: rgba(255, 255, 255, 1);
   }
 
   .dark {
@@ -240,6 +265,7 @@
     --rs-accent-light: rgba(52, 211, 153, 0.12);
     --rs-accent-hover: #2cc48a;
     --rs-overlay: rgba(0, 0, 0, 0.6);
+    --rs-overlay-heavy: rgba(0, 0, 0, 0.9);
     --rs-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     --rs-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
     --rs-selected-bg: rgba(52, 211, 153, 0.08);
@@ -340,6 +366,34 @@
        existing dark:bg-[#16171c]/80 literal (== --rs-bg dark) — same value,
        just also exposed as its own taxonomy-category-3 token. */
     --chrome-bg: #16171c;
+
+    /* MOP-0029 Phase 6 — card surface background (dark). Was
+       rgba(255,255,255,0.03) — a pure-white tint lifting the card above the
+       dark page background. Dark mode's surface ramp is INVERTED (surface-50
+       is the darkest step, surface-900 the lightest, #f5f5f4/"245 245 244"),
+       so no ramp step reproduces true white (255 255 255) exactly — using
+       --surface-900-rgb here would shift Evergreen's rendered pixels by a
+       few RGB units, failing the byte-identical requirement every MOP-0029
+       phase must hold to. Kept as its own static named token instead (same
+       treatment Phase 4 already gave --rs-bg / --rs-bg-elevated for dark
+       values with no ramp equivalent) — still zero raw literals inside
+       `.card` itself (G1), just not ramp-derived for this one static value. */
+    --surface-card: rgba(255, 255, 255, 0.03);
+    /* Was .card's hardcoded dark border rgba(255,255,255,0.06) — same
+       no-exact-ramp-match situation as --surface-card above. Declared as
+       its own named token rather than left inline, so .card references a
+       variable instead of a literal even though the value itself is static. */
+    --surface-card-border: rgba(255, 255, 255, 0.06);
+
+    /* MOP-0029 Phase 6 / G4 — dark .btn-secondary base + border + their
+       hover steps. Was hardcoded rgba(255,255,255,0.04|0.08) base/border and
+       a separate rgba(255,255,255,0.08|0.14) hover literal; hover now derives
+       from the same base/border tokens by an alpha step instead of its own
+       literal. */
+    --btn-secondary-bg: rgba(255, 255, 255, 0.04);
+    --btn-secondary-bg-hover: rgba(255, 255, 255, 0.08);
+    --btn-secondary-border: rgba(255, 255, 255, 0.08);
+    --btn-secondary-border-hover: rgba(255, 255, 255, 0.14);
   }
 
   html, body, #root {
@@ -423,34 +477,69 @@
     --tw-ring-color: var(--rs-accent);
   }
 
+  /* MOP-0029 Phase 6 / governance rule G4: a hover/interactive state must
+     derive from a base token by a shade-step or alpha adjustment, never
+     introduce its own new color literal. `--btn-secondary-bg` (declared in
+     :root/.dark below, alongside --surface-card) is that base token; :hover
+     derives from it by stepping alpha up, exactly as G4 prescribes, instead
+     of hover hardcoding its own separate `rgba(255,255,255,1)` literal as it
+     did before. The base token itself is kept a static per-mode value (not a
+     `--surface-*` ramp step) for the same reason as --surface-card: no ramp
+     step reproduces true white/near-black exactly, and this phase's hard
+     constraint is Evergreen staying byte-identical, not ramp-purity. */
   .btn-secondary {
     @apply font-medium py-2.5 px-5 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 text-stone-700 border border-stone-200 hover:border-stone-300;
-    background: rgba(255, 255, 255, 0.8);
+    background: var(--btn-secondary-bg);
   }
 
   .btn-secondary:hover {
-    background: rgba(255, 255, 255, 1);
+    background: var(--btn-secondary-bg-hover);
   }
 
   .dark .btn-secondary {
     color: #f0efe9;
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--btn-secondary-bg);
+    border-color: var(--btn-secondary-border);
   }
 
   .dark .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.14);
+    background: var(--btn-secondary-bg-hover);
+    border-color: var(--btn-secondary-border-hover);
   }
 
   /* ── Cards ── */
+  /* MOP-0029 Phase 6: rewritten from `bg-white` / `border-stone-200/80` (light)
+     and hardcoded `rgba(255,255,255,0.03|0.06)` (dark) to token references —
+     `border-color` now reads the `--surface-*-rgb` ramp directly (same value
+     `border-stone-200/80` resolved to, since `stone` is the deprecated alias
+     for `surface`), and `background` reads the new `--surface-card` L2 token
+     (declared in the :root/.dark blocks above, alongside `--chrome-bg` and
+     `--rs-bg-elevated`) instead of the bare `bg-white` utility / raw dark rgba.
+     `--surface-card` is kept a static per-mode value rather than a ramp step:
+     light's #ffffff (bg-white) sits ABOVE surface-50 (#fafaf9, the page
+     background) with no existing ramp slot for "whiter than the lightest
+     step" — the exact situation Phase 4 already accepted for --rs-bg-elevated
+     (#f9fafb, also not a ramp step). Dark's rgba(255,255,255,0.03)/(0.06)
+     (background/border) had no ramp match either — using --surface-900-rgb
+     (dark mode's ramp is inverted, so 900 is the lightest/whitest step) was
+     evaluated and rejected: 245/245/244 vs true white's 255/255/255 is a
+     small but real byte difference that would violate the pixel-identical
+     requirement. --surface-card / --surface-card-border (declared in the
+     .dark block) instead keep the exact literals as their own named static
+     tokens. Net effect: no raw hex/rgba literal remains inside `.card`
+     itself (G1) — the light-mode border IS fully ramp-derived and therefore
+     preset-reactive; the dark-mode background/border tokens are declared,
+     named CSS variables rather than inline literals, matching the
+     --rs-bg-elevated precedent for values with no ramp equivalent. */
   .card {
-    @apply bg-white rounded-2xl border border-stone-200/80 p-6 transition-all duration-200 shadow-sm;
+    @apply rounded-2xl border p-6 transition-all duration-200 shadow-sm;
+    background: var(--surface-card);
+    border-color: rgb(var(--surface-200-rgb) / 0.8);
   }
 
   .dark .card {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: rgba(255, 255, 255, 0.06);
+    background: var(--surface-card);
+    border-color: var(--surface-card-border);
     box-shadow: none;
   }
 
@@ -517,6 +606,29 @@
   .dark .stat-card {
     background: rgba(255, 255, 255, 0.03);
     border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* ── Modal / dialog backdrop ── */
+  /* MOP-0029 Phase 6: consolidates raw `bg-black/NN` modal/dialog backdrop
+     utilities onto the existing `--rs-overlay` token (already used via inline
+     style by RecipeSelectorModal.tsx) so overlay darkness is a single,
+     preset-aware source of truth instead of one-off Tailwind opacity classes
+     that can't reference a CSS var. A plain utility class (rather than
+     inline style on every call site) keeps the call-site diff minimal —
+     callers just swap `bg-black/40 backdrop-blur-sm` for
+     `modal-backdrop backdrop-blur-sm`. Positioning (`fixed`/`absolute inset-0`
+     etc.) stays on the caller, since that varies by usage. */
+  .modal-backdrop {
+    background: var(--rs-overlay);
+  }
+
+  /* Fullscreen image lightbox backdrop — deliberately darker than a standard
+     dialog (COLOR_SCHEMA.md §8 overlay/scrim). An image viewer wants the
+     image to be the sole focus, unlike a form/confirm dialog. Originally
+     bg-black/80 (ChatInterface.tsx) and bg-black/90 (RecipeDetail.tsx) —
+     do not fold these into .modal-backdrop, that visibly washes them out. */
+  .modal-backdrop-heavy {
+    background: var(--rs-overlay-heavy);
   }
 
   /* ── Stagger Animation ── */

@@ -146,7 +146,7 @@ const DayAssignmentModal = ({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[60] flex items-center justify-center modal-backdrop backdrop-blur-sm animate-fade-in"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
       <div className="w-full max-w-lg max-h-[85vh] mx-4 bg-white dark:bg-[#16171c] rounded-2xl shadow-2xl border border-stone-200/60 dark:border-white/[0.08] flex flex-col overflow-hidden animate-scale-in">

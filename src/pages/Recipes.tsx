@@ -125,7 +125,7 @@ const Recipes = () => {
             {mobileCollectionsOpen && (
               <div className="fixed inset-0 z-50 lg:hidden">
                 <div
-                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                  className="absolute inset-0 modal-backdrop backdrop-blur-sm"
                   onClick={() => setMobileCollectionsOpen(false)}
                 />
                 <div className="absolute inset-y-0 left-0 w-80 max-w-[85vw] bg-white dark:bg-[#16171c] shadow-2xl animate-slide-up p-5 overflow-y-auto">

@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
 import { Loader2, ShoppingCart } from 'lucide-react'
+import { SectionHeader } from '@/components/ui/section-header'
 import type { DashboardStats } from '@/types/dashboard'
 
 interface GroceryCartWidgetProps {
@@ -18,23 +18,16 @@ const GroceryCartWidget = ({ stats, isLoading }: GroceryCartWidgetProps) => {
 
   return (
     <div className="rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2
-          className="text-sm font-semibold italic text-stone-800 dark:text-gray-200"
-          style={{ fontFamily: "'Fraunces', serif" }}
-        >
-          Grocery cart
-        </h2>
-        <Link
-          to="/meal-planner"
-          className="text-xs text-stone-400 hover:text-teal-500 dark:text-gray-500 dark:hover:text-teal-400 transition-colors"
-          style={{ fontFamily: "'DM Sans', sans-serif" }}
-        >
-          Open cart
-        </Link>
-      </div>
+      <SectionHeader
+        title="Grocery cart"
+        action={{
+          label: 'Open cart',
+          to: '/meal-planner',
+          className: 'hover:text-teal-500 dark:hover:text-teal-400',
+        }}
+      />
 
-      <div className="border-t border-dashed border-stone-200 dark:border-white/[0.08] pt-3">
+      <div>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-4 w-4 animate-spin text-stone-400 dark:text-gray-500" />

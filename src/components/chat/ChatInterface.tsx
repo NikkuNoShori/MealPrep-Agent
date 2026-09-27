@@ -1608,7 +1608,7 @@ export const ChatInterface: React.FC = () => {
       {/* Backdrop — mobile only, dismisses the overlay drawer */}
       {isMobile && !isSidebarCollapsed && (
         <div
-          className="absolute inset-0 z-30 bg-black/40 md:hidden"
+          className="absolute inset-0 z-30 modal-backdrop md:hidden"
           onClick={() => setIsSidebarCollapsed(true)}
           aria-hidden="true"
         />
@@ -2349,7 +2349,7 @@ export const ChatInterface: React.FC = () => {
       {/* Image lightbox overlay */}
       {lightboxImage && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-50 modal-backdrop-heavy flex items-center justify-center p-4 cursor-pointer"
           onClick={() => setLightboxImage(null)}
         >
           <button

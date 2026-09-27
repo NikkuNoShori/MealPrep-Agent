@@ -228,7 +228,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
 
           {isImageFullscreen && (
             <div
-              className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+              className="fixed inset-0 z-50 modal-backdrop-heavy backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
               onClick={() => setIsImageFullscreen(false)}
             >
               <Button
