@@ -835,6 +835,30 @@ class ApiClient {
       .single();
 
     if (error) throw error;
+
+    // Dual-write Phase (MOP-0011): mirror grocery list to child table when caller
+    // replaces the full grocery_list JSONB (GroceryCart.handleGenerate path).
+    if (data.groceryList !== undefined && data.groceryList?.items) {
+      const items = (data.groceryList.items as any[]).map((item: any, idx: number) => ({
+        name:           item.name,
+        amount:         item.amount         ?? null,
+        unit:           item.unit           || '',
+        category:       item.category       || 'other',
+        sourceRecipes:  item.sourceRecipes  || [],
+        sourceRecipeId: item.sourceRecipeId || undefined,
+        isManual:       item.isManual       ?? false,
+        isChecked:      item.isChecked      ?? false,
+        notes:          item.notes          || null,
+        rawAmount:      item.rawAmount      ?? null,
+        lastGenerated:  data.groceryList.lastGenerated || undefined,
+        position:       idx,
+      }));
+      await this.replaceGroceryItems(id, items).catch(() => {
+        // Non-fatal: JSONB write already succeeded; child-table write will be
+        // retried on next full save or caught during Phase 5 cleanup.
+      });
+    }
+
     return snakeToCamel(mealPlan);
   }
 
@@ -896,7 +920,220 @@ class ApiClient {
       .single();
 
     if (error) throw error;
-    return snakeToCamel(mealPlan);
+    const newPlan = snakeToCamel(mealPlan);
+
+    // Dual-write Phase (MOP-0011): copy source entries into child tables for the
+    // new plan, with dates shifted by the same dayOffset applied to shiftedMeals.
+    const sourceEntries = await this.getMealPlanEntries(sourceId).catch(() => []);
+    if (sourceEntries.length > 0) {
+      const shiftedEntries = sourceEntries.map((e: any) => {
+        const shifted: any = {
+          recipeName:  e.recipeName,
+          recipeId:    e.recipeId    || undefined,
+          recipeImage: e.recipeImage || undefined,
+          servings:    e.servings,
+          prepTime:    e.prepTime    ?? undefined,
+          cookTime:    e.cookTime    ?? undefined,
+          notes:       e.notes       || undefined,
+          position:    e.position    ?? 0,
+        };
+        if (e.date) {
+          const d = new Date(e.date);
+          d.setDate(d.getDate() + dayOffset);
+          shifted.date = d.toISOString().split('T')[0];
+          shifted.slot = e.slot;
+        } else {
+          shifted.listKey = e.listKey;
+        }
+        return shifted;
+      });
+      await Promise.all(
+        shiftedEntries.map((entry: any) => this.addMealPlanEntry(newPlan.id, entry))
+      ).catch(() => {
+        // Non-fatal: JSONB write succeeded; child-table drift caught in Phase 5.
+      });
+    }
+
+    return newPlan;
+  }
+
+  // ── Meal Plan Child Tables (MOP-0011) ──
+  // These methods write directly to meal_plan_entries / grocery_list_items.
+  // During the dual-write phase createMealPlan/updateMealPlan/copyMealPlan
+  // also write to the JSONB columns; once reads switch to child tables the
+  // JSONB writes and these methods are the sole source of truth.
+
+  async getMealPlanEntries(planId: string) {
+    const { data, error } = await (supabase as any)
+      .from("meal_plan_entries")
+      .select("*")
+      .eq("meal_plan_id", planId)
+      .order("date", { ascending: true, nullsFirst: false })
+      .order("position", { ascending: true });
+    if (error) throw error;
+    return (data || []).map((r: any) => snakeToCamel(r));
+  }
+
+  async addMealPlanEntry(planId: string, entry: {
+    date?: string;
+    slot?: string;
+    listKey?: string;
+    recipeId?: string;
+    recipeName: string;
+    recipeImage?: string;
+    servings: number;
+    prepTime?: number;
+    cookTime?: number;
+    notes?: string;
+    position?: number;
+  }) {
+    const { data, error } = await (supabase as any)
+      .from("meal_plan_entries")
+      .insert({
+        meal_plan_id: planId,
+        date:         entry.date       || null,
+        slot:         entry.slot       || null,
+        list_key:     entry.listKey    || null,
+        recipe_id:    entry.recipeId   || null,
+        recipe_name:  entry.recipeName,
+        recipe_image: entry.recipeImage || null,
+        servings:     entry.servings,
+        prep_time:    entry.prepTime   ?? null,
+        cook_time:    entry.cookTime   ?? null,
+        notes:        entry.notes      || null,
+        position:     entry.position   ?? 0,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async removeMealPlanEntry(entryId: string) {
+    const { error } = await (supabase as any)
+      .from("meal_plan_entries")
+      .delete()
+      .eq("id", entryId);
+    if (error) throw error;
+  }
+
+  async getGroceryItems(planId: string) {
+    const { data, error } = await (supabase as any)
+      .from("grocery_list_items")
+      .select("*")
+      .eq("meal_plan_id", planId)
+      .order("position", { ascending: true });
+    if (error) throw error;
+    return (data || []).map((r: any) => snakeToCamel(r));
+  }
+
+  async addGroceryItem(planId: string, item: {
+    name: string;
+    amount?: number | null;
+    unit?: string;
+    category?: string;
+    sourceRecipes?: string[];
+    sourceRecipeId?: string;
+    isManual?: boolean;
+    notes?: string;
+    rawAmount?: number | null;
+    lastGenerated?: string;
+    position?: number;
+  }) {
+    const { data, error } = await (supabase as any)
+      .from("grocery_list_items")
+      .insert({
+        meal_plan_id:     planId,
+        name:             item.name,
+        amount:           item.amount           ?? null,
+        unit:             item.unit             || '',
+        category:         item.category         || 'other',
+        source_recipes:   item.sourceRecipes    || [],
+        source_recipe_id: item.sourceRecipeId   || null,
+        is_manual:        item.isManual         ?? false,
+        notes:            item.notes            || null,
+        raw_amount:       item.rawAmount        ?? null,
+        last_generated:   item.lastGenerated    ? new Date(item.lastGenerated).toISOString() : null,
+        position:         item.position         ?? 0,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async updateGroceryItem(itemId: string, patch: {
+    isChecked?: boolean;
+    isRemoved?: boolean;
+    amount?: number | null;
+    unit?: string;
+    notes?: string;
+  }) {
+    const payload: any = {};
+    if (patch.isChecked  !== undefined) payload.is_checked = patch.isChecked;
+    if (patch.isRemoved  !== undefined) payload.is_removed = patch.isRemoved;
+    if (patch.amount     !== undefined) payload.amount     = patch.amount;
+    if (patch.unit       !== undefined) payload.unit       = patch.unit;
+    if (patch.notes      !== undefined) payload.notes      = patch.notes;
+
+    const { data, error } = await (supabase as any)
+      .from("grocery_list_items")
+      .update(payload)
+      .eq("id", itemId)
+      .select()
+      .single();
+    if (error) throw error;
+    return snakeToCamel(data);
+  }
+
+  async replaceGroceryItems(planId: string, items: Array<{
+    name: string;
+    amount?: number | null;
+    unit?: string;
+    category?: string;
+    sourceRecipes?: string[];
+    sourceRecipeId?: string;
+    isManual?: boolean;
+    notes?: string;
+    rawAmount?: number | null;
+    lastGenerated?: string;
+    position?: number;
+  }>) {
+    // Delete all existing items for the plan, then bulk-insert the new set.
+    // Used by GroceryCart.handleGenerate which rebuilds the list from scratch.
+    const { error: delError } = await (supabase as any)
+      .from("grocery_list_items")
+      .delete()
+      .eq("meal_plan_id", planId);
+    if (delError) throw delError;
+
+    if (items.length === 0) return [];
+
+    const lastGenerated = items[0]?.lastGenerated
+      ? new Date(items[0].lastGenerated).toISOString()
+      : null;
+
+    const rows = items.map((item, idx) => ({
+      meal_plan_id:     planId,
+      name:             item.name,
+      amount:           item.amount           ?? null,
+      unit:             item.unit             || '',
+      category:         item.category         || 'other',
+      source_recipes:   item.sourceRecipes    || [],
+      source_recipe_id: item.sourceRecipeId   || null,
+      is_manual:        item.isManual         ?? false,
+      notes:            item.notes            || null,
+      raw_amount:       item.rawAmount        ?? null,
+      last_generated:   lastGenerated,
+      position:         idx,
+    }));
+
+    const { data, error } = await (supabase as any)
+      .from("grocery_list_items")
+      .insert(rows)
+      .select();
+    if (error) throw error;
+    return (data || []).map((r: any) => snakeToCamel(r));
   }
 
   async uploadImage(file: File, folder: string = "recipes"): Promise<string> {
@@ -2104,6 +2341,74 @@ export const useCopyMealPlan = () => {
       apiClient.copyMealPlan(sourceId, newDateRange),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meal-plans"] });
+    },
+  });
+};
+
+// ── Meal Plan Child Table hooks (MOP-0011) ──
+
+export const useMealPlanEntries = (planId: string) => {
+  return useQuery({
+    queryKey: ["meal-plan-entries", planId],
+    queryFn: () => apiClient.getMealPlanEntries(planId),
+    enabled: !!planId,
+    staleTime: QUERY_STALE_TIME.domain,
+  });
+};
+
+export const useAddMealPlanEntry = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ planId, entry }: { planId: string; entry: Parameters<ApiClient["addMealPlanEntry"]>[1] }) =>
+      apiClient.addMealPlanEntry(planId, entry),
+    onSuccess: (_, { planId }) => {
+      queryClient.invalidateQueries({ queryKey: ["meal-plan-entries", planId] });
+    },
+  });
+};
+
+export const useRemoveMealPlanEntry = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ planId: _planId, entryId }: { planId: string; entryId: string }) =>
+      apiClient.removeMealPlanEntry(entryId),
+    onSuccess: (_, { planId }) => {
+      queryClient.invalidateQueries({ queryKey: ["meal-plan-entries", planId] });
+    },
+  });
+};
+
+export const useGroceryItems = (planId: string) => {
+  return useQuery({
+    queryKey: ["grocery-items", planId],
+    queryFn: () => apiClient.getGroceryItems(planId),
+    enabled: !!planId,
+    staleTime: QUERY_STALE_TIME.domain,
+  });
+};
+
+export const useAddGroceryItem = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ planId, item }: { planId: string; item: Parameters<ApiClient["addGroceryItem"]>[1] }) =>
+      apiClient.addGroceryItem(planId, item),
+    onSuccess: (_, { planId }) => {
+      queryClient.invalidateQueries({ queryKey: ["grocery-items", planId] });
+    },
+  });
+};
+
+export const useUpdateGroceryItem = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ planId: _planId, itemId, patch }: { planId: string; itemId: string; patch: Parameters<ApiClient["updateGroceryItem"]>[1] }) =>
+      apiClient.updateGroceryItem(itemId, patch),
+    onSuccess: (_, { planId }) => {
+      queryClient.invalidateQueries({ queryKey: ["grocery-items", planId] });
     },
   });
 };
