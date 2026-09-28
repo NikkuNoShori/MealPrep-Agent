@@ -837,20 +837,23 @@ const MealPlanner = () => {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-surface-500 dark:text-surface-400 shrink-0">Duration:</span>
                 <div className="flex gap-1">
-                  {DURATION_OPTIONS.map(opt => (
-                    <button
-                      key={opt.days}
-                      onClick={() => setNewPlanDays(opt.days as 7 | 14 | 28)}
-                      className={[
-                        'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
-                        newPlanDays === opt.days
-                          ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400'
-                          : 'border-surface-200 dark:border-white/[0.08] text-surface-500 dark:text-surface-400 hover:border-surface-300',
-                      ].join(' ')}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                  {DURATION_OPTIONS.map(opt => {
+                    const isDefault = opt.days === configToDays(planPeriodConfig);
+                    return (
+                      <button
+                        key={opt.days}
+                        onClick={() => setNewPlanDays(opt.days as 7 | 14 | 28)}
+                        className={[
+                          'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
+                          newPlanDays === opt.days
+                            ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400'
+                            : 'border-surface-200 dark:border-white/[0.08] text-surface-500 dark:text-surface-400 hover:border-surface-300',
+                        ].join(' ')}
+                      >
+                        {opt.label}{isDefault ? ' · Default' : ''}
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="flex-1" />
                 <Button onClick={handleCreatePlan} disabled={createMealPlan.isPending} size="sm" className="gap-1.5">
