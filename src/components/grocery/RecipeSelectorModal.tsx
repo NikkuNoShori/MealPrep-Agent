@@ -310,7 +310,7 @@ const RecipeSelectorModal = ({
       }}
     >
       <div style={{
-        width: '100%', maxWidth: 560, maxHeight: '85vh', margin: '0 16px',
+        width: '100%', maxWidth: 860, maxHeight: '90vh', margin: '0 16px',
         background: 'var(--rs-bg)', borderRadius: 20,
         border: `1px solid var(--rs-border)`,
         boxShadow: '0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.06)',
@@ -472,7 +472,7 @@ const RecipeSelectorModal = ({
           ) : view === 'grid' ? (
             /* ── Grid View ── */
             <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12,
             }}>
               {filtered.map((recipe) => {
                 const isSelected = selected.has(recipe.id);
