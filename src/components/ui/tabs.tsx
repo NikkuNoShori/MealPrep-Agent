@@ -37,7 +37,7 @@ const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
     return (
       <div
         ref={ref}
-        className={`inline-flex h-10 items-center justify-center rounded-md bg-stone-100 p-1 text-stone-500 dark:bg-white/[0.04] dark:text-stone-400 ${className}`}
+        className={`inline-flex h-10 items-center justify-center rounded-md bg-surface-100 p-1 text-surface-500 dark:bg-white/[0.04] dark:text-surface-400 ${className}`}
       >
         {children}
       </div>
@@ -65,10 +65,10 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
       <button
         ref={ref}
         onClick={() => context.onValueChange(value)}
-        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-stone-950 dark:focus-visible:ring-stone-300 ${
+        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-surface-950 dark:focus-visible:ring-surface-300 ${
           isActive
-            ? "bg-white text-stone-900 shadow-sm dark:bg-white/[0.08] dark:text-white"
-            : "text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+            ? "bg-white text-surface-900 shadow-sm dark:bg-white/[0.08] dark:text-white"
+            : "text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white"
         } ${className}`}
       >
         {children}
@@ -98,7 +98,7 @@ const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
     return (
       <div
         ref={ref}
-        className={`mt-2 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-950 focus-visible:ring-offset-2 dark:ring-offset-stone-950 dark:focus-visible:ring-stone-300 ${className}`}
+        className={`mt-2 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-950 focus-visible:ring-offset-2 dark:ring-offset-surface-950 dark:focus-visible:ring-surface-300 ${className}`}
       >
         {children}
       </div>

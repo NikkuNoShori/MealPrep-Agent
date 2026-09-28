@@ -582,10 +582,10 @@ const Household = () => {
                                   <ChevronDown className="h-4 w-4" />
                                 </Button>
                                 {memberMenuOpen === member.id && (
-                                  <div className="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border border-stone-200/50 dark:border-white/[0.08] bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl p-1 shadow-lg shadow-black/10 dark:shadow-black/30">
+                                  <div className="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border border-surface-200/50 dark:border-white/[0.08] bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl p-1 shadow-lg shadow-black/10 dark:shadow-black/30">
                                     {member.role === 'member' ? (
                                       <button
-                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
                                         onClick={() => handleChangeRole(member.id, 'admin', memberName)}
                                       >
                                         <Shield className="h-3.5 w-3.5" />
@@ -593,7 +593,7 @@ const Household = () => {
                                       </button>
                                     ) : (
                                       <button
-                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
                                         onClick={() => handleChangeRole(member.id, 'member', memberName)}
                                       >
                                         <User className="h-3.5 w-3.5" />
@@ -601,7 +601,7 @@ const Household = () => {
                                       </button>
                                     )}
                                     <button
-                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
                                       onClick={() => {
                                         setConfirmAction({ type: 'transfer', memberId: member.id, memberName });
                                         setMemberMenuOpen(null);
@@ -610,9 +610,9 @@ const Household = () => {
                                       <ArrowRightLeft className="h-3.5 w-3.5" />
                                       Transfer Ownership
                                     </button>
-                                    <div className="my-1 border-t border-stone-100/60 dark:border-white/[0.06]" />
+                                    <div className="my-1 border-t border-surface-100/60 dark:border-white/[0.06]" />
                                     <button
-                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-400 dark:text-surface-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
                                       onClick={() => {
                                         setConfirmAction({ type: 'remove', memberId: member.id, memberName });
                                         setMemberMenuOpen(null);

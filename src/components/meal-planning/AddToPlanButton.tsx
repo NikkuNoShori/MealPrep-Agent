@@ -166,7 +166,7 @@ const AddToPlanButton = ({
           className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:text-primary-500 hover:scale-110 active:scale-95 transition-all duration-150"
           title="Add to Meal Plan"
         >
-          <CalendarPlus className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />
+          <CalendarPlus className="h-3.5 w-3.5 text-surface-600 dark:text-surface-300" />
         </button>
       ) : (
         <Button
@@ -182,30 +182,30 @@ const AddToPlanButton = ({
 
       {open && (
         <div
-          className={`absolute top-full mt-2 z-50 w-72 rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] shadow-xl animate-scale-in ${compact ? 'left-0' : 'right-0'}`}
+          className={`absolute top-full mt-2 z-50 w-72 rounded-xl border border-surface-200/80 dark:border-white/[0.08] bg-white dark:bg-[var(--rs-bg)] shadow-xl animate-scale-in ${compact ? 'left-0' : 'right-0'}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Week nav */}
-          <div className="flex items-center justify-between px-3 py-2 border-b border-stone-100 dark:border-white/[0.06]">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-surface-100 dark:border-white/[0.06]">
             <button
-              className="p-1 rounded-lg text-stone-500 hover:text-stone-900 dark:hover:text-white transition-colors"
+              className="p-1 rounded-lg text-surface-500 hover:text-surface-900 dark:hover:text-white transition-colors"
               onClick={() => setWeekOffset(weekOffset - 1)}
             >
-              <ChevronLeft className="h-4 w-4 text-stone-500" />
+              <ChevronLeft className="h-4 w-4 text-surface-500" />
             </button>
-            <span className="text-xs font-medium text-stone-600 dark:text-gray-400">
+            <span className="text-xs font-medium text-surface-600 dark:text-gray-400">
               {weekLabel}
             </span>
             <button
-              className="p-1 rounded-lg text-stone-500 hover:text-stone-900 dark:hover:text-white transition-colors"
+              className="p-1 rounded-lg text-surface-500 hover:text-surface-900 dark:hover:text-white transition-colors"
               onClick={() => setWeekOffset(weekOffset + 1)}
             >
-              <ChevronRight className="h-4 w-4 text-stone-500" />
+              <ChevronRight className="h-4 w-4 text-surface-500" />
             </button>
           </div>
 
           {!targetPlan && (
-            <div className="px-3 py-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-b border-stone-100 dark:border-white/[0.06]">
+            <div className="px-3 py-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-b border-surface-100 dark:border-white/[0.06]">
               No plan for this week
             </div>
           )}
@@ -217,7 +217,7 @@ const AddToPlanButton = ({
               return (
                 <div key={formatDateKey(date)} className="mb-1.5 last:mb-0">
                   <p className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 ${
-                    isToday ? 'text-primary-500' : 'text-stone-400 dark:text-gray-500'
+                    isToday ? 'text-primary-500' : 'text-surface-400 dark:text-gray-500'
                   }`}>
                     {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     {isToday && <span className="ml-1 text-primary-500">· today</span>}
@@ -226,7 +226,7 @@ const AddToPlanButton = ({
                     {DAILY_SLOTS.map((slot) => (
                       <button
                         key={slot.key}
-                        className="flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg text-stone-500 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-all duration-150 disabled:opacity-30"
+                        className="flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg text-surface-500 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-all duration-150 disabled:opacity-30"
                         onClick={() => handleAdd(date, slot.key)}
                         disabled={!targetPlan || updateMealPlan.isPending}
                         title={`Add to ${slot.label}`}
@@ -245,9 +245,9 @@ const AddToPlanButton = ({
             })}
 
             {/* Snacks (plan-level) */}
-            <div className="px-2 pt-1 pb-1 border-t border-stone-100 dark:border-white/[0.06]">
+            <div className="px-2 pt-1 pb-1 border-t border-surface-100 dark:border-white/[0.06]">
               <button
-                className="w-full flex items-center gap-2 py-2 px-2 rounded-lg text-stone-500 dark:text-gray-400 hover:text-pink-500 dark:hover:text-pink-400 transition-all duration-150 disabled:opacity-30"
+                className="w-full flex items-center gap-2 py-2 px-2 rounded-lg text-surface-500 dark:text-gray-400 hover:text-pink-500 dark:hover:text-pink-400 transition-all duration-150 disabled:opacity-30"
                 onClick={handleAddToSnacks}
                 disabled={!targetPlan || updateMealPlan.isPending}
               >

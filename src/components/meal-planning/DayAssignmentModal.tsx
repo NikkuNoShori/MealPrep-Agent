@@ -149,14 +149,14 @@ const DayAssignmentModal = ({
       className="fixed inset-0 z-[60] flex items-center justify-center modal-backdrop backdrop-blur-sm animate-fade-in"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
-      <div className="w-full max-w-lg max-h-[85vh] mx-4 bg-white dark:bg-[#16171c] rounded-2xl shadow-2xl border border-stone-200/60 dark:border-white/[0.08] flex flex-col overflow-hidden animate-scale-in">
+      <div className="w-full max-w-lg max-h-[85vh] mx-4 bg-white dark:bg-[var(--rs-bg)] rounded-2xl shadow-2xl border border-surface-200/60 dark:border-white/[0.08] flex flex-col overflow-hidden animate-scale-in">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200/60 dark:border-white/[0.06]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200/60 dark:border-white/[0.06]">
           <div>
-            <h3 className="text-lg font-semibold text-stone-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-surface-900 dark:text-white">
               Assign to Plan
             </h3>
-            <p className="text-xs text-stone-500 dark:text-gray-400 mt-0.5">
+            <p className="text-xs text-surface-500 dark:text-gray-400 mt-0.5">
               Choose a meal type for each recipe
             </p>
           </div>
@@ -175,16 +175,16 @@ const DayAssignmentModal = ({
             return (
               <div
                 key={recipe.recipeId}
-                className="rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-stone-50/50 dark:bg-white/[0.02] overflow-hidden transition-all duration-200 hover:border-stone-300/60 dark:hover:border-white/[0.1]"
+                className="rounded-xl border border-surface-200/60 dark:border-white/[0.06] bg-surface-50/50 dark:bg-white/[0.02] overflow-hidden transition-all duration-200 hover:border-surface-300/60 dark:hover:border-white/[0.1]"
               >
                 {/* Recipe info + slot buttons */}
                 <div className="flex items-center gap-3 p-3">
                   <RecipeImage src={recipe.recipeImage} alt={recipe.recipeName} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-stone-800 dark:text-gray-200 truncate">
+                    <p className="text-sm font-medium text-surface-800 dark:text-gray-200 truncate">
                       {recipe.recipeName}
                     </p>
-                    <p className="text-[10px] text-stone-400 dark:text-gray-500 mt-0.5">
+                    <p className="text-[10px] text-surface-400 dark:text-gray-500 mt-0.5">
                       {recipe.servings} servings
                     </p>
                   </div>
@@ -213,7 +213,7 @@ const DayAssignmentModal = ({
 
                 {/* Day chips (when Days toggle is on and slot is not snacks) */}
                 {showDays && currentSlot && currentSlot !== 'snacks' && (
-                  <div className="flex items-center gap-1 px-3 pb-3 pt-0.5 border-t border-stone-100 dark:border-white/[0.04]">
+                  <div className="flex items-center gap-1 px-3 pb-3 pt-0.5 border-t border-surface-100 dark:border-white/[0.04]">
                     {weekDates.map(date => {
                       const dateStr = formatDateKey(date);
                       const isSelected = dates.includes(dateStr);
@@ -230,7 +230,7 @@ const DayAssignmentModal = ({
                               ? 'bg-primary-500 text-white shadow-sm'
                               : isToday
                                 ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 hover:bg-primary-500/20'
-                                : 'text-stone-400 dark:text-gray-500 hover:bg-stone-100 dark:hover:bg-white/[0.06]'
+                                : 'text-surface-400 dark:text-gray-500 hover:bg-surface-100 dark:hover:bg-white/[0.06]'
                           }`}
                           title={date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                         >
@@ -247,20 +247,20 @@ const DayAssignmentModal = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-stone-200/60 dark:border-white/[0.06] flex items-center justify-between bg-stone-50/50 dark:bg-white/[0.02]">
+        <div className="px-5 py-4 border-t border-surface-200/60 dark:border-white/[0.06] flex items-center justify-between bg-surface-50/50 dark:bg-white/[0.02]">
           {/* Days toggle */}
           <button
             onClick={() => setShowDays(!showDays)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
               showDays
                 ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400'
-                : 'text-stone-400 dark:text-gray-500 hover:text-stone-600 dark:hover:text-gray-300 hover:bg-stone-100 dark:hover:bg-white/[0.06]'
+                : 'text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300 hover:bg-surface-100 dark:hover:bg-white/[0.06]'
             }`}
           >
             <Calendar className="h-3.5 w-3.5" />
             Days
             <div className={`w-7 h-4 rounded-full transition-all duration-200 relative ${
-              showDays ? 'bg-primary-500' : 'bg-stone-300 dark:bg-gray-600'
+              showDays ? 'bg-primary-500' : 'bg-surface-300 dark:bg-gray-600'
             }`}>
               <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all duration-200 ${
                 showDays ? 'left-3.5' : 'left-0.5'

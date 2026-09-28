@@ -1619,7 +1619,7 @@ export const ChatInterface: React.FC = () => {
           instead of squeezing it down to a sliver. */}
       <div
         ref={sidebarRef}
-        className={`bg-stone-100 dark:bg-white/[0.03] border-r border-stone-200/60 dark:border-white/[0.06] flex flex-col min-h-0 transition-all duration-200 ease-in-out ${
+        className={`bg-surface-100 dark:bg-white/[0.03] border-r border-surface-200/60 dark:border-white/[0.06] flex flex-col min-h-0 transition-all duration-200 ease-in-out ${
           isMobile
             ? `absolute inset-y-0 left-0 z-40 shadow-xl ${isSidebarCollapsed ? "-translate-x-full" : "translate-x-0"}`
             : `relative ${isSidebarCollapsed ? "overflow-hidden" : ""}`
@@ -1641,7 +1641,7 @@ export const ChatInterface: React.FC = () => {
           </div>
         )}
         {/* Header with New Chat and Multi-select */}
-        <div className="p-3 border-b border-stone-200/60 dark:border-white/[0.06] bg-white/50 dark:bg-white/[0.02] backdrop-blur-sm">
+        <div className="p-3 border-b border-surface-200/60 dark:border-white/[0.06] bg-white/50 dark:bg-white/[0.02] backdrop-blur-sm">
           <div className="flex gap-2">
             <Button
               onClick={() => {
@@ -1651,7 +1651,7 @@ export const ChatInterface: React.FC = () => {
               variant="outline"
               size="icon"
               title="New Chat"
-              className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-stone-200 dark:border-white/[0.08] hover:text-stone-900 dark:hover:text-white"
+              className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-surface-900 dark:hover:text-white"
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -1663,7 +1663,7 @@ export const ChatInterface: React.FC = () => {
                     onClick={() => setIsMultiSelectMode(true)}
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-stone-200 dark:border-white/[0.08] hover:text-stone-900 dark:hover:text-white"
+                    className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-surface-900 dark:hover:text-white"
                     title="Select"
                   >
                     <CheckSquare className="h-3.5 w-3.5" />
@@ -1674,7 +1674,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={selectAllConversations}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-stone-200 dark:border-white/[0.08] hover:text-stone-900 dark:hover:text-white"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-surface-900 dark:hover:text-white"
                       title="Select All"
                     >
                       <CheckSquare className="h-3.5 w-3.5" />
@@ -1683,7 +1683,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={clearSelection}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-stone-200 dark:border-white/[0.08] hover:text-stone-900 dark:hover:text-white"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-surface-900 dark:hover:text-white"
                       title="Cancel"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -1714,7 +1714,7 @@ export const ChatInterface: React.FC = () => {
             .map((conversation) => (
               <div
                 key={conversation.id}
-                className={`p-3 border-b border-stone-200/40 dark:border-white/[0.04] cursor-pointer transition-colors group ${
+                className={`p-3 border-b border-surface-200/40 dark:border-white/[0.04] cursor-pointer transition-colors group ${
                   currentConversationId === conversation.id
                     ? "bg-white dark:bg-white/[0.06] shadow-sm"
                     : ""
@@ -1929,7 +1929,7 @@ export const ChatInterface: React.FC = () => {
                         </p>
                         <button
                           onClick={() => copyMessage(message.id, message.content)}
-                          className="absolute -top-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+                          className="absolute -top-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-surface-400 hover:text-surface-700 dark:hover:text-surface-200"
                           title="Copy message"
                         >
                           {copiedMessageId === message.id ? (
@@ -2118,7 +2118,7 @@ export const ChatInterface: React.FC = () => {
                     )}
                     <button
                       onClick={() => copyMessage(message.id, message.content)}
-                      className={`absolute -top-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 ${
+                      className={`absolute -top-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 ${
                         message.sender === "user" ? "right-1" : "right-1"
                       }`}
                       title="Copy message"
