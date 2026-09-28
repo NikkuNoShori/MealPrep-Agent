@@ -303,14 +303,15 @@ const RecipeSelectorModal = ({
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 60,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        paddingTop: 72, paddingBottom: 24,
         background: 'var(--rs-overlay)', backdropFilter: 'blur(4px)',
         animation: 'rsFadeIn 0.2s ease',
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
       <div style={{
-        width: '100%', maxWidth: 860, maxHeight: '90vh', margin: '0 16px',
+        width: '100%', maxWidth: 860, maxHeight: 'calc(100vh - 96px)', margin: '0 16px',
         background: 'var(--rs-bg)', borderRadius: 20,
         border: `1px solid var(--rs-border)`,
         boxShadow: '0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.06)',
@@ -500,7 +501,7 @@ const RecipeSelectorModal = ({
                     }}
                   >
                     {/* Photo area */}
-                    <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 3', overflow: 'hidden' }}>
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', overflow: 'hidden' }}>
                       {recipe.image ? (
                         <RecipePhoto src={recipe.image} name={recipe.name} />
                       ) : (
@@ -510,9 +511,9 @@ const RecipeSelectorModal = ({
                     </div>
 
                     {/* Info */}
-                    <div style={{ padding: '10px 12px 12px' }}>
+                    <div style={{ padding: '8px 10px 10px' }}>
                       <p style={{
-                        margin: 0, fontSize: 15, fontWeight: 600,
+                        margin: 0, fontSize: 13, fontWeight: 600,
                         fontFamily: "'Fraunces', serif",
                         color: 'var(--rs-text-primary)',
                         lineHeight: 1.3,
@@ -523,7 +524,7 @@ const RecipeSelectorModal = ({
                         {recipe.name}
                       </p>
                       <p style={{
-                        margin: '4px 0 8px', fontSize: 12,
+                        margin: '2px 0 6px', fontSize: 11,
                         color: 'var(--rs-text-tertiary)',
                         textAlign: 'left',
                       }}>
