@@ -13,7 +13,7 @@ import type { StructuredRecipe as StructuredRecipeType } from "@/types";
 
 interface Ingredient {
   name: string;
-  amount: number | null;
+  amount: string | number | null;
   unit: string;
   category?: string;
   notes?: string;
@@ -128,14 +128,14 @@ function CompactIngredientRow({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(ingredient.name);
   const [amount, setAmount] = useState(
-    ingredient.amount != null && ingredient.amount > 0 ? String(ingredient.amount) : ""
+    ingredient.amount != null && Number(ingredient.amount) !== 0 ? String(ingredient.amount) : ""
   );
   const [unit, setUnit] = useState(ingredient.unit);
 
   useEffect(() => {
     setName(ingredient.name);
     setAmount(
-      ingredient.amount != null && ingredient.amount > 0 ? String(ingredient.amount) : ""
+      ingredient.amount != null && Number(ingredient.amount) !== 0 ? String(ingredient.amount) : ""
     );
     setUnit(ingredient.unit);
   }, [ingredient]);
@@ -157,7 +157,7 @@ function CompactIngredientRow({
   const cancel = () => {
     setName(ingredient.name);
     setAmount(
-      ingredient.amount != null && ingredient.amount > 0 ? String(ingredient.amount) : ""
+      ingredient.amount != null && Number(ingredient.amount) !== 0 ? String(ingredient.amount) : ""
     );
     setUnit(ingredient.unit);
     setEditing(false);

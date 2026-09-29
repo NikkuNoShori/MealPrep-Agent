@@ -304,14 +304,14 @@ const RecipeSelectorModal = ({
       style={{
         position: 'fixed', inset: 0, zIndex: 60,
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        paddingTop: 72, paddingBottom: 24,
+        paddingTop: 72, paddingBottom: 56,
         background: 'var(--rs-overlay)', backdropFilter: 'blur(4px)',
         animation: 'rsFadeIn 0.2s ease',
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
       <div style={{
-        width: '100%', maxWidth: 860, maxHeight: 'calc(100vh - 96px)', margin: '0 16px',
+        width: '100%', maxWidth: 960, maxHeight: 'calc(100vh - 128px)', margin: '0 16px',
         background: 'var(--rs-bg)', borderRadius: 20,
         border: `1px solid var(--rs-border)`,
         boxShadow: '0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.06)',
@@ -473,7 +473,7 @@ const RecipeSelectorModal = ({
           ) : view === 'grid' ? (
             /* ── Grid View ── */
             <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12,
+              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
             }}>
               {filtered.map((recipe) => {
                 const isSelected = selected.has(recipe.id);

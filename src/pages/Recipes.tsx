@@ -17,7 +17,7 @@ const Recipes = () => {
   const [editingRecipe, setEditingRecipe] = useState<any>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'shared' | 'collection'>('mine');
+  const [viewMode, setViewMode] = useState<'public' | 'mine' | 'household' | 'shared' | 'collection' | 'all'>('mine');
   const [mobileCollectionsOpen, setMobileCollectionsOpen] = useState(false);
   const { user } = useAuthStore();
   const deleteRecipeMutation = useDeleteRecipe();

@@ -30,8 +30,8 @@ interface CollectionsSidebarProps {
   selectedCollectionId: string | null
   onSelectCollection: (collectionId: string | null) => void
   onCollectionNameChange?: (name: string | null) => void
-  onViewModeChange?: (mode: 'public' | 'mine' | 'household' | 'shared' | 'collection') => void
-  viewMode?: 'public' | 'mine' | 'household' | 'shared' | 'collection'
+  onViewModeChange?: (mode: 'public' | 'mine' | 'household' | 'shared' | 'collection' | 'all') => void
+  viewMode?: 'public' | 'mine' | 'household' | 'shared' | 'collection' | 'all'
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -203,11 +203,18 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     onViewModeChange?.('shared')
   }
 
+  const handleSelectAll = () => {
+    onSelectCollection(null)
+    onCollectionNameChange?.('All Recipes')
+    onViewModeChange?.('all')
+  }
+
   const feedItems = [
-    { key: 'public' as const, label: 'Public', icon: Globe, handler: handleSelectPublic, badge: 0 },
+    { key: 'all' as const, label: 'All Recipes', icon: BookOpen, handler: handleSelectAll, badge: 0 },
     { key: 'mine' as const, label: 'My Recipes', icon: FolderOpen, handler: handleSelectMine, badge: 0 },
     { key: 'household' as const, label: 'Household', icon: Home, handler: handleSelectHousehold, badge: 0 },
     { key: 'shared' as const, label: 'Shared with me', icon: Share2, handler: handleSelectShared, badge: unseenCount as number },
+    { key: 'public' as const, label: 'Public', icon: Globe, handler: handleSelectPublic, badge: 0 },
   ]
 
   return (

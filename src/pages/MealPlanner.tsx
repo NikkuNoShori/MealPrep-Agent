@@ -29,6 +29,7 @@ import {
   Pencil,
   LayoutGrid,
   Rows,
+  List,
   Shuffle,
   Sparkles,
   Trash2,
@@ -351,7 +352,7 @@ function WeekLabelDropdown({
 
 const MealPlanner = () => {
   const [activeTab, setActiveTab] = useState('calendar');
-  const [calendarView, setCalendarView] = useState<'days' | 'meals'>('days');
+  const [calendarView, setCalendarView] = useState<'days' | 'meals' | 'titles'>('days');
   // Plan-first navigation: which plan is open, and which week within it
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [planWeekOffset, setPlanWeekOffset] = useState(0); // 0 = first week of selected plan
@@ -963,6 +964,13 @@ const MealPlanner = () => {
                   >
                     <Rows className="h-3.5 w-3.5" />
                   </button>
+                  <button
+                    className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'titles' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary-500' : 'text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300'}`}
+                    onClick={() => setCalendarView('titles')}
+                    title="Titles view"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </button>
                 </div>
 
                 <PlannerSettingsMenu options={[]} />
@@ -1091,6 +1099,50 @@ const MealPlanner = () => {
                                   })}
                                 </div>
                               </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : calendarView === 'titles' ? (
+              /* ── Titles View: compact slot×date grid showing recipe names only ── */
+              <div className="space-y-1 animate-fade-in">
+                {DAILY_SLOTS.map((slot) => (
+                  <div key={slot.key} className="rounded-xl border border-surface-200/60 dark:border-white/[0.06] overflow-hidden">
+                    <div className={`flex items-center gap-2 px-3 py-2 ${slot.bg}`}>
+                      <slot.icon className={`h-3.5 w-3.5 ${slot.color}`} />
+                      <span className={`text-xs font-semibold ${slot.color}`}>{slot.label}</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <div className="grid min-w-0" style={{ gridTemplateColumns: `repeat(${planDates.length}, minmax(80px, 1fr))` }}>
+                        {planDates.map((date) => {
+                          const dateStr = date.toISOString().split('T')[0];
+                          const meals = weekPlan?.meals?.[dateStr]?.[slot.key] || [];
+                          const isToday = dateStr === new Date().toISOString().split('T')[0];
+                          return (
+                            <div
+                              key={dateStr}
+                              className={`border-r last:border-r-0 border-surface-100 dark:border-white/[0.04] px-2 py-2 min-h-[52px] ${
+                                isToday ? 'bg-primary-50/40 dark:bg-primary-500/[0.05]' : ''
+                              }`}
+                            >
+                              <p className={`text-[9px] font-medium mb-1 ${isToday ? 'text-primary-500' : 'text-surface-400 dark:text-surface-500'}`}>
+                                {date.toLocaleDateString('en-US', { weekday: 'narrow', month: 'numeric', day: 'numeric' })}
+                              </p>
+                              {meals.length > 0 ? (
+                                <div className="space-y-0.5">
+                                  {meals.map((meal: PlannedMealEntry) => (
+                                    <p key={meal.id} className="text-[10px] text-surface-700 dark:text-gray-300 leading-tight truncate" title={meal.recipeName}>
+                                      {meal.recipeName}
+                                    </p>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-[10px] text-surface-300 dark:text-surface-600 italic">—</p>
+                              )}
                             </div>
                           );
                         })}
@@ -1474,6 +1526,7 @@ const MealPlanner = () => {
         weekDates={weekDates}
         defaultDate={selectorDate}
         defaultSlot={selectorSlot}
+        slotLocked={!!selectorSlot}
         onConfirm={handleAssignmentConfirmed}
         onClose={() => setShowAssignmentModal(false)}
       />

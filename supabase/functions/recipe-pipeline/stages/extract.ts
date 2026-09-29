@@ -234,10 +234,15 @@ export function normalizeExtractedRecipe(raw: any): ExtractedRecipe {
         // Model returned { name, quantity } instead of { name, amount, unit }
         if (ing.quantity && !ing.amount && !ing.unit) {
           const parsed = parseQuantityString(ing.quantity);
+          let qUnit = parsed.unit;
+          qUnit = qUnit.replace(/^\s*(heaping|scant|rounded|level|generous)\s+/i, "").trim();
+          qUnit = UNIT_CANONICAL[qUnit.toLowerCase()] ?? qUnit;
+          if (COUNTABLE_UNITS.has(qUnit.toLowerCase())) qUnit = "";
+          const qName = ing.name || ing.ingredient || "";
           return {
-            name: ing.name || ing.ingredient || "",
+            name: INGREDIENT_NAME_MAP[qName.toLowerCase().trim()] ?? qName,
             amount: parsed.amount,
-            unit: parsed.unit,
+            unit: qUnit,
             category: ing.category || "",
             notes: parsed.notes || ing.notes || "",
           };
@@ -261,8 +266,17 @@ export function normalizeExtractedRecipe(raw: any): ExtractedRecipe {
           }
         }
 
+        // Canonicalize unit
+        unit = unit.replace(/^\s*(heaping|scant|rounded|level|generous)\s+/i, "").trim();
+        unit = UNIT_CANONICAL[unit.toLowerCase()] ?? unit;
+        if (COUNTABLE_UNITS.has(unit.toLowerCase())) unit = "";
+
+        // Expand ingredient name abbreviations
+        let name = ing.name || ing.ingredient || "";
+        name = INGREDIENT_NAME_MAP[name.toLowerCase().trim()] ?? name;
+
         return {
-          name: ing.name || ing.ingredient || "",
+          name,
           amount: ing.amount ?? null,
           unit,
           category: ing.category || "",
@@ -272,12 +286,17 @@ export function normalizeExtractedRecipe(raw: any): ExtractedRecipe {
     : [];
 
   // Normalize instructions — handle string[] or object[] formats
-  const instructions = Array.isArray(recipe.instructions)
+  const rawInstructions = Array.isArray(recipe.instructions)
     ? recipe.instructions.map((inst: any) => {
         if (typeof inst === "string") return inst;
         return inst.text || inst.step || inst.instruction || inst.description || String(inst);
       })
     : [];
+  // Filter out noise steps (very short or common filler phrases)
+  const instructions = rawInstructions.filter((step: string) => {
+    const trimmed = step.trim();
+    return trimmed.split(/\s+/).length > 3 && !INSTRUCTION_NOISE.test(trimmed);
+  });
 
   return {
     title: recipe.title,
@@ -386,6 +405,38 @@ const KNOWN_UNITS = [
 
 const UNITS_PATTERN = new RegExp(`^(${KNOWN_UNITS})$`, "i");
 const UNITS_CAPTURE = new RegExp(`^(${KNOWN_UNITS})(?:\\s|,|$)`, "i");
+
+// ── Canonicalization maps ──
+
+/** Normalize verbose unit strings to short canonical forms */
+const UNIT_CANONICAL: Record<string, string> = {
+  tablespoon: "tbsp", tablespoons: "tbsp",
+  teaspoon: "tsp", teaspoons: "tsp",
+  cup: "cup", cups: "cup",
+  ounce: "oz", ounces: "oz",
+  pound: "lb", pounds: "lb",
+  gram: "g", grams: "g",
+  kilogram: "kg", kilograms: "kg",
+  milliliter: "ml", milliliters: "ml",
+  liter: "l", liters: "l",
+  clove: "clove", cloves: "clove",
+};
+
+/** Units that represent countable whole items — drop them so the item reads naturally */
+const COUNTABLE_UNITS = new Set(["piece", "pieces", "stalk", "stalks"]);
+
+/** Expand common ingredient abbreviations and informal names to full names */
+const INGREDIENT_NAME_MAP: Record<string, string> = {
+  "feta": "feta cheese",
+  "ap flour": "all-purpose flour",
+  "evoo": "extra virgin olive oil",
+  "parm": "parmesan cheese",
+  "parmigiano": "parmesan cheese",
+  "parmigiano reggiano": "parmesan cheese",
+};
+
+/** Noise phrases that should be stripped from the end of instruction steps */
+const INSTRUCTION_NOISE = /^(enjoy|serve immediately|dig in|bon appétit|bon appetit|garnish with)/i;
 
 // ── Phase 2: Unicode fractions & written numbers ──
 
@@ -572,10 +623,17 @@ function parseIngredientString(text: string): { name: string; amount: number | n
     }
   }
 
+  let unit = parsed.unit;
+  unit = unit.replace(/^\s*(heaping|scant|rounded|level|generous)\s+/i, "").trim();
+  unit = UNIT_CANONICAL[unit.toLowerCase()] ?? unit;
+  if (COUNTABLE_UNITS.has(unit.toLowerCase())) unit = "";
+
+  const expandedName = INGREDIENT_NAME_MAP[(name || text).toLowerCase().trim()] ?? (name || text);
+
   return {
-    name: name || text,
+    name: expandedName,
     amount: parsed.amount,
-    unit: parsed.unit,
+    unit,
     category: "",
     notes: parsed.notes,
   };

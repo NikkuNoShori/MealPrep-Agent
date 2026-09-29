@@ -18,7 +18,7 @@ interface RecipeListProps {
   onEditRecipe?: (recipe: any) => void;
   collectionId?: string | null;
   collectionName?: string | null;
-  feedMode?: 'public' | 'mine' | 'household' | 'shared' | 'collection';
+  feedMode?: 'public' | 'mine' | 'household' | 'shared' | 'collection' | 'all';
 }
 
 export const RecipeList: React.FC<RecipeListProps> = ({
@@ -174,15 +174,25 @@ export const RecipeList: React.FC<RecipeListProps> = ({
         imageUrl: s.imageUrl,
         tags: s.tags,
         visibility: s.visibility,
-        // Attach sharer info for display
         _shareId: s.shareId,
         _seenAt: s.seenAt,
         _sharerDisplayName: s.sharerDisplayName,
         _sharerUsername: s.sharerUsername,
       }))
+    : feedMode === 'all'
+    ? (() => {
+        const mine: any[] = (recipes as any)?.recipes || [];
+        const household: any[] = (householdRecipesData as any)?.recipes || [];
+        const seenIds = new Set<string>(mine.map((r: any) => r.id));
+        const merged = [...mine];
+        for (const r of household) {
+          if (!seenIds.has(r.id)) { seenIds.add(r.id); merged.push(r); }
+        }
+        return merged;
+      })()
     : (recipes as any)?.recipes || [];
 
-  const useServerSearch = !!debouncedQuery.trim() && feedMode !== 'collection' && feedMode !== 'household' && feedMode !== 'public' && feedMode !== 'shared';
+  const useServerSearch = !!debouncedQuery.trim() && feedMode !== 'collection' && feedMode !== 'household' && feedMode !== 'public' && feedMode !== 'shared' && feedMode !== 'all';
   const { data: serverSearchResults } = useRecipeTextSearch(useServerSearch ? debouncedQuery : "");
   const recipesAfterSearch = useServerSearch
     ? (serverSearchResults || [])

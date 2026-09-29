@@ -27,6 +27,8 @@ interface DayAssignmentModalProps {
   weekDates: Date[];
   defaultDate: string;
   defaultSlot: MealSlot;
+  /** When true, the slot was pre-determined by the calendar cell click and the slot picker is hidden. */
+  slotLocked?: boolean;
   onConfirm: (assignments: RecipeAssignment[]) => void;
   onClose: () => void;
 }
@@ -54,6 +56,7 @@ const DayAssignmentModal = ({
   weekDates,
   defaultDate,
   defaultSlot,
+  slotLocked = false,
   onConfirm,
   onClose,
 }: DayAssignmentModalProps) => {
@@ -190,26 +193,41 @@ const DayAssignmentModal = ({
                   </div>
                 </div>
 
-                {/* Slot selection buttons */}
-                <div className="flex items-center gap-1.5 px-3 pb-3">
-                  {SLOT_CONFIG.map(slot => {
-                    const isActive = currentSlot === slot.key;
-                    return (
-                      <button
-                        key={slot.key}
-                        onClick={() => updateSlot(recipe.recipeId, slot.key)}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 ${
-                          isActive
-                            ? `${slot.activeBg} text-white shadow-sm`
-                            : `${slot.bg} ${slot.color} hover:opacity-80`
-                        }`}
-                      >
-                        <slot.icon className="h-3 w-3" />
-                        {slot.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Slot selection buttons — hidden when slot was pre-selected from calendar cell */}
+                {!slotLocked && (
+                  <div className="flex items-center gap-1.5 px-3 pb-3">
+                    {SLOT_CONFIG.map(slot => {
+                      const isActive = currentSlot === slot.key;
+                      return (
+                        <button
+                          key={slot.key}
+                          onClick={() => updateSlot(recipe.recipeId, slot.key)}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 ${
+                            isActive
+                              ? `${slot.activeBg} text-white shadow-sm`
+                              : `${slot.bg} ${slot.color} hover:opacity-80`
+                          }`}
+                        >
+                          <slot.icon className="h-3 w-3" />
+                          {slot.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {slotLocked && currentSlot && (
+                  <div className="px-3 pb-3">
+                    {(() => {
+                      const slot = SLOT_CONFIG.find(s => s.key === currentSlot);
+                      return slot ? (
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium ${slot.activeBg} text-white`}>
+                          <slot.icon className="h-3 w-3" />
+                          {slot.label}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
 
                 {/* Day chips (when Days toggle is on and slot is not snacks) */}
                 {showDays && currentSlot && currentSlot !== 'snacks' && (

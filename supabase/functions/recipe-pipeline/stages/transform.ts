@@ -42,7 +42,7 @@ export function transform(
   // ── Normalize ingredients ──
   const ingredients = extracted.ingredients.map((ing) => ({
     name: String(ing.name || "").trim(),
-    amount: typeof ing.amount === "number" ? ing.amount : null,
+    amount: ing.amount != null ? ing.amount : null,
     unit: String(ing.unit || "").trim(),
     category: String(ing.category || "pantry").trim(),
     ...(ing.notes ? { notes: ing.notes } : {}),

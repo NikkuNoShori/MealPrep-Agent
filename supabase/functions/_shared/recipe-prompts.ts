@@ -73,6 +73,9 @@ You MUST return ONLY valid JSON in this exact structure:
    - difficulty: "easy" | "medium" | "hard"
    - ingredients: array of objects (not strings)
    - instructions: array of strings
+8. **Full ingredient names** - Use complete names: "feta cheese" not "feta", "all-purpose flour" not "AP flour", "extra virgin olive oil" not "EVOO", "parmesan cheese" not "parm".
+9. **Countable whole items** - For items like onion, potato, egg, bell pepper, garlic clove — omit the unit field (leave it empty string ""); use only the numeric amount.
+10. **Instruction quality** - Each instruction step must be a complete action (more than 3 words). Do not include filler phrases like "Enjoy!", "Serve immediately", "Dig in!", or "Bon appétit" as instruction steps.
 
 ## Image Processing
 - Analyze ALL provided images
@@ -145,7 +148,10 @@ For multiple recipes visible in the images:
 2. **Handle poor quality** — if text is partially legible, extract what you can and note uncertainty
 3. **Combine multiple images** — if images show different parts of the same recipe, merge them
 4. **No commentary** — return ONLY JSON, no explanations
-5. **Do NOT wrap in markdown** — return raw JSON only`;
+5. **Do NOT wrap in markdown** — return raw JSON only
+6. **Full ingredient names** — use complete names: "feta cheese" not "feta", "all-purpose flour" not "AP flour", "extra virgin olive oil" not "EVOO".
+7. **Countable whole items** — for items like onion, potato, egg, bell pepper — omit the unit (leave it empty string ""); use only the numeric amount.
+8. **Instruction quality** — each step must be a complete action. Do not include "Enjoy!", "Dig in!", or "Bon appétit" as steps.`;
 
 /**
  * @deprecated — superseded by tool-using agent (MOP-0008).

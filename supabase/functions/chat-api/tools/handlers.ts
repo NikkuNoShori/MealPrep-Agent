@@ -860,7 +860,16 @@ async function saveRecipe(
     }
   }
 
-  // 2. Build the insert row — map camelCase → snake_case for the DB.
+  // 2. Read user's default visibility preference.
+  const { data: profileData } = await ctx.supabase
+    .from("profiles")
+    .select("default_recipe_visibility")
+    .eq("id", ctx.user.id)
+    .maybeSingle();
+  const defaultVisibility = (profileData as { default_recipe_visibility?: string } | null)
+    ?.default_recipe_visibility ?? "private";
+
+  // 3. Build the insert row — map camelCase → snake_case for the DB.
   const insertRow: Record<string, unknown> = {
     user_id: ctx.user.id,
     household_id: null, // will be resolved by RLS / trigger if needed
@@ -879,7 +888,7 @@ async function saveRecipe(
     source_name: recipeArg.source_name ?? null,
     image_url: recipeArg.image_url ?? null,
     is_favorite: false,
-    visibility: "private",
+    visibility: defaultVisibility,
     needs_reembed: true, // triggers async embedding refresh (MOP-0015)
     created_by: ctx.user.id,
   };
@@ -900,13 +909,15 @@ async function saveRecipe(
     return { ok: false, error: `Failed to save recipe: ${insertErr.message}`, retryable: true };
   }
 
+  const savedId = (saved as { id: string }).id;
+  const savedTitle = (saved as { title: string }).title;
   return {
     ok: true,
     data: {
       status: "saved",
-      recipe_id: (saved as { id: string }).id,
-      title: (saved as { title: string }).title,
-      message: `"${title}" has been saved to your library.`,
+      recipe_id: savedId,
+      title: savedTitle,
+      message: `"${savedTitle}" has been saved to your recipe library. [View recipe →](/recipes/${savedId})`,
     },
   };
 }

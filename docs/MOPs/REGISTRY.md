@@ -2,8 +2,8 @@
 
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
-**Last reviewed:** 2026-09-27
-**Last updated:** 2026-09-27 (MOP-0011 verifying — all 5 phases complete; migration 046 awaiting deploy)
+**Last reviewed:** 2026-09-28
+**Last updated:** 2026-09-28 (MOP-0032 scaffolded — QoL backlog batch 1 from 2026-08-24 through 2026-09-27 session)
 
 ---
 
@@ -63,6 +63,7 @@
 | [MOP-0029](MOP-0029-theme-token-layering-surface-presets.md) | Theme Token Layering & Surface-Aware Presets | deferred | 2026-09-21 | 2026-09-22 | — | surface-reviewer |
 | [MOP-0030](MOP-0030-dashboard-redesign-real-data-widgets.md) | Dashboard Redesign — Real-Data Widgets | complete | 2026-09-22 | 2026-09-25 | 2026-09-25 | Nick Neal |
 | [MOP-0031](MOP-0031-direct-recipe-sharing.md) | Direct Recipe Sharing | complete | 2026-09-22 | 2026-09-25 | 2026-09-25 | Nick Neal |
+| [MOP-0032](MOP-0032-qol-backlog-batch-1.md) | QoL Backlog Batch 1 — Extraction, Chat, Recipes, Planner, Grocery | draft | 2026-09-28 | 2026-09-28 | — | Nick Neal |
 
 > **MOP-0030 complete 2026-09-25.** `/verify-mop` passed all 12 assertions (lint, build, 240/240 tests, RPC structural checks). A `data-integrity` review of the new `get_dashboard_stats()` RPC found and this MOP fixed two real bugs before completion: (1) recipe-count/top-cuisines queries referenced a superseded RLS policy (migration 009) and silently missed recipes visible only via collection-sharing (migration 012's 4th OR-branch) — added a `collection_shared_count` bucket; (2) the most-cooked-this-month query's `::UUID` cast had no value-shape guard, so one malformed `recipeId` could abort the entire RPC payload — added a regex guard. **Note on history:** these two fixes are committed but bundled without their own commit message inside `54ad8f8` (a separate session's MOP-0031 commit) — the fixes are verified correct and present, left as-is rather than rewriting shared history.
 >

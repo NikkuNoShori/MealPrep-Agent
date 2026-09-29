@@ -22,6 +22,9 @@ import {
   X,
   Undo2,
   Pencil,
+  List,
+  LayoutList,
+  CheckCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { GroceryItem, MealPlanMeals } from '@/types/mealPlan';
@@ -35,6 +38,10 @@ interface GroceryCartProps {
 }
 
 const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
+  const [groceryView, setGroceryView] = useState<'categories' | 'flat'>(() => {
+    try { return (localStorage.getItem('mealprep:grocery-view') as 'categories' | 'flat') || 'categories'; }
+    catch { return 'categories'; }
+  });
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [addingManual, setAddingManual] = useState(false);
   const [manualName, setManualName] = useState('');
@@ -272,6 +279,11 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
     );
   };
 
+  const handleSetGroceryView = (view: 'categories' | 'flat') => {
+    setGroceryView(view);
+    try { localStorage.setItem('mealprep:grocery-view', view); } catch { /* ignore */ }
+  };
+
   const toggleCategory = (cat: string) => {
     setCollapsedCategories((prev) => {
       const next = new Set(prev);
@@ -285,6 +297,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
   const removedItems = groceryItems.filter((i) => i.isRemoved);
   const checkedCount = activeItems.filter((i) => i.isChecked).length;
   const grouped = useMemo(() => groupByCategory(activeItems), [activeItems]);
+  const flatItems = useMemo(() => [...activeItems].sort((a, b) => a.name.localeCompare(b.name)), [activeItems]);
   const hasMeals = plan?.meals && Object.keys(plan.meals).length > 0;
 
   // Empty state: no plan or no meals
@@ -332,6 +345,31 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center rounded-lg border border-surface-200 dark:border-white/[0.08] overflow-hidden">
+            <button
+              onClick={() => handleSetGroceryView('categories')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors ${
+                groceryView === 'categories'
+                  ? 'bg-primary-500 text-white'
+                  : 'text-surface-500 dark:text-gray-400 hover:bg-surface-100 dark:hover:bg-white/[0.06]'
+              }`}
+              title="Group by category"
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => handleSetGroceryView('flat')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors ${
+                groceryView === 'flat'
+                  ? 'bg-primary-500 text-white'
+                  : 'text-surface-500 dark:text-gray-400 hover:bg-surface-100 dark:hover:bg-white/[0.06]'
+              }`}
+              title="Flat list"
+            >
+              <List className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -414,6 +452,57 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                   : 'Add recipes to your meal plan, then generate the grocery list.'}
               </p>
             </div>
+          </CardContent>
+        </Card>
+      ) : groceryView === 'flat' ? (
+        <Card className="border-surface-200/60 dark:border-white/[0.06]">
+          <CardContent className="p-3 space-y-1">
+            {flatItems.map((item) => (
+              <div
+                key={item.id}
+                className={`group flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 ${
+                  item.isChecked ? 'bg-surface-50 dark:bg-white/[0.02] opacity-60' : ''
+                }`}
+              >
+                <button
+                  className={`flex-shrink-0 w-5 h-5 rounded-md border-2 transition-all duration-200 flex items-center justify-center ${
+                    item.isChecked
+                      ? 'bg-primary-500 border-primary-500 text-white'
+                      : 'border-surface-300 dark:border-gray-600 hover:border-primary-400'
+                  }`}
+                  onClick={() => handleToggleCheck(item.id)}
+                >
+                  {item.isChecked && <Check className="h-3 w-3" />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className={`flex items-baseline justify-between gap-3 text-sm ${
+                    item.isChecked ? 'line-through text-surface-400 dark:text-gray-500' : 'text-surface-700 dark:text-gray-300'
+                  }`}>
+                    <span className="min-w-0 truncate">{item.name}</span>
+                    {(item.amount !== null || item.unit) && (
+                      <span className="flex-shrink-0 font-semibold tabular-nums text-primary-600 dark:text-primary-400">
+                        {item.amount !== null && item.amount}
+                        {item.unit && (item.amount !== null ? ` ${item.unit}` : item.unit)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-surface-400 hover:text-emerald-500 transition-all"
+                  onClick={() => handleRemoveItem(item.id)}
+                  title="Already have it"
+                >
+                  <CheckCheck className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-surface-400 hover:text-destructive transition-all"
+                  onClick={() => handleRemoveItem(item.id)}
+                  title="Remove"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       ) : (
@@ -545,6 +634,13 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
                               title="Adjust quantity"
                             >
                               <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-surface-400 hover:text-emerald-500 transition-all"
+                              onClick={() => handleRemoveItem(item.id)}
+                              title="Already have it"
+                            >
+                              <CheckCheck className="h-3.5 w-3.5" />
                             </button>
                             <button
                               className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-surface-400 hover:text-destructive transition-all"

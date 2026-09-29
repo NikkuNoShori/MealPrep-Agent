@@ -348,7 +348,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                     <div className="space-y-0.5">
                       {visibleIngredients.map((ingredient, index) => {
                         const rawUnit = (ingredient.unit || '').toLowerCase().trim()
-                        const amount = typeof ingredient.amount === 'number' ? ingredient.amount : parseFloat(ingredient.amount) || 0
+                        const amount = ingredient.amount == null ? 0 : (typeof ingredient.amount === 'number' ? ingredient.amount : parseFloat(String(ingredient.amount)) || 0)
                         const isQualitative = ['to taste', 'to serve', 'as needed', 'optional', 'pinch', 'dash', 'splash', 'garnish', 'for garnish', 'to garnish'].includes(rawUnit)
                         const isZeroAmount = amount === 0 || isNaN(amount)
 

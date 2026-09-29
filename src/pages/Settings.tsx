@@ -11,6 +11,7 @@ import { useMeasurementSystem } from "@/hooks/useMeasurementSystem";
 import {
   useMyProfile,
   useUpdateUsername,
+  useUpdateDefaultVisibility,
 } from '../services/api';
 import {
   Moon,
@@ -47,6 +48,7 @@ const Settings = () => {
   // Profile state
   const { data: profile } = useMyProfile();
   const updateUsername = useUpdateUsername();
+  const updateDefaultVisibility = useUpdateDefaultVisibility();
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [editedUsername, setEditedUsername] = useState('');
 
@@ -405,6 +407,38 @@ const Settings = () => {
                 <SelectContent>
                   <SelectItem value="metric">Metric</SelectItem>
                   <SelectItem value="imperial">Imperial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Recipe Defaults ── */}
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-4">Recipe Defaults</h2>
+          <div className="space-y-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm text-surface-600 dark:text-surface-300">Default Visibility</Label>
+                <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">Visibility applied to newly saved recipes</p>
+              </div>
+              <Select
+                value={(profile as any)?.defaultRecipeVisibility ?? 'private'}
+                onValueChange={(value: 'private' | 'household' | 'public') => {
+                  updateDefaultVisibility.mutate(value, {
+                    onSuccess: () => toast.success('Default visibility updated'),
+                    onError: () => toast.error('Failed to update default visibility'),
+                  });
+                }}
+                disabled={updateDefaultVisibility.isPending}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private">Private</SelectItem>
+                  <SelectItem value="household">Household</SelectItem>
+                  <SelectItem value="public">Public</SelectItem>
                 </SelectContent>
               </Select>
             </div>

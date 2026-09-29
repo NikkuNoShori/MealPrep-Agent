@@ -454,7 +454,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
               <div className="w-full h-full flex items-center justify-center">
                 {isPreview && previewActions?.saved
                   ? <CheckCircle2 className="h-10 w-10 text-emerald-400/60" />
-                  : <ChefHat className="h-10 w-10 text-surface-300 dark:text-surface-600" />
+                  : <ChefHat className="h-10 w-10 text-surface-400 dark:text-surface-500" />
                 }
               </div>
             )}
@@ -581,7 +581,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-2">
               <div className="w-16 h-16 rounded-2xl bg-white/40 dark:bg-white/[0.06] flex items-center justify-center">
-                <ChefHat className="h-8 w-8 text-surface-300 dark:text-surface-600" />
+                <ChefHat className="h-8 w-8 text-surface-400 dark:text-surface-500" />
               </div>
             </div>
           )}

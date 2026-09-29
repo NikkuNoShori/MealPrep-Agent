@@ -2043,6 +2043,17 @@ class ApiClient {
     return snakeToCamel(data);
   }
 
+  // ── Default Recipe Visibility (MOP-0032) ──
+
+  async updateDefaultVisibility(visibility: 'private' | 'household' | 'public') {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const { error } = await (supabase.from("profiles") as any)
+      .update({ default_recipe_visibility: visibility })
+      .eq("id", user.id);
+    if (error) throw error;
+  }
+
   // ── Plan Period Config (MOP-0022) ──
 
   async getPlanPeriodConfig() {
@@ -2875,6 +2886,18 @@ export const useUpdateUsername = () => {
 
   return useMutation({
     mutationFn: (username: string) => apiClient.updateUsername(username),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+};
+
+export const useUpdateDefaultVisibility = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (visibility: 'private' | 'household' | 'public') =>
+      apiClient.updateDefaultVisibility(visibility),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
     },

@@ -332,14 +332,14 @@ const EditableIngredientItem: React.FC<EditableIngredientItemProps> = ({
   const [isEditing, setIsEditing] = React.useState(false);
   const [editName, setEditName] = React.useState(ingredient.name);
   const [editAmount, setEditAmount] = React.useState(
-    ingredient.amount > 0 ? String(ingredient.amount) : ""
+    ingredient.amount != null && Number(ingredient.amount) !== 0 ? String(ingredient.amount) : ""
   );
   const [editUnit, setEditUnit] = React.useState(ingredient.unit);
   const [editCustomUnit, setEditCustomUnit] = React.useState("");
 
   React.useEffect(() => {
     setEditName(ingredient.name);
-    setEditAmount(ingredient.amount > 0 ? String(ingredient.amount) : "");
+    setEditAmount(ingredient.amount != null && Number(ingredient.amount) !== 0 ? String(ingredient.amount) : "");
     setEditUnit(ingredient.unit);
     setEditCustomUnit("");
   }, [ingredient]);
@@ -363,7 +363,7 @@ const EditableIngredientItem: React.FC<EditableIngredientItemProps> = ({
 
   const handleCancel = () => {
     setEditName(ingredient.name);
-    setEditAmount(ingredient.amount > 0 ? String(ingredient.amount) : "");
+    setEditAmount(ingredient.amount != null && Number(ingredient.amount) !== 0 ? String(ingredient.amount) : "");
     setEditUnit(ingredient.unit);
     setEditCustomUnit("");
     setIsEditing(false);
@@ -422,7 +422,7 @@ const EditableIngredientItem: React.FC<EditableIngredientItemProps> = ({
       <span className="font-medium">{ingredient.name}</span>
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground">
-          {ingredient.amount > 0
+          {ingredient.amount != null && Number(ingredient.amount) !== 0
             ? `${ingredient.amount} ${ingredient.unit}`
             : ingredient.unit}
         </span>

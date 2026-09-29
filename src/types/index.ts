@@ -17,7 +17,7 @@ export interface Recipe {
 
 export interface Ingredient {
   name: string
-  amount: number
+  amount: string | number | null
   unit: string
   category: IngredientCategory
   alternatives?: string[]

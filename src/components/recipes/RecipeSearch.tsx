@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +38,18 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
   onFiltersChange
 }) => {
   const [showFilters, setShowFilters] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showFilters) return
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showFilters])
 
   const updateFilter = (key: string, value: any) => {
     onFiltersChange({
@@ -76,7 +88,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
   )
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" ref={filterRef}>
       {/* Compact Search Bar */}
       <div className="flex gap-2">
         <div className="relative flex-1 max-w-sm">

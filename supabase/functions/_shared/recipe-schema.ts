@@ -23,7 +23,7 @@ export interface IntermediateContent {
 
 export interface Ingredient {
   name: string;
-  amount: number | null;
+  amount: string | number | null;
   unit: string;
   category: string;
   notes?: string;

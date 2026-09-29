@@ -2082,17 +2082,35 @@ export const ChatInterface: React.FC = () => {
                           ))}
                         </div>
                       )}
-                      {message.content && (
-                        <p
-                          className={`text-sm whitespace-pre-wrap break-words ${
-                            message.sender === "user"
-                              ? "text-white"
-                              : "text-gray-900 dark:text-gray-100"
-                          }`}
-                        >
-                          {message.content}
-                        </p>
-                      )}
+                      {message.content && (() => {
+                        // Strip <extracted_recipe> XML that the server injects into
+                        // stored messages for context — render a recipe card instead.
+                        const xmlMatch = message.content.match(/<extracted_recipe>([\s\S]*?)<\/extracted_recipe>/);
+                        if (xmlMatch && message.sender === "ai") {
+                          let parsed: StructuredRecipe | null = null;
+                          try { parsed = JSON.parse(xmlMatch[1].trim()); } catch { /* ignore */ }
+                          const before = message.content.slice(0, xmlMatch.index).trim();
+                          const after = message.content.slice((xmlMatch.index ?? 0) + xmlMatch[0].length).trim();
+                          return (
+                            <>
+                              {before && <p className="text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100 mb-2">{before}</p>}
+                              {parsed && <StructuredRecipeDisplay recipe={parsed} />}
+                              {after && <p className="text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100 mt-2">{after}</p>}
+                            </>
+                          );
+                        }
+                        return (
+                          <p
+                            className={`text-sm whitespace-pre-wrap break-words ${
+                              message.sender === "user"
+                                ? "text-white"
+                                : "text-gray-900 dark:text-gray-100"
+                            }`}
+                          >
+                            {message.content}
+                          </p>
+                        );
+                      })()}
                       <p
                         className={`text-xs opacity-70 mt-1 ${
                           message.sender === "user"

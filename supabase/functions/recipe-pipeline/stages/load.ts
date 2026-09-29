@@ -102,6 +102,15 @@ export async function load(
   // Merge allergy tags into recipe tags (deduplicated)
   const mergedTags = [...new Set([...(recipe.tags ?? []), ...allergyTags])];
 
+  // ── Read user's default visibility preference ──
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("default_recipe_visibility")
+    .eq("id", userId)
+    .maybeSingle();
+  const defaultVisibility = (profile as { default_recipe_visibility?: string } | null)
+    ?.default_recipe_visibility ?? "private";
+
   // ── Insert into database ──
   const { data, error } = await supabase
     .from("recipes")
@@ -123,7 +132,7 @@ export async function load(
       source_url: recipe.source_url,
       source_name: recipe.source_name,
       slug: recipe.slug,
-      visibility: 'private',
+      visibility: defaultVisibility,
       is_favorite: false,
       ...(embedding ? { embedding_vector: `[${embedding.join(",")}]` } : {}),
     })
