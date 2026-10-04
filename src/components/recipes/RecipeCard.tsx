@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Clock, Users, ChefHat, Edit, Trash2, ThumbsUp, ThumbsDown, MoreVertical, Share2, Check } from "lucide-react";
+import { Clock, Users, ChefHat, Edit, Trash2, ThumbsUp, ThumbsDown, MoreVertical, Share2, Check, ChevronDown, ChevronUp, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import AddToPlanButton from "@/components/meal-planning/AddToPlanButton";
+import { Button } from "@/components/ui/button";
 
 export interface RecipeReaction {
   id: string;
@@ -16,28 +17,43 @@ export interface RecipeReaction {
   name: string | null;
 }
 
-interface RecipeCardProps {
-  recipe: {
-    id: string;
-    slug?: string;
-    title: string;
-    description?: string;
-    prepTime?: number;
-    cookTime?: number;
-    servings?: number;
-    difficulty?: "easy" | "medium" | "hard";
-    tags?: string[];
-    imageUrl?: string;
-    rating?: number;
-    familyPreferences?: {
-      [memberId: string]: "love" | "like" | "neutral" | "dislike";
-    };
-    author?: {
-      displayName?: string;
-      username?: string;
-      avatarUrl?: string;
-    };
+/** Actions available in preview mode (pre-save, no id required). */
+export interface RecipePreviewActions {
+  onSave?: () => void;
+  isSaving?: boolean;
+  /** When true, show "Saved ✓" badge instead of Save button. */
+  saved?: boolean;
+  onExpand?: () => void;
+  expanded?: boolean;
+  hasDetails?: boolean;
+}
+
+/** Base recipe shape shared by both modes. id is required in normal mode. */
+interface RecipeBase {
+  slug?: string;
+  title: string;
+  description?: string;
+  prepTime?: number;
+  cookTime?: number;
+  servings?: number;
+  difficulty?: "easy" | "medium" | "hard";
+  cuisine?: string;
+  tags?: string[];
+  imageUrl?: string;
+  rating?: number;
+  familyPreferences?: {
+    [memberId: string]: "love" | "like" | "neutral" | "dislike";
   };
+  author?: {
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+}
+
+/** Normal mode — id required, no previewActions. */
+interface RecipeCardProps {
+  recipe: RecipeBase & { id: string };
   viewMode: "grid" | "list";
   reactions?: RecipeReaction[];
   dependents?: { id: string; name: string }[];
@@ -46,20 +62,78 @@ interface RecipeCardProps {
   onClick?: () => void;
   onEdit?: (recipe: any) => void;
   onDelete?: (recipeId: string) => void;
+  previewActions?: undefined;
+  /** Multi-select props (MOP-0028) */
+  isSelected?: boolean;
+  isSelectMode?: boolean;
+  onSelect?: (id: string) => void;
 }
 
-export const RecipeCard: React.FC<RecipeCardProps> = ({
-  recipe,
-  viewMode,
-  reactions = [],
-  dependents = [],
-  showPhotos = true,
-  onReact,
-  onClick,
-  onEdit,
-  onDelete,
-}) => {
+/** Preview mode — id optional, previewActions required. */
+interface RecipeCardPreviewProps {
+  recipe: RecipeBase & { id?: string };
+  viewMode: "grid" | "list";
+  previewActions: RecipePreviewActions;
+  reactions?: undefined;
+  dependents?: undefined;
+  onReact?: undefined;
+  onClick?: undefined;
+  onEdit?: undefined;
+  onDelete?: undefined;
+  isSelected?: undefined;
+  isSelectMode?: undefined;
+  onSelect?: undefined;
+}
+
+type Props = RecipeCardProps | RecipeCardPreviewProps;
+
+export const RecipeCard: React.FC<Props> = (props) => {
+  const { recipe, viewMode } = props;
+  const isPreview = props.previewActions !== undefined;
+  const previewActions = isPreview ? props.previewActions : undefined;
+
+  // In normal mode these are always defined; in preview mode they're always undefined.
+  const reactions = (!isPreview && props.reactions) || [];
+  const dependents = (!isPreview && props.dependents) || [];
+  const onReact = !isPreview ? props.onReact : undefined;
+  const onClick = !isPreview ? props.onClick : undefined;
+  const onEdit = !isPreview ? props.onEdit : undefined;
+  const onDelete = !isPreview ? props.onDelete : undefined;
+  const isSelected = (!isPreview && props.isSelected) || false;
+  const isSelectMode = (!isPreview && props.isSelectMode) || false;
+  const onSelect = !isPreview ? props.onSelect : undefined;
+  // recipe.id is only safe to use in non-preview paths
+  const recipeId = (recipe as RecipeBase & { id?: string }).id;
+
+  // Long-press timer for mobile select-mode entry
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const handlePointerDown = () => {
+    if (isPreview || !onSelect || isSelectMode) return;
+    longPressFiredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      if (recipeId) onSelect(recipeId);
+    }, 500);
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+  };
+
+  const handlePointerCancel = () => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, []);
+
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
+  const hasAllergyWarning = Array.isArray(recipe.tags) && recipe.tags.includes("ALLERGY WARNING");
 
   // Overflow menu state
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
@@ -68,7 +142,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const path = recipe.slug ? `/recipes/${recipe.slug}` : `/recipes/${recipe.id}`;
+    const path = recipe.slug ? `/recipes/${recipe.slug}` : `/recipes/${recipeId}`;
     const url = `${window.location.origin}${path}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedLink(true);
@@ -110,7 +184,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
   const handleReactionClick = (e: React.MouseEvent, reaction: "thumbs_up" | "thumbs_down", familyMemberId?: string) => {
     e.stopPropagation();
-    onReact?.(recipe.id, reaction, familyMemberId);
+    if (recipeId) onReact?.(recipeId, reaction, familyMemberId);
   };
 
   useEffect(() => {
@@ -173,6 +247,16 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           </div>
         )}
       </div>
+    );
+  };
+
+  const AllergyBadge = () => {
+    if (!hasAllergyWarning) return null;
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold flex-shrink-0">
+        <ShieldAlert className="h-3 w-3" />
+        Allergen
+      </span>
     );
   };
 
@@ -284,9 +368,9 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 Edit
               </button>
             )}
-            {onDelete && (
+            {onDelete && recipeId && (
               <button
-                onClick={(e) => { e.stopPropagation(); setShowOverflowMenu(false); onDelete(recipe.id); }}
+                onClick={(e) => { e.stopPropagation(); setShowOverflowMenu(false); onDelete(recipeId); }}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -299,24 +383,80 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     );
   };
 
+  /** Actions rendered in the top-right of list-view cards in preview mode. */
+  const PreviewActions = () => {
+    if (!previewActions) return null;
+    return (
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {previewActions.hasDetails && (
+          <button
+            onClick={previewActions.onExpand}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+            aria-label={previewActions.expanded ? "Collapse recipe details" : "Expand recipe details"}
+          >
+            {previewActions.expanded
+              ? <ChevronUp className="h-4 w-4" />
+              : <ChevronDown className="h-4 w-4" />
+            }
+          </button>
+        )}
+        {!previewActions.saved && (
+          <Button
+            variant="default"
+            size="sm"
+            className="text-xs h-7 px-2.5"
+            onClick={previewActions.onSave}
+            disabled={previewActions.isSaving}
+          >
+            {previewActions.isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+          </Button>
+        )}
+        {previewActions.saved && (
+          <span className="flex items-center gap-1 text-[12px] font-medium text-emerald-600 dark:text-emerald-400">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Saved ✓
+          </span>
+        )}
+      </div>
+    );
+  };
+
   // ── List View ──
   if (viewMode === "list") {
     return (
-      <div onClick={onClick} className="group cursor-pointer">
-        <div className="flex items-stretch gap-4 p-3 rounded-2xl bg-white/60 dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/[0.06] hover:bg-white dark:hover:bg-white/[0.05] hover:shadow-lg hover:shadow-black/[0.04] dark:hover:shadow-black/20 hover:border-stone-300/60 dark:hover:border-white/[0.1] transition-all duration-300">
+      <div
+        onClick={!isPreview ? (isSelectMode && recipeId ? () => onSelect?.(recipeId) : onClick) : undefined}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        className={!isPreview ? "group cursor-pointer" : "group"}
+      >
+        <div className={[
+          "flex items-stretch gap-4 p-3 rounded-2xl border transition-all duration-300 overflow-hidden",
+          isPreview && previewActions?.saved
+            ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40"
+            : isSelected
+            ? "bg-primary-50/60 dark:bg-primary-900/20 border-primary-300/60 dark:border-primary-500/40 ring-1 ring-primary-400/40 dark:ring-primary-500/30"
+            : "bg-white/60 dark:bg-white/[0.03] border-stone-200/60 dark:border-white/[0.06]",
+          !isPreview
+            ? "hover:bg-white dark:hover:bg-white/[0.05] hover:shadow-lg hover:shadow-black/[0.04] dark:hover:shadow-black/20 hover:border-stone-300/60 dark:hover:border-white/[0.1]"
+            : "",
+        ].join(" ")}>
           {/* Image */}
           <div className="relative w-28 h-28 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-200/80 dark:from-gray-800 dark:to-gray-700">
             {showPhotos && recipe.imageUrl ? (
               <img
                 src={recipe.imageUrl}
                 alt={recipe.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className={["w-full h-full object-cover", !isPreview ? "group-hover:scale-105 transition-transform duration-500" : ""].join(" ")}
                 loading="lazy"
                 onError={(e) => { e.currentTarget.style.display = "none"; }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <ChefHat className="h-10 w-10 text-stone-300 dark:text-stone-600" />
+                {isPreview && previewActions?.saved
+                  ? <CheckCircle2 className="h-10 w-10 text-emerald-400/60" />
+                  : <ChefHat className="h-10 w-10 text-stone-300 dark:text-stone-600" />
+                }
               </div>
             )}
             {/* Time chip on image */}
@@ -326,37 +466,62 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 <span className="text-[11px] font-medium text-white">{totalTime}m</span>
               </div>
             )}
+            {/* Select checkbox (list view) */}
+            {!isPreview && onSelect && (
+              <div
+                className={[
+                  "absolute top-1.5 left-1.5 transition-opacity duration-150",
+                  isSelectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                ].join(" ")}
+                onClick={(e) => { e.stopPropagation(); if (recipeId) onSelect(recipeId); }}
+              >
+                <div className={[
+                  "w-5 h-5 rounded-md flex items-center justify-center shadow transition-colors",
+                  isSelected
+                    ? "bg-primary-500 border-2 border-primary-500"
+                    : "bg-white/90 dark:bg-black/50 border-2 border-stone-300 dark:border-white/30",
+                ].join(" ")}>
+                  {isSelected && <Check className="h-3 w-3 text-white" />}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Content */}
           <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
             {/* Top: title + actions */}
             <div>
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-[15px] text-stone-900 dark:text-white leading-snug truncate" title={recipe.title}>
                     {recipe.title}
                   </h3>
-                  {recipe.author && (
+                  {(recipe.author || recipe.cuisine) && (
                     <p className="text-[12px] text-stone-400 dark:text-stone-500 mt-0.5">
-                      @{recipe.author.username || recipe.author.displayName}
+                      {recipe.author
+                        ? `@${recipe.author.username || recipe.author.displayName}`
+                        : recipe.cuisine}
                     </p>
                   )}
                 </div>
-                {/* Hover actions */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
-                  <ReactionButtons compact />
-                  <AddToPlanButton
-                    recipeId={recipe.id}
-                    recipeName={recipe.title}
-                    recipeImage={recipe.imageUrl}
-                    servings={recipe.servings}
-                    prepTime={recipe.prepTime}
-                    cookTime={recipe.cookTime}
-                    compact
-                  />
-                  <OverflowMenu />
-                </div>
+                {/* Actions — preview mode or normal hover actions */}
+                {isPreview ? (
+                  <PreviewActions />
+                ) : (
+                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
+                    <ReactionButtons compact />
+                    <AddToPlanButton
+                      recipeId={(recipe as RecipeBase & { id: string }).id}
+                      recipeName={recipe.title}
+                      recipeImage={recipe.imageUrl}
+                      servings={recipe.servings}
+                      prepTime={recipe.prepTime}
+                      cookTime={recipe.cookTime}
+                      compact
+                    />
+                    <OverflowMenu />
+                  </div>
+                )}
               </div>
               {recipe.description && (
                 <p className="text-[13px] text-stone-500 dark:text-stone-400 line-clamp-2 mt-1 leading-relaxed">
@@ -367,20 +532,21 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
             {/* Bottom: meta + reactions */}
             <div className="flex items-center justify-between gap-3 mt-auto">
-              <div className="flex items-center gap-3 text-[12px] text-stone-400 dark:text-stone-500">
+              <div className="flex items-center gap-2 flex-wrap text-[12px] text-stone-400 dark:text-stone-500">
+                <AllergyBadge />
                 {recipe.servings && (
                   <span className="flex items-center gap-1">
                     <Users className="h-3 w-3" /> {recipe.servings}
                   </span>
                 )}
-                {recipe.tags && recipe.tags.slice(0, 2).map((tag, i) => (
+                {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
                   <span key={i} className="text-stone-400 dark:text-stone-500">{tag}</span>
                 ))}
-                {recipe.tags && recipe.tags.length > 2 && (
-                  <span className="text-stone-300 dark:text-stone-600">+{recipe.tags.length - 2}</span>
+                {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
+                  <span className="text-stone-300 dark:text-stone-600">+{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}</span>
                 )}
               </div>
-              <ReactionBadges size="sm" />
+              {!isPreview && <ReactionBadges size="sm" />}
             </div>
           </div>
         </div>
@@ -390,8 +556,19 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
   // ── Grid View ──
   return (
-    <div onClick={onClick} className="group h-full cursor-pointer">
-      <div className="h-full rounded-2xl overflow-hidden bg-white dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/[0.06] hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:border-stone-300/80 dark:hover:border-white/[0.1] hover:-translate-y-1 transition-all duration-300 flex flex-col">
+    <div
+      onClick={!isPreview ? (isSelectMode && recipeId ? () => onSelect?.(recipeId) : onClick) : undefined}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      className={["group h-full", !isPreview ? "cursor-pointer" : ""].join(" ")}
+    >
+      <div className={[
+        "h-full rounded-2xl overflow-hidden border hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:-translate-y-1 transition-all duration-300 flex flex-col",
+        isSelected
+          ? "bg-primary-50/60 dark:bg-primary-900/20 border-primary-300/60 dark:border-primary-500/40 ring-1 ring-primary-400/40 dark:ring-primary-500/30"
+          : "bg-white dark:bg-white/[0.03] border-stone-200/60 dark:border-white/[0.06] hover:border-stone-300/80 dark:hover:border-white/[0.1]",
+      ].join(" ")}>
         {/* Image area */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200/80 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700">
           {showPhotos && recipe.imageUrl ? (
@@ -413,10 +590,12 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           {/* Gradient scrim for overlaid text */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-transparent pointer-events-none" />
 
-          {/* Top-right: overflow menu */}
-          <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
-            <OverflowMenu />
-          </div>
+          {/* Top-right: overflow menu (normal mode only) */}
+          {!isPreview && (
+            <div className="absolute top-2.5 right-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
+              <OverflowMenu />
+            </div>
+          )}
 
           {/* Bottom-left: time + servings overlaid on image */}
           <div className="absolute bottom-2.5 left-2.5 flex items-center gap-2">
@@ -434,25 +613,46 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             )}
           </div>
 
-          {/* Bottom-right: hover reaction buttons */}
-          {onReact && (
-            <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+          {/* Bottom-right: hover reaction buttons (normal mode only) */}
+          {!isPreview && onReact && (
+            <div className="absolute bottom-2.5 right-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 translate-y-0 md:translate-y-1 md:group-hover:translate-y-0">
               <ReactionButtons compact />
             </div>
           )}
 
-          {/* Top-left: add to plan */}
-          <div className="absolute top-2.5 left-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
-            <AddToPlanButton
-              recipeId={recipe.id}
-              recipeName={recipe.title}
-              recipeImage={recipe.imageUrl}
-              servings={recipe.servings}
-              prepTime={recipe.prepTime}
-              cookTime={recipe.cookTime}
-              compact
-            />
-          </div>
+          {/* Top-left: select checkbox (select mode) or add to plan (normal mode) */}
+          {!isPreview && recipeId && (
+            isSelectMode || onSelect ? (
+              <div
+                className={[
+                  "absolute top-2.5 left-2.5 transition-opacity duration-150",
+                  isSelectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                ].join(" ")}
+                onClick={(e) => { e.stopPropagation(); if (recipeId && onSelect) onSelect(recipeId); }}
+              >
+                <div className={[
+                  "w-6 h-6 rounded-lg flex items-center justify-center shadow-md transition-colors",
+                  isSelected
+                    ? "bg-primary-500 border-2 border-primary-500"
+                    : "bg-white/90 dark:bg-black/50 border-2 border-white/70 dark:border-white/30",
+                ].join(" ")}>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
+                </div>
+              </div>
+            ) : (
+              <div className="absolute top-2.5 left-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
+                <AddToPlanButton
+                  recipeId={recipeId}
+                  recipeName={recipe.title}
+                  recipeImage={recipe.imageUrl}
+                  servings={recipe.servings}
+                  prepTime={recipe.prepTime}
+                  cookTime={recipe.cookTime}
+                  compact
+                />
+              </div>
+            )
+          )}
         </div>
 
         {/* Content area */}
@@ -462,10 +662,12 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             {recipe.title}
           </h3>
 
-          {/* Author */}
-          {recipe.author && (
+          {/* Author or cuisine */}
+          {(recipe.author || recipe.cuisine) && (
             <p className="text-[12px] text-stone-400 dark:text-stone-500 mt-0.5">
-              @{recipe.author.username || recipe.author.displayName}
+              {recipe.author
+                ? `@${recipe.author.username || recipe.author.displayName}`
+                : recipe.cuisine}
             </p>
           )}
 
@@ -481,22 +683,23 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
           {/* Footer: tags + reactions */}
           <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-stone-100 dark:border-white/[0.04]">
-            {/* Tags */}
-            <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
-              {recipe.tags && recipe.tags.slice(0, 2).map((tag, i) => (
+            {/* Tags (allergy badge first, then regular tags) */}
+            <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden flex-wrap">
+              <AllergyBadge />
+              {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
                 <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-stone-100 dark:bg-white/[0.06] text-[11px] font-medium text-stone-500 dark:text-stone-400 truncate max-w-[80px]">
                   {tag}
                 </span>
               ))}
-              {recipe.tags && recipe.tags.length > 2 && (
+              {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
                 <span className="text-[11px] text-stone-300 dark:text-stone-600 font-medium flex-shrink-0">
-                  +{recipe.tags.length - 2}
+                  +{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}
                 </span>
               )}
             </div>
 
-            {/* Reaction counts */}
-            <ReactionBadges size="sm" />
+            {/* Reaction counts (normal mode only) */}
+            {!isPreview && <ReactionBadges size="sm" />}
           </div>
         </div>
       </div>

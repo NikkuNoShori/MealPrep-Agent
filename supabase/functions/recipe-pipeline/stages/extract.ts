@@ -10,10 +10,15 @@ import { RECIPE_EXTRACTION_PROMPT, IMAGE_EXTRACTION_PROMPT } from "../../_shared
 /** Maximum number of recipes allowed per request */
 const MAX_RECIPES_PER_REQUEST = 5;
 
-/** Vision models to try in order — fallback if first returns 500 */
+/**
+ * Vision models to try in order — fallback chain if primary fails.
+ * qwen-2.5-vl-7b was retired from OpenRouter; replaced with Qwen3 VL family.
+ * Updated 2026-09-05: confirmed live slugs via GET /api/v1/models.
+ */
 const VISION_MODELS = [
-  "qwen/qwen-2.5-vl-7b-instruct",
-  "google/gemini-2.0-flash-001",
+  "qwen/qwen3-vl-8b-instruct",    // Qwen3 VL 8B — successor to retired qwen-2.5-vl-7b
+  "qwen/qwen2.5-vl-72b-instruct", // Qwen2.5 VL 72B — quality fallback (larger, slower)
+  "google/gemini-2.0-flash-001",  // Google fallback
 ];
 
 /** Minimum caption/OCR text before we skip vision re-processing in extract. */
@@ -157,20 +162,28 @@ function parseRecipeResponse(response: string): ExtractedRecipe | ExtractedRecip
   // a single recipe inside this array even when only one was requested, and
   // may duplicate (incomplete) fields at the top level — so unwrap whenever
   // the array is present rather than only on length > 1.
+  //
+  // Common degenerate shape: { recipes: [{ title, instructions }], ingredients, prepTime }
+  // where the LLM split fields between the array item and the root object.
+  // We merge root-level fields INTO the array item before normalising.
+  const { recipes: _recipesKey, data: _data, result: _result, ...topLevelFields } = parsed;
   const recipesArray = parsed.recipes || parsed.data?.recipes || parsed.result?.recipes;
   if (Array.isArray(recipesArray) && recipesArray.length > 0) {
     const capped = recipesArray.slice(0, MAX_RECIPES_PER_REQUEST);
 
     if (capped.length === 1) {
-      console.log("Single recipe wrapped in 'recipes' array — unwrapping");
-      return normalizeExtractedRecipe(capped[0]);
+      console.log("Single recipe wrapped in 'recipes' array — unwrapping + merging top-level fields");
+      // Merge: array item wins for keys it has; top-level fills in anything missing.
+      const merged = { ...topLevelFields, ...capped[0] };
+      return normalizeExtractedRecipe(merged);
     }
 
     console.log(`Multi-recipe detected: ${recipesArray.length} recipes`);
     const results: ExtractedRecipe[] = [];
     for (const rawRecipe of capped) {
       try {
-        results.push(normalizeExtractedRecipe(rawRecipe));
+        // Apply same top-level merge for each item.
+        results.push(normalizeExtractedRecipe({ ...topLevelFields, ...rawRecipe }));
       } catch (e) {
         console.warn("Skipping malformed recipe in multi-recipe response:", e.message);
       }

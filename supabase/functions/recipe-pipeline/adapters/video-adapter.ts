@@ -104,7 +104,12 @@ export async function videoAdapter(
   // ── 3. Transcript: provided or auto-transcribe uploaded media ──
   let resolvedTranscript = transcript;
   if (!resolvedTranscript && shouldTranscribe) {
-    resolvedTranscript = await transcribeUploadedMedia(media_url, media_base64);
+    try {
+      resolvedTranscript = await transcribeUploadedMedia(media_url, media_base64);
+    } catch (transcribeError) {
+      // Transcription failure is non-fatal — frame OCR (step 5) can still extract content.
+      console.warn("[video-adapter] Transcription failed, falling back to frames only:", transcribeError);
+    }
   }
   if (resolvedTranscript) {
     textParts.push(`Transcript:\n${resolvedTranscript}`);
@@ -221,7 +226,7 @@ async function extractTextFromFrames(
       "You are an OCR system. Extract ALL visible text from these video frames. Include recipe titles, ingredients, instructions, and any other text. Return only the extracted text, no commentary.",
       "Extract all visible text from these video frames. Focus on recipe content: titles, ingredient lists, cooking instructions, measurements, and cooking times.",
       frameUrls.slice(0, MAX_OCR_FRAMES),
-      "qwen/qwen-2.5-vl-7b-instruct",
+      "qwen/qwen3-vl-8b-instruct", // qwen-2.5-vl-7b retired; Qwen3 VL 8B is the successor
       { temperature: 0.1, max_tokens: 3000 }
     );
     return response;

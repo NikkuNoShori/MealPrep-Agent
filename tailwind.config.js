@@ -59,6 +59,16 @@ export default {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        // Status roles (MOP-0029 Phase 3) — wires the previously-dead
+        // --success-*/--warning-*/--error-* vars to Tailwind utilities so
+        // they are no longer set-but-unconsumed. `error` aliases `destructive`
+        // since ColorScheme.semantic.error is the single source of truth for
+        // both (COLOR_SCHEMA.md §5).
+        status: {
+          success: 'hsl(var(--status-success))',
+          warning: 'hsl(var(--status-warning))',
+          error: 'hsl(var(--destructive))',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (`POST /chat-api/persist-extraction`, video `source_metadata.extra.thumbnail_url`, agent model `qwen/qwen3-8b`, abortable send)
+**Last reviewed:** 2026-09-21
+**Last updated:** 2026-09-21 (MOP-0028: three bulk recipe action RPCs added; useBulk* hooks added to Recipe Collections section)
 
 ---
 
@@ -80,6 +80,20 @@ apikey: <supabase-anon-key>
 
 `pendingConfirmation` is present only when the agent emitted a destructive tool call. The handler did **not** execute — the UI must render a Confirm/Cancel surface and resend on Confirm with `context.confirmAction` carrying the same `{ tool, args, idempotencyKey }`.
 
+**SSE streaming mode (MOP-0017):** Add `Accept: text/event-stream` to the request headers. The endpoint returns `Content-Type: text/event-stream` and streams `data: <json>\n\n` frames as the agent runs. The tool loop runs synchronously; only the final prose reply is streamed token-by-token.
+
+SSE frame types:
+```
+data: {"type":"delta","text":"..."}          — content token (one or more per response)
+data: {"type":"recipe","recipe":{...}}       — extracted recipe (if present)
+data: {"type":"recipes","recipes":[...]}     — multiple recipes (if present)
+data: {"type":"confirmation","pendingConfirmation":{...}}  — destructive tool gate
+data: {"type":"done","messageId":"uuid","conversationId":"uuid","sessionId":"...","intentMetadata":{...},"title":"..."}
+data: {"type":"error","message":"..."}       — error; stream closes after this
+```
+
+The `done` frame is the terminal success signal and carries the same metadata as the JSON response. Non-streaming callers (no `Accept` header) receive the JSON response unchanged.
+
 **`recipe` object shape:**
 ```json
 {
@@ -107,7 +121,7 @@ apikey: <supabase-anon-key>
 
 **Tool-call lifecycle (MOP-0008):**
 
-1. The model receives the user message + the tool catalog (up to 12 tools, see [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md)).
+1. The model receives the user message + the tool catalog (23 tools — see [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md) and [MOPs/MOP-0018-ai-tool-expansion.md](MOPs/MOP-0018-ai-tool-expansion.md) for catalog details).
 2. Each iteration the model emits 0..many `tool_calls`. The dispatcher validates args against the tool's JSON Schema, rejects any `user_id` key, and:
    - Always-destructive tools (`update_recipe`, `delete_recipe`) → return a `pendingConfirmation` envelope; the handler does NOT run.
    - Conditionally destructive (`assign_recipe_to_meal_plan_slot` when the slot is occupied) → same envelope.
@@ -188,6 +202,42 @@ Persist a **client-side** video extraction into `chat_messages` so follow-up age
 - AI message: `message_type: recipe`, `metadata.recipe`, `metadata.recipes`, `metadata.thumbnail_url` (HTTP URL only — **no base64 keyframes**)
 
 **Client:** `apiClient.persistChatExtraction()` in `src/services/api.ts`; called from `ChatInterface` after `processVideoIntake`.
+
+---
+
+### POST `/functions/v1/chat-api/batch-extract`
+
+MOP-0019 — SSE-streamed batch URL extraction. Accepts up to 50 recipe URLs, runs parallel extraction (wave-chunked into groups of 10 to stay within Supabase's 150s wall-clock limit), and emits SSE events for each result.
+
+**Location:** `supabase/functions/chat-api/batch-extract.ts`
+
+**Headers:** Same as `/chat-api/message` (Authorization + apikey). Must include `Accept: text/event-stream`.
+
+**Request body:**
+```json
+{
+  "urls": ["string (up to 50 valid http/https URLs; dupes silently dropped)"]
+}
+```
+
+**Response:** `Content-Type: text/event-stream`. Each `data:` frame is a JSON object — one of:
+
+| Event type | Shape |
+|------------|-------|
+| `progress` | `{ type, index, total, url, status: "extracting" }` |
+| `result` | `{ type, index, url, recipe: <extracted recipe object> }` |
+| `error` | `{ type, index, url, message: string }` |
+| `done` | `{ type, total, succeeded, failed }` |
+
+**Extraction path per URL:** `POST /recipe-pipeline/extract-only` with `auto_save: false`. The client saves via `apiClient.ingestRecipeFromUrl(url, true)` on user confirmation.
+
+**Constraints:**
+- URLs capped at 50 (excess silently truncated server-side)
+- Per-URL timeout: 50s (AbortSignal.timeout)
+- Wave size: 10 concurrent extractions
+- All waves processed before `done` is emitted
+
+**Client:** `apiClient.batchImport(urls, callbacks, signal?)` in `src/services/api.ts`, rendered in `BatchImportPanel` + `BatchImportCard` components.
 
 ---
 
@@ -423,7 +473,7 @@ Full-text search using PostgreSQL tsvector.
 ```sql
 search_recipes_text(
   search_query TEXT,
-  user_uuid UUID,
+  user_uuid UUID,   -- VESTIGIAL: ignored; auth.uid() is the source of truth (migration 028)
   max_results INT DEFAULT 10
 )
 ```
@@ -456,7 +506,7 @@ Find recipes similar to a given recipe.
 ```sql
 find_similar_recipes(
   recipe_id UUID,
-  user_id UUID,
+  user_id UUID,   -- VESTIGIAL: ignored; auth.uid() is the source of truth (migration 028)
   similarity_threshold FLOAT DEFAULT 0.6,
   max_results INT DEFAULT 5
 )
@@ -472,7 +522,7 @@ Preference-based recipe recommendations.
 
 ```sql
 get_recipe_recommendations(
-  user_id UUID,
+  user_id UUID,             -- VESTIGIAL: ignored; auth.uid() is the source of truth (migration 028)
   preference_difficulty VARCHAR DEFAULT NULL,
   preference_tags TEXT[] DEFAULT NULL,
   max_prep_time_minutes INT DEFAULT NULL,
@@ -480,9 +530,11 @@ get_recipe_recommendations(
 )
 ```
 
-**Scoring:** difficulty match (1.0/0.5) + tags match (1.0/0.5) + rating/5 + prep_time constraint (1.0/0.3)
+**Scoring (5 terms, migration 035):** (difficulty match + tags match + rating/5 + prep_time fit + reaction signal) / 5.0
+- Reaction signal: avg of `recipe_reactions` for caller's recipes — thumbs-up = +1.0, thumbs-down = −0.7, no reaction = 0; bounded 0–1
+- Previous formula was 4 terms / 4.0 (no reactions)
 
-**Returns:** Ranked recipe recommendations with `recommendation_score`.
+**Returns:** Ranked recipe recommendations with `recommendation_score` (0–1).
 
 ---
 
@@ -556,6 +608,40 @@ get_my_pending_invites()  -- uses auth.uid()
 ```
 
 **Returns:** `[{ id, household_id, invited_email, inviter_name, status, ..., households: { id, name } }]`
+
+---
+
+### transfer_household_ownership *(Migration 037 — MOP-0014)*
+
+Atomically promotes target member to `owner` and demotes the caller to `admin` in a single transaction. Replaces the prior two-step PATCH sequence that left a dual-owner window on mid-transfer failure.
+
+```sql
+transfer_household_ownership(
+  p_member_id    UUID,   -- household_members.id of the target
+  p_household_id UUID    -- household to transfer
+)
+```
+
+**Auth:** Caller must be current `owner` of the household. Non-owners receive `errcode 42501`.
+
+**Returns:** `void`
+
+---
+
+### respond_to_household_invite *(Migration 037 — MOP-0014)*
+
+Atomically marks the invite `accepted` or `declined` and (on accept) inserts the caller into `household_members` in a single transaction. Replaces the prior PATCH + conditional INSERT sequence that left an orphaned-member-row window on failure.
+
+```sql
+respond_to_household_invite(
+  p_invite_id UUID,
+  p_accept    BOOLEAN
+)
+```
+
+**Auth:** Caller's email must match `household_invites.invited_email` (case-insensitive). Invite must be `pending`. Non-invitee callers and already-responded invites receive `errcode 42501` / `22023` respectively.
+
+**Returns:** `TABLE(household_id UUID, household_name TEXT, status TEXT)`
 
 ---
 
@@ -635,12 +721,13 @@ get_my_pending_invites()  -- uses auth.uid()
 | `getInviteDetails(inviteId)` | Get invite details (valid/invalid, names, expiry) |
 | `acceptInviteById(inviteId)` | Accept an invite (adds user to household) |
 | `getMyPendingInvites()` | Get invites addressed to current user (via RPC) |
-| `respondToInvite(inviteId, accept)` | Accept or decline invite |
+| `respondToInvite(inviteId, accept)` | Accept or decline invite — atomic via `respond_to_household_invite` RPC (migration 037) |
+| `transferOwnership(memberId, householdId)` | Transfer household ownership to another member — atomic via `transfer_household_ownership` RPC (migration 037) |
 | `getHouseholdRecipes(params?)` | Get household-visible recipes with author profiles (via RPC) |
 | `getPublicRecipes(params?)` | Get all public recipes with author profiles |
 | `updateRecipeVisibility(recipeId, visibility)` | Set recipe visibility (private/household/public) |
 
-**React Query hooks:** `useMyHousehold`, `useUpdateHousehold`, `useCreateHouseholdInvite`, `useMyPendingInvites`, `useRespondToInvite`, `useUpdateRecipeVisibility`, `useHouseholdRecipes`, `useAcceptInviteById`
+**React Query hooks:** `useMyHousehold`, `useUpdateHousehold`, `useCreateHouseholdInvite`, `useMyPendingInvites`, `useRespondToInvite`, `useRespondToInvite`, `useTransferOwnership`, `useUpdateRecipeVisibility`, `useHouseholdRecipes`, `useAcceptInviteById`
 
 ### Recipe Reactions
 
@@ -683,8 +770,11 @@ get_my_pending_invites()  -- uses auth.uid()
 | `deleteCollection(collectionId)` | Delete a collection (recipes are not deleted) |
 | `addRecipeToCollection(collectionId, recipeId)` | Add a recipe to a collection |
 | `removeRecipeFromCollection(collectionId, recipeId)` | Remove a recipe from a collection |
+| `bulkUpdateRecipeVisibility(recipeIds, visibility)` | Set visibility on multiple owned recipes in one RPC call (`bulk_update_recipe_visibility`, migration 038) — returns row count |
+| `bulkDeleteRecipes(recipeIds)` | Delete multiple owned recipes in one RPC call (`bulk_delete_recipes`, migration 038) — returns row count |
+| `bulkAddToCollection(collectionId, recipeIds)` | Add multiple recipes to a collection in one RPC call (`bulk_add_to_collection`, migration 038) — returns rows inserted; duplicate-safe via `ON CONFLICT DO NOTHING` |
 
-**React Query hooks:** `useMyCollections`, `useCollection`, `useCollectionRecipes`, `useCreateCollection`, `useUpdateCollection`, `useDeleteCollection`, `useAddRecipeToCollection`, `useRemoveRecipeFromCollection`
+**React Query hooks:** `useMyCollections`, `useCollection`, `useCollectionRecipes`, `useCreateCollection`, `useUpdateCollection`, `useDeleteCollection`, `useAddRecipeToCollection`, `useRemoveRecipeFromCollection`, `useBulkUpdateRecipeVisibility`, `useBulkDeleteRecipes`, `useBulkAddToCollection`
 
 ### Field Mapping
 

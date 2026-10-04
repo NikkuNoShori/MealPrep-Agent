@@ -15,6 +15,7 @@ import { textAdapter } from "./adapters/text-adapter.ts";
 import { urlAdapter } from "./adapters/url-adapter.ts";
 import { videoAdapter } from "./adapters/video-adapter.ts";
 import { isShortFormVideoUrl } from "../_shared/video-url-utils.ts";
+import { checkBlocklist, checkRobotsTxt } from "./_shared/tos-check.ts";
 import { extract } from "./stages/extract.ts";
 import { transform } from "./stages/transform.ts";
 import { load } from "./stages/load.ts";
@@ -168,6 +169,34 @@ async function runAdapter(
 
     case "url":
       if (!request.url) throw new Error("URL is required for url source_type");
+
+      // ── MOP-0027: ToS compliance checks ──────────────────────────────────
+      // 1. Domain blocklist — hard-no sites; no HTTP request made
+      {
+        const blocked = checkBlocklist(request.url);
+        if (blocked) {
+          throw {
+            stage: "fetch",
+            code: "TOS_BLOCKED",
+            message:
+              "This site prohibits automated recipe imports. Copy the recipe text and paste it instead — it works just as well.",
+          };
+        }
+      }
+
+      // 2. robots.txt — fails open on network/parse error
+      {
+        const robots = await checkRobotsTxt(request.url);
+        if (!robots.allowed) {
+          throw {
+            stage: "fetch",
+            code: "TOS_BLOCKED",
+            message: robots.reason!,
+          };
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       // Short-form video URLs → oEmbed path (not HTML scrape)
       if (isShortFormVideoUrl(request.url)) {
         return videoAdapter(openRouter, {

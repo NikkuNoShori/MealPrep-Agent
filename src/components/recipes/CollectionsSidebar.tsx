@@ -357,7 +357,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                       className={`w-5 h-5 flex items-center justify-center rounded transition-colors ${
                         isMenuOpen
                           ? 'text-stone-700 dark:text-stone-200'
-                          : 'text-stone-300 dark:text-stone-600 opacity-0 group-hover:opacity-100 hover:text-stone-500 dark:hover:text-stone-400'
+                          : 'text-stone-300 dark:text-stone-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-stone-500 dark:hover:text-stone-400'
                       }`}
                     >
                       <MoreVertical className="h-3.5 w-3.5" />

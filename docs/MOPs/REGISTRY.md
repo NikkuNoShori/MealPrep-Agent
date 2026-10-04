@@ -2,8 +2,8 @@
 
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (MOP-0016 Phase 3b shipped; operator smoke pending `recipe-pipeline` deploy)
+**Last reviewed:** 2026-09-21
+**Last updated:** 2026-09-21 (MOP-0029 scope expanded — full color-surface audit; `docs/COLOR_SCHEMA.md` standard added)
 
 ---
 
@@ -34,24 +34,41 @@
 |-----|-------|--------|-----------|---------|-----------|--------------|
 | [MOP-0001](MOP-0001.md) | Recipe Pipeline Improvements (Images, Multi-Recipe, Quantities) | complete | 2026-03-11 | 2026-03-11 | 2026-03-11 | Nick Neal |
 | [MOP-0002](MOP-0002.md) | Family Sharing, Recipe Permissions & Collections | complete | 2026-03-11 | 2026-03-14 | 2026-03-14 | Nick Neal |
-| [MOP-0003](MOP-0003.md) | Dietary Profiles & Allergen Detection | draft | 2026-03-12 | 2026-03-12 | — | Nick Neal |
+| [MOP-0003](MOP-0003.md) | Dietary Profiles & Allergen Detection | cancelled | 2026-03-12 | 2026-09-06 | — | Nick Neal |
 | [MOP-0004](MOP-0004.md) | Meal Planner & Grocery Cart | complete | 2026-03-12 | 2026-06-14 | 2026-06-14 | Nick Neal |
 | [MOP-0005](MOP-0005.md) | Test Coverage & Testing Infrastructure | complete | 2026-03-14 | 2026-06-14 | 2026-06-14 | Nick Neal |
 | [MOP-0006](MOP-0006.md) | Generated Supabase Types & API Typing | complete | 2026-05-08 | 2026-06-03 | 2026-06-03 | Nick Neal |
-| [MOP-0007](MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
+| [MOP-0007](MOP-0007.md) | Wire RAG into Recipes Page, Meal Planner Suggestions, Reactions as Ranking Signal | complete | 2026-06-01 | 2026-09-16 | 2026-09-16 | Nick Neal |
 | [MOP-0008](MOP-0008.md) | Chat: Intent Router → Tool-Using Single Agent | complete | 2026-06-01 | 2026-06-15 | 2026-06-15 | Nick Neal |
-| [MOP-0009](MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
-| [MOP-0010](MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
+| [MOP-0009](MOP-0009.md) | Dev Automation Expansion (migration-rls-checker, scaffolders, runbook-recorder) | deferred | 2026-06-01 | 2026-09-07 | — | Nick Neal |
+| [MOP-0010](MOP-0010.md) | Lockticket MOP System (machine-verifiable acceptance criteria) | complete | 2026-06-01 | 2026-09-07 | 2026-09-07 | Nick Neal |
 | [MOP-0011](MOP-0011.md) | Normalize `meal_plans` JSONB → Child Tables | draft (deferred) | 2026-06-01 | 2026-06-01 | — | Nick Neal |
-| [MOP-0012](MOP-0012.md) | Recipe-Pipeline Test Fixture Library | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
-| [MOP-0013](MOP-0013.md) | Playwright E2E Test Setup | draft | 2026-06-01 | 2026-06-01 | — | Nick Neal |
-| [MOP-0014](MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | draft | 2026-06-01 | 2026-06-01 | — | surface-reviewer |
-| [MOP-0015](MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle — fix stale embeddings from edited recipes | draft | 2026-06-04 | 2026-06-04 | — | chat-rag-sme audit |
-| [MOP-0016](MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | in_progress | 2026-06-15 | 2026-06-16 | — | Nick Neal |
+| [MOP-0012](MOP-0012.md) | Recipe-Pipeline Test Fixture Library | deferred | 2026-06-01 | 2026-09-07 | — | Nick Neal |
+| [MOP-0013](MOP-0013.md) | Playwright E2E Test Setup | complete | 2026-06-01 | 2026-09-04 | 2026-09-04 | Nick Neal |
+| [MOP-0014](MOP-0014-household-write-atomicity-rpcs.md) | Household Write Atomicity — `transferOwnership` & `respondToInvite` RPCs | complete | 2026-06-01 | 2026-09-21 | 2026-09-16 | surface-reviewer |
+| [MOP-0015](MOP-0015-embedding-refresh-lifecycle.md) | Embedding Refresh Lifecycle — fix stale embeddings from edited recipes | complete | 2026-06-04 | 2026-09-06 | 2026-09-06 | chat-rag-sme audit |
+| [MOP-0016](MOP-0016-short-form-video-intake.md) | Short-Form Video Recipe Intake (ToS-Compliant) | complete | 2026-06-15 | 2026-09-05 | 2026-09-05 | Nick Neal |
+| [MOP-0017](MOP-0017-streaming-chat-responses.md) | Streaming Chat Responses | complete | 2026-09-03 | 2026-09-04 | 2026-09-04 | Nick Neal |
+| [MOP-0018](MOP-0018-ai-tool-expansion.md) | AI Tool Catalog Expansion — Save, Grocery, Household, Reactions | complete | 2026-09-04 | 2026-09-05 | 2026-09-05 | Nick Neal |
+| [MOP-0019](MOP-0019-batch-recipe-import.md) | Batch Recipe Import — SSE-Streamed Multi-URL Extraction | complete | 2026-09-05 | 2026-09-05 | 2026-09-05 | Nick Neal |
+| [MOP-0020](MOP-0020-realtime-reasoning-display.md) | Realtime Reasoning Display — Tool Step Visibility in Chat | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
+| [MOP-0021](MOP-0021-multi-week-meal-planner-view.md) | Multi-Week Meal Planner View | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
+| [MOP-0022](MOP-0022-configurable-plan-period.md) | Configurable Default Meal Plan Period | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
+| [MOP-0023](MOP-0023-meal-randomizer.md) | "I Don't Know" Meal Randomizer | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
+| [MOP-0024](MOP-0024-allergy-tagging.md) | Automatic Allergy Tagging on Recipe Import | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
+| [MOP-0025](MOP-0025-dietary-allergy-profiles.md) | Household Dietary & Allergy Profiles UI | complete | 2026-09-05 | 2026-09-06 | 2026-09-06 | Nick Neal |
+| [MOP-0026](MOP-0026-security-auditor-agent.md) | Security Auditor Agent | draft | 2026-09-07 | 2026-09-21 | — | Nick Neal |
+| [MOP-0027](MOP-0027-tos-compliant-url-scraping.md) | ToS-Compliant URL Scraping — robots.txt check + domain blocklist | complete | 2026-09-07 | 2026-09-07 | 2026-09-07 | Nick Neal |
+| [MOP-0028](MOP-0028-bulk-recipe-actions.md) | Bulk Recipe Actions — Multi-Select Visibility, Folder Assignment, Delete, and Sharing | complete | 2026-09-21 | 2026-09-21 | 2026-09-21 | Nick Neal |
+| [MOP-0029](MOP-0029-theme-token-layering-surface-presets.md) | Theme Token Layering & Surface-Aware Presets | deferred | 2026-09-21 | 2026-09-21 | — | surface-reviewer |
+
+> **MOP-0029 (scope expanded 2026-09-21):** Now covers all thirteen color-surface categories, not just backgrounds. Grew from 6 to 10 phases. **Phases 0–3 and 5 are NOT deferred** — Phase 0 publishes [docs/COLOR_SCHEMA.md](../COLOR_SCHEMA.md) (P1, binding on new code immediately); Phases 1, 2, 3, 5 are separable correctness fixes. Only Phases 4, 6, 7, 8, 9 carry the deferral trigger.
 
 > **MOP-0016:** Phases 1–3b shipped 2026-06-16 (`chat-api` deployed). **Outstanding:** deploy `recipe-pipeline`, run §Operator smoke tests, then promote to `verifying`. MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
 
-> **Deferred-with-trigger MOPs:** MOP-0011 is in `draft` but explicitly deferred — execute only when a documented trigger condition fires (see MOP-0011 §Trigger Conditions). This is a new MOP pattern; if more deferred MOPs accumulate, codify the pattern in MOP_TEMPLATE.md.
+> **MOP-0017:** Phase 1 shipped 2026-09-03. Phases 2–5 (SSE edge function, agent-loop onDelta, frontend reader, verification) implemented 2026-09-04. Status `verifying` — pending `/verify-mop` and `chat-api` deploy.
+
+> **Deferred-with-trigger MOPs:** MOP-0011 is in `draft` but explicitly deferred — execute only when a documented trigger condition fires (see MOP-0011 §Trigger Conditions). MOP-0029 follows the same pattern (see MOP-0029 §Trigger Conditions), with the nuance that its Phases 1–2 are separable correctness fixes that may land ahead of the trigger. This pattern now has multiple instances; codify it in MOP_TEMPLATE.md.
 
 ---
 

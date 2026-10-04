@@ -186,15 +186,15 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                   </div>
                   <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Dietary Restrictions</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {DIETARY_RESTRICTIONS.map(restriction => (
                     <Badge
                       key={restriction}
                       variant={filters.dietaryRestrictions.includes(restriction) ? 'default' : 'outline'}
-                      className={`cursor-pointer px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
+                      className={`cursor-pointer min-w-0 justify-center text-center leading-tight px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         filters.dietaryRestrictions.includes(restriction)
                           ? 'bg-primary-500 hover:bg-primary-600 text-white shadow'
-                          : 'border border-stone-200 dark:border-white/[0.08] hover:border-primary-500 dark:hover:border-primary-400 bg-white/80 dark:bg-white/[0.04]'
+                          : 'border border-stone-300 dark:border-white/[0.18] hover:border-primary-500 dark:hover:border-primary-400 bg-white dark:bg-white/[0.07]'
                       }`}
                       onClick={() => toggleDietaryRestriction(restriction)}
                     >
@@ -212,15 +212,15 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                   </div>
                   <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Prep Time</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {PREP_TIME_RANGES.map(range => (
                     <Badge
                       key={range.value}
                       variant={filters.prepTime === range.value ? 'default' : 'outline'}
-                      className={`cursor-pointer px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
+                      className={`cursor-pointer min-w-0 justify-center text-center leading-tight px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         filters.prepTime === range.value
                           ? 'bg-green-600 hover:bg-green-700 text-white shadow'
-                          : 'border border-stone-200 dark:border-white/[0.08] hover:border-green-500 dark:hover:border-green-400 bg-white/80 dark:bg-white/[0.04]'
+                          : 'border border-stone-300 dark:border-white/[0.18] hover:border-green-500 dark:hover:border-green-400 bg-white dark:bg-white/[0.07]'
                       }`}
                       onClick={() => updateFilter('prepTime', filters.prepTime === range.value ? '' : range.value)}
                     >
@@ -238,7 +238,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                   </div>
                   <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Difficulty Level</h4>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {DIFFICULTY_LEVELS.map(difficulty => (
                     <Badge
                       key={difficulty}
@@ -264,15 +264,15 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                   </div>
                   <h4 className="text-sm font-semibold text-stone-900 dark:text-white">Popular Tags</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {['Quick', 'Healthy', 'Budget-Friendly', 'Family-Friendly', 'Spicy', 'Sweet', 'Savory'].map(tag => (
                     <Badge
                       key={tag}
                       variant={filters.tags.includes(tag) ? 'default' : 'outline'}
-                      className={`cursor-pointer px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
+                      className={`cursor-pointer min-w-0 justify-center text-center leading-tight px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         filters.tags.includes(tag)
                           ? 'bg-orange-600 hover:bg-orange-700 text-white shadow'
-                          : 'border border-stone-200 dark:border-white/[0.08] hover:border-orange-500 dark:hover:border-orange-400 bg-white/80 dark:bg-white/[0.04]'
+                          : 'border border-stone-300 dark:border-white/[0.18] hover:border-orange-500 dark:hover:border-orange-400 bg-white dark:bg-white/[0.07]'
                       }`}
                       onClick={() => toggleTag(tag)}
                     >

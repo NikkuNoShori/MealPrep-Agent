@@ -40,6 +40,63 @@ export interface ConfirmActionInput {
   idempotencyKey?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// MOP-0017 — SSE streaming types
+// ─────────────────────────────────────────────────────────────────────
+
+export type SSEEvent =
+  | { type: "delta"; text: string }
+  | { type: "tool_start"; name: string; label: string; index: number }
+  | { type: "tool_done";  name: string; ok: boolean; durationMs: number; index: number }
+  | { type: "recipe"; recipe: any }
+  | { type: "recipes"; recipes: any[] }
+  | { type: "confirmation"; pendingConfirmation: any }
+  | { type: "done"; messageId?: string; conversationId: string; sessionId: string; intentMetadata?: any; title?: string }
+  | { type: "error"; message: string };
+
+/**
+ * Callback-based streaming interface. `onEvent` fires for every SSE frame;
+ * the returned `Promise<void>` resolves when the stream closes or rejects on
+ * network error. Callers can abort via the `signal` on the input.
+ */
+export type StreamCallbacks = {
+  onEvent: (event: SSEEvent) => void;
+  onError?: (err: Error) => void;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// MOP-0019 — Batch import types
+// ─────────────────────────────────────────────────────────────────────
+
+export type BatchSSEEvent =
+  | { type: "progress"; index: number; total: number; url: string; status: "extracting" }
+  | { type: "result";   index: number; url: string; recipe: any }
+  | { type: "error";    index: number; url: string; message: string }
+  | { type: "done";     total: number; succeeded: number; failed: number };
+
+export type BatchImportCallbacks = {
+  onEvent: (event: BatchSSEEvent) => void;
+};
+
+/** Parse a raw textarea value into a deduplicated, validated URL list. */
+export function parseImportUrls(raw: string): string[] {
+  const seen = new Set<string>();
+  const valid: string[] = [];
+  for (const chunk of raw.split(/[\s,]+/)) {
+    const trimmed = chunk.trim();
+    if (!trimmed) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    try {
+      const u = new URL(trimmed);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        valid.push(trimmed);
+      }
+    } catch { /* skip invalid */ }
+  }
+  return valid;
+}
+
 export interface ChatToolCallTrace {
   name: string;
   args: Record<string, unknown>;
@@ -90,9 +147,6 @@ export interface SendMessageInput {
   signal?: AbortSignal;
 }
 
-// For local development, use local server for RAG endpoints
-const LOCAL_API_URL = "http://localhost:3000";
-const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
 // API client
 class ApiClient {
@@ -118,7 +172,9 @@ class ApiClient {
       const error = await response
         .json()
         .catch(() => ({ error: "Network error" }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+      // Pipeline errors return { errors: [{ message, stage, code }], stage_failed }
+      const pipelineMsg = Array.isArray(error.errors) && error.errors[0]?.message;
+      throw new Error(pipelineMsg || error.error || `HTTP ${response.status}`);
     }
 
     return response.json();
@@ -158,6 +214,21 @@ class ApiClient {
     return { recipes: camelRecipes, total: camelRecipes.length };
   }
 
+  /** Lightweight recipe list for the randomizer — id, title, tags, visibility only.
+   *  Includes own recipes + household-visible recipes so the pool matches what
+   *  the user sees in their recipe library. RLS enforces actual access. */
+  async getRecipesLight() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("id, title, tags, visibility")
+      .or(`user_id.eq.${user.id},visibility.eq.household,visibility.eq.public`)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data || []) as Array<{ id: string; title: string; tags: string[] | null; visibility: string }>;
+  }
+
   async getRecipe(idOrSlug: string) {
     const {
       data: { user },
@@ -167,10 +238,9 @@ class ApiClient {
     // Determine if the input is a UUID or a slug
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
 
-    let query = supabase
-      .from("recipes")
-      .select("*")
-      .eq("user_id", user.id);
+    // No user_id filter — RLS handles visibility (public/household/owned).
+    // Filtering by the viewer's user_id breaks shared recipe links from other users.
+    let query = supabase.from("recipes").select("*");
 
     if (isUuid) {
       query = query.eq("id", idOrSlug);
@@ -178,12 +248,10 @@ class ApiClient {
       query = query.eq("slug", idOrSlug);
     }
 
-    const { data, error } = await query.single();
+    const { data, error } = await query.maybeSingle();
 
-    if (error) {
-      if (error.code === "PGRST116") return null;
-      throw error;
-    }
+    if (error) throw error;
+    if (!data) return null;
 
     // Transform snake_case to camelCase
     return snakeToCamel(data);
@@ -316,15 +384,6 @@ class ApiClient {
     return { success: true };
   }
 
-  async searchRecipes(query: string, limit?: number) {
-    // Use RAG search for recipe search
-    return this.ragSearch({
-      query,
-      userId: (await supabase.auth.getUser()).data.user?.id || "anonymous",
-      limit: limit || 10,
-      searchType: "hybrid",
-    });
-  }
 
   /**
    * MOP-0007 Phase 1 — Full-text search over the caller's own recipes.
@@ -358,6 +417,36 @@ class ApiClient {
     if (error) throw error;
 
     // RPC returns Json; map snake_case → camelCase for frontend consumption.
+    return ((data as any[]) || []).map((r: any) => snakeToCamel(r));
+  }
+
+  /**
+   * MOP-0007 Phase 2 — Find recipes similar to a given recipe by embedding proximity.
+   *
+   * Calls the `find_similar_recipes` PostgreSQL RPC (migration 004, updated in
+   * migration 028 to use auth.uid() internally). Returns up to `limit` recipes
+   * whose embedding_vector cosine similarity exceeds `threshold` (default 0.6).
+   *
+   * Returns an empty array when:
+   *  - the target recipe has no embedding_vector (recently edited / never embedded)
+   *  - no other recipe crosses the similarity threshold
+   *  - caller is unauthenticated
+   *
+   * ~50-100ms — one vector lookup, no query embedding needed at runtime.
+   * See docs/RAG_AUDIT.md for the per-surface mechanism rationale.
+   */
+  async findSimilarRecipes(recipeId: string, limit: number = 5, threshold: number = 0.6) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase.rpc('find_similar_recipes', {
+      recipe_id: recipeId,
+      user_id: user.id, // vestigial post-migration 028; auth.uid() is authoritative
+      similarity_threshold: threshold,
+      max_results: limit,
+    });
+    if (error) throw error;
+
     return ((data as any[]) || []).map((r: any) => snakeToCamel(r));
   }
 
@@ -432,6 +521,153 @@ class ApiClient {
         messageLength: data.message.length,
       });
       throw error;
+    }
+  }
+
+  /**
+   * MOP-0017 — SSE streaming variant of sendMessage.
+   *
+   * Sends a request with `Accept: text/event-stream`; the edge function returns
+   * a ReadableStream of SSE frames. Each frame is parsed and forwarded to
+   * `callbacks.onEvent`. The Promise resolves on `{type:"done"}` or stream end,
+   * and rejects on network/parse error.
+   */
+  async sendMessageStream(
+    data: SendMessageInput,
+    callbacks: StreamCallbacks
+  ): Promise<void> {
+    const endpoint = `${SUPABASE_FUNCTIONS_URL}/chat-api/message`;
+    const { signal, ...payload } = data;
+
+    // Build auth header the same way `request()` does.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream",
+      "apikey": SUPABASE_ANON_KEY,
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`SSE request failed: ${response.status} ${text.slice(0, 200)}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      let reading = true;
+      while (reading) {
+        const { done, value } = await reader.read();
+        if (done) { reading = false; break; }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const payload = trimmed.slice(5).trim();
+          if (!payload) continue;
+
+          let event: SSEEvent;
+          try {
+            event = JSON.parse(payload) as SSEEvent;
+          } catch {
+            continue; // malformed frame — skip
+          }
+
+          callbacks.onEvent(event);
+
+          if (event.type === "done" || event.type === "error") {
+            return; // stream logically complete
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  /**
+   * MOP-0019 — Batch recipe import.
+   *
+   * Sends up to 50 URLs to POST /chat-api/batch-extract and streams SSE
+   * progress/result/error/done events back via callbacks.
+   */
+  async batchImport(
+    urls: string[],
+    callbacks: BatchImportCallbacks,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const endpoint = `${SUPABASE_FUNCTIONS_URL}/chat-api/batch-extract`;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream",
+      "apikey": SUPABASE_ANON_KEY,
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ urls }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`Batch import failed: ${response.status} ${text.slice(0, 200)}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      let reading = true;
+      while (reading) {
+        const { done, value } = await reader.read();
+        if (done) { reading = false; break; }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const payload = trimmed.slice(5).trim();
+          if (!payload) continue;
+
+          let event: BatchSSEEvent;
+          try {
+            event = JSON.parse(payload) as BatchSSEEvent;
+          } catch {
+            continue;
+          }
+
+          callbacks.onEvent(event);
+
+          if (event.type === "done") return;
+        }
+      }
+    } finally {
+      reader.releaseLock();
     }
   }
 
@@ -918,60 +1154,6 @@ class ApiClient {
     }
   }
 
-  // RAG endpoints - using local server for now (can be migrated to Supabase edge function later)
-  async ragSearch(request: any) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost ? "/api/rag/search" : "/rag/search";
-    return this.request(`${baseUrl}${path}`, {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
-  }
-
-  async ragEmbedding(request: any) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost ? "/api/rag/embedding" : "/rag/embedding";
-    return this.request(`${baseUrl}${path}`, {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
-  }
-
-  async ragSimilar(recipeId: string, userId: string, limit: number = 5) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost
-      ? `/api/rag/similar/${recipeId}`
-      : `/rag/similar/${recipeId}`;
-    return this.request(`${baseUrl}${path}?userId=${userId}&limit=${limit}`);
-  }
-
-  async ragIngredients(
-    ingredients: string[],
-    userId: string,
-    limit: number = 10
-  ) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost ? "/api/rag/ingredients" : "/rag/ingredients";
-    return this.request(`${baseUrl}${path}`, {
-      method: "POST",
-      body: JSON.stringify({ ingredients, userId, limit }),
-    });
-  }
-
-  async ragRecommendations(
-    userId: string,
-    preferences?: any,
-    limit: number = 10
-  ) {
-    const baseUrl = isLocalhost ? LOCAL_API_URL : SUPABASE_FUNCTIONS_URL;
-    const path = isLocalhost
-      ? "/api/rag/recommendations"
-      : "/rag/recommendations";
-    return this.request(`${baseUrl}${path}`, {
-      method: "POST",
-      body: JSON.stringify({ userId, preferences, limit }),
-    });
-  }
 
   // ── Duplicate & Similarity checks ──
 
@@ -1104,9 +1286,13 @@ class ApiClient {
     return snakeToCamel(data);
   }
 
-  async updateHousehold(householdId: string, data: { name: string }) {
-    const { data: household, error } = await supabase.from("households")
-      .update({ name: data.name })
+  async updateHousehold(householdId: string, data: { name?: string; allowMemberEdits?: boolean; allowMemberChildEdits?: boolean }) {
+    const payload: Record<string, any> = {};
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.allowMemberEdits !== undefined) payload.allow_member_edits = data.allowMemberEdits;
+    if (data.allowMemberChildEdits !== undefined) payload.allow_member_child_edits = data.allowMemberChildEdits;
+    const { data: household, error } = await (supabase.from("households") as any)
+      .update(payload)
       .eq("id", householdId)
       .select()
       .single();
@@ -1150,31 +1336,18 @@ class ApiClient {
   }
 
   async respondToInvite(inviteId: string, accept: boolean) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    // Single atomic RPC — invite update + optional member insert happen in one
+    // Postgres transaction. Replaces the prior two-step Supabase client writes
+    // (migration 037 / MOP-0014). RPC enforces SECURITY DEFINER auth checks.
+    const { data, error } = await (supabase as any).rpc('respond_to_household_invite', {
+      p_invite_id: inviteId,
+      p_accept: accept,
+    });
 
-    // Update invite status
-    const { data: invite, error: updateError } = await supabase.from("household_invites")
-      .update({ status: accept ? "accepted" : "declined" })
-      .eq("id", inviteId)
-      .select("*, households(id, name)")
-      .single();
-
-    if (updateError) throw updateError;
-
-    // If accepted, add user to household
-    if (accept && invite) {
-      const { error: joinError } = await supabase.from("household_members")
-        .insert({
-          household_id: invite.household_id,
-          user_id: user.id,
-          role: "member",
-        });
-
-      if (joinError) throw joinError;
-    }
-
-    return snakeToCamel(invite);
+    if (error) throw error;
+    // RPC returns table(household_id, household_name, status); callers only
+    // invalidate query cache on success — return shape is not consumed directly.
+    return snakeToCamel((data as any[])?.[0] ?? null);
   }
 
   // ── Household Member Management ──
@@ -1199,23 +1372,15 @@ class ApiClient {
   }
 
   async transferOwnership(memberId: string, householdId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    // Single atomic RPC — promote target + demote caller in one Postgres
+    // transaction. Replaces the prior two-step PATCH sequence that left a
+    // dual-owner window on mid-transfer failure (migration 037 / MOP-0014).
+    const { error } = await (supabase as any).rpc('transfer_household_ownership', {
+      p_member_id: memberId,
+      p_household_id: householdId,
+    });
 
-    // Promote target to owner
-    const { error: promoteError } = await supabase.from("household_members")
-      .update({ role: 'owner' })
-      .eq("id", memberId);
-
-    if (promoteError) throw promoteError;
-
-    // Demote self to admin
-    const { error: demoteError } = await supabase.from("household_members")
-      .update({ role: 'admin' })
-      .eq("household_id", householdId)
-      .eq("user_id", user.id);
-
-    if (demoteError) throw demoteError;
+    if (error) throw error;
   }
 
   // ── Family Members (Dependents) ──
@@ -1256,6 +1421,10 @@ class ApiClient {
     age?: number | null;
     dietaryRestrictions?: string[];
     allergies?: string[];
+    /** Structured lifestyle dietary flags: 'vegan','vegetarian','gluten-free','dairy-free','halal','kosher','keto','paleo' */
+    dietaryFlags?: string[];
+    /** Soft ingredient/cuisine dislikes (non-allergy) */
+    dislikes?: string[];
     preferences?: Record<string, any>;
   }) {
     const payload: Record<string, unknown> = {};
@@ -1264,6 +1433,8 @@ class ApiClient {
     if (updates.age !== undefined) payload.age = updates.age;
     if (updates.dietaryRestrictions !== undefined) payload.dietary_restrictions = updates.dietaryRestrictions;
     if (updates.allergies !== undefined) payload.allergies = updates.allergies;
+    if (updates.dietaryFlags !== undefined) payload.dietary_flags = updates.dietaryFlags;
+    if (updates.dislikes !== undefined) payload.dislikes = updates.dislikes;
     if (updates.preferences !== undefined) payload.preferences = updates.preferences;
 
     const { data: member, error } = await supabase.from("family_members")
@@ -1274,6 +1445,19 @@ class ApiClient {
 
     if (error) throw error;
     return snakeToCamel(member);
+  }
+
+  /** Convenience alias — patches only the four dietary/allergy arrays. */
+  async updateFamilyMemberProfile(
+    memberId: string,
+    profile: {
+      allergies?: string[];
+      dietaryRestrictions?: string[];
+      dietaryFlags?: string[];
+      dislikes?: string[];
+    }
+  ) {
+    return this.updateFamilyMember(memberId, profile);
   }
 
   async deleteFamilyMember(memberId: string) {
@@ -1327,6 +1511,35 @@ class ApiClient {
 
     if (error) throw error;
     return { id: recipeId, visibility };
+  }
+
+  // ── Bulk Recipe Actions (MOP-0028) ──
+  // Cast to `any` — RPCs not yet in generated types until migration 038 is deployed.
+
+  async bulkUpdateRecipeVisibility(recipeIds: string[], visibility: 'private' | 'household' | 'public'): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('bulk_update_recipe_visibility', {
+      p_recipe_ids: recipeIds,
+      p_visibility: visibility,
+    });
+    if (error) throw error;
+    return (data as number) ?? 0;
+  }
+
+  async bulkDeleteRecipes(recipeIds: string[]): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('bulk_delete_recipes', {
+      p_recipe_ids: recipeIds,
+    });
+    if (error) throw error;
+    return (data as number) ?? 0;
+  }
+
+  async bulkAddToCollection(collectionId: string, recipeIds: string[]): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('bulk_add_to_collection', {
+      p_collection_id: collectionId,
+      p_recipe_ids: recipeIds,
+    });
+    if (error) throw error;
+    return (data as number) ?? 0;
   }
 
   // ── Recipe Collections ──
@@ -1489,6 +1702,30 @@ class ApiClient {
     return snakeToCamel(data);
   }
 
+  // ── Plan Period Config (MOP-0022) ──
+
+  async getPlanPeriodConfig() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    // plan_period_config is a new column (migration 031) — cast to any until
+    // Supabase types are regenerated post-deploy.
+    const { data, error } = await (supabase.from("profiles") as any)
+      .select("plan_period_config")
+      .eq("id", user.id)
+      .single();
+    if (error) throw error;
+    return (data?.plan_period_config ?? null) as import("@/components/settings/PlanPeriodConfig").PlanPeriodConfigValue | null;
+  }
+
+  async setPlanPeriodConfig(config: import("@/components/settings/PlanPeriodConfig").PlanPeriodConfigValue) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const { error } = await (supabase.from("profiles") as any)
+      .update({ plan_period_config: config })
+      .eq("id", user.id);
+    if (error) throw error;
+  }
+
   // ── Admin Methods (via admin-api edge function) ──
 
   async adminGetAllUsers() {
@@ -1577,6 +1814,17 @@ export const useRecipes = (params?: { limit?: number; offset?: number }) => {
   });
 };
 
+/** Lightweight recipe hook for the randomizer — avoids loading full objects. */
+export const useRecipesLight = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["recipes-light"],
+    queryFn: () => apiClient.getRecipesLight(),
+    enabled: !authLoading && !!user,
+    staleTime: QUERY_STALE_TIME.domain,
+  });
+};
+
 // Auth hooks
 // Auth is now managed by Zustand store in src/stores/authStore
 
@@ -1625,13 +1873,6 @@ export const useDeleteRecipe = () => {
   });
 };
 
-export const useSearchRecipes = (query: string, limit?: number) => {
-  return useQuery({
-    queryKey: ["recipes", "search", query, limit],
-    queryFn: () => apiClient.searchRecipes(query, limit),
-    enabled: !!query,
-  });
-};
 
 /**
  * MOP-0007 Phase 1 — React Query hook for full-text search over the caller's
@@ -1644,6 +1885,51 @@ export const useRecipeTextSearch = (query: string, limit?: number) => {
     queryFn: () => apiClient.searchRecipesText(query, limit),
     enabled: !!query.trim(),
     staleTime: QUERY_STALE_TIME.search,
+  });
+};
+
+/**
+ * MOP-0007 Phase 3/4 — Scored recipe recommendations.
+ *
+ * Calls `get_recipe_recommendations` (migration 035 — now includes reaction
+ * signal as a 5th scoring term). Filters by difficulty, tags, and max prep
+ * time. Returns up to `limit` recipes scored 0–1 (recommendation_score).
+ */
+export const useGetRecipeRecommendations = (
+  params: {
+    preferenceDifficulty?: string;
+    preferenceTags?: string[];
+    maxPrepTimeMinutes?: number;
+    limit?: number;
+  },
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: ["recipes", "recommendations", params],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data, error } = await (supabase.rpc as any)('get_recipe_recommendations', {
+        user_id: user.id, // vestigial post-migration 028; auth.uid() is authoritative
+        preference_difficulty: params.preferenceDifficulty ?? null,
+        preference_tags: params.preferenceTags ?? null,
+        max_prep_time_minutes: params.maxPrepTimeMinutes ?? null,
+        limit_count: params.limit ?? 10,
+      });
+      if (error) throw error;
+      return ((data as any[]) || []).map((r: any) => snakeToCamel(r));
+    },
+    enabled,
+    staleTime: QUERY_STALE_TIME.domain,
+  });
+};
+
+export const useFindSimilarRecipes = (recipeId: string, limit?: number, threshold?: number) => {
+  return useQuery({
+    queryKey: ["recipes", "similar", recipeId, limit, threshold],
+    queryFn: () => apiClient.findSimilarRecipes(recipeId, limit, threshold),
+    enabled: !!recipeId,
+    staleTime: QUERY_STALE_TIME.domain,
   });
 };
 
@@ -1722,7 +2008,25 @@ export const useDeleteMealPlan = () => {
 
   return useMutation({
     mutationFn: (id: string) => apiClient.deleteMealPlan(id),
-    onSuccess: () => {
+    // Optimistic: strip the plan from every cached meal-plans query immediately
+    // so the list updates without waiting for a round-trip refetch.
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["meal-plans"] });
+      const snapshots = queryClient.getQueriesData<any[]>({ queryKey: ["meal-plans"] });
+      queryClient.setQueriesData<any[]>({ queryKey: ["meal-plans"] }, (old) =>
+        old ? old.filter((p: any) => p.id !== id) : old
+      );
+      return { snapshots };
+    },
+    onError: (_err, _id, context: any) => {
+      // Roll back on failure
+      if (context?.snapshots) {
+        context.snapshots.forEach(([key, data]: [any, any]) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["meal-plans"] });
     },
   });
@@ -1784,6 +2088,43 @@ export const useUpdateHousehold = () => {
     mutationFn: ({ householdId, name }: { householdId: string; name: string }) =>
       apiClient.updateHousehold(householdId, { name }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["household"] });
+    },
+  });
+};
+
+export const useUpdateHouseholdPermissions = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ householdId, allowMemberEdits, allowMemberChildEdits }: {
+      householdId: string;
+      allowMemberEdits?: boolean;
+      allowMemberChildEdits?: boolean;
+    }) => apiClient.updateHousehold(householdId, { allowMemberEdits, allowMemberChildEdits }),
+    onMutate: async ({ allowMemberEdits, allowMemberChildEdits }) => {
+      // Cancel any in-flight refetch so it doesn't overwrite optimistic state
+      await queryClient.cancelQueries({ queryKey: ["household"] });
+      const previous = queryClient.getQueryData(["household"]);
+      queryClient.setQueryData(["household"], (old: any) => {
+        if (!old?.household) return old;
+        return {
+          ...old,
+          household: {
+            ...old.household,
+            ...(allowMemberEdits !== undefined && { allowMemberEdits }),
+            ...(allowMemberChildEdits !== undefined && { allowMemberChildEdits }),
+          },
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context: any) => {
+      // Roll back to the snapshot taken before the mutation
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(["household"], context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["household"] });
     },
   });
@@ -1869,7 +2210,7 @@ export const useUpdateFamilyMember = () => {
   return useMutation({
     mutationFn: ({ memberId, updates }: {
       memberId: string;
-      updates: { name?: string; relationship?: string; age?: number | null; dietaryRestrictions?: string[]; allergies?: string[]; preferences?: Record<string, any> };
+      updates: { name?: string; relationship?: string; age?: number | null; dietaryRestrictions?: string[]; allergies?: string[]; dietaryFlags?: string[]; dislikes?: string[]; preferences?: Record<string, any> };
     }) => apiClient.updateFamilyMember(memberId, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["household"] });
@@ -2066,6 +2407,74 @@ export const useUpdateUsername = () => {
   });
 };
 
+// ── Plan Period Config Hooks (MOP-0022) ──
+
+export const usePlanPeriodConfig = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["plan-period-config"],
+    queryFn: () => apiClient.getPlanPeriodConfig(),
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useSetPlanPeriodConfig = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: import("@/components/settings/PlanPeriodConfig").PlanPeriodConfigValue) =>
+      apiClient.setPlanPeriodConfig(config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plan-period-config"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+};
+
+// ── My Dietary Profile (MOP-0025) ──
+
+export const useMyDietaryProfile = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["my-dietary-profile"],
+    queryFn: async () => {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) throw new Error("Not authenticated");
+      // dietary_restrictions and allergies added in migration 030 — cast until types regenerated
+      const { data, error } = await (supabase.from("profiles") as any)
+        .select("dietary_restrictions, allergies")
+        .eq("id", u.id)
+        .single();
+      if (error) throw error;
+      return {
+        dietaryRestrictions: (data?.dietary_restrictions ?? []) as string[],
+        allergies: (data?.allergies ?? []) as string[],
+      };
+    },
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useSetMyDietaryProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (profile: { dietaryRestrictions: string[]; allergies: string[] }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await (supabase.from("profiles") as any)
+        .update({
+          dietary_restrictions: profile.dietaryRestrictions,
+          allergies: profile.allergies,
+        })
+        .eq("id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-dietary-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+};
+
 // ── Recipe Reaction Hooks ──
 
 export const useRecipeReactions = (recipeIds: string[]) => {
@@ -2167,6 +2576,40 @@ export const useAdminDeleteHousehold = () => {
     mutationFn: (householdId: string) => apiClient.adminDeleteHousehold(householdId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+// ── Bulk Recipe Action Hooks (MOP-0028) ──
+
+export const useBulkUpdateRecipeVisibility = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recipeIds, visibility }: { recipeIds: string[]; visibility: 'private' | 'household' | 'public' }) =>
+      apiClient.bulkUpdateRecipeVisibility(recipeIds, visibility),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+    },
+  });
+};
+
+export const useBulkDeleteRecipes = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (recipeIds: string[]) => apiClient.bulkDeleteRecipes(recipeIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+    },
+  });
+};
+
+export const useBulkAddToCollection = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ collectionId, recipeIds }: { collectionId: string; recipeIds: string[] }) =>
+      apiClient.bulkAddToCollection(collectionId, recipeIds),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["collections", variables.collectionId, "recipes"] });
     },
   });
 };

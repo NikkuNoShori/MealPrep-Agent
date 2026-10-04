@@ -50,6 +50,10 @@ export interface FamilyMember {
   name: string
   dietaryRestrictions: string[]
   allergies: string[]
+  /** Structured lifestyle dietary flags: 'vegan','vegetarian','gluten-free','dairy-free','halal','kosher','keto','paleo' */
+  dietaryFlags?: string[]
+  /** Soft ingredient/cuisine dislikes (non-allergy) */
+  dislikes?: string[]
   preferenceProfile: PreferenceProfile
 }
 
@@ -114,6 +118,15 @@ export interface GroceryItem {
   category: IngredientCategory
   checked: boolean
   estimatedPrice?: number
+}
+
+// User / Profile types
+/** Dietary and allergy fields on the authenticated user's own profile row. */
+export interface UserDietaryProfile {
+  /** Dietary restriction labels (e.g. 'vegetarian', 'gluten-free') */
+  dietaryRestrictions?: string[]
+  /** Allergy labels (e.g. 'peanuts', 'milk') */
+  allergies?: string[]
 }
 
 // API Response types

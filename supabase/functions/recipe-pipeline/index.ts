@@ -98,7 +98,7 @@ serve(async (req) => {
       const similar = (data ?? []).map((r: any) => ({
         id: r.id,
         title: r.title,
-        similarity: r.similarity,
+        similarity: r.similarity_score,
       }));
 
       return corsResponse({ similar });

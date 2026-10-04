@@ -126,18 +126,21 @@ curl -s https://openrouter.ai/api/v1/models | grep "qwen/qwen-2.5-7b-instruct"
 - Text search works but semantic search doesn't
 
 ### Likely causes
-- Recipe embeddings not generated (embedding_vector is NULL)
+- Recipe has `needs_reembed = true` but the refresh job hasn't run yet (wait up to 5 min)
+- Refresh job is not scheduled or is failing (check edge function logs)
+- Recipe has `embedding_vector IS NULL` and `needs_reembed = false` — pre-MOP-0015 row that missed the backfill
 - pgvector extension not enabled
 - Embedding dimension mismatch
 - Similarity threshold too high
 
 ### Verification steps
 ```sql
--- Check how many recipes have embeddings
+-- Check embedding health across all recipes
 SELECT
-  COUNT(*) as total_recipes,
-  COUNT(embedding_vector) as with_embeddings,
-  COUNT(*) - COUNT(embedding_vector) as missing_embeddings
+  COUNT(*)                                             AS total_recipes,
+  COUNT(embedding_vector)                              AS with_embeddings,
+  COUNT(*) - COUNT(embedding_vector)                   AS null_embeddings,
+  COUNT(*) FILTER (WHERE needs_reembed = true)         AS pending_refresh
 FROM recipes
 WHERE user_id = '<user-uuid>';
 
@@ -145,7 +148,7 @@ WHERE user_id = '<user-uuid>';
 SELECT * FROM pg_extension WHERE extname = 'vector';
 
 -- Check vector dimensions
-SELECT id, title, array_length(embedding_vector::text::text[], 1) as dims
+SELECT id, title, array_length(embedding_vector::text::text[], 1) AS dims
 FROM recipes
 WHERE embedding_vector IS NOT NULL
 LIMIT 5;
@@ -160,11 +163,40 @@ SELECT * FROM search_recipes_semantic(
 ```
 
 ### Fix steps
-1. If embeddings are NULL, regenerate them through the chat interface or by calling `embeddingService.generateRecipeEmbedding(recipe)`
-2. If pgvector is missing: `CREATE EXTENSION IF NOT EXISTS vector;`
-3. Lower the similarity threshold in `src/services/database.js` if results are borderline
+1. **Embeddings pending** (`needs_reembed = true`): wait up to 5 minutes for the `embedding-refresh` cron job to run. If still stuck, invoke the edge function manually from the Supabase Dashboard → Edge Functions → `embedding-refresh` → Invoke.
+2. **Embeddings null with flag false** (missed backfill): run `UPDATE recipes SET needs_reembed = true WHERE embedding_vector IS NULL;` in the SQL editor. The next cron run picks them up.
+3. **Refresh job failing**: check Supabase Edge Function logs for `[embedding-refresh]` errors. Common causes: OpenRouter API key expired, rate limit hit, or service-role key not set in function secrets.
+4. **pgvector missing**: `CREATE EXTENSION IF NOT EXISTS vector;`
+5. **Threshold too tight**: lower similarity threshold in the `search_recipes_semantic` RPC call.
 
-**Added:** 2026-03-10
+**Added:** 2026-03-10 | **Updated:** 2026-09-06 (MOP-0015 — embedding refresh lifecycle)
+
+---
+
+## Embedding refresh: job not processing flagged recipes
+
+### Symptom
+- `SELECT COUNT(*) FROM recipes WHERE needs_reembed = true` is non-zero and not decreasing over time
+- Edited recipes remain missing from chat search after more than 5 minutes
+
+### Likely causes
+- `embedding-refresh` edge function not scheduled (cron not set up)
+- Edge function secrets missing (`SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`)
+- OpenRouter rate limit or quota exhausted
+- Edge function throwing and silently failing
+
+### Verification steps
+1. **Check cron schedule** — Supabase Dashboard → Database → Extensions → confirm `pg_cron` is enabled, or Dashboard → Edge Functions → check scheduled invocations for `embedding-refresh`.
+2. **Invoke manually** — Supabase Dashboard → Edge Functions → `embedding-refresh` → Invoke. Check the response JSON: `{ processed, succeeded, failed, durationMs }`.
+3. **Check logs** — Supabase Dashboard → Edge Functions → `embedding-refresh` → Logs. Look for `[embedding-refresh]` lines.
+4. **Check secrets** — Supabase Dashboard → Edge Functions → Secrets → confirm `SUPABASE_SERVICE_ROLE_KEY` and `OPENROUTER_API_KEY` (or `OPENROUTER_MEDIA_API_KEY`) are set.
+
+### Fix steps
+1. If cron not set up: schedule via `pg_cron` or the Dashboard scheduled-function UI to call `embedding-refresh` every 5 minutes.
+2. If secrets missing: add them in Dashboard → Edge Functions → Secrets, then redeploy.
+3. If rate limited: OpenRouter will retry on the next cron run. No action needed unless the backlog grows unboundedly.
+
+**Added:** 2026-09-06 (MOP-0015)
 
 ---
 

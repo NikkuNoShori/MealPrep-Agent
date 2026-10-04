@@ -3,11 +3,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSendMessage, useChatHistory } from "../../services/api";
 import type { PendingConfirmation, ConfirmActionInput } from "../../services/api";
 import { ConfirmationPrompt } from "./ConfirmationPrompt";
+import { ReasoningDisplay } from "./ReasoningDisplay";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { apiClient } from "../../services/api";
-import { detectIntent } from "../../services/ragService";
 import { Logger } from "../../services/logger";
 import { Button } from "../ui/button";
+import { BatchImportPanel } from "./BatchImportPanel";
 import {
   Send,
   Loader2,
@@ -26,6 +27,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Save,
+  PackagePlus,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { ChatMessageResponse, StructuredRecipe } from "../../types";
@@ -143,6 +145,21 @@ interface Message {
    * handleConfirmAction / handleCancelConfirmation in ChatInterface.
    */
   pendingConfirmation?: PendingConfirmation;
+  /**
+   * When true, this is an optimistic placeholder bubble rendered while
+   * the server is processing. It is replaced by the real AI message
+   * when the response arrives and never persisted.
+   */
+  isThinking?: boolean;
+  toolSteps?: ToolStep[];
+}
+
+export interface ToolStep {
+  name: string;
+  label: string;
+  ok?: boolean;
+  durationMs?: number;
+  done: boolean;
 }
 
 function mapDbMessagesToLocal(messages: Array<Record<string, unknown>>): Message[] {
@@ -246,6 +263,8 @@ export const ChatInterface: React.FC = () => {
   // Tracks the message id whose pendingConfirmation is currently being
   // dispatched, so the Confirm/Cancel buttons can show a busy state.
   const [confirmingMessageId, setConfirmingMessageId] = useState<string | null>(null);
+  // MOP-0019 — Batch import panel visibility
+  const [showBatchPanel, setShowBatchPanel] = useState(false);
 
   const sendMessageMutation = useSendMessage();
   const queryClient = useQueryClient();
@@ -493,22 +512,28 @@ export const ChatInterface: React.FC = () => {
     Logger.chat.stateChange('conversation_switched', { conversationId: newConversation.id });
   };
 
-  // Handle intent selection via button click
-  const handleIntentSelection = (intent: "recipe_extraction" | null) => {
+  // Inject a starter AI prompt into the conversation and focus the input,
+  // so the user knows exactly what to do next without a server round-trip.
+  const handleStarterPrompt = (aiText: string) => {
     if (!currentConversationId) return;
 
-    Logger.chat.stateChange('intent_selected', {
-      conversationId: currentConversationId,
-      intent,
-    });
+    const starterMessage: Message = {
+      id: `starter-${Date.now()}`,
+      content: aiText,
+      sender: "ai",
+      timestamp: new Date(),
+    };
 
     setConversations((prev) =>
       prev.map((conv) =>
         conv.id === currentConversationId
-          ? { ...conv, selectedIntent: intent }
+          ? { ...conv, messages: [...conv.messages, starterMessage] }
           : conv
       )
     );
+
+    // Focus the input so the user can reply immediately
+    setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
   const deleteConversation = async (conversationId: string) => {
@@ -941,9 +966,28 @@ export const ChatInterface: React.FC = () => {
         : "Thinking..."
     );
 
+    // Optimistic placeholder — shows an AI "thinking" bubble immediately so
+    // the user sees acknowledgment before the server responds.
+    const thinkingMessage: Message = {
+      id: "ai-thinking-placeholder",
+      content: "",
+      sender: "ai",
+      timestamp: new Date(),
+      isThinking: true,
+    };
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === currentConversationId
+          ? { ...conv, messages: [...conv.messages, thinkingMessage] }
+          : conv
+      )
+    );
+
     try {
       let response: ChatMessageResponse;
       let videoMessagesSynced = false;
+      // MOP-0020 — populated during SSE streaming; read after the else block closes
+      let streamedSteps: ToolStep[] = [];
 
       if (videoForIntake) {
         toast.loading("Extracting recipe from video (transcription + frames)...", {
@@ -1030,7 +1074,10 @@ export const ChatInterface: React.FC = () => {
                 conv.id === currentConversationId
                   ? {
                       ...conv,
-                      messages: [...conv.messages, aiMessage],
+                      messages: [
+                        ...conv.messages.filter((m) => m.id !== "ai-thinking-placeholder"),
+                        aiMessage,
+                      ],
                       lastMessage: response.response.content,
                     }
                   : conv
@@ -1116,88 +1163,155 @@ export const ChatInterface: React.FC = () => {
 
         response = sendResponse;
       } else {
-        // Handle general chat and RAG queries
-        // Server performs AI-powered intent detection, but we can provide a client-side hint
-        const detectedIntent = detectIntent(inputMessage);
-        Logger.chat.intentDetected(detectedIntent, 0.8, 'Client-side hint (server will make final decision)', inputMessage);
-
-        // Only send explicit intent if client-side detection strongly suggests recipe_extraction
-        // Otherwise, let server's AI-powered detection decide (it handles images, context, etc.)
-        // Server intents: 'recipe_extraction' | 'rag_search' | 'general_chat'
-        const intentToSend =
-          detectedIntent === "recipe_extraction"
-            ? "recipe_extraction" // Explicitly request recipe extraction
-            : undefined; // Let server's AI detection decide (handles RAG search, general chat, etc.)
-
-        const messageData: {
-          message: string;
-          sessionId: string;
-          intent?: string;
-          images?: string[];
-          context: any;
-          signal?: AbortSignal;
-        } = {
+        // ── MOP-0017: SSE streaming path — server agent decides routing ──
+        const messageData = {
           message: messageText,
           sessionId: currentConversation.sessionId,
-          intent: intentToSend, // Only set if recipe_extraction, otherwise undefined for server to detect
+          images: imageDataUrls.length > 0 ? imageDataUrls : undefined,
           context: {
             recentMessages: currentConversation.messages.slice(-5),
             conversationId: currentConversationId,
-            clientDetectedIntent: detectedIntent, // Pass as hint for logging/debugging
           },
           signal,
         };
-        if (imageDataUrls.length > 0) {
-          messageData.images = imageDataUrls;
-        }
-        const sendResponse = (await sendMessageMutation.mutateAsync(
-          messageData
-        )) as ChatMessageResponse & {
-          conversationId?: string;
-          sessionId?: string;
-        };
+
+        // Accumulate stream state — populated by SSE callbacks.
+        let streamedContent = "";
+        let streamedRecipe: any = null;
+        let streamedRecipes: any[] | null = null;
+        let streamedConfirmation: any = null;
+        let doneEvent: any = null;
+        // streamedSteps is declared in outer scope so it's readable after this block
+
+        await apiClient.sendMessageStream(messageData, {
+          onEvent: (event) => {
+            if (signal.aborted) return;
+
+            if (event.type === "tool_start") {
+              streamedSteps.push({ name: event.name, label: event.label, done: false });
+              // Update placeholder with live steps
+              setConversations((prev) =>
+                prev.map((conv) =>
+                  conv.id === currentConversationId
+                    ? {
+                        ...conv,
+                        messages: conv.messages.map((m) =>
+                          m.id === "ai-thinking-placeholder"
+                            ? { ...m, toolSteps: [...streamedSteps] }
+                            : m
+                        ),
+                      }
+                    : conv
+                )
+              );
+            } else if (event.type === "tool_done") {
+              const step = streamedSteps[event.index];
+              if (step) {
+                step.ok = event.ok;
+                step.durationMs = event.durationMs;
+                step.done = true;
+              }
+              setConversations((prev) =>
+                prev.map((conv) =>
+                  conv.id === currentConversationId
+                    ? {
+                        ...conv,
+                        messages: conv.messages.map((m) =>
+                          m.id === "ai-thinking-placeholder"
+                            ? { ...m, toolSteps: [...streamedSteps] }
+                            : m
+                        ),
+                      }
+                    : conv
+                )
+              );
+            } else if (event.type === "delta") {
+              streamedContent += event.text;
+              // Update the thinking-placeholder in-place so the bubble fills
+              // character-by-character without re-mounting the component.
+              setConversations((prev) =>
+                prev.map((conv) =>
+                  conv.id === currentConversationId
+                    ? {
+                        ...conv,
+                        messages: conv.messages.map((m) =>
+                          m.id === "ai-thinking-placeholder"
+                            ? { ...m, content: streamedContent, isThinking: false, toolSteps: [...streamedSteps] }
+                            : m
+                        ),
+                      }
+                    : conv
+                )
+              );
+            } else if (event.type === "recipe") {
+              streamedRecipe = event.recipe;
+            } else if (event.type === "recipes") {
+              streamedRecipes = event.recipes;
+            } else if (event.type === "confirmation") {
+              streamedConfirmation = event.pendingConfirmation;
+            } else if (event.type === "done") {
+              doneEvent = event;
+            } else if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          },
+        });
+
         if (signal.aborted) return;
 
-        // Update conversation ID if this is a new conversation (from database)
-        if (sendResponse.conversationId && currentConversation.isTemporary) {
+        // Construct a synthetic ChatMessageResponse so the code below that
+        // replaces the placeholder and updates conversation state is unchanged.
+        const doneConversationId: string = doneEvent?.conversationId ?? currentConversationId;
+        const doneSessionId: string = doneEvent?.sessionId ?? currentConversation.sessionId;
+
+        // Persist the new conversationId if this was a temporary conversation.
+        if (doneConversationId !== currentConversationId && currentConversation.isTemporary) {
           Logger.chat.stateChange('conversation_persisted', {
             oldId: currentConversationId,
-            newId: sendResponse.conversationId,
+            newId: doneConversationId,
           });
           setConversations((prev) =>
             prev.map((conv) =>
               conv.id === currentConversationId
-                ? {
-                    ...conv,
-                    id: sendResponse.conversationId!,
-                    isTemporary: false,
-                  }
+                ? { ...conv, id: doneConversationId, isTemporary: false }
                 : conv
             )
           );
-          setCurrentConversationId(sendResponse.conversationId);
+          setCurrentConversationId(doneConversationId);
         }
 
-        // Update sessionId if provided
-        if (
-          sendResponse.sessionId &&
-          sendResponse.sessionId !== currentConversation.sessionId
-        ) {
-          Logger.chat.stateChange('sessionId_updated', {
-            conversationId: sendResponse.conversationId || currentConversationId,
-            oldSessionId: currentConversation.sessionId,
-            newSessionId: sendResponse.sessionId,
-          });
+        // Update sessionId if it changed.
+        if (doneSessionId && doneSessionId !== currentConversation.sessionId) {
           setConversations((prev) =>
             prev.map((conv) =>
-              conv.id === (sendResponse.conversationId || currentConversationId)
-                ? { ...conv, sessionId: sendResponse.sessionId! }
+              conv.id === doneConversationId
+                ? { ...conv, sessionId: doneSessionId }
                 : conv
             )
           );
         }
 
-        response = sendResponse;
+        // The local ChatMessageResponse type (from ../../types) is the slim
+        // frontend-only shape. Extra fields (conversationId, title, etc.) are
+        // accessed via the `as any` casts already present in the shared path
+        // below — so we cast here to satisfy TS while carrying the extras.
+        response = {
+          response: {
+            id: doneEvent?.messageId ?? `stream-${Date.now()}`,
+            content: streamedContent,
+            timestamp: new Date().toISOString(),
+          },
+          recipe: streamedRecipe ?? undefined,
+          recipes: streamedRecipes ?? undefined,
+          // Carry extras via type assertion — consumed below as (response as any).xxx
+          ...({
+            pendingConfirmation: streamedConfirmation ?? undefined,
+            conversationId: doneConversationId,
+            sessionId: doneSessionId,
+            intentMetadata: doneEvent?.intentMetadata,
+            title: doneEvent?.title,
+          } as any),
+        };
       }
 
       if (signal.aborted) return;
@@ -1215,6 +1329,8 @@ export const ChatInterface: React.FC = () => {
         thumbnailUrl: (response as ChatMessageResponse).thumbnailUrl,
         // MOP-0008 Step 8 — surfaced when the agent proposed a destructive tool
         pendingConfirmation: (response as any).pendingConfirmation,
+        // MOP-0020 — carry tool steps so the reasoning panel persists on the finished message
+        toolSteps: streamedSteps.length > 0 ? [...streamedSteps] : undefined,
       };
 
       // Log successful response
@@ -1247,7 +1363,11 @@ export const ChatInterface: React.FC = () => {
           conv.id === resolvedConversationId
             ? {
                 ...conv,
-                messages: [...conv.messages, aiMessage],
+                // Replace the optimistic thinking placeholder with the real message.
+                messages: [
+                  ...conv.messages.filter((m) => m.id !== "ai-thinking-placeholder"),
+                  aiMessage,
+                ],
                 lastMessage: response.response.content,
                 ...(serverTitle ? { title: serverTitle } : {}),
               }
@@ -1286,7 +1406,10 @@ export const ChatInterface: React.FC = () => {
           conv.id === currentConversationId
             ? {
                 ...conv,
-                messages: [...conv.messages, errorMessage],
+                messages: [
+                  ...conv.messages.filter((m) => m.id !== "ai-thinking-placeholder"),
+                  errorMessage,
+                ],
                 lastMessage: "Error occurred",
               }
             : conv
@@ -1315,8 +1438,13 @@ export const ChatInterface: React.FC = () => {
       e.preventDefault();
       handleSendMessage();
     } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (historyIndex < messageHistory.length - 1) {
+      // Only trigger history navigation when the cursor is on the first line
+      // (or the textarea is empty). Otherwise let the caret move normally.
+      const ta = e.currentTarget as HTMLTextAreaElement;
+      const textBeforeCursor = ta.value.slice(0, ta.selectionStart ?? 0);
+      const isOnFirstLine = !textBeforeCursor.includes("\n");
+      if (isOnFirstLine && historyIndex < messageHistory.length - 1) {
+        e.preventDefault();
         const newIndex = historyIndex + 1;
         setHistoryIndex(newIndex);
         if (newIndex === 0) {
@@ -1325,14 +1453,20 @@ export const ChatInterface: React.FC = () => {
         setInputMessage(messageHistory[newIndex]);
       }
     } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInputMessage(messageHistory[newIndex]);
-      } else if (historyIndex === 0) {
-        setHistoryIndex(-1);
-        setInputMessage(tempInput);
+      // Only trigger history navigation when the cursor is on the last line.
+      const ta = e.currentTarget as HTMLTextAreaElement;
+      const textAfterCursor = ta.value.slice(ta.selectionEnd ?? ta.value.length);
+      const isOnLastLine = !textAfterCursor.includes("\n");
+      if (isOnLastLine && historyIndex >= 0) {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          const newIndex = historyIndex - 1;
+          setHistoryIndex(newIndex);
+          setInputMessage(messageHistory[newIndex]);
+        } else {
+          setHistoryIndex(-1);
+          setInputMessage(tempInput);
+        }
       }
     }
   };
@@ -1710,14 +1844,18 @@ export const ChatInterface: React.FC = () => {
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 <Button
-                  onClick={() => handleIntentSelection("recipe_extraction")}
+                  onClick={() => handleStarterPrompt(
+                    "Ready to add a recipe! You can paste a URL, paste the recipe text directly, or upload photos of the recipe — whichever is easiest."
+                  )}
                   variant="outline"
                   className="px-6 py-2"
                 >
                   Add new recipe
                 </Button>
                 <Button
-                  onClick={() => handleIntentSelection(null)}
+                  onClick={() => handleStarterPrompt(
+                    "What would you like to know? I can search your recipes, suggest what to make with ingredients you have, check your meal plan, or help with substitutions."
+                  )}
                   variant="outline"
                   className="px-6 py-2"
                 >
@@ -1738,9 +1876,52 @@ export const ChatInterface: React.FC = () => {
                     <Bot className="h-4 w-4 text-primary" />
                   </div>
                 )}
-                {(message.recipe || message.recipes) && message.sender === "ai" ? (
+                {/* Optimistic thinking placeholder — reasoning steps + animated dots */}
+                {message.isThinking ? (
+                  <div className="flex flex-col gap-1 max-w-[85%] sm:max-w-[70%]">
+                    {/* Live tool-step progress (MOP-0020) */}
+                    {message.toolSteps && message.toolSteps.length > 0 && (
+                      <ReasoningDisplay
+                        steps={message.toolSteps}
+                        isStreaming={true}
+                      />
+                    )}
+                    {/* Streaming text content (deltas arrive before done) */}
+                    {message.content ? (
+                      <div className="rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
+                        <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                          {message.content}
+                        </p>
+                      </div>
+                    ) : (
+                      /* Pure thinking state — no steps yet, no content */
+                      (!message.toolSteps || message.toolSteps.length === 0) && (
+                        <div className="rounded-lg px-4 py-3 bg-gray-100 dark:bg-gray-800 flex items-center gap-1.5">
+                          <span
+                            className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"
+                            style={{ animationDelay: "0ms" }}
+                          />
+                          <span
+                            className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"
+                            style={{ animationDelay: "150ms" }}
+                          />
+                          <span
+                            className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"
+                            style={{ animationDelay: "300ms" }}
+                          />
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (message.recipe || message.recipes) && message.sender === "ai" ? (
                   // Full-width recipe display (single or multi)
                   <div className="flex-1">
+                    {/* MOP-0020 — tool step summary on finished recipe messages */}
+                    {message.toolSteps && message.toolSteps.length > 0 && (
+                      <div className="mb-2 max-w-[90%] sm:max-w-[70%]">
+                        <ReasoningDisplay steps={message.toolSteps} isStreaming={false} />
+                      </div>
+                    )}
                     {message.content && (
                       <div className="relative mb-3 max-w-[90%] sm:max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
                         <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">
@@ -1865,6 +2046,10 @@ export const ChatInterface: React.FC = () => {
                 ) : (
                   // Regular message display
                   <div className="relative group/bubble max-w-[90%] sm:max-w-[70%] min-w-0">
+                    {/* MOP-0020 — tool step summary on finished AI text messages */}
+                    {message.sender === "ai" && message.toolSteps && message.toolSteps.length > 0 && (
+                      <ReasoningDisplay steps={message.toolSteps} isStreaming={false} />
+                    )}
                     <div
                       className={`rounded-lg px-4 py-2 ${
                         message.sender === "user"
@@ -1996,6 +2181,37 @@ export const ChatInterface: React.FC = () => {
 
         {/* Input Area */}
         <div className="border-t p-4 flex-shrink-0">
+          {/* MOP-0019 — Batch Import Panel (drawer above input).
+              Rendered but hidden (display:none) when closed so card state
+              survives panel open/close — the user can reopen and review results. */}
+          <div className="mb-3" style={{ display: showBatchPanel ? undefined : "none" }}>
+            <BatchImportPanel
+              onDismiss={() => setShowBatchPanel(false)}
+              onSaveComplete={(summary) => {
+                  // Keep panel open so user can review what was saved.
+                  // Echo a system-level confirmation into the chat conversation.
+                  const conversationId = currentConversationId ?? `local-${Date.now()}`;
+                  setConversations((prev) =>
+                    prev.map((conv) =>
+                      conv.id === conversationId
+                        ? {
+                            ...conv,
+                            messages: [
+                              ...conv.messages,
+                              {
+                                id: `batch-save-${Date.now()}`,
+                                content: `✅ ${summary}`,
+                                sender: "ai" as const,
+                                timestamp: new Date(),
+                              },
+                            ],
+                          }
+                        : conv,
+                    ),
+                  );
+                }}
+              />
+          </div>
           <div className="space-y-2">
               {/* Image Previews */}
               {pendingImages.length > 0 && (
@@ -2015,7 +2231,7 @@ export const ChatInterface: React.FC = () => {
                         />
                         <button
                           onClick={() => removeImage(index)}
-                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                           aria-label="Remove image"
                         >
                           <X className="h-3 w-3 text-white" />
@@ -2070,9 +2286,21 @@ export const ChatInterface: React.FC = () => {
                 >
                   <ImageIcon className="h-4 w-4" />
                 </Button>
+                {/* MOP-0019 — Batch import button */}
+                <Button
+                  onClick={() => setShowBatchPanel((v) => !v)}
+                  variant={showBatchPanel ? "secondary" : "outline"}
+                  size="icon"
+                  title="Batch import recipes from URLs"
+                  data-testid="batch-import-toolbar-btn"
+                >
+                  <PackagePlus className="h-4 w-4" />
+                </Button>
                 <textarea
                   ref={textareaRef}
                   value={inputMessage}
+                  data-testid="chat-input"
+                  data-conversation-id={currentConversationId ?? ''}
                   onChange={(e) => {
                     setInputMessage(e.target.value);
                     // Auto-resize textarea
@@ -2084,10 +2312,6 @@ export const ChatInterface: React.FC = () => {
                   placeholder={
                     isLoading
                       ? "Draft your next message, or press Enter to queue it..."
-                      : currentConversation?.selectedIntent === "recipe_extraction"
-                      ? "Paste or type your recipe here, or upload images..."
-                      : currentConversation?.selectedIntent === null
-                      ? "Ask me about your recipes..."
                       : "Type your message... (Shift+Enter for new line)"
                   }
                   rows={2}
@@ -2112,6 +2336,7 @@ export const ChatInterface: React.FC = () => {
                       !pendingVideo
                     }
                     size="icon"
+                    data-testid="send-message-btn"
                   >
                     <Send className="h-4 w-4" />
                   </Button>

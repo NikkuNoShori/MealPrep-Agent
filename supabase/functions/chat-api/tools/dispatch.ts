@@ -199,6 +199,14 @@ function summarizeForConfirmation(
       return `Update recipe ${args.recipe_id} with ${JSON.stringify(args.changes ?? {})}?`;
     case "assign_recipe_to_meal_plan_slot":
       return `Overwrite ${args.slot} on ${args.date} with recipe ${args.recipe_id}?`;
+    case "update_member_allergens": {
+      const add = (args.add as string[] | undefined) ?? [];
+      const remove = (args.remove as string[] | undefined) ?? [];
+      const parts: string[] = [];
+      if (add.length) parts.push(`add: ${add.join(", ")}`);
+      if (remove.length) parts.push(`remove: ${remove.join(", ")}`);
+      return `Update ${args.member_name}'s allergens — ${parts.join("; ")}?`;
+    }
     default:
       return `Confirm ${name}?`;
   }
@@ -348,5 +356,18 @@ export async function dispatchTool(
     };
   }
 
-  return { ok: true, data: raw };
+  // Unwrap handler envelope. Handlers return { ok: true, data: payload };
+  // returning { ok: true, data: raw } would nest payload one level too deep,
+  // making result.data.recipe undefined in agent-loop.ts and preventing
+  // StructuredRecipeDisplay from ever mounting. The ok:false branch above
+  // already passes through correctly — this mirrors that behaviour for ok:true.
+  const payload =
+    raw &&
+    typeof raw === "object" &&
+    "ok" in (raw as Record<string, unknown>) &&
+    (raw as { ok: unknown }).ok === true &&
+    "data" in (raw as Record<string, unknown>)
+      ? (raw as { ok: true; data: unknown }).data
+      : raw;
+  return { ok: true, data: payload };
 }

@@ -5,10 +5,10 @@
 | **MOP** | MOP-0016 |
 | **Title** | Short-Form Video Recipe Intake (ToS-Compliant) |
 | **Date Submitted** | 2026-06-15 |
-| **Date Updated** | 2026-06-16 (Phase 3b UX + persist/history + image-on-save; `chat-api` deployed; `recipe-pipeline` deploy pending operator smoke) |
-| **Date Completed** | — |
+| **Date Updated** | 2026-09-05 |
+| **Date Completed** | 2026-09-05 |
 | **Submitted By** | Nick Neal |
-| **Status** | in_progress |
+| **Status** | complete |
 
 > **Shipped as of 2026-06-15:**
 > - **oEmbed path:** TikTok + YouTube official oEmbed (`platform-oembed.ts`) — caption, author, thumbnail

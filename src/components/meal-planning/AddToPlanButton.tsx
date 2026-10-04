@@ -3,9 +3,6 @@ import { Button } from '@/components/ui/button';
 import { useMealPlans, useUpdateMealPlan } from '@/services/api';
 import {
   CalendarPlus,
-  Coffee,
-  Sun,
-  Moon,
   Cookie,
   ChevronLeft,
   ChevronRight,
@@ -13,12 +10,12 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { MealSlot, PlannedMealEntry } from '@/types/mealPlan';
+import { DAILY_MEAL_SLOTS } from '@/theme/accentCategories';
 
-const DAILY_SLOTS: { key: MealSlot; label: string; icon: React.ElementType }[] = [
-  { key: 'breakfast', label: 'Breakfast', icon: Coffee },
-  { key: 'lunch', label: 'Lunch', icon: Sun },
-  { key: 'dinner', label: 'Dinner', icon: Moon },
-];
+// Sourced from the single accent-category module (MOP-0029 Phase 5 /
+// COLOR_SCHEMA.md §6) — a fourth verbatim copy of the breakfast/lunch/dinner
+// map found during implementation, beyond the three the MOP's audit caught.
+const DAILY_SLOTS = DAILY_MEAL_SLOTS;
 
 interface AddToPlanButtonProps {
   recipeId: string;

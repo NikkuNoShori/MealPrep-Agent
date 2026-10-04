@@ -181,42 +181,39 @@ describe('apiClient.removeHouseholdMember', () => {
 });
 
 describe('apiClient.transferOwnership', () => {
-  // transferOwnership(memberId, householdId) is NOT a single RPC — it does two
-  // sequential PATCHes against household_members: promote target → owner,
-  // then demote the caller → admin.
-  it('promotes the target member then demotes the caller', async () => {
-    mockCurrentUser({ id: 'u-current', email: 'owner@example.com' });
+  // MOP-0014: transferOwnership now issues exactly ONE supabase.rpc() call
+  // (transfer_household_ownership). The prior two-step PATCH sequence has
+  // been replaced by a SECURITY DEFINER RPC (migration 037).
 
-    const patchedUrls: string[] = [];
-    const patchedBodies: any[] = [];
-    server.use(
-      supabasePatch('household_members', async ({ request }) => {
-        patchedUrls.push(request.url);
-        patchedBodies.push(await request.json());
-        return new HttpResponse(null, { status: 204 });
-      })
-    );
+  it('calls transfer_household_ownership RPC with correct params and resolves undefined', async () => {
+    server.use(supabaseRpc('transfer_household_ownership', null));
 
     await expect(
       apiClient.transferOwnership('m-target', 'h-1')
     ).resolves.toBeUndefined();
-
-    expect(patchedBodies).toEqual([{ role: 'owner' }, { role: 'admin' }]);
-    expect(patchedUrls[0]).toContain('id=eq.m-target');
-    expect(patchedUrls[1]).toContain('household_id=eq.h-1');
-    expect(patchedUrls[1]).toContain('user_id=eq.u-current');
   });
 
-  it('throws if the promotion step fails (permission denied)', async () => {
-    mockCurrentUser({ id: 'u-current', email: 'owner@example.com' });
+  it('makes exactly one network call (single RPC, no double-PATCH)', async () => {
+    let callCount = 0;
     server.use(
-      supabasePatch(
-        'household_members',
-        () =>
-          HttpResponse.json(
-            { message: 'permission denied', code: '42501' },
-            { status: 403 }
-          )
+      supabaseRpc('transfer_household_ownership', () => {
+        callCount++;
+        return HttpResponse.json(null, { status: 200 });
+      })
+    );
+
+    await apiClient.transferOwnership('m-target', 'h-1');
+
+    expect(callCount).toBe(1);
+  });
+
+  it('throws when the RPC returns an error (non-owner caller rejected)', async () => {
+    server.use(
+      supabaseRpc('transfer_household_ownership', () =>
+        HttpResponse.json(
+          { message: 'caller is not owner of household h-1', code: '42501' },
+          { status: 403 }
+        )
       )
     );
 
@@ -610,78 +607,74 @@ describe('apiClient.getMyPendingInvites', () => {
 });
 
 describe('apiClient.respondToInvite', () => {
-  // NOTE: respondToInvite does NOT call an edge function. It PATCHes
-  // household_invites with the new status, then (if accepting) INSERTs
-  // into household_members. Test the actual behavior.
-  it('on accept: patches invite to "accepted" then inserts the membership row', async () => {
-    mockCurrentUser({ id: 'u-current', email: 'me@example.com' });
+  // MOP-0014: respondToInvite now issues exactly ONE supabase.rpc() call
+  // (respond_to_household_invite). The prior two-step PATCH+INSERT sequence
+  // has been replaced by a SECURITY DEFINER RPC (migration 037).
 
-    let invitePatchBody: any = null;
-    let membershipInsertBody: any = null;
+  it('on accept: calls RPC with p_accept=true and returns camelCased first row', async () => {
     server.use(
-      supabasePatch('household_invites', async ({ request }) => {
-        invitePatchBody = await request.json();
-        return HttpResponse.json({
-          id: 'inv-1',
-          status: 'accepted',
-          household_id: 'h-1',
-          households: { id: 'h-1', name: 'Smith Family' },
-        });
-      }),
-      supabaseInsert('household_members', async ({ request }) => {
-        membershipInsertBody = await request.json();
-        return new HttpResponse(null, { status: 201 });
-      })
+      supabaseRpc('respond_to_household_invite', [
+        { household_id: 'h-1', household_name: 'Smith Family', status: 'accepted' },
+      ])
     );
 
     const result = await apiClient.respondToInvite('inv-1', true);
 
-    expect(invitePatchBody).toEqual({ status: 'accepted' });
-    expect(membershipInsertBody).toEqual({
-      household_id: 'h-1',
-      user_id: 'u-current',
-      role: 'member',
-    });
     expect(result).toMatchObject({
-      id: 'inv-1',
-      status: 'accepted',
       householdId: 'h-1',
+      householdName: 'Smith Family',
+      status: 'accepted',
     });
   });
 
-  it('on decline: patches the invite to "declined" and does NOT insert membership', async () => {
-    mockCurrentUser({ id: 'u-current', email: 'me@example.com' });
-
-    let invitePatchBody: any = null;
-    let membershipInsertCalled = false;
+  it('on decline: calls RPC with p_accept=false and returns declined status', async () => {
     server.use(
-      supabasePatch('household_invites', async ({ request }) => {
-        invitePatchBody = await request.json();
-        return HttpResponse.json({
-          id: 'inv-1',
-          status: 'declined',
-          household_id: 'h-1',
-        });
-      }),
-      supabaseInsert('household_members', () => {
-        membershipInsertCalled = true;
-        return new HttpResponse(null, { status: 201 });
+      supabaseRpc('respond_to_household_invite', [
+        { household_id: 'h-1', household_name: 'Smith Family', status: 'declined' },
+      ])
+    );
+
+    const result = await apiClient.respondToInvite('inv-1', false);
+
+    expect(result).toMatchObject({ status: 'declined' });
+  });
+
+  it('makes exactly one network call (single RPC, no separate insert)', async () => {
+    let callCount = 0;
+    server.use(
+      supabaseRpc('respond_to_household_invite', () => {
+        callCount++;
+        return HttpResponse.json(
+          [{ household_id: 'h-1', household_name: 'Smith Family', status: 'accepted' }],
+          { status: 200 }
+        );
       })
     );
 
-    await apiClient.respondToInvite('inv-1', false);
+    await apiClient.respondToInvite('inv-1', true);
 
-    expect(invitePatchBody).toEqual({ status: 'declined' });
-    expect(membershipInsertCalled).toBe(false);
+    expect(callCount).toBe(1);
   });
 
-  it('throws when the invite update fails', async () => {
-    mockCurrentUser({ id: 'u-current', email: 'me@example.com' });
+  it('throws when the RPC returns an error (non-invitee caller rejected)', async () => {
     server.use(
-      supabasePatch('household_invites', () =>
+      supabaseRpc('respond_to_household_invite', () =>
         HttpResponse.json(
-          { message: 'permission denied', code: '42501' },
+          { message: 'caller is not the invitee for invite inv-1', code: '42501' },
           { status: 403 }
+        )
+      )
+    );
+
+    await expect(apiClient.respondToInvite('inv-1', true)).rejects.toThrow();
+  });
+
+  it('throws when the invite is not pending (idempotency guard)', async () => {
+    server.use(
+      supabaseRpc('respond_to_household_invite', () =>
+        HttpResponse.json(
+          { message: 'invite inv-1 is not pending (current: accepted)', code: '22023' },
+          { status: 422 }
         )
       )
     );
@@ -2669,6 +2662,142 @@ describe('apiClient.sendMessage', () => {
 
     await expect(
       apiClient.sendMessage({ message: 'hello', sessionId: 's-1' })
+    ).rejects.toThrow();
+  });
+});
+
+// ── MOP-0028: Bulk Recipe Actions ──
+
+describe('apiClient.bulkUpdateRecipeVisibility', () => {
+  it('calls bulk_update_recipe_visibility RPC and returns row count', async () => {
+    server.use(supabaseRpc('bulk_update_recipe_visibility', 3));
+
+    const result = await apiClient.bulkUpdateRecipeVisibility(
+      ['r-1', 'r-2', 'r-3'],
+      'household'
+    );
+
+    expect(result).toBe(3);
+  });
+
+  it('makes exactly one network call (single RPC, no fan-out)', async () => {
+    let callCount = 0;
+    server.use(
+      supabaseRpc('bulk_update_recipe_visibility', () => {
+        callCount++;
+        return HttpResponse.json(2, { status: 200 });
+      })
+    );
+
+    await apiClient.bulkUpdateRecipeVisibility(['r-1', 'r-2'], 'public');
+
+    expect(callCount).toBe(1);
+  });
+
+  it('throws when caller is unauthenticated', async () => {
+    server.use(
+      supabaseRpc('bulk_update_recipe_visibility', () =>
+        HttpResponse.json(
+          { message: 'not authenticated', code: '42501' },
+          { status: 401 }
+        )
+      )
+    );
+
+    await expect(
+      apiClient.bulkUpdateRecipeVisibility(['r-1'], 'private')
+    ).rejects.toThrow();
+  });
+});
+
+describe('apiClient.bulkDeleteRecipes', () => {
+  it('calls bulk_delete_recipes RPC and returns row count', async () => {
+    server.use(supabaseRpc('bulk_delete_recipes', 2));
+
+    const result = await apiClient.bulkDeleteRecipes(['r-1', 'r-2']);
+
+    expect(result).toBe(2);
+  });
+
+  it('returns 0 for an empty array (no-op)', async () => {
+    server.use(supabaseRpc('bulk_delete_recipes', 0));
+
+    const result = await apiClient.bulkDeleteRecipes([]);
+
+    expect(result).toBe(0);
+  });
+
+  it('makes exactly one network call', async () => {
+    let callCount = 0;
+    server.use(
+      supabaseRpc('bulk_delete_recipes', () => {
+        callCount++;
+        return HttpResponse.json(1, { status: 200 });
+      })
+    );
+
+    await apiClient.bulkDeleteRecipes(['r-1']);
+
+    expect(callCount).toBe(1);
+  });
+
+  it('throws when caller is unauthenticated', async () => {
+    server.use(
+      supabaseRpc('bulk_delete_recipes', () =>
+        HttpResponse.json(
+          { message: 'not authenticated', code: '42501' },
+          { status: 401 }
+        )
+      )
+    );
+
+    await expect(apiClient.bulkDeleteRecipes(['r-1'])).rejects.toThrow();
+  });
+});
+
+describe('apiClient.bulkAddToCollection', () => {
+  it('calls bulk_add_to_collection RPC and returns inserted row count', async () => {
+    server.use(supabaseRpc('bulk_add_to_collection', 3));
+
+    const result = await apiClient.bulkAddToCollection('col-1', ['r-1', 'r-2', 'r-3']);
+
+    expect(result).toBe(3);
+  });
+
+  it('returns 0 when all recipes are already in the collection (ON CONFLICT DO NOTHING)', async () => {
+    server.use(supabaseRpc('bulk_add_to_collection', 0));
+
+    const result = await apiClient.bulkAddToCollection('col-1', ['r-1', 'r-2']);
+
+    expect(result).toBe(0);
+  });
+
+  it('makes exactly one network call', async () => {
+    let callCount = 0;
+    server.use(
+      supabaseRpc('bulk_add_to_collection', () => {
+        callCount++;
+        return HttpResponse.json(2, { status: 200 });
+      })
+    );
+
+    await apiClient.bulkAddToCollection('col-1', ['r-1', 'r-2']);
+
+    expect(callCount).toBe(1);
+  });
+
+  it('throws when caller does not own the collection', async () => {
+    server.use(
+      supabaseRpc('bulk_add_to_collection', () =>
+        HttpResponse.json(
+          { message: 'collection col-99 not found or not owned by caller', code: '42501' },
+          { status: 403 }
+        )
+      )
+    );
+
+    await expect(
+      apiClient.bulkAddToCollection('col-99', ['r-1'])
     ).rejects.toThrow();
   });
 });

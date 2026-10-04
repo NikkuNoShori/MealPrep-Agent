@@ -5,10 +5,10 @@
 | **MOP** | MOP-0015 |
 | **Title** | Embedding Refresh Lifecycle — fix stale embeddings from edited recipes |
 | **Date Submitted** | 2026-06-04 |
-| **Date Updated** | 2026-06-04 |
-| **Date Completed** | — |
+| **Date Updated** | 2026-09-06 |
+| **Date Completed** | 2026-09-06 |
 | **Submitted By** | Nick Neal (via `chat-rag-sme` audit surfacing during KB build) |
-| **Status** | draft |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md).
 

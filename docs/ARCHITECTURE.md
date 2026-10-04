@@ -2,8 +2,8 @@
 
 > System boundaries, data flow, authentication, AI pipeline, and architectural patterns for MealPrep Agent.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (video intake UX + `draftRecipeStore` session cache, `persist-extraction`, React Query `staleTime`, agent model `qwen/qwen3-8b`)
+**Last reviewed:** 2026-09-16
+**Last updated:** 2026-09-16 (MOP-0007: Smart Discovery — search bar, similar rail, suggest modal, reaction scoring)
 
 ---
 
@@ -113,7 +113,7 @@ MealPrep Agent is a conversational recipe management platform with AI-powered re
 
 ### Chat Agent Loop (MOP-0008)
 
-The `chat-api` edge function runs a **single tool-using agent** ("Chef Marcus"). The previous router pattern (one LLM call classifies intent → branches to one of three handlers) is gone. Each user turn drives up to 5 LLM iterations against a 12-tool catalog; the model picks zero, one, or many tools per iteration. Full design: [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md).
+The `chat-api` edge function runs a **single tool-using agent** ("Chef Marcus"). The previous router pattern (one LLM call classifies intent → branches to one of three handlers) is gone. Each user turn drives up to 5 LLM iterations against a 23-tool catalog; the model picks zero, one, or many tools per iteration. Full design: [MOPs/MOP-0008-design.md](MOPs/MOP-0008-design.md).
 
 ```
 POST /chat-api/message
@@ -151,7 +151,7 @@ Persist AI message + metadata.toolCalls (audit log)
 | Concept | Location |
 |---|---|
 | Agent loop | `supabase/functions/chat-api/agent-loop.ts` |
-| Tool catalog (12 tools, OpenAI-format JSON schemas) | `supabase/functions/chat-api/tools/catalog.ts` |
+| Tool catalog (23 tools, OpenAI-format JSON schemas) | `supabase/functions/chat-api/tools/catalog.ts` |
 | Dispatcher (schema validation, `user_id` reject, destructive short-circuit) | `supabase/functions/chat-api/tools/dispatch.ts` |
 | Tool handlers | `supabase/functions/chat-api/tools/handlers.ts` |
 | Recipe context injection for agent history | `supabase/functions/chat-api/conversation-context.ts` |
@@ -166,10 +166,74 @@ Persist AI message + metadata.toolCalls (audit log)
 | Read (DB) | `search_recipes`, `find_similar_recipes`, `get_household_recipes`, `get_household_profile`, `get_meal_plan`, `propose_substitution` |
 | Read (web) | `web_search_recipe` (gated on `WEB_SEARCH_API_KEY`) |
 | Capture | `extract_recipe_from_source` (delegates to `recipe-pipeline/extract-only`) |
-| Plan / cart | `assign_recipe_to_meal_plan_slot` (conditionally destructive), `add_to_grocery_list` |
+| Plan / cart | `assign_recipe_to_meal_plan_slot` (conditionally destructive), `add_to_grocery_list`, `create_meal_plan`, `clear_meal_plan_slot` |
+| Grocery | `get_grocery_list`, `mark_grocery_item_purchased`, `remove_grocery_item` |
+| Social / safety | `react_to_recipe`, `check_recipe_safety`, `update_member_allergens`, `get_recommendations` |
+| Utility | `scale_recipe`, `save_recipe` |
 | Destructive | `update_recipe`, `delete_recipe` — always return `pendingConfirmation`; user must reply via `context.confirmAction` |
 
 Models: **`qwen/qwen3-8b`** default for the agent loop (`OPENROUTER_AGENT_MODEL` override; `supabase/functions/chat-api/agent-loop.ts`). OpenRouter `chatWithTools` uses `provider.require_parameters: true` so only tool-capable endpoints are selected. Vision/text inside `recipe-pipeline` still uses `qwen/qwen-2.5-vl-7b-instruct` / `qwen/qwen-2.5-7b-instruct` as appropriate. Temperature 0.2, `tool_choice: auto`, `MAX_ITERS = 5`.
+
+### SSE Streaming (MOP-0017)
+
+When the client sends `Accept: text/event-stream`, `/chat-api/message` switches to a streaming response. The tool loop runs synchronously first; only the **final prose reply** is streamed via OpenRouter's SSE endpoint (`stream: true`).
+
+```
+Client: Accept: text/event-stream
+  │
+  ▼
+handleSendMessage detects wantsStream=true
+  → returns ReadableStream immediately
+  │
+  ├─► Tool loop runs synchronously (same as non-streaming)
+  │
+  ├─► Final reply: openRouter.streamChatWithTools(... onDelta ...)
+  │     → each content delta → enqueue sseEvent({type:"delta", text})
+  │
+  ├─► sseEvent({type:"recipe", recipe})        (if recipe extracted)
+  ├─► sseEvent({type:"done", messageId, ...})  (terminal frame)
+  └─► controller.close()
+```
+
+SSE event types: `delta` · `recipe` · `recipes` · `confirmation` · `done` · `error`.
+
+Non-streaming callers (no `Accept: text/event-stream`) receive the existing JSON response unchanged — **fully backwards-compatible**.
+
+Frontend: `apiClient.sendMessageStream()` (`src/services/api.ts`) reads the stream and calls `onEvent` per frame. `ChatInterface` updates the thinking-placeholder bubble in-place on each `delta`, then finalises on `done`. Key files: `supabase/functions/_shared/openrouter-client.ts` (`streamChatWithTools`), `supabase/functions/chat-api/agent-loop.ts` (`onDelta` hookup), `supabase/functions/chat-api/index.ts` (SSE path).
+
+### Batch Recipe Import (MOP-0019)
+
+Allows the user to paste up to 50 recipe URLs and extract them in a single SSE-streamed operation directly from the chat input toolbar.
+
+```
+User pastes URLs into BatchImportPanel textarea
+  → parseImportUrls() deduplicates + validates client-side
+  → apiClient.batchImport(urls, callbacks, signal)
+      POST /chat-api/batch-extract   (Accept: text/event-stream)
+        │
+        ├─► Wave loop (10 concurrent per wave):
+        │     extractOne(url) → POST /recipe-pipeline/extract-only (auto_save:false)
+        │       → SSE: {type:"progress", index, url, status:"extracting"}
+        │       → SSE: {type:"result", index, url, recipe}  (success)
+        │         or: {type:"error",  index, url, message}  (failure)
+        │
+        └─► SSE: {type:"done", total, succeeded, failed}
+  → BatchImportPanel renders BatchImportCard per URL
+      extracting → pulsing skeleton
+      done       → title, ingredient count, Save button
+      error      → message, Retry button
+      saved      → green confirmation
+
+User: per-card Save or "Save All"
+  → apiClient.ingestRecipeFromUrl(url, true)
+      POST /recipe-pipeline/ingest (full pipeline: extract + embed + save)
+```
+
+**Wave chunking** keeps total execution time within Supabase's 150s wall-clock limit. Per-URL timeout: 50s (`AbortSignal.timeout`). The endpoint accepts an abort signal — the panel's Abort button cancels the in-flight fetch.
+
+**Save path:** `ingestRecipeFromUrl(url, true)` re-runs extraction + dedup check + embedding on save. Cards store the preview recipe object for display only; the canonical save goes through the full pipeline.
+
+Key files: `supabase/functions/chat-api/batch-extract.ts`, `src/components/chat/BatchImportPanel.tsx`, `src/components/chat/BatchImportCard.tsx`, `src/services/api.ts` (`batchImport`, `parseImportUrls`).
 
 ### Short-Form Video Intake (MOP-0016)
 
@@ -195,7 +259,25 @@ Attach saved MP4/WebM in chat
 Implementation: [MOPs/MOP-0016-short-form-video-intake.md](MOPs/MOP-0016-short-form-video-intake.md).
 
 ### Embedding Pipeline
-Recipe embeddings are still generated via `text-embedding-ada-002` (1536-dim) on extract → `recipes.embedding_vector`. Used by `search_recipes` and `find_similar_recipes` tool handlers via the existing semantic/full-text RPCs.
+Recipe embeddings are generated via `text-embedding-ada-002` (1536-dim) on initial extract/save → `recipes.embedding_vector`. Used by `search_recipes` and `find_similar_recipes` tool handlers via the existing semantic/full-text RPCs.
+
+**Refresh lifecycle (MOP-0015):** When a recipe is edited, the `update_recipe_embedding` Postgres trigger sets `recipes.needs_reembed = true` instead of nulling the vector. The stale vector remains queryable during the refresh window. The `embedding-refresh` scheduled edge function runs every 5 minutes, queries `WHERE needs_reembed = true LIMIT 50`, regenerates embeddings via OpenRouter, writes the new vector, and clears the flag. This ensures semantic search stays accurate for edited recipes without adding latency to the save path. See RUNBOOK § "Embedding refresh: job not processing flagged recipes" for operational diagnostics.
+
+### Smart Discovery (MOP-0007)
+
+Three client-side surfaces now use the search/recommendation RPCs directly from `api.ts` (no edge function needed — pure SQL scoring):
+
+| Surface | RPC | Mechanism |
+|---------|-----|-----------|
+| Recipe search bar (own recipes) | `search_recipes_text` | PostgreSQL tsvector; ~30–80ms; searches title + ingredients + instructions |
+| Similar Recipes Rail on RecipeDetail | `find_similar_recipes` | pgvector cosine similarity (1536-dim); threshold 0.6; top 5 |
+| "Suggest meals" modal in Meal Planner | `get_recipe_recommendations` | 5-term SQL score: difficulty + tags + rating + prep_time + **reaction signal** |
+
+**Reaction scoring (migration 035):** `get_recipe_recommendations` now includes a fifth term derived from `recipe_reactions` (thumbs-up = +1.0, thumbs-down = −0.7, bounded 0–1, divided by 5.0 total). Scores recipes the user has positively reacted to higher; soft-demotes disliked recipes without hard-excluding them.
+
+**Security note (migration 028):** All five RPCs use `auth.uid()` internally. Legacy `user_id` parameters are vestigial — present for backwards compatibility but ignored. Never trust a caller-supplied `user_id` in these functions.
+
+**RAG dead code removed:** `apiClient.rag*` methods and `src/services/ragService.ts` are deleted. The chat agent's `search_recipes` tool was already using the RPC path directly; the old Express-server-based RAG endpoints were never reached in production.
 
 ### Prompts
 **Server-side** (authoritative): `supabase/functions/_shared/recipe-prompts.ts`
@@ -288,7 +370,7 @@ src/components/
 `src/services/api.ts` is a singleton HTTP client wrapping Supabase calls with:
 - Automatic camelCase ↔ snake_case field mapping
 - React Query hooks for all CRUD operations
-- Methods for: recipes, chat, meal plans, preferences, images, RAG search, households, collections, reactions, admin
+- Methods for: recipes, chat, meal plans, preferences, images, households, collections, reactions, admin, full-text search, similar recipes, recommendations
 - Recipe lookup by UUID or URL slug (`getRecipe(idOrSlug)`)
 - **RPC optimization**: Five high-traffic methods use PostgreSQL `SECURITY DEFINER` functions via `supabase.rpc()` to collapse multiple round trips into single database calls: `get_my_household`, `toggle_recipe_reaction`, `get_household_recipes`, `get_recipe_reactions`, `get_my_pending_invites` (migration 025)
 
@@ -385,6 +467,35 @@ All data tables have RLS enabled. See [DATA_MODEL.md](DATA_MODEL.md) for per-tab
 - **Path pattern:** `{userId}/recipes/{timestamp}-{random}.{ext}`
 - **Access:** Private (signed URLs)
 - **Limits:** 5MB max file size, `image/*` types only
+
+---
+
+## Testing
+
+### Unit / Integration Tests
+Vitest (`src/test/`, `supabase/functions/**/__tests__/`). Run with `npm run test:run`. See [docs/prompts/DOMAIN_TEST_MATRIX.md](prompts/DOMAIN_TEST_MATRIX.md) for domain → suite routing.
+
+### End-to-End Tests (MOP-0013)
+Playwright, Chromium only. Runs against the hosted Supabase project (remote DB, not local).
+
+```
+npx playwright test               # full suite (smoke + golden-path + chat)
+npx playwright test --ui          # Playwright UI mode
+npx playwright test e2e/chat.spec.ts  # chat suite only
+```
+
+| File | Covers |
+|------|--------|
+| `e2e/smoke.spec.ts` | App shell loads; unauthenticated redirect |
+| `e2e/golden-path.spec.ts` | Authenticated nav, recipe library, meal planner, chat input |
+| `e2e/chat.spec.ts` | AI tool flows: send/receive, recipe search, extraction, grocery, destructive gate, scale |
+| `e2e/fixtures/auth.ts` | `getTestSession()` — Supabase Auth REST call for test user JWT |
+| `e2e/fixtures/test-data.ts` | `createTestRecipe`, `createTestMealPlan`, cleanup helpers |
+| `e2e/global-setup.ts` | Signs in via UI; saves `storageState` to `e2e/.auth/user.json` |
+
+**Key implementation detail:** `ChatInterface` exposes `data-conversation-id` on its textarea so E2E tests can gate on conversation initialization before sending messages (eliminates the `handleSendMessage → !currentConversationId` race).
+
+See [docs/Development/E2E_TESTING.md](Development/E2E_TESTING.md) for full authoring guide.
 
 ---
 

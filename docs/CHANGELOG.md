@@ -2,8 +2,119 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-06-16
-**Last updated:** 2026-06-16 (video intake + draft store + chat UX on branch `cursor/mop-0008-golden-routing-video-intake`)
+**Last reviewed:** 2026-09-21
+**Last updated:** 2026-09-21 (MOP-0028 complete — bulk recipe actions)
+
+---
+
+## 2026-09-21 (MOP-0028: Bulk Recipe Actions) `main`
+
+**Bulk Recipe Actions — Multi-Select Visibility, Folder Assignment, Delete (MOP-0028 — complete)**
+
+- **Multi-select mode** on the recipe library: hover a card on desktop to reveal a checkbox (click to enter select mode); long-press any card on mobile (500ms) to enter select mode. Clicking any card in select mode toggles selection without navigating.
+- **Unified count display** in the toolbar text-swaps between "N recipes" (normal mode) and "N of M selected" (select mode) in the same location — no layout shift.
+- **Bulk toolbar**: Visibility popover (Private / Household / Public), Add to folder dropdown (your collections), Delete with confirmation dialog ("Delete N recipes? This cannot be undone."), × to exit select mode.
+- **Bulk RPCs** (migration 038, three SECURITY DEFINER functions): `bulk_update_recipe_visibility`, `bulk_delete_recipes`, `bulk_add_to_collection` — each issues a single `supabase.rpc()` call; no fan-out. Caller must own the recipes / collection.
+- Maximum 100 recipes selectable at once (enforced with toast). Bulk actions restricted to "My Recipes" feed mode.
+
+## 2026-09-21 (MOP-0014: Household Write Atomicity + bug fixes) `main`
+
+**Household Write Atomicity — `transferOwnership` + `respondToInvite` (MOP-0014 — complete)**
+
+- **`transferOwnership`** now uses a single SECURITY DEFINER RPC (`transfer_household_ownership`, migration 037). The prior two sequential PATCHes to `household_members` left a window where two owners could exist simultaneously if the second write failed. Now atomic — any failure rolls back completely.
+- **`respondToInvite`** now uses a single SECURITY DEFINER RPC (`respond_to_household_invite`, migration 037). The prior PATCH + conditional INSERT left a window where an invite could appear accepted with no corresponding membership row. Now atomic.
+- Both RPCs enforce explicit caller authorization via `auth.uid()` (non-owners and non-invitees receive `errcode 42501`).
+
+**Bug fixes**
+
+- **Admin user delete** no longer fails with "Database error deleting user" when the target user created a household or sent invites. The delete handler now removes the user's households (cascading members + invites) and any remaining sent-invite rows before calling the auth delete.
+- **Invite UX**: when inviting an email address that already has an account, the invite row is created and the invitee sees it in-app — but Supabase cannot send an email to an existing user. The inviter now sees an accurate toast ("Invite created — they already have an account and will see it in the app") instead of the misleading "Invite sent" message.
+
+## 2026-09-16 (MOP-0007: Smart Discovery complete) `main`
+
+**Smart Discovery — Recipe Search, Similar Rail, Meal Planner Suggestions (MOP-0007 — complete)**
+
+- **Recipe search bar** now uses full-text PostgreSQL search (`search_recipes_text` RPC) for the user's own recipes. Searches across title, ingredients, and instructions in ~30–80ms. Filter chips (dietary, prep time, difficulty) continue to apply on top of server results. Household/public/collection modes retain client-side title matching (scoping differs).
+- **Similar Recipes Rail** on Recipe Detail: a horizontally-scrollable rail of up to 5 semantically similar recipes (backed by `find_similar_recipes` + pgvector cosine similarity). Rail is hidden entirely when no similar results exist or when the recipe has no embedding.
+- **"Suggest meals" in Meal Planner**: Sparkles button in the planner toolbar opens a modal that fetches scored recipe suggestions via `get_recipe_recommendations`. Supports difficulty and prep-time filters. Recipes from the most recent history plan are excluded to avoid repetition. Individual recipe cards can be assigned to slots; "Fill slots" shortcut bulk-assigns top suggestions.
+- **Reaction scoring in recommendations**: `get_recipe_recommendations` now includes a reaction signal as a fifth scoring term (thumbs-up = +1.0, thumbs-down = −0.7, normalised to 0–1). Score formula updated to divide by 5.0 (migration 035). Previously 4 terms / 4.0.
+- **Security fix**: All five search/recommendation RPCs (`search_recipes_text`, `search_recipes_semantic`, `find_similar_recipes`, `search_recipes_by_ingredients`, `get_recipe_recommendations`) now derive the caller from `auth.uid()` internally. Legacy `user_id` parameters are vestigial — ignored. Migration 028.
+- **Dead code removal**: `apiClient.rag*` methods (`ragSearch`, `ragEmbedding`, `ragSimilar`, `ragIngredients`, `ragRecommendations`), the `searchRecipes()` wrapper, `useSearchRecipes` hook, and the entire `src/services/ragService.ts` file removed. All replaced by the direct Supabase RPC methods added in this MOP.
+
+**Meal Planner UX overhaul** (accompanies MOP-0007 Phase 4)
+
+- **WeekLabelDropdown**: the week date range in the toolbar is now the plan-switcher dropdown. Click it to switch plans, rename, mark complete, restore to active, or delete. Per-plan `⋯` button in the dropdown exposes these actions. Old standalone `⋯` banner removed.
+- **Plan status bucketing**: active/draft plans with `end_date < today` are now routed to History (not the active view). History groups plans into Active (stale) → Completed → Archived sections with newest-first sort within each group.
+- **History redesign**: status icons per group, per-row ellipsis menu (Copy to new plan, Restore, Archive, Mark complete, Delete), wide detail overlay panel (`max-w-2xl`).
+- **Copy to new plan**: starts the day after the source plan's `end_date`, runs for the user's configured default duration.
+- **Delete safeguards**: deleting the sole active plan now works (previously nothing happened). Confirmation dialogs on delete and mark-complete. Optimistic removal — plan disappears immediately from UI without waiting for server round-trip.
+- **Shopping Mode removed**: the toggle and `ShoppingMode` component are gone. Grocery tab is always in its normal state.
+- **`meal_plans.copied_from`**: self-referential FK with `ON DELETE SET NULL` added (migration 036).
+
+---
+
+## 2026-09-06 (MOP-0015: Embedding Refresh Lifecycle) `main`
+
+**Embedding refresh lifecycle fix (MOP-0015 — complete)**
+
+- Fixed a silent search degradation: editing a recipe previously nulled its embedding vector permanently, making edited recipes invisible to semantic search in chat. The longer a user used the app and edited recipes, the worse chat search became.
+- New `needs_reembed` flag on `recipes` table: trigger now sets the flag instead of nulling the vector. The stale vector stays queryable during the refresh window — search degrades gracefully instead of returning nothing.
+- New `embedding-refresh` scheduled edge function: runs every 5 minutes, picks up all flagged recipes in batches of 50, regenerates embeddings via OpenRouter, and clears the flag.
+- One-time backfill: all pre-existing null-vector rows are marked `needs_reembed = true` so they are picked up immediately after deploy.
+- Requires migration 029 + edge function deploy + cron schedule setup (see RUNBOOK).
+
+---
+
+## 2026-09-05 (MOP-0019: Batch Recipe Import) `main`
+
+**Batch Recipe Import (MOP-0019 — complete)**
+- New `PackagePlus` toolbar button in the chat input area opens a **Batch Import Panel** — a drawer that accepts up to 50 recipe URLs (pasted or comma-separated).
+- Extraction runs in parallel waves of 10 (SSE-streamed from `chat-api/batch-extract`). Each URL gets a live card showing `extracting → done / error`.
+- Per-URL **Save** button and **Save All** bulk action persist recipes through the full `recipe-pipeline/ingest` path (dedup-safe, embeddings on save).
+- **Retry** button re-extracts individual failed cards. **Abort** button cancels an in-flight run.
+- Saved recipes echo a confirmation message into the chat conversation.
+- All-in unit tests (9) and Playwright E2E spec (14 test cases) added.
+
+---
+
+## 2026-09-04 (MOP-0017: SSE streaming chat) `main`
+
+**Streaming chat responses (MOP-0017 — complete)**
+- Chat agent now streams the final prose reply token-by-token via SSE. The thinking-placeholder bubble fills in real-time instead of appearing all at once after the full round-trip.
+- Add `Accept: text/event-stream` to opt in. Non-streaming callers (JSON) are unchanged. SSE frame types: `delta`, `recipe`, `recipes`, `confirmation`, `done`, `error`.
+- Frontend: `apiClient.sendMessageStream()` + in-place placeholder update in `ChatInterface`.
+- Edge function: `streamChatWithTools()` in `openrouter-client.ts`; `onDelta` hookup in `agent-loop.ts`; `ReadableStream` response branch in `chat-api/index.ts`.
+
+**Arrow-key history navigation fix**
+- ArrowUp/Down no longer hijack cursor movement inside multi-line messages. History cycling only triggers when the cursor is already at the first (Up) or last (Down) line of the textarea.
+
+**Test fix**
+- `draftRecipeStore` unit test corrected: assertion now checks for the full `thumbnailUrl` value rather than a bare filename substring.
+
+---
+
+## 2026-09-05 (MOP-0016 + MOP-0018 verified complete) `main`
+
+**Video intake (MOP-0016 — complete)**
+- `recipe-pipeline` v39 deployed. Short-form video intake (TikTok/YouTube URL via oEmbed, saved video via Whisper STT + frame OCR) is live end-to-end.
+
+**AI Tool Catalog (MOP-0018 — complete)**
+- `chat-api` v44 deployed with 23-tool catalog. All 11 MOP-0018 tools verified in production.
+
+---
+
+## 2026-09-04 (Playwright E2E suite + AI tool expansion) `main`
+
+**Testing (MOP-0013 — complete)**
+- Playwright E2E suite added: 19 tests across smoke, golden-path, and chat specs running against Chromium.
+- Chat E2E tests exercise live AI tool flows: recipe search, text extraction, grocery list, destructive confirmation gate, and recipe scaling.
+- Auth fixture signs in programmatically via Supabase REST; test-data helpers seed and clean up recipes/meal plans per spec.
+- `ChatInterface` textarea now exposes `data-conversation-id` attribute so tests can gate on conversation initialization, eliminating a race condition in headless mode.
+- See [docs/Development/E2E_TESTING.md](Development/E2E_TESTING.md) for authoring guide.
+
+**AI Tool Catalog (MOP-0018 — complete)**
+- 11 new agent tools added to `chat-api` (catalog now 23 tools, up from 12): `save_recipe`, `check_recipe_safety`, `get_grocery_list`, `mark_grocery_item_purchased`, `remove_grocery_item`, `create_meal_plan`, `clear_meal_plan_slot`, `react_to_recipe`, `get_recommendations`, `update_member_allergens`, `scale_recipe`.
+- Chef Marcus can now save extracted recipes, read/modify the grocery list, create meal plans, react to recipes, check allergen safety, update household member allergens, scale servings, and suggest recommendations — all in a single user turn.
 
 ---
 

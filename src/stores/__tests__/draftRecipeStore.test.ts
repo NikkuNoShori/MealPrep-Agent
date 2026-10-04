@@ -29,7 +29,7 @@ describe("draftRecipeStore", () => {
     const stored = sessionStorage.getItem("mealprep:draft-recipes-v1");
     expect(stored).toBeTruthy();
     expect(stored).not.toContain("base64");
-    expect(stored).toContain("thumbnail.jpg");
+    expect(stored).toContain("https://example.com/thumb.jpg");
 
     expect(useDraftRecipeStore.getState().getDraft("conv:msg:0")?.previewImageDataUrl).toBe(
       "data:image/jpeg;base64,abc"

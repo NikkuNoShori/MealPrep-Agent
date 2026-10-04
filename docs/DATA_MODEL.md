@@ -2,8 +2,8 @@
 
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
-**Last reviewed:** 2026-03-14
-**Last updated:** 2026-03-14 (username/setup_completed on profiles, recipe_reactions table, inviter_name on invites, profile visibility RLS, 5 data-access RPC functions, migration index 013-025)
+**Last reviewed:** 2026-09-21
+**Last updated:** 2026-09-21 (MOP-0028: three bulk recipe action RPCs added — migration 038; migration index updated)
 
 ---
 
@@ -201,13 +201,16 @@ Weekly/custom meal plans with grocery lists.
 | `meals` | JSONB | | Structured meal assignments by day/slot |
 | `grocery_list` | JSONB | | Generated shopping list |
 | `total_cost` | DECIMAL(10,2) | | |
-| `status` | VARCHAR(20) | | `draft`, etc. |
+| `status` | VARCHAR(20) | DEFAULT 'draft' | `draft` \| `active` \| `completed` \| `archived` |
+| `copied_from` | UUID | FK → `meal_plans(id)` ON DELETE SET NULL | Source plan when copied (migration 036) |
 | `created_at` | TIMESTAMPTZ | DEFAULT now() | |
 | `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
 
 **Indexes:** user_id, (start_date + end_date)
 **RLS:** Users can only access their own meal plans
 **Triggers:** `update_meal_plans_updated_at`
+
+**Status lifecycle:** `draft` → `active` → `completed` → `archived`. Plans with `end_date < today` and status `active`/`draft` are treated as stale by the UI and shown in History.
 
 ---
 
@@ -405,7 +408,7 @@ System roles (`admin`, `user`, `family_member`) with JSONB permissions. Default 
 | `search_recipes_text` | `search_query`, `user_uuid`, `max_results` | Full-text search using tsvector ranking |
 | `search_recipes_by_ingredients` | `ingredient_list`, `user_id`, `match_threshold`, `match_count` | Text search on ingredient names |
 | `find_similar_recipes` | `recipe_id`, `user_id`, `similarity_threshold`, `max_results` | Finds recipes similar to a given recipe |
-| `get_recipe_recommendations` | `user_id`, `preference_difficulty`, `preference_tags`, `max_prep_time_minutes`, `limit_count` | Scored recommendations based on preferences |
+| `get_recipe_recommendations` | `user_id` (vestigial), `preference_difficulty`, `preference_tags`, `max_prep_time_minutes`, `limit_count` | 5-term scored recommendations: difficulty + tags + rating + prep_time + reaction signal (migration 035) |
 
 ### Data Access Functions (Migration 025)
 
@@ -418,6 +421,29 @@ All use `SECURITY DEFINER` to bypass RLS for cross-user profile reads, validate 
 | `get_household_recipes()` | `p_limit INT DEFAULT 50, p_offset INT DEFAULT 0` | `{ recipes: [...with profiles], total }` | `getHouseholdRecipes()` (3 queries → 1) |
 | `get_recipe_reactions()` | `p_recipe_ids UUID[]` | `[{ id, recipe_id, user_id, family_member_id, reaction, name }]` | `getRecipeReactions()` (2 queries → 1) |
 | `get_my_pending_invites()` | (none — uses `auth.uid()`) | `[{ id, household_id, ..., households: { id, name } }]` | `getMyPendingInvites()` (2 queries → 1) |
+
+### Write-Atomicity RPCs (Migration 037 — MOP-0014)
+
+Two `SECURITY DEFINER` RPCs that replace non-atomic sequential client writes with single Postgres transactions. Both verify `auth.uid()` and raise `errcode 42501` for unauthorized callers.
+
+| Function | Parameters | Returns | Replaces |
+|----------|-----------|---------|----------|
+| `transfer_household_ownership(p_member_id UUID, p_household_id UUID)` | Caller must be household owner | `void` | Two sequential PATCHes to `household_members` (promote target → demote self). Prior dual-owner window eliminated. |
+| `respond_to_household_invite(p_invite_id UUID, p_accept BOOLEAN)` | Caller email must match `invited_email`; invite must be `pending` | `TABLE(household_id UUID, household_name TEXT, status TEXT)` | PATCH to `household_invites` + conditional INSERT into `household_members`. Prior orphaned-member-row window eliminated. |
+
+**Authorization pattern:** Each RPC checks the caller's role/identity via `auth.uid()` before mutating. Non-owner callers on `transfer_household_ownership` and non-invitee callers on `respond_to_household_invite` receive `errcode = '42501'` (permission denied). `SECURITY DEFINER` is required because RLS cannot enforce cross-row role checks atomically.
+
+### Bulk Recipe Action RPCs (Migration 038 — MOP-0028)
+
+Three `SECURITY DEFINER` RPCs for bulk operations on the caller's own recipes. All validate `auth.uid()`, silently skip rows the caller doesn't own, and return the count of affected rows.
+
+| Function | Parameters | Returns | Notes |
+|----------|-----------|---------|-------|
+| `bulk_update_recipe_visibility(p_recipe_ids UUID[], p_visibility TEXT)` | `p_visibility` must be `'private'`, `'household'`, or `'public'`; caller must own the recipes | `INT` (rows updated) | Silently skips IDs not owned by caller. Raises `22023` for invalid visibility value. |
+| `bulk_delete_recipes(p_recipe_ids UUID[])` | Caller must own the recipes | `INT` (rows deleted) | Silently skips IDs not owned by caller. |
+| `bulk_add_to_collection(p_collection_id UUID, p_recipe_ids UUID[])` | Caller must own the collection | `INT` (rows inserted) | Uses `ON CONFLICT DO NOTHING` — re-adding existing recipes is a no-op. Raises `42501` if caller does not own the collection. |
+
+**Authorization pattern:** Each RPC checks `user_id = auth.uid()` at the row level. Unauthenticated callers receive `errcode = '42501'`. `SECURITY DEFINER` is required to perform the delete/update in a single statement bypassing per-row RLS overhead.
 
 ### Helper Functions
 
@@ -473,3 +499,16 @@ All use `SECURITY DEFINER` to bypass RLS for cross-user profile reads, validate 
 | `20260314500000_023_fix_trigger_missing_email.sql` | 023 | Fixed `handle_new_user()` trigger missing email field |
 | `20260314600000_024_household_member_profile_visibility.sql` | 024 | RLS policy: household members can view each other's profiles |
 | `20260314700000_025_rpc_functions.sql` | 025 | 5 SECURITY DEFINER RPC functions for data-access optimization |
+| `20260314800000_026_fix_function_search_paths.sql` | 026 | Fix `search_path` on RPC functions (security hardening) |
+| `20260314900000_027_meal_plan_enhancements.sql` | 027 | `meal_plans` status column, multi-week plan support |
+| `20260604000000_028_search_rpcs_auth_uid.sql` | 028 | Replace `user_id` param with `auth.uid()` in all 5 search/recommendation RPCs (security gate — MOP-0007) |
+| `20260604000001_029_embedding_refresh_lifecycle.sql` | 029 | `needs_reembed` flag + `embedding-refresh` scheduled function (MOP-0015) |
+| `20260906000000_030_dietary_flags_and_allergy_tagging.sql` | 030 | Dietary flags + automatic allergy tagging on recipe import (MOP-0024/0025) |
+| `20260906000001_031_plan_period_config.sql` | 031 | `plan_period_config` table for configurable default plan duration (MOP-0022) |
+| `20260906000002_032_household_rbac_flags.sql` | 032 | Household RBAC role flags |
+| `20260906000003_033_get_my_household_rbac_fields.sql` | 033 | Extend `get_my_household` RPC with RBAC fields |
+| `20260907000000_034_chat_retention_cleanup.sql` | 034 | Chat message retention cleanup |
+| `20260907000001_035_recommendations_with_reactions.sql` | 035 | Add reaction signal (5th term) to `get_recipe_recommendations` scoring formula (MOP-0007 Phase 3) |
+| `20260907000002_036_meal_plans_copied_from_cascade.sql` | 036 | `meal_plans.copied_from` self-referential FK with ON DELETE SET NULL |
+| `20260916000000_037_household_write_atomicity_rpcs.sql` | 037 | Two write-atomicity SECURITY DEFINER RPCs: `transfer_household_ownership` + `respond_to_household_invite` (MOP-0014) |
+| `20260921000000_038_bulk_recipe_actions.sql` | 038 | Three bulk recipe action RPCs: `bulk_update_recipe_visibility`, `bulk_delete_recipes`, `bulk_add_to_collection` (MOP-0028) |

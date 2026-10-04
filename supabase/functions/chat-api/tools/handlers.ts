@@ -793,6 +793,377 @@ async function proposeSubstitution(
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// save_recipe — MOP-0018 P0
+// Saves the extracted recipe to the library after a duplicate check.
+// ─────────────────────────────────────────────────────────────────────
+
+async function saveRecipe(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const recipeArg = args.recipe as Record<string, unknown>;
+  const overrideDuplicate = (args.override_duplicate as boolean | undefined) ?? false;
+
+  if (!recipeArg || typeof recipeArg !== "object") {
+    return { ok: false, error: "recipe argument is required and must be an object.", retryable: false };
+  }
+
+  const title = (recipeArg.title as string | undefined)?.trim();
+  if (!title) {
+    return { ok: false, error: "Recipe must have a title.", retryable: false };
+  }
+
+  // 1. Exact title duplicate check (case-insensitive).
+  if (!overrideDuplicate) {
+    const { data: exactMatch } = await ctx.supabase
+      .from("recipes")
+      .select("id, title")
+      .eq("user_id", ctx.user.id)
+      .ilike("title", title)
+      .limit(1)
+      .maybeSingle();
+
+    if (exactMatch) {
+      return {
+        ok: true,
+        data: {
+          status: "duplicate",
+          existing_recipe_id: (exactMatch as { id: string }).id,
+          existing_title: (exactMatch as { title: string }).title,
+          message: `You already have a recipe titled "${(exactMatch as { title: string }).title}". Pass override_duplicate: true to save a second copy, or update the existing recipe instead.`,
+        },
+      };
+    }
+  }
+
+  // 2. Build the insert row — map camelCase → snake_case for the DB.
+  const insertRow: Record<string, unknown> = {
+    user_id: ctx.user.id,
+    household_id: null, // will be resolved by RLS / trigger if needed
+    title,
+    description: recipeArg.description ?? null,
+    ingredients: recipeArg.ingredients ?? [],
+    instructions: recipeArg.instructions ?? [],
+    prep_time: recipeArg.prepTime ?? recipeArg.prep_time ?? null,
+    cook_time: recipeArg.cookTime ?? recipeArg.cook_time ?? null,
+    total_time: recipeArg.totalTime ?? recipeArg.total_time ?? null,
+    servings: recipeArg.servings ?? null,
+    difficulty: recipeArg.difficulty ?? null,
+    cuisine: recipeArg.cuisine ?? null,
+    tags: recipeArg.tags ?? [],
+    source_url: recipeArg.source_url ?? null,
+    source_name: recipeArg.source_name ?? null,
+    image_url: recipeArg.image_url ?? null,
+    is_favorite: false,
+    visibility: "private",
+    needs_reembed: true, // triggers async embedding refresh (MOP-0015)
+    created_by: ctx.user.id,
+  };
+
+  // Resolve household_id from the user's current household (if any).
+  const { data: hhData } = await ctx.supabase.rpc("get_my_household");
+  if (hhData && typeof hhData === "object" && (hhData as any).id) {
+    insertRow.household_id = (hhData as any).id;
+  }
+
+  const { data: saved, error: insertErr } = await ctx.supabase
+    .from("recipes")
+    .insert(insertRow)
+    .select("id, title, created_at")
+    .single();
+
+  if (insertErr) {
+    return { ok: false, error: `Failed to save recipe: ${insertErr.message}`, retryable: true };
+  }
+
+  return {
+    ok: true,
+    data: {
+      status: "saved",
+      recipe_id: (saved as { id: string }).id,
+      title: (saved as { title: string }).title,
+      message: `"${title}" has been saved to your library.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// check_recipe_safety — MOP-0018 P0
+// Cross-references recipe ingredients against household allergen lists.
+// Called proactively by the agent after every extraction.
+// ─────────────────────────────────────────────────────────────────────
+
+interface FamilyMember {
+  name: string;
+  allergens?: string[];
+  dietary_restrictions?: string[];
+}
+
+async function checkRecipeSafety(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const recipeArg = args.recipe as Record<string, unknown> | undefined;
+  const recipeId = args.recipe_id as string | undefined;
+
+  // 1. Get recipe data — either from passed object or by id.
+  let ingredientNames: string[] = [];
+  let recipeTitle = "this recipe";
+
+  if (recipeArg && typeof recipeArg === "object") {
+    recipeTitle = (recipeArg.title as string) || recipeTitle;
+    const rawIngredients = recipeArg.ingredients;
+    if (Array.isArray(rawIngredients)) {
+      ingredientNames = rawIngredients.map((ing) => {
+        if (typeof ing === "string") return ing.toLowerCase();
+        if (ing && typeof ing === "object") {
+          const i = ing as { name?: string };
+          return (i.name || "").toLowerCase();
+        }
+        return "";
+      }).filter(Boolean);
+    }
+  } else if (recipeId) {
+    const { data: recipe, error } = await ctx.supabase
+      .from("recipes")
+      .select("title, ingredients")
+      .eq("id", recipeId)
+      .maybeSingle();
+    if (error || !recipe) {
+      return { ok: false, error: "Recipe not found.", retryable: false };
+    }
+    recipeTitle = (recipe as { title?: string }).title || recipeTitle;
+    const rawIngredients = (recipe as { ingredients?: unknown[] }).ingredients || [];
+    ingredientNames = rawIngredients.map((ing) => {
+      if (typeof ing === "string") return ing.toLowerCase();
+      if (ing && typeof ing === "object") {
+        const i = ing as { name?: string };
+        return (i.name || "").toLowerCase();
+      }
+      return "";
+    }).filter(Boolean);
+  } else {
+    return { ok: false, error: "Provide either recipe or recipe_id.", retryable: false };
+  }
+
+  // 2. Get household profile.
+  const { data: hhData, error: hhErr } = await ctx.supabase.rpc("get_my_household");
+  if (hhErr) {
+    return { ok: false, error: hhErr.message, retryable: true };
+  }
+
+  const members: FamilyMember[] = [];
+  if (hhData && typeof hhData === "object") {
+    const hh = hhData as { family_members?: FamilyMember[] };
+    if (Array.isArray(hh.family_members)) {
+      members.push(...hh.family_members);
+    }
+  }
+
+  if (members.length === 0) {
+    return {
+      ok: true,
+      data: {
+        safe: true,
+        warnings: [],
+        message: "No household members with allergen profiles found.",
+      },
+    };
+  }
+
+  // 3. Cross-reference: for each member, check if any allergen appears in any ingredient name.
+  const warnings: Array<{
+    member: string;
+    allergens: string[];
+    matched_ingredients: string[];
+  }> = [];
+
+  for (const member of members) {
+    const allergens = (member.allergens || []).map((a) => a.toLowerCase());
+    if (allergens.length === 0) continue;
+
+    const matchedIngredients: string[] = [];
+    const matchedAllergens: string[] = [];
+
+    for (const allergen of allergens) {
+      for (const ingredient of ingredientNames) {
+        if (ingredient.includes(allergen)) {
+          if (!matchedIngredients.includes(ingredient)) matchedIngredients.push(ingredient);
+          if (!matchedAllergens.includes(allergen)) matchedAllergens.push(allergen);
+        }
+      }
+    }
+
+    if (matchedIngredients.length > 0) {
+      warnings.push({
+        member: member.name,
+        allergens: matchedAllergens,
+        matched_ingredients: matchedIngredients,
+      });
+    }
+  }
+
+  const safe = warnings.length === 0;
+  return {
+    ok: true,
+    data: {
+      safe,
+      recipe_title: recipeTitle,
+      warnings,
+      message: safe
+        ? `${recipeTitle} appears safe for all household members. Always verify labels for packaged ingredients.`
+        : warnings
+            .map(
+              (w) =>
+                `⚠️ ${w.member} is allergic to ${w.allergens.join(", ")} — found in: ${w.matched_ingredients.join(", ")}.`
+            )
+            .join(" ") + " Always verify labels before serving.",
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// get_grocery_list — MOP-0018 P1 (read-only)
+// ─────────────────────────────────────────────────────────────────────
+
+async function getGroceryList(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const mealPlanId = args.meal_plan_id as string | undefined;
+
+  let plan: { id: string; title: string; grocery_list: unknown } | null = null;
+
+  if (mealPlanId) {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, title, grocery_list")
+      .eq("id", mealPlanId)
+      .eq("user_id", ctx.user.id)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  } else {
+    // Default to the most recent active plan, then any draft.
+    const { data: activePlan } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, title, grocery_list")
+      .eq("user_id", ctx.user.id)
+      .eq("status", "active")
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activePlan) {
+      plan = activePlan as typeof plan;
+    } else {
+      const { data: draftPlan, error } = await ctx.supabase
+        .from("meal_plans")
+        .select("id, title, grocery_list")
+        .eq("user_id", ctx.user.id)
+        .eq("status", "draft")
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) return { ok: false, error: error.message, retryable: true };
+      plan = draftPlan as typeof plan;
+    }
+  }
+
+  if (!plan) {
+    return {
+      ok: true,
+      data: { items: [], count: 0, message: "No meal plan found with a grocery list." },
+    };
+  }
+
+  const items = Array.isArray(plan.grocery_list) ? plan.grocery_list : [];
+  return {
+    ok: true,
+    data: {
+      meal_plan_id: plan.id,
+      meal_plan_title: plan.title,
+      count: items.length,
+      items,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// mark_grocery_item_purchased — MOP-0018 P2
+// ─────────────────────────────────────────────────────────────────────
+
+async function markGroceryItemPurchased(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const itemName = (args.item_name as string).toLowerCase();
+  const purchased = (args.purchased as boolean | undefined) ?? true;
+  const mealPlanId = args.meal_plan_id as string | undefined;
+
+  // Find the plan.
+  let plan: { id: string; grocery_list: unknown } | null = null;
+  if (mealPlanId) {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, grocery_list")
+      .eq("id", mealPlanId)
+      .eq("user_id", ctx.user.id)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  } else {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, grocery_list")
+      .eq("user_id", ctx.user.id)
+      .eq("status", "active")
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  }
+
+  if (!plan) {
+    return { ok: false, error: "No active meal plan found.", retryable: false };
+  }
+
+  const items = Array.isArray(plan.grocery_list)
+    ? [...(plan.grocery_list as Record<string, unknown>[])]
+    : [];
+
+  let updated = false;
+  const updatedItems = items.map((i) => {
+    const name = ((i as { item?: string }).item || "").toLowerCase();
+    if (name.includes(itemName) || itemName.includes(name)) {
+      updated = true;
+      return { ...i, purchased, purchased_at: purchased ? new Date().toISOString() : null };
+    }
+    return i;
+  });
+
+  if (!updated) {
+    return {
+      ok: false,
+      error: `No item matching "${itemName}" found in the grocery list.`,
+      retryable: false,
+    };
+  }
+
+  const { error: updErr } = await ctx.supabase
+    .from("meal_plans")
+    .update({ grocery_list: updatedItems, last_edited_by: ctx.user.id })
+    .eq("id", plan.id);
+  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+
+  return {
+    ok: true,
+    data: { updated: true, item_name: itemName, purchased, meal_plan_id: plan.id },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // web_search_recipe (MOP-0008 Addendum 1) — read-only, no DB surface.
 // Delegates to the shared web-search-client; provider credentials are
 // read only inside that shared module (never from this file).
@@ -853,6 +1224,481 @@ async function deleteRecipe(
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// remove_grocery_item — MOP-0018 P1
+// ─────────────────────────────────────────────────────────────────────
+
+async function removeGroceryItem(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const itemName = (args.item_name as string).toLowerCase();
+  const mealPlanId = args.meal_plan_id as string | undefined;
+
+  let plan: { id: string; grocery_list: unknown } | null = null;
+  if (mealPlanId) {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, grocery_list")
+      .eq("id", mealPlanId)
+      .eq("user_id", ctx.user.id)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  } else {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, grocery_list")
+      .eq("user_id", ctx.user.id)
+      .eq("status", "active")
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  }
+
+  if (!plan) {
+    return { ok: false, error: "No active meal plan found.", retryable: false };
+  }
+
+  const items = Array.isArray(plan.grocery_list)
+    ? [...(plan.grocery_list as Record<string, unknown>[])]
+    : [];
+
+  const filtered = items.filter((i) => {
+    const name = ((i as { item?: string }).item || "").toLowerCase();
+    return !(name.includes(itemName) || itemName.includes(name));
+  });
+
+  const removed = items.length - filtered.length;
+  if (removed === 0) {
+    return {
+      ok: false,
+      error: `No item matching "${itemName}" found in the grocery list.`,
+      retryable: false,
+    };
+  }
+
+  const { error: updErr } = await ctx.supabase
+    .from("meal_plans")
+    .update({ grocery_list: filtered, last_edited_by: ctx.user.id })
+    .eq("id", plan.id);
+  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+
+  return {
+    ok: true,
+    data: { removed_count: removed, item_name: itemName, remaining: filtered.length, meal_plan_id: plan.id },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// create_meal_plan — MOP-0018 P1
+// ─────────────────────────────────────────────────────────────────────
+
+async function createMealPlan(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const startDate = args.start_date as string;
+  const endDate = args.end_date as string;
+  const title =
+    (args.title as string | undefined) ||
+    `Meal Plan (${startDate} – ${endDate})`;
+
+  const { data: created, error } = await ctx.supabase
+    .from("meal_plans")
+    .insert({
+      user_id: ctx.user.id,
+      created_by: ctx.user.id,
+      last_edited_by: ctx.user.id,
+      title,
+      start_date: startDate,
+      end_date: endDate,
+      meals: {},
+      grocery_list: [],
+      status: "draft",
+    })
+    .select("id, title, start_date, end_date, status")
+    .single();
+
+  if (error) return { ok: false, error: error.message, retryable: true };
+
+  return {
+    ok: true,
+    data: {
+      meal_plan_id: (created as { id: string }).id,
+      title: (created as { title: string }).title,
+      start_date: startDate,
+      end_date: endDate,
+      status: "draft",
+      message: `Created "${title}". You can now assign recipes to slots.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// clear_meal_plan_slot — MOP-0018 P1
+// ─────────────────────────────────────────────────────────────────────
+
+async function clearMealPlanSlot(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const date = args.date as string;
+  const slot = args.slot as string;
+  const mealPlanId = args.meal_plan_id as string | undefined;
+
+  let plan: { id: string; meals: unknown } | null = null;
+  if (mealPlanId) {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, meals")
+      .eq("id", mealPlanId)
+      .eq("user_id", ctx.user.id)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  } else {
+    const { data, error } = await ctx.supabase
+      .from("meal_plans")
+      .select("id, meals")
+      .eq("user_id", ctx.user.id)
+      .lte("start_date", date)
+      .gte("end_date", date)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message, retryable: true };
+    plan = data as typeof plan;
+  }
+
+  if (!plan) {
+    return { ok: false, error: `No meal plan found covering ${date}.`, retryable: false };
+  }
+
+  const currentMeals = (
+    plan.meals && typeof plan.meals === "object"
+      ? { ...(plan.meals as Record<string, Record<string, string>>) }
+      : {}
+  ) as Record<string, Record<string, string>>;
+
+  const daySlots = currentMeals[date] ? { ...currentMeals[date] } : {};
+  if (!daySlots[slot]) {
+    return {
+      ok: true,
+      data: { message: `The ${slot} slot on ${date} was already empty.`, meal_plan_id: plan.id },
+    };
+  }
+
+  delete daySlots[slot];
+  if (Object.keys(daySlots).length === 0) {
+    delete currentMeals[date];
+  } else {
+    currentMeals[date] = daySlots;
+  }
+
+  const { error: updErr } = await ctx.supabase
+    .from("meal_plans")
+    .update({ meals: currentMeals, last_edited_by: ctx.user.id })
+    .eq("id", plan.id);
+  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+
+  return {
+    ok: true,
+    data: { cleared: true, date, slot, meal_plan_id: plan.id },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// react_to_recipe — MOP-0018 P2
+// Upserts a thumbs_up / thumbs_down / removes reaction for a family member.
+// ─────────────────────────────────────────────────────────────────────
+
+async function reactToRecipe(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const recipeId = args.recipe_id as string;
+  const reaction = args.reaction as "thumbs_up" | "thumbs_down" | "remove";
+  const memberName = args.member_name as string | undefined;
+
+  // Verify the recipe is accessible.
+  const { data: recipe, error: recErr } = await ctx.supabase
+    .from("recipes")
+    .select("id, title")
+    .eq("id", recipeId)
+    .maybeSingle();
+  if (recErr || !recipe) {
+    return { ok: false, error: "Recipe not found or you don't have access to it.", retryable: false };
+  }
+  const recipeTitle = (recipe as { title: string }).title;
+
+  // Determine reactor: family member by name, or the authenticated user.
+  let familyMemberId: string | null = null;
+  let reactorLabel = "you";
+
+  if (memberName) {
+    const { data: members } = await ctx.supabase
+      .from("family_members")
+      .select("id, name")
+      .eq("managed_by", ctx.user.id)
+      .eq("is_active", true)
+      .ilike("name", memberName);
+
+    if (!members || members.length === 0) {
+      return {
+        ok: false,
+        error: `No family member named "${memberName}" found. Check the name and try again.`,
+        retryable: false,
+      };
+    }
+    familyMemberId = (members[0] as { id: string }).id;
+    reactorLabel = (members[0] as { name: string }).name;
+  }
+
+  // Remove reaction.
+  if (reaction === "remove") {
+    const deleteQuery = ctx.supabase.from("recipe_reactions").delete();
+    const filtered = familyMemberId
+      ? (deleteQuery as any).eq("recipe_id", recipeId).eq("family_member_id", familyMemberId)
+      : (deleteQuery as any).eq("recipe_id", recipeId).eq("user_id", ctx.user.id);
+    const { error } = await filtered;
+    if (error) return { ok: false, error: error.message, retryable: true };
+    return {
+      ok: true,
+      data: { removed: true, recipe_title: recipeTitle, reactor: reactorLabel },
+    };
+  }
+
+  // Upsert reaction.
+  const row = familyMemberId
+    ? { recipe_id: recipeId, family_member_id: familyMemberId, user_id: null, reaction }
+    : { recipe_id: recipeId, user_id: ctx.user.id, family_member_id: null, reaction };
+
+  const conflictColumn = familyMemberId
+    ? "recipe_id, family_member_id"
+    : "recipe_id, user_id";
+
+  const { error: upsertErr } = await ctx.supabase
+    .from("recipe_reactions")
+    .upsert(row, { onConflict: conflictColumn });
+
+  if (upsertErr) return { ok: false, error: upsertErr.message, retryable: true };
+
+  const emoji = reaction === "thumbs_up" ? "👍" : "👎";
+  return {
+    ok: true,
+    data: {
+      reaction,
+      recipe_id: recipeId,
+      recipe_title: recipeTitle,
+      reactor: reactorLabel,
+      message: `${emoji} Marked "${recipeTitle}" as ${reaction === "thumbs_up" ? "liked" : "disliked"} for ${reactorLabel}.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// get_recommendations — MOP-0018 P2
+// Recipes the household or a named member tends to like.
+// ─────────────────────────────────────────────────────────────────────
+
+async function getRecommendations(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const memberName = args.member_name as string | undefined;
+  const reactionFilter = (args.reaction as string | undefined) ?? "thumbs_up";
+  const limit = (args.limit as number | undefined) ?? 10;
+
+  // Resolve family member ID if name given.
+  let familyMemberId: string | null = null;
+  let scopeLabel = "your household";
+
+  if (memberName) {
+    const { data: members } = await ctx.supabase
+      .from("family_members")
+      .select("id, name")
+      .eq("managed_by", ctx.user.id)
+      .eq("is_active", true)
+      .ilike("name", memberName);
+
+    if (!members || members.length === 0) {
+      return {
+        ok: false,
+        error: `No family member named "${memberName}" found.`,
+        retryable: false,
+      };
+    }
+    familyMemberId = (members[0] as { id: string }).id;
+    scopeLabel = (members[0] as { name: string }).name;
+  }
+
+  // Query reactions joined to recipes.
+  // When a specific member is named, filter by family_member_id.
+  // When no member is named, return recipes that have at least one thumbs_up
+  // from anyone in the household (user_id = auth user OR family_member managed_by auth user).
+  let query = ctx.supabase
+    .from("recipe_reactions")
+    .select(
+      "recipe_id, reaction, recipes!inner(id, title, description, cuisine, difficulty, prep_time, cook_time, tags)"
+    )
+    .eq("reaction", reactionFilter);
+
+  if (familyMemberId) {
+    query = (query as any).eq("family_member_id", familyMemberId);
+  } else {
+    // Household scope: reactions by the user themselves.
+    query = (query as any).eq("user_id", ctx.user.id);
+  }
+
+  const { data, error } = await (query as any).limit(limit);
+  if (error) return { ok: false, error: error.message, retryable: true };
+
+  const results = (data || []).map((row: any) => ({
+    recipe_id: row.recipe_id,
+    title: row.recipes?.title,
+    description: row.recipes?.description,
+    cuisine: row.recipes?.cuisine,
+    difficulty: row.recipes?.difficulty,
+    prep_time: row.recipes?.prep_time,
+    cook_time: row.recipes?.cook_time,
+    tags: row.recipes?.tags,
+  }));
+
+  return {
+    ok: true,
+    data: {
+      scope: scopeLabel,
+      reaction: reactionFilter,
+      count: results.length,
+      results,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// update_member_allergens — MOP-0018 P2 (always destructive — gated)
+// ─────────────────────────────────────────────────────────────────────
+
+async function updateMemberAllergens(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const memberName = args.member_name as string;
+  const add = (args.add as string[] | undefined) ?? [];
+  const remove = (args.remove as string[] | undefined) ?? [];
+
+  if (add.length === 0 && remove.length === 0) {
+    return { ok: false, error: "Provide at least one allergen to add or remove.", retryable: false };
+  }
+
+  // Resolve member.
+  const { data: members, error: memberErr } = await ctx.supabase
+    .from("family_members")
+    .select("id, name, allergies")
+    .eq("managed_by", ctx.user.id)
+    .eq("is_active", true)
+    .ilike("name", memberName);
+
+  if (memberErr) return { ok: false, error: memberErr.message, retryable: true };
+  if (!members || members.length === 0) {
+    return {
+      ok: false,
+      error: `No family member named "${memberName}" found.`,
+      retryable: false,
+    };
+  }
+
+  const member = members[0] as { id: string; name: string; allergies: string[] | null };
+  const current = new Set<string>((member.allergies || []).map((a) => a.toLowerCase()));
+
+  for (const a of add) current.add(a.toLowerCase());
+  for (const r of remove) current.delete(r.toLowerCase());
+
+  const updated = Array.from(current);
+
+  const { error: updErr } = await ctx.supabase
+    .from("family_members")
+    .update({ allergies: updated })
+    .eq("id", member.id)
+    .eq("managed_by", ctx.user.id);
+
+  if (updErr) return { ok: false, error: updErr.message, retryable: true };
+
+  return {
+    ok: true,
+    data: {
+      member_name: member.name,
+      allergies: updated,
+      added: add,
+      removed: remove,
+      message: `Updated ${member.name}'s allergen list. Current allergies: ${updated.length > 0 ? updated.join(", ") : "none"}.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// scale_recipe — MOP-0018 P2 (read-only)
+// Returns ingredient quantities scaled to a target serving count.
+// ─────────────────────────────────────────────────────────────────────
+
+async function scaleRecipe(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolHandlerResult> {
+  const recipeId = args.recipe_id as string;
+  const targetServings = args.target_servings as number;
+
+  const { data: recipe, error } = await ctx.supabase
+    .from("recipes")
+    .select("id, title, servings, ingredients, instructions, prep_time, cook_time")
+    .eq("id", recipeId)
+    .maybeSingle();
+
+  if (error || !recipe) {
+    return { ok: false, error: "Recipe not found or you don't have access to it.", retryable: false };
+  }
+
+  const originalServings = (recipe as { servings?: number }).servings;
+  if (!originalServings || originalServings <= 0) {
+    return {
+      ok: false,
+      error: "This recipe doesn't have a serving count — can't scale it.",
+      retryable: false,
+    };
+  }
+
+  const factor = targetServings / originalServings;
+  const rawIngredients = (recipe as { ingredients?: unknown[] }).ingredients || [];
+
+  const scaled = rawIngredients.map((ing) => {
+    if (!ing || typeof ing !== "object") return ing;
+    const i = ing as { name?: string; amount?: number; unit?: string; category?: string; notes?: string };
+    return {
+      ...i,
+      amount: i.amount != null ? Math.round(i.amount * factor * 100) / 100 : null,
+    };
+  });
+
+  return {
+    ok: true,
+    data: {
+      recipe_id: recipeId,
+      title: (recipe as { title: string }).title,
+      original_servings: originalServings,
+      target_servings: targetServings,
+      scale_factor: Math.round(factor * 100) / 100,
+      ingredients: scaled,
+      instructions: (recipe as { instructions?: string[] }).instructions || [],
+      prep_time: (recipe as { prep_time?: number }).prep_time,
+      cook_time: (recipe as { cook_time?: number }).cook_time,
+      note: `Scaled from ${originalServings} to ${targetServings} servings. Times don't change — adjust based on batch size.`,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Registry
 // ─────────────────────────────────────────────────────────────────────
 
@@ -869,6 +1715,19 @@ export const HANDLERS: Record<string, ToolHandler> = {
   update_recipe: updateRecipe as ToolHandler,
   delete_recipe: deleteRecipe as ToolHandler,
   web_search_recipe: webSearchRecipe as ToolHandler,
+  // MOP-0018: new tools (P0 + P1)
+  save_recipe: saveRecipe as ToolHandler,
+  check_recipe_safety: checkRecipeSafety as ToolHandler,
+  get_grocery_list: getGroceryList as ToolHandler,
+  mark_grocery_item_purchased: markGroceryItemPurchased as ToolHandler,
+  remove_grocery_item: removeGroceryItem as ToolHandler,
+  create_meal_plan: createMealPlan as ToolHandler,
+  clear_meal_plan_slot: clearMealPlanSlot as ToolHandler,
+  // MOP-0018: P2
+  react_to_recipe: reactToRecipe as ToolHandler,
+  get_recommendations: getRecommendations as ToolHandler,
+  update_member_allergens: updateMemberAllergens as ToolHandler,
+  scale_recipe: scaleRecipe as ToolHandler,
 };
 
 /**
@@ -965,6 +1824,10 @@ export async function executeConfirmedTool(
       ok: true,
       data: { meal_plan_id: mealPlanId, date, slot, recipe_id: recipeId },
     };
+  }
+
+  if (name === "update_member_allergens") {
+    return updateMemberAllergens(args, ctx);
   }
 
   return { ok: false, error: `No confirmed-execution path for ${name}`, retryable: false };

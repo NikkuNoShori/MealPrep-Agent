@@ -114,6 +114,7 @@ const Recipes = () => {
             onEdit={selectedRecipe.userId === user?.id ? () => handleEditRecipe(selectedRecipe) : undefined}
             onClose={handleCloseDetail}
             onDelete={selectedRecipe.userId === user?.id ? handleDeleteRecipe : undefined}
+            onSelectSimilar={handleRecipeSelect}
           />
         )}
 

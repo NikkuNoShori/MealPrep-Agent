@@ -268,3 +268,9 @@ Append to the update log at the bottom of this document:
 | 2026-03-14 | Nick | enhancement/feature-release (invites, reactions, admin, setup, RPC optimization, migrations 014-025) | ARCHITECTURE, DATA_MODEL, API, RUNBOOK, CHANGELOG, docs/README, MOP-0002, REGISTRY |
 | 2026-06-01 | Nick Neal | main (11 commits 72895a7..c2d7c7e: test harness, agent system, MOP/ADR governance, AI Integration Audit, ARCHITECTURE/RUNBOOK security tightening) | CHANGELOG, docs/README, ARCHITECTURE, RUNBOOK, DOCUMENTATION_UPDATE_PROCEDURE |
 | 2026-06-16 | Nick Neal | cursor/mop-0008-golden-routing-video-intake | ARCHITECTURE, API, RUNBOOK, CHANGELOG, docs/README, MOP-0016, REGISTRY, SESSION_HANDOFF, DOCUMENTATION_UPDATE_PROCEDURE |
+| 2026-09-04 | Nick Neal | main (MOP-0013 E2E suite, MOP-0018 tool expansion — commits 5d56fdb..a7e25f2) | ARCHITECTURE, API, CHANGELOG, docs/README, MOP-0013, REGISTRY |
+| 2026-09-05 | Nick Neal | main (MOP-0016 + MOP-0018 verified complete, edge deploys confirmed) | CHANGELOG, docs/README, MOP-0016, MOP-0018, REGISTRY |
+| 2026-09-04 | Nick Neal | main (MOP-0017 SSE streaming complete; arrow-key fix; draftRecipeStore test fix) | ARCHITECTURE, API, CHANGELOG, docs/README, MOP-0017, REGISTRY |
+| 2026-09-16 | Nick Neal | main (MOP-0007 complete — smart discovery, reaction scoring, meal planner UX overhaul, dead rag* code removed) | ARCHITECTURE, DATA_MODEL, API, CHANGELOG, MOP-0007, REGISTRY |
+| 2026-09-21 | Nick Neal | main (MOP-0014 complete — household write atomicity RPCs; admin delete bug fix; invite email UX fix) | DATA_MODEL, API, CHANGELOG, MOP-0014, REGISTRY |
+| 2026-09-21 | Nick Neal | main (MOP-0028 complete — bulk recipe actions: multi-select UI, bulk RPCs, migration 038) | DATA_MODEL, API, CHANGELOG, MOP-0028, REGISTRY |
