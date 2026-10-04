@@ -811,7 +811,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           <div className="border border-border/40 rounded-lg">
             <button
               onClick={() => setShowIngredients(!showIngredients)}
-              className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-stone-900 dark:hover:text-white"
+              className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-surface-900 dark:hover:text-white"
             >
               <h4 className="font-semibold text-sm">
                 Ingredients ({ingredients.length})
@@ -845,7 +845,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           <div className="border border-border/40 rounded-lg">
             <button
               onClick={() => setShowInstructions(!showInstructions)}
-              className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-stone-900 dark:hover:text-white"
+              className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-surface-900 dark:hover:text-white"
             >
               <h4 className="font-semibold text-sm">
                 Instructions ({instructions.length} steps)

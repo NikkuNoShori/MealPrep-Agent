@@ -40,7 +40,7 @@ export default function ResetPassword() {
                 <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">M</span>
                 </div>
-                <span className="text-xl font-bold text-stone-900 dark:text-white">
+                <span className="text-xl font-bold text-surface-900 dark:text-white">
                   MealPrep Agent
                 </span>
               </div>
@@ -84,7 +84,7 @@ export default function ResetPassword() {
               <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">M</span>
               </div>
-              <span className="text-xl font-bold text-stone-900 dark:text-white">
+              <span className="text-xl font-bold text-surface-900 dark:text-white">
                 MealPrep Agent
               </span>
             </div>

@@ -10,14 +10,14 @@ const NotFound: React.FC = () => {
             <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">M</span>
             </div>
-            <span className="text-xl font-bold text-stone-900 dark:text-white">
+            <span className="text-xl font-bold text-surface-900 dark:text-white">
               MealPrep Agent
             </span>
           </div>
         </Link>
 
-        <h1 className="text-4xl font-bold text-stone-900 dark:text-white mb-2">404</h1>
-        <p className="text-stone-600 dark:text-gray-400 mb-6">
+        <h1 className="text-4xl font-bold text-surface-900 dark:text-white mb-2">404</h1>
+        <p className="text-surface-600 dark:text-gray-400 mb-6">
           We couldn't find that page. It may have moved or never existed.
         </p>
 

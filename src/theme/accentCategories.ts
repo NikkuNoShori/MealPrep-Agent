@@ -144,8 +144,8 @@ export interface MealPlanStatusAccent {
 export const MEAL_PLAN_STATUS_ACCENTS: Record<MealPlanStatusKey, MealPlanStatusAccent> = {
   draft: {
     label: 'Draft',
-    color: 'text-stone-500 dark:text-stone-400',
-    bg: 'bg-stone-100 dark:bg-white/[0.04]',
+    color: 'text-surface-500 dark:text-surface-400',
+    bg: 'bg-surface-100 dark:bg-white/[0.04]',
   },
   active: {
     label: 'Active',
@@ -159,8 +159,8 @@ export const MEAL_PLAN_STATUS_ACCENTS: Record<MealPlanStatusKey, MealPlanStatusA
   },
   archived: {
     label: 'Archived',
-    color: 'text-stone-400 dark:text-stone-500',
-    bg: 'bg-stone-100 dark:bg-stone-800/60',
+    color: 'text-surface-400 dark:text-surface-500',
+    bg: 'bg-surface-100 dark:bg-surface-800/60',
   },
 }
 

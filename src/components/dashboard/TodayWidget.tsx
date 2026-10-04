@@ -19,23 +19,23 @@ const TodayWidget = ({ stats, isLoading }: TodayWidgetProps) => {
   )
 
   return (
-    <div className="rounded-2xl border border-stone-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4">
+    <div className="rounded-2xl border border-surface-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4">
       <SectionHeader title="Today" action={{ label: 'Plan week', to: '/meal-planner' }} />
 
       <div>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-4 w-4 animate-spin text-stone-400 dark:text-gray-500" />
+            <Loader2 className="h-4 w-4 animate-spin text-surface-400 dark:text-gray-500" />
           </div>
         ) : !stats?.thisWeek?.planId ? (
           <div className="text-center py-8">
-            <ChefHat className="h-5 w-5 text-stone-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-xs text-stone-400 dark:text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <ChefHat className="h-5 w-5 text-surface-300 dark:text-gray-600 mx-auto mb-2" />
+            <p className="text-xs text-surface-400 dark:text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               No meal plan yet
             </p>
           </div>
         ) : !hasAnyMeal ? (
-          <p className="text-xs text-stone-400 dark:text-gray-500 py-4 text-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <p className="text-xs text-surface-400 dark:text-gray-500 py-4 text-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Nothing planned for today
           </p>
         ) : (
@@ -47,10 +47,10 @@ const TodayWidget = ({ stats, isLoading }: TodayWidgetProps) => {
                 <div key={slot.key} className="flex items-start gap-2">
                   <slot.icon className={`h-3.5 w-3.5 mt-0.5 ${slot.color}`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                    <p className="text-[10px] uppercase tracking-wide text-surface-400 dark:text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                       {slot.label}
                     </p>
-                    <p className="text-sm text-stone-700 dark:text-gray-300 truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                    <p className="text-sm text-surface-700 dark:text-gray-300 truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                       {entries.map((e) => e.recipeName).join(', ')}
                     </p>
                   </div>

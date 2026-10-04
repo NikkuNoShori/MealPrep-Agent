@@ -56,17 +56,17 @@ const KpiStrip = ({ stats, isLoading, householdSize, householdLoading }: KpiStri
         <div key={item.label} className="flex items-center gap-2">
           <item.icon className={`h-4 w-4 ${item.color}`} />
           {item.loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-stone-400 dark:text-gray-500" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-surface-400 dark:text-gray-500" />
           ) : (
             <span
-              className="text-sm font-semibold text-stone-900 dark:text-white tabular-nums"
+              className="text-sm font-semibold text-surface-900 dark:text-white tabular-nums"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
               {item.value ?? 0}
             </span>
           )}
           <span
-            className="text-xs text-stone-400 dark:text-gray-500"
+            className="text-xs text-surface-400 dark:text-gray-500"
             style={{ fontFamily: "'DM Sans', sans-serif" }}
           >
             {item.label}

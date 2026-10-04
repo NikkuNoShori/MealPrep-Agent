@@ -133,7 +133,7 @@ const InviteAccept: React.FC = () => {
             <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25">
               <span className="text-white font-bold text-sm">M</span>
             </div>
-            <span className="text-lg font-bold text-stone-900 dark:text-white tracking-tight">
+            <span className="text-lg font-bold text-surface-900 dark:text-white tracking-tight">
               MealPrep <span className="text-primary-500">Agent</span>
             </span>
           </Link>

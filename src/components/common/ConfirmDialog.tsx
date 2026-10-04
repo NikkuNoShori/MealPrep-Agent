@@ -84,17 +84,17 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
-        className="w-full max-w-sm rounded-2xl border border-stone-200 dark:border-white/[0.08] bg-white dark:bg-[#1e1f26] p-5 shadow-2xl animate-scale-in"
+        className="w-full max-w-sm rounded-2xl border border-surface-200 dark:border-white/[0.08] bg-white dark:bg-[var(--rs-bg-elevated)] p-5 shadow-2xl animate-scale-in"
       >
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-9 h-9 rounded-full bg-rose-100 dark:bg-rose-500/10 flex items-center justify-center">
             <AlertTriangle className="h-4.5 w-4.5 text-rose-500 dark:text-rose-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 id="confirm-dialog-title" className="text-sm font-semibold text-stone-900 dark:text-white">
+            <h2 id="confirm-dialog-title" className="text-sm font-semibold text-surface-900 dark:text-white">
               {title}
             </h2>
-            <p id="confirm-dialog-description" className="text-sm text-stone-500 dark:text-gray-400 mt-1">
+            <p id="confirm-dialog-description" className="text-sm text-surface-500 dark:text-gray-400 mt-1">
               {description}
             </p>
           </div>
@@ -105,7 +105,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={isConfirming}
-            className="flex-1 h-9 rounded-xl text-sm font-medium border border-stone-200 dark:border-white/[0.1] text-stone-700 dark:text-gray-300 hover:bg-stone-50 dark:hover:bg-white/[0.04] disabled:opacity-50 transition-colors"
+            className="flex-1 h-9 rounded-xl text-sm font-medium border border-surface-200 dark:border-white/[0.1] text-surface-700 dark:text-gray-300 hover:bg-surface-50 dark:hover:bg-white/[0.04] disabled:opacity-50 transition-colors"
           >
             {cancelLabel}
           </button>

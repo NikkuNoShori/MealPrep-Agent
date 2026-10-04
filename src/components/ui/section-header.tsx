@@ -58,10 +58,10 @@ interface SectionHeaderProps {
 
 /** The italic Fraunces-serif label style shared by every section header. */
 const TITLE_CLASSES =
-  'text-sm font-semibold italic text-stone-800 dark:text-gray-200'
+  'text-sm font-semibold italic text-surface-800 dark:text-gray-200'
 
 const ACTION_CLASSES =
-  'text-xs text-stone-400 hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400 transition-colors'
+  'text-xs text-surface-400 hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400 transition-colors'
 
 function SectionHeaderAction({ action }: { action: SectionHeaderAction }) {
   const style = { fontFamily: "'DM Sans', sans-serif" }
@@ -99,7 +99,7 @@ export function SectionHeader({
   divider = true,
 }: SectionHeaderProps) {
   return (
-    <div className={cn(divider && 'border-b border-dashed border-stone-200 dark:border-white/[0.08] pb-3 mb-3', className)}>
+    <div className={cn(divider && 'border-b border-dashed border-surface-200 dark:border-white/[0.08] pb-3 mb-3', className)}>
       <div className="flex items-center justify-between gap-3">
         <h2 className={cn(TITLE_CLASSES, titleClassName)} style={{ fontFamily: "'Fraunces', serif" }}>
           {title}
