@@ -6,6 +6,7 @@ import { RecipeSearch } from './RecipeSearch'
 import { useAuthStore } from '@/stores/authStore'
 import { useShowPhotos } from '@/hooks/useShowPhotos'
 import { useShowDescriptions } from '@/hooks/useShowDescriptions'
+import { useShowTags } from '@/hooks/useShowTags'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -36,6 +37,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const { showPhotos, toggleShowPhotos } = useShowPhotos();
   const { showDescriptions, toggleShowDescriptions } = useShowDescriptions();
+  const { showTags, toggleShowTags } = useShowTags();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   useEffect(() => {
@@ -465,6 +467,13 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                       <span>Show descriptions</span>
                       <Switch checked={showDescriptions} />
                     </button>
+                    <button
+                      onClick={toggleShowTags}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                    >
+                      <span>Show tags</span>
+                      <Switch checked={showTags} />
+                    </button>
                   </div>
                 )}
               </div>
@@ -532,7 +541,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
         <div
           className={
             viewMode === "grid"
-              ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
+              ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
               : "space-y-4"
           }
         >
@@ -549,6 +558,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                 dependents={dependents}
                 showPhotos={showPhotos}
                 showDescriptions={showDescriptions}
+                showTags={showTags}
                 onReact={handleReact}
                 onClick={isSelectMode ? undefined : () => onRecipeSelect?.(recipe)}
                 onEdit={(!isSelectMode && recipe.userId === user?.id) ? onEditRecipe : undefined}

@@ -69,6 +69,7 @@ interface RecipeCardProps {
   dependents?: { id: string; name: string }[];
   showPhotos?: boolean;
   showDescriptions?: boolean;
+  showTags?: boolean;
   onReact?: (recipeId: string, reaction: "thumbs_up" | "thumbs_down", familyMemberId?: string) => void;
   onClick?: () => void;
   onEdit?: (recipe: any) => void;
@@ -108,6 +109,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
   const dependents = (!isPreview && props.dependents) || [];
   const showPhotos = isPreview || props.showPhotos !== false;
   const showDescriptions = isPreview || props.showDescriptions !== false;
+  const showTags = isPreview || props.showTags !== false;
   const onReact = !isPreview ? props.onReact : undefined;
   const onClick = !isPreview ? props.onClick : undefined;
   const onEdit = !isPreview ? props.onEdit : undefined;
@@ -553,10 +555,10 @@ export const RecipeCard: React.FC<Props> = (props) => {
                     <Users className="h-3 w-3" /> {recipe.servings}
                   </span>
                 )}
-                {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
+                {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
                   <span key={i} className="text-stone-400 dark:text-stone-500">{tag}</span>
                 ))}
-                {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
+                {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
                   <span className="text-stone-300 dark:text-stone-600">+{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}</span>
                 )}
               </div>
@@ -701,12 +703,12 @@ export const RecipeCard: React.FC<Props> = (props) => {
             {/* Tags (allergy badge first, then regular tags) */}
             <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden flex-wrap">
               <AllergyBadge />
-              {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
+              {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
                 <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-stone-100 dark:bg-white/[0.06] text-[11px] font-medium text-stone-500 dark:text-stone-400 truncate max-w-[80px]">
                   {tag}
                 </span>
               ))}
-              {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
+              {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
                 <span className="text-[11px] text-stone-300 dark:text-stone-600 font-medium flex-shrink-0">
                   +{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}
                 </span>

@@ -95,9 +95,9 @@ const Recipes = () => {
 
   return (
     <div className="bg-stone-50 dark:bg-[#0e0f13]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
         {(showAddForm || editingRecipe) && (
-          <div className="animate-fade-in">
+          <div className="max-w-7xl animate-fade-in">
             <RecipeForm
               recipe={editingRecipe}
               onSave={() => {
@@ -169,7 +169,7 @@ const Recipes = () => {
             </div>
 
             {/* Recipe List */}
-            <div className="flex-1 min-w-0 space-y-4">
+            <div className="flex-1 min-w-0 max-w-6xl space-y-4">
               <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
                 {viewMode === 'collection' && selectedCollectionName ? selectedCollectionName : viewMode === 'household' ? 'Household Recipes' : viewMode === 'public' ? 'Public Recipes' : 'My Recipes'}
               </h1>
@@ -192,6 +192,9 @@ const Recipes = () => {
                 feedMode={viewMode}
               />
             </div>
+
+            {/* Ad rail — reserved width only, not shown until an ad provider is wired up */}
+            <div className="hidden xl:block w-[300px] shrink-0" />
           </div>
           </div>
         )}
