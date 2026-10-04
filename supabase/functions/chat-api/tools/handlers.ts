@@ -247,7 +247,10 @@ async function extractRecipeFromSource(
       };
     }
     body.source_type = "text";
-    body.text = "";
+    // Pass the user's own typed caption through — it may carry servings,
+    // page order ("page 2 of 2"), or corrections the model can't see in the
+    // image. This is the user's own input, not third-party content.
+    body.text = ctx.attachedImagesCaption || "";
     body.images = ctx.attachedImages;
   } else if (sourceType === "video") {
     body.source_type = "video";
@@ -890,7 +893,6 @@ async function saveRecipe(
     is_favorite: false,
     visibility: defaultVisibility,
     needs_reembed: true, // triggers async embedding refresh (MOP-0015)
-    created_by: ctx.user.id,
   };
 
   // Resolve household_id from the user's current household (if any).
