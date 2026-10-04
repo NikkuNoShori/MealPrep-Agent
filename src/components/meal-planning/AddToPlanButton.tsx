@@ -26,6 +26,7 @@ interface AddToPlanButtonProps {
   cookTime?: number;
   size?: 'sm' | 'default';
   compact?: boolean; // icon-only mode for card hover
+  panelAlign?: 'left' | 'right'; // which edge the dropdown panel hangs from; defaults by compact
 }
 
 function getWeekStart(date: Date): Date {
@@ -48,6 +49,7 @@ const AddToPlanButton = ({
   cookTime,
   size = 'sm',
   compact = false,
+  panelAlign,
 }: AddToPlanButtonProps) => {
   const [open, setOpen] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -182,7 +184,7 @@ const AddToPlanButton = ({
 
       {open && (
         <div
-          className={`absolute top-full mt-2 z-50 w-72 rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] shadow-xl animate-scale-in ${compact ? 'left-0' : 'right-0'}`}
+          className={`absolute top-full mt-2 z-50 w-72 rounded-xl border border-stone-200/80 dark:border-white/[0.08] bg-white dark:bg-[#16171c] shadow-xl animate-scale-in ${(panelAlign ?? (compact ? 'left' : 'right')) === 'left' ? 'left-0' : 'right-0'}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Week nav */}

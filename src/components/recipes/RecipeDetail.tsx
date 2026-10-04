@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { useMeasurementSystem } from '@/hooks/useMeasurementSystem'
+import { useShowPhotos } from '@/hooks/useShowPhotos'
 import { convertIngredient, optimizeUnit, formatConvertedValue, Unit } from '@/utils/unitConverter'
 import { VisibilityPicker, type RecipeVisibility } from '@/components/recipes/VisibilityPicker'
 import { AddToCollectionMenu } from '@/components/recipes/AddToCollectionMenu'
@@ -83,7 +84,8 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
     }
   }
 
-  const hasImage = recipe.imageUrl && recipe.imageUrl !== 'none'
+  const { showPhotos } = useShowPhotos()
+  const hasImage = showPhotos && recipe.imageUrl && recipe.imageUrl !== 'none'
   const hasNutrition = recipe.nutritionInfo && (
     (recipe.nutritionInfo.calories && recipe.nutritionInfo.calories > 0) ||
     (recipe.nutritionInfo.protein && recipe.nutritionInfo.protein > 0) ||
@@ -171,7 +173,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
             className="relative rounded-2xl overflow-hidden cursor-pointer group shadow-lg hover:shadow-2xl transition-all duration-500 mb-6"
             onClick={() => setIsImageFullscreen(true)}
           >
-            <div className="relative w-full h-72 sm:h-80 lg:h-96">
+            <div className="relative w-full h-48 sm:h-64 lg:h-96">
               <img
                 src={recipe.imageUrl}
                 alt={recipe.title}

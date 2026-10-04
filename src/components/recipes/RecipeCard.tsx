@@ -3,6 +3,16 @@ import { Clock, Users, ChefHat, Edit, Trash2, ThumbsUp, ThumbsDown, MoreVertical
 import AddToPlanButton from "@/components/meal-planning/AddToPlanButton";
 import { Button } from "@/components/ui/button";
 
+/** Shared across grid (2-line) and list (1-line) titles so both clip at the same length. */
+const TITLE_CHAR_LIMIT = 70;
+/** Shared across grid and list descriptions (both 2-line) so both clip at the same length. */
+const DESCRIPTION_CHAR_LIMIT = 140;
+
+function truncateText(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return text.slice(0, limit - 1).trimEnd() + "…";
+}
+
 export interface RecipeReaction {
   id: string;
   recipeId: string;
@@ -58,6 +68,7 @@ interface RecipeCardProps {
   reactions?: RecipeReaction[];
   dependents?: { id: string; name: string }[];
   showPhotos?: boolean;
+  showDescriptions?: boolean;
   onReact?: (recipeId: string, reaction: "thumbs_up" | "thumbs_down", familyMemberId?: string) => void;
   onClick?: () => void;
   onEdit?: (recipe: any) => void;
@@ -96,6 +107,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
   const reactions = (!isPreview && props.reactions) || [];
   const dependents = (!isPreview && props.dependents) || [];
   const showPhotos = isPreview || props.showPhotos !== false;
+  const showDescriptions = isPreview || props.showDescriptions !== false;
   const onReact = !isPreview ? props.onReact : undefined;
   const onClick = !isPreview ? props.onClick : undefined;
   const onEdit = !isPreview ? props.onEdit : undefined;
@@ -432,7 +444,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
         className={!isPreview ? "group cursor-pointer" : "group"}
       >
         <div className={[
-          "flex items-stretch gap-4 p-3 rounded-2xl border transition-all duration-300 overflow-hidden",
+          "flex items-stretch gap-4 p-3 rounded-2xl border transition-all duration-300",
           isPreview && previewActions?.saved
             ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40"
             : isSelected
@@ -495,7 +507,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-[15px] text-stone-900 dark:text-white leading-snug truncate" title={recipe.title}>
-                    {recipe.title}
+                    {truncateText(recipe.title, TITLE_CHAR_LIMIT)}
                   </h3>
                   {(recipe.author || recipe.cuisine) && (
                     <p className="text-[12px] text-stone-400 dark:text-stone-500 mt-0.5">
@@ -519,14 +531,15 @@ export const RecipeCard: React.FC<Props> = (props) => {
                       prepTime={recipe.prepTime}
                       cookTime={recipe.cookTime}
                       compact
+                      panelAlign="right"
                     />
                     <OverflowMenu />
                   </div>
                 )}
               </div>
-              {recipe.description && (
+              {showDescriptions && recipe.description && (
                 <p className="text-[13px] text-stone-500 dark:text-stone-400 line-clamp-2 mt-1 leading-relaxed">
-                  {recipe.description}
+                  {truncateText(recipe.description, DESCRIPTION_CHAR_LIMIT)}
                 </p>
               )}
             </div>
@@ -565,13 +578,13 @@ export const RecipeCard: React.FC<Props> = (props) => {
       className={["group h-full", !isPreview ? "cursor-pointer" : ""].join(" ")}
     >
       <div className={[
-        "h-full rounded-2xl overflow-hidden border hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:-translate-y-1 transition-all duration-300 flex flex-col",
+        "h-full rounded-2xl border hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:-translate-y-1 transition-all duration-300 flex flex-col",
         isSelected
           ? "bg-primary-50/60 dark:bg-primary-900/20 border-primary-300/60 dark:border-primary-500/40 ring-1 ring-primary-400/40 dark:ring-primary-500/30"
           : "bg-white dark:bg-white/[0.03] border-stone-200/60 dark:border-white/[0.06] hover:border-stone-300/80 dark:hover:border-white/[0.1]",
       ].join(" ")}>
         {/* Image area */}
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200/80 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700">
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-2xl bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200/80 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700">
           {showPhotos && recipe.imageUrl ? (
             <img
               src={recipe.imageUrl}
@@ -621,27 +634,28 @@ export const RecipeCard: React.FC<Props> = (props) => {
             </div>
           )}
 
-          {/* Top-left: select checkbox (select mode) or add to plan (normal mode) */}
+          {/* Top-left: select checkbox (hover to enter select mode, or always-on once active) + add to plan */}
           {!isPreview && recipeId && (
-            isSelectMode || onSelect ? (
-              <div
-                className={[
-                  "absolute top-2.5 left-2.5 transition-opacity duration-150",
-                  isSelectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                ].join(" ")}
-                onClick={(e) => { e.stopPropagation(); if (recipeId && onSelect) onSelect(recipeId); }}
-              >
-                <div className={[
-                  "w-6 h-6 rounded-lg flex items-center justify-center shadow-md transition-colors",
-                  isSelected
-                    ? "bg-primary-500 border-2 border-primary-500"
-                    : "bg-white/90 dark:bg-black/50 border-2 border-white/70 dark:border-white/30",
-                ].join(" ")}>
+            <div
+              className={[
+                "absolute top-2.5 left-2.5 flex items-center gap-1.5 transition-opacity duration-150",
+                isSelectMode || isSelected ? "opacity-100" : "opacity-100 md:opacity-0 md:group-hover:opacity-100",
+              ].join(" ")}
+            >
+              {onSelect && (
+                <div
+                  onClick={(e) => { e.stopPropagation(); onSelect(recipeId); }}
+                  className={[
+                    "w-6 h-6 rounded-lg flex items-center justify-center shadow-md transition-colors",
+                    isSelected
+                      ? "bg-primary-500 border-2 border-primary-500"
+                      : "bg-white/90 dark:bg-black/50 border-2 border-white/70 dark:border-white/30",
+                  ].join(" ")}
+                >
                   {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
                 </div>
-              </div>
-            ) : (
-              <div className="absolute top-2.5 left-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
+              )}
+              {!isSelectMode && (
                 <AddToPlanButton
                   recipeId={recipeId}
                   recipeName={recipe.title}
@@ -651,16 +665,16 @@ export const RecipeCard: React.FC<Props> = (props) => {
                   cookTime={recipe.cookTime}
                   compact
                 />
-              </div>
-            )
+              )}
+            </div>
           )}
         </div>
 
         {/* Content area */}
         <div className="flex flex-col flex-1 px-3.5 pt-3 pb-3">
           {/* Title */}
-          <h3 className="font-semibold text-[15px] text-stone-900 dark:text-white leading-snug line-clamp-1" title={recipe.title}>
-            {recipe.title}
+          <h3 className="font-semibold text-[15px] text-stone-900 dark:text-white leading-snug line-clamp-2" title={recipe.title}>
+            {truncateText(recipe.title, TITLE_CHAR_LIMIT)}
           </h3>
 
           {/* Author or cuisine */}
@@ -673,9 +687,9 @@ export const RecipeCard: React.FC<Props> = (props) => {
           )}
 
           {/* Description */}
-          {recipe.description && (
+          {showDescriptions && recipe.description && (
             <p className="text-[12px] text-stone-500 dark:text-stone-400 line-clamp-2 mt-1.5 leading-relaxed">
-              {recipe.description}
+              {truncateText(recipe.description, DESCRIPTION_CHAR_LIMIT)}
             </p>
           )}
 

@@ -4,14 +4,16 @@ import { useRecipes, useDeleteRecipe, useRemoveRecipeFromCollection, useCollecti
 import { RecipeCard, RecipeReaction } from './RecipeCard'
 import { RecipeSearch } from './RecipeSearch'
 import { useAuthStore } from '@/stores/authStore'
+import { useShowPhotos } from '@/hooks/useShowPhotos'
+import { useShowDescriptions } from '@/hooks/useShowDescriptions'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Plus, Grid, List, X, Trash2, Eye, FolderOpen, ChevronDown, Image, ImageOff } from "lucide-react";
+import { Switch } from '@/components/ui/switch'
+import { Plus, Grid, List, X, Trash2, Eye, FolderOpen, ChevronDown, MoreHorizontal } from "lucide-react";
 import toast from 'react-hot-toast';
 
 const MAX_SELECTION = 100;
-const SHOW_PHOTOS_STORAGE_KEY = "mealprep:recipes:showPhotos";
 
 interface RecipeListProps {
   onRecipeSelect?: (recipe: any) => void;
@@ -32,24 +34,8 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 }) => {
   const { user } = useAuthStore();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [showPhotos, setShowPhotos] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(SHOW_PHOTOS_STORAGE_KEY) !== "off";
-    } catch {
-      return true;
-    }
-  });
-  const toggleShowPhotos = () => {
-    setShowPhotos((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(SHOW_PHOTOS_STORAGE_KEY, next ? "on" : "off");
-      } catch {
-        // ignore storage errors (private browsing, etc.)
-      }
-      return next;
-    });
-  };
+  const { showPhotos, toggleShowPhotos } = useShowPhotos();
+  const { showDescriptions, toggleShowDescriptions } = useShowDescriptions();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   useEffect(() => {
@@ -68,8 +54,10 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showVisibilityPopover, setShowVisibilityPopover] = useState(false);
   const [showFolderPopover, setShowFolderPopover] = useState(false);
+  const [showViewOptionsPopover, setShowViewOptionsPopover] = useState(false);
   const visibilityRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<HTMLDivElement>(null);
+  const viewOptionsRef = useRef<HTMLDivElement>(null);
 
   const bulkDelete = useBulkDeleteRecipes();
   const bulkVisibility = useBulkUpdateRecipeVisibility();
@@ -85,7 +73,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 
   // Close popovers on outside click
   useEffect(() => {
-    if (!showVisibilityPopover && !showFolderPopover) return;
+    if (!showVisibilityPopover && !showFolderPopover && !showViewOptionsPopover) return;
     const handler = (e: MouseEvent) => {
       if (visibilityRef.current && !visibilityRef.current.contains(e.target as Node)) {
         setShowVisibilityPopover(false);
@@ -93,10 +81,13 @@ export const RecipeList: React.FC<RecipeListProps> = ({
       if (folderRef.current && !folderRef.current.contains(e.target as Node)) {
         setShowFolderPopover(false);
       }
+      if (viewOptionsRef.current && !viewOptionsRef.current.contains(e.target as Node)) {
+        setShowViewOptionsPopover(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [showVisibilityPopover, showFolderPopover]);
+  }, [showVisibilityPopover, showFolderPopover, showViewOptionsPopover]);
 
   const exitSelectMode = () => {
     setIsSelectMode(false);
@@ -226,6 +217,19 @@ export const RecipeList: React.FC<RecipeListProps> = ({
   const recipeIds = useMemo(() => filteredRecipes.map((r: any) => r.id), [filteredRecipes]);
   const { data: allReactions } = useRecipeReactions(recipeIds);
 
+  const allSelected = selectedIds.size > 0 && selectedIds.size === recipeIds.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      exitSelectMode();
+      return;
+    }
+    if (recipeIds.length > MAX_SELECTION) {
+      toast.error(`Selected the first ${MAX_SELECTION} recipes (max at once).`);
+    }
+    setSelectedIds(new Set(recipeIds.slice(0, MAX_SELECTION)));
+  };
+
   const reactionsByRecipe = useMemo(() => {
     const map: Record<string, RecipeReaction[]> = {};
     if (allReactions) {
@@ -301,6 +305,14 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             <span className="text-sm font-semibold text-stone-700 dark:text-stone-200 shrink-0">
               {selectedIds.size} of {totalCount} selected
             </span>
+
+            {/* Select all / deselect all */}
+            <button
+              onClick={toggleSelectAll}
+              className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline shrink-0"
+            >
+              {allSelected ? 'Deselect all' : 'Select all'}
+            </button>
 
             {/* Visibility button */}
             <div className="relative" ref={visibilityRef}>
@@ -426,16 +438,36 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                 </Button>
               </div>
 
-              {/* Photo visibility toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleShowPhotos}
-                className="rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] shrink-0"
-                title={showPhotos ? "Hide recipe photos" : "Show recipe photos"}
-              >
-                {showPhotos ? <Image className="h-4 w-4" /> : <ImageOff className="h-4 w-4" />}
-              </Button>
+              {/* Card display options (photos / descriptions) */}
+              <div className="relative" ref={viewOptionsRef}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowViewOptionsPopover(v => !v)}
+                  className="rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] shrink-0"
+                  title="Card display options"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+                {showViewOptionsPopover && (
+                  <div className="absolute top-full right-0 mt-1.5 z-[200] bg-white dark:bg-[#1e1f26] border border-stone-200/60 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 py-1.5 min-w-[220px] animate-scale-in origin-top-right">
+                    <button
+                      onClick={toggleShowPhotos}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                    >
+                      <span>Show photos</span>
+                      <Switch checked={showPhotos} />
+                    </button>
+                    <button
+                      onClick={toggleShowDescriptions}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                    >
+                      <span>Show descriptions</span>
+                      <Switch checked={showDescriptions} />
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {onAddRecipe && (
                 <Button
@@ -500,7 +532,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
         <div
           className={
             viewMode === "grid"
-              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+              ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
               : "space-y-4"
           }
         >
@@ -516,6 +548,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                 reactions={reactionsByRecipe[recipe.id] || []}
                 dependents={dependents}
                 showPhotos={showPhotos}
+                showDescriptions={showDescriptions}
                 onReact={handleReact}
                 onClick={isSelectMode ? undefined : () => onRecipeSelect?.(recipe)}
                 onEdit={(!isSelectMode && recipe.userId === user?.id) ? onEditRecipe : undefined}
