@@ -5,8 +5,13 @@
 -- missing id, image_url, tags, prep_time, slug, created_at, etc. caused
 -- blank/broken cards in the My Recipes feed. This replaces the function
 -- to return all recipe columns plus rank_score.
+--
+-- PostgreSQL requires DROP + CREATE (not CREATE OR REPLACE) when the
+-- RETURNS TABLE shape changes.
 
-CREATE OR REPLACE FUNCTION search_recipes_text(
+DROP FUNCTION IF EXISTS search_recipes_text(TEXT, UUID, INTEGER);
+
+CREATE FUNCTION search_recipes_text(
     search_query TEXT,
     user_uuid UUID,  -- VESTIGIAL: ignored; auth.uid() is the source of truth
     max_results INTEGER DEFAULT 20
