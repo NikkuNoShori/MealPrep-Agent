@@ -3,7 +3,7 @@
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
 **Last reviewed:** 2026-09-28
-**Last updated:** 2026-09-28 (MOP-0032 scaffolded — QoL backlog batch 1 from 2026-08-24 through 2026-09-27 session)
+**Last updated:** 2026-10-04 (MOP-0029 Phase 7 complete — stone-* migration finished; MOP-0034 + MOP-0035 drafted by surface-reviewer from screenshot-extraction audit; MOP-0033 number reserved by MOP-0032 for nutrition/frequency/family-requests)
 
 ---
 
@@ -60,14 +60,18 @@
 | [MOP-0026](MOP-0026-security-auditor-agent.md) | Security Auditor Agent | complete | 2026-09-07 | 2026-09-22 | 2026-09-22 | Nick Neal |
 | [MOP-0027](MOP-0027-tos-compliant-url-scraping.md) | ToS-Compliant URL Scraping — robots.txt check + domain blocklist | complete | 2026-09-07 | 2026-09-07 | 2026-09-07 | Nick Neal |
 | [MOP-0028](MOP-0028-bulk-recipe-actions.md) | Bulk Recipe Actions — Multi-Select Visibility, Folder Assignment, Delete, and Sharing | complete | 2026-09-21 | 2026-09-21 | 2026-09-21 | Nick Neal |
-| [MOP-0029](MOP-0029-theme-token-layering-surface-presets.md) | Theme Token Layering & Surface-Aware Presets | deferred | 2026-09-21 | 2026-09-22 | — | surface-reviewer |
+| [MOP-0029](MOP-0029-theme-token-layering-surface-presets.md) | Theme Token Layering & Surface-Aware Presets | in_progress | 2026-09-21 | 2026-10-04 | — | surface-reviewer |
 | [MOP-0030](MOP-0030-dashboard-redesign-real-data-widgets.md) | Dashboard Redesign — Real-Data Widgets | complete | 2026-09-22 | 2026-09-25 | 2026-09-25 | Nick Neal |
 | [MOP-0031](MOP-0031-direct-recipe-sharing.md) | Direct Recipe Sharing | complete | 2026-09-22 | 2026-09-25 | 2026-09-25 | Nick Neal |
-| [MOP-0032](MOP-0032-qol-backlog-batch-1.md) | QoL Backlog Batch 1 — Extraction, Chat, Recipes, Planner, Grocery | draft | 2026-09-28 | 2026-09-28 | — | Nick Neal |
+| [MOP-0032](MOP-0032-qol-backlog-batch-1.md) | QoL Backlog Batch 1 — Extraction, Chat, Recipes, Planner, Grocery | draft | 2026-09-28 | 2026-10-04 | — | Nick Neal |
+| [MOP-0034](MOP-0034-screenshot-extraction-accuracy.md) | Screenshot / Image Recipe Extraction Accuracy | draft | 2026-10-04 | 2026-10-04 | — | surface-reviewer |
+| [MOP-0035](MOP-0035-extraction-requirements-spec.md) | Per-Modality Recipe Extraction Requirements Spec | draft | 2026-10-04 | 2026-10-04 | — | surface-reviewer |
+
+> **MOP-0034 / MOP-0035 (2026-10-04):** Drafted from the recipe-pipeline-sme screenshot-extraction audit. Backed by ADR-0007 (absent = null, uncertainty → `warnings[]`). MOP-0034 Phase 1c supersedes MOP-0032 Phase 1 item 6's ≤3-word instruction filter. MOP-0012's deferral trigger has likely fired (second image-path extraction bug) and awaits a user decision on promotion. MOP-0033 is intentionally unassigned: MOP-0032 reserves it for nutrition / meal frequency / family meal requests.
 
 > **MOP-0030 complete 2026-09-25.** `/verify-mop` passed all 12 assertions (lint, build, 240/240 tests, RPC structural checks). A `data-integrity` review of the new `get_dashboard_stats()` RPC found and this MOP fixed two real bugs before completion: (1) recipe-count/top-cuisines queries referenced a superseded RLS policy (migration 009) and silently missed recipes visible only via collection-sharing (migration 012's 4th OR-branch) — added a `collection_shared_count` bucket; (2) the most-cooked-this-month query's `::UUID` cast had no value-shape guard, so one malformed `recipeId` could abort the entire RPC payload — added a regex guard. **Note on history:** these two fixes are committed but bundled without their own commit message inside `54ad8f8` (a separate session's MOP-0031 commit) — the fixes are verified correct and present, left as-is rather than rewriting shared history.
 >
-> **MOP-0029 (scope expanded 2026-09-21):** Now covers all thirteen color-surface categories, not just backgrounds. Grew from 6 to 10 phases. **Phases 0, 1, 2, 3, and 5 are implemented** (commits `48d965f`, `aeb2457`). Phase 9's palette-design blocker cleared 2026-09-22 — full hex specs for all five presets approved. **MOP-0030 has now shipped, clearing the deferral trigger for Phases 4, 6, 7, 8, 9** — see MOP-0029 §Trigger Conditions for remaining scheduling.
+> **MOP-0029 (2026-10-04):** Phases 0–7 of 10 now shipped. Both deferral trigger conditions (MOP-0030 shipped; palette specs approved) cleared 2026-09-25/22. Phase 7 (the `stone-*` → `surface-*` migration) completed across 4 batches, 51 files, 900 occurrences, zero visual change — commits `d05e455`, `8b9bcfb`, `b5c6eb1`, `83c8b40`. 6 real bugs/gaps found and fixed along the way (raw hex literals duplicating existing tokens). Only Phase 8 (gradients/shadows/CI enforcement) remains unstarted; Phase 9's design work was already completed inside Phase 4, so it now just needs acceptance-criteria verification once Phase 8 lands.
 
 > **MOP-0016:** Phases 1–3b shipped 2026-06-16 (`chat-api` deployed). **Outstanding:** deploy `recipe-pipeline`, run §Operator smoke tests, then promote to `verifying`. MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
 

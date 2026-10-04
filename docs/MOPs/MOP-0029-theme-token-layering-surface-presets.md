@@ -5,16 +5,14 @@
 | **MOP** | MOP-0029 |
 | **Title** | Theme Token Layering & Surface-Aware Presets |
 | **Date Submitted** | 2026-09-21 |
-| **Date Updated** | 2026-09-22 (Phase 9 palette specs approved) |
+| **Date Updated** | 2026-10-04 (Phase 7 complete — stone-* migration finished) |
 | **Date Completed** | — |
 | **Submitted By** | surface-reviewer |
-| **Status** | deferred |
+| **Status** | in_progress |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md). Valid values: `draft` / `evaluation` / `approved` / `planned` / `in_progress` / `verifying` / `complete` / `blocked` / `cancelled` / `deferred`.
 
-> **Reason (deferred):** The **migration and preset-authoring phases (4–9)** are sequenced deliberately *after* the dashboard redesign ships on the current live palette. This is cross-cutting work touching 44+ files; running it concurrently with an in-design redesign would entangle two independent change sets. See §Trigger Conditions.
->
-> **Phases 0–3 are NOT deferred** — they are the governance standard plus separable correctness fixes with no user-visible change and no dependency on preset design work. **Phases 0, 1, 2, 3, and 5 are implemented** (see commits `48d965f`, `aeb2457`). The only remaining deferral condition is the dashboard redesign shipping — the palette-design blocker on Phase 9 is cleared (see §Approved Phase 9 palette specs).
+> **No longer deferred (2026-10-04).** The dashboard redesign (MOP-0030) shipped, clearing the trigger condition. **Phases 0–7 are implemented**: 0 (`48d965f`), 1/2/3/5 (`aeb2457`), 4 (`154f6ae`), 6 (`b87ad80`), 7 (`d05e455`, `8b9bcfb`, `b5c6eb1`, `83c8b40`). Remaining: Phase 8 (gradients/shadows/CI enforcement) and Phase 9 (which Phase 4 already substantively completed by authoring all five presets' full token specs — what's left there is verification against the acceptance criteria once Phase 8 lands).
 
 > **Scope expanded 2026-09-21.** This MOP originally covered page background + card surface only. A full audit of every color surface found the same root cause across thirteen categories. Phases 0, 3, 6, 7, 8 are new; Phase 5 (migration) and Phase 9 (preset) are widened. See ADR-0006 §Full-audit findings and [docs/COLOR_SCHEMA.md](../COLOR_SCHEMA.md).
 
@@ -161,13 +159,15 @@ Resolve the three competing "error" representations into one (ADR-0006 Decision 
 
 Mechanical migration in batches, highest-density files first:
 
-- `stone-*` → `surface-*`
-- Raw accent literals (**328 occurrences**) → brand / status / accent-category tokens
-- Hardcoded dark hex (`#0e0f13`, `#16171c`, `#1e1f26` across 20 files) → tokens. **Includes `Header.tsx:151`, which uses `dark:bg-[#1e1f26]/95` when `var(--rs-bg-elevated)` already holds that exact value.**
-- Resolve the light/dark asymmetries (e.g. `Dashboard.tsx:52` `text-stone-500 dark:text-gray-400` — one element, two systems) per rule G5.
-- Add `dark:` coverage to the 28 `stone-*` lines that have none, or (preferred) move them to auto-swapping tokens.
+- `stone-*` → `surface-*` — **COMPLETE (2026-10-04).** All 4 batches landed: 51 files, 900 occurrences migrated across the whole codebase (grown from the original 44-file/878-occurrence audit snapshot, since new code kept using `stone-*` while this MOP was in progress). `grep -ro "stone-[0-9]+" src/` now returns only 2 hits, both inside a code comment in `src/stores/themeStore.ts` (lines 862/948) documenting the var()-opacity limitation discovered during the migration — not live class usage, deliberately left as historical documentation. Commits: `d05e455` (batch 1, 5 files), `8b9bcfb` (batch 2, 10 files), `b5c6eb1` (batch 3, 12 files), `83c8b40` (batch 4, 24 files).
+- Raw accent literals (**328 occurrences**) → brand / status / accent-category tokens — **NOT STARTED.** This is a separate migration from the `stone-*` rename (one-off hues like `amber-600`/`rose-500`/`indigo-500` used for meal-slot icons, status badges, etc. — distinct from the `MEAL_SLOT_ACCENTS`/`DASHBOARD_STAT_ACCENTS` maps already centralized in `src/theme/accentCategories.ts` by Phase 5, which still intentionally reference raw Tailwind hues rather than `--accent-cat-*` tokens).
+- Hardcoded dark hex (`#0e0f13`, `#16171c`, `#1e1f26` across 20 files) → tokens — **partially resolved as a side effect** of the `stone-*` batches (9 opportunistic fixes landed: 2 in batch 1, 5 in batch 2, 1 in batch 3, 1 in batch 4 — all tokenizing a bare hex literal with no opacity modifier onto `var(--rs-bg)`/`var(--rs-bg-elevated)` where it matched exactly). **Still open:** every opacity-modified instance (`#1e1f26/95`, `#16171c/80`, etc. — found in `Header.tsx:151` exactly as this MOP originally flagged, plus `RecipeCard.tsx`, `CollectionsSidebar.tsx`, `VisibilityPicker.tsx`, `AddToCollectionMenu.tsx`, and others) — these need `-rgb` triplet token infrastructure for `--rs-bg-elevated`/`--rs-bg` (the same fix Phase 4 already built for `--surface-*`) before they can be tokenized; confirmed via direct testing that Tailwind's arbitrary-value syntax cannot derive an alpha channel from an opaque `var()` reference.
+- Resolve the light/dark asymmetries (e.g. `Dashboard.tsx:52` `text-stone-500 dark:text-gray-400` — one element, two systems) per rule G5 — **largely moot post-migration**: the `stone-*`→`surface-*` rename means `Dashboard.tsx:52`'s specific example no longer exists as written (it's now `text-surface-500 dark:text-gray-400`). The underlying `surface-*`/`gray-*` split across light/dark on one element is a widespread, pre-existing, intentional pattern (confirmed during batches 1–4 across 20+ files) — not a violation, since `surface` and `gray` are legitimately separate token families (ADR-0006). No further action needed here.
+- Add `dark:` coverage to the 28 `stone-*` lines that have none — **implicitly resolved**: none of the 51 migrated files needed a new `dark:` variant added: every `surface-*` line already had one, or didn't need one. The original 28-line figure was from the stale pre-Phase-4 audit.
 
-> The Phase 4 aliases mean partial completion is always shippable. **Expect multiple sessions** — this is the largest phase by a wide margin.
+> New finding during Phase 7 (not fixed, flagged for a future decision): `src/components/ui/tabs.tsx` uses `ring-stone-950`/`ring-surface-950` (post-rename) — `950` is not a defined shade in either the `stone` or `surface` Tailwind key (both only go to 900), so it silently falls through to Tailwind's own default color scale rather than this project's token system. Pre-existing, not introduced by this migration.
+
+> The Phase 4 aliases meant partial completion was shippable throughout — confirmed across all 4 batches, each landed and verified independently without the others.
 
 ### Phase 8: Gradients, shadows, and CI enforcement
 **Files affected:** `src/index.css`, `tailwind.config.js`, ESLint config / CI script, 16 gradient sites
@@ -246,18 +246,18 @@ Source of truth for the `surface`, `accentCategory`, `gradient`, and `status` ra
 
 | Priority | Item | Effort | Impact |
 |----------|------|--------|--------|
-| **P1** | **Phase 0 — publish `COLOR_SCHEMA.md` + register in doc procedures** | Small | **High** (every day without it grows the violation count) |
-| P2 | Phase 1 — static CSS fallbacks (separable; fixes latent FOUC) | Small | Medium |
-| P2 | Phase 3 — reconcile status colors (fixes live success-as-brand bug; removes dead vars) | Small | Medium |
-| P3 | Phase 2 — consolidate apply path | Small | Low (correctness/maintainability) |
-| P3 | Phase 5 — deduplicate accent maps (pullable forward; kills 3-way copy-paste divergence) | Small | Medium |
-| defer | Phase 4 — token families + Tailwind wiring | Medium | Medium (enabling) |
-| defer | Phase 6 — shared surface primitives (component work) | Medium | Medium |
-| defer | Phase 7 — 44+35+20-file migration | **Large** | Low (enabling) |
-| defer | Phase 8 — gradients, shadows, CI enforcement | Medium | Medium (guards Phase 9) |
-| defer | Phase 9 — author professional presets | **Medium–Large** (design-bound) | **High** (the actual user-visible payoff) |
+| ✅ | Phase 0 — publish `COLOR_SCHEMA.md` + register in doc procedures | Small | High — **shipped** (`48d965f`) |
+| ✅ | Phase 1 — static CSS fallbacks | Small | Medium — **shipped** (`aeb2457`) |
+| ✅ | Phase 2 — consolidate apply path | Small | Low — **shipped** (`aeb2457`) |
+| ✅ | Phase 3 — reconcile status colors | Small | Medium — **shipped** (`aeb2457`) |
+| ✅ | Phase 4 — token families + Tailwind wiring | Medium | Medium — **shipped** (`154f6ae`) |
+| ✅ | Phase 5 — deduplicate accent maps | Small | Medium — **shipped** (`aeb2457`) |
+| ✅ | Phase 6 — shared surface primitives | Medium | Medium — **shipped** (`b87ad80`) |
+| ✅ | Phase 7 — stone-* → surface-* migration (51 files, 900 occurrences) | **Large** | Low — **shipped** (`d05e455`, `8b9bcfb`, `b5c6eb1`, `83c8b40`). Raw-accent-literal and opacity-modified-hex migration are separate, still-open sub-items — see Phase 7's updated description. |
+| P1 | Phase 8 — gradients, shadows, CI enforcement | Medium | Medium (guards Phase 9's visual integrity) |
+| P1 | Phase 9 — verify all five presets against acceptance criteria | Small (design work already done in Phase 4) | **High** (the actual user-visible payoff) |
 
-> **Note the effort shift.** Phase 9 was originally sized "Small." It is not — authoring 5 fully-specified presets across 4 ramp families × 2 modes is the gating design cost, and it is what the user actually wants. The token plumbing exists to make it possible.
+> **Effort note, updated.** Phase 9's hard part — authoring 5 fully-specified presets across 4 ramp families × 2 modes — was already done as part of Phase 4 (the token data had to exist before the Tailwind wiring could reference it). What remains under "Phase 9" is verification against the MOP's acceptance criteria, not design work.
 
 ---
 
@@ -268,11 +268,13 @@ Source of truth for the `surface`, `accentCategory`, `gradient`, and `status` ra
 - **Phase 0** (standard) — deferring it is self-defeating; it governs code written *while the rest waits*.
 - **Phases 1, 2, 3, 5** — separable correctness fixes and deduplication. No user-visible change, no dependency on preset design work.
 
-### Deferred — execute Phases 4, 6, 7, 8, 9 when this holds
+### Formerly deferred — both trigger conditions now satisfied
 
-1. The dashboard redesign has shipped on the current live palette (avoids entangling two cross-cutting change sets).
+~~1. The dashboard redesign has shipped...~~ — **Satisfied.** MOP-0030 (Dashboard Redesign) shipped 2026-09-25.
 
-~~2. A surface-differentiated preset is still wanted in product...~~ — **Satisfied 2026-09-22.** All five presets have approved hex ramps across all four L1 families in both modes (see §Approved Phase 9 palette specs). The remaining trigger is condition 1 only.
+~~2. A surface-differentiated preset is still wanted in product...~~ — **Satisfied 2026-09-22.** All five presets have approved hex ramps across all four L1 families in both modes (see §Approved Phase 9 palette specs).
+
+Phases 4, 6, 7 executed and shipped once both conditions cleared. Phase 8 remains the only phase not yet started.
 
 ### Pull forward early if any of these fire
 
