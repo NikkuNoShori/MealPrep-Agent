@@ -7,10 +7,11 @@ import { useAuthStore } from '@/stores/authStore'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Plus, Grid, List, X, Trash2, Eye, FolderOpen, ChevronDown } from "lucide-react";
+import { Plus, Grid, List, X, Trash2, Eye, FolderOpen, ChevronDown, Image, ImageOff } from "lucide-react";
 import toast from 'react-hot-toast';
 
 const MAX_SELECTION = 100;
+const SHOW_PHOTOS_STORAGE_KEY = "mealprep:recipes:showPhotos";
 
 interface RecipeListProps {
   onRecipeSelect?: (recipe: any) => void;
@@ -424,6 +425,17 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                   <List className="h-4 w-4" />
                 </Button>
               </div>
+
+              {/* Photo visibility toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleShowPhotos}
+                className="rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] shrink-0"
+                title={showPhotos ? "Hide recipe photos" : "Show recipe photos"}
+              >
+                {showPhotos ? <Image className="h-4 w-4" /> : <ImageOff className="h-4 w-4" />}
+              </Button>
 
               {onAddRecipe && (
                 <Button

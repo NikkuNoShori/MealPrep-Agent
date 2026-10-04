@@ -95,6 +95,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
   // In normal mode these are always defined; in preview mode they're always undefined.
   const reactions = (!isPreview && props.reactions) || [];
   const dependents = (!isPreview && props.dependents) || [];
+  const showPhotos = isPreview || props.showPhotos !== false;
   const onReact = !isPreview ? props.onReact : undefined;
   const onClick = !isPreview ? props.onClick : undefined;
   const onEdit = !isPreview ? props.onEdit : undefined;
