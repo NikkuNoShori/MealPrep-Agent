@@ -41,6 +41,7 @@ interface RecipeCardProps {
   viewMode: "grid" | "list";
   reactions?: RecipeReaction[];
   dependents?: { id: string; name: string }[];
+  showPhotos?: boolean;
   onReact?: (recipeId: string, reaction: "thumbs_up" | "thumbs_down", familyMemberId?: string) => void;
   onClick?: () => void;
   onEdit?: (recipe: any) => void;
@@ -52,6 +53,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   viewMode,
   reactions = [],
   dependents = [],
+  showPhotos = true,
   onReact,
   onClick,
   onEdit,
@@ -304,7 +306,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         <div className="flex items-stretch gap-4 p-3 rounded-2xl bg-white/60 dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/[0.06] hover:bg-white dark:hover:bg-white/[0.05] hover:shadow-lg hover:shadow-black/[0.04] dark:hover:shadow-black/20 hover:border-stone-300/60 dark:hover:border-white/[0.1] transition-all duration-300">
           {/* Image */}
           <div className="relative w-28 h-28 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-200/80 dark:from-gray-800 dark:to-gray-700">
-            {recipe.imageUrl ? (
+            {showPhotos && recipe.imageUrl ? (
               <img
                 src={recipe.imageUrl}
                 alt={recipe.title}
@@ -392,7 +394,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       <div className="h-full rounded-2xl overflow-hidden bg-white dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/[0.06] hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:border-stone-300/80 dark:hover:border-white/[0.1] hover:-translate-y-1 transition-all duration-300 flex flex-col">
         {/* Image area */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200/80 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700">
-          {recipe.imageUrl ? (
+          {showPhotos && recipe.imageUrl ? (
             <img
               src={recipe.imageUrl}
               alt={recipe.title}

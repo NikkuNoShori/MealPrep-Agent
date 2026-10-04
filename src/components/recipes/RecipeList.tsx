@@ -7,7 +7,9 @@ import { useAuthStore } from '@/stores/authStore'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Plus, Grid, List } from "lucide-react";
+import { Plus, Grid, List, Image, ImageOff } from "lucide-react";
+
+const SHOW_PHOTOS_STORAGE_KEY = "mealprep:recipes:showPhotos";
 
 interface RecipeListProps {
   onRecipeSelect?: (recipe: any) => void;
@@ -28,6 +30,24 @@ export const RecipeList: React.FC<RecipeListProps> = ({
 }) => {
   const { user } = useAuthStore();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [showPhotos, setShowPhotos] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SHOW_PHOTOS_STORAGE_KEY) !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const toggleShowPhotos = () => {
+    setShowPhotos((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SHOW_PHOTOS_STORAGE_KEY, next ? "on" : "off");
+      } catch {
+        // ignore storage errors (private browsing, etc.)
+      }
+      return next;
+    });
+  };
   const [searchQuery, setSearchQuery] = useState("");
   // MOP-0007 Phase 1: debounce the search query so each keystroke doesn't
   // trigger a network call. ~200ms is the standard sweet spot for search-as-
@@ -218,6 +238,17 @@ export const RecipeList: React.FC<RecipeListProps> = ({
           </Button>
         </div>
 
+        {/* Photo visibility toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleShowPhotos}
+          className="rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] shrink-0"
+          title={showPhotos ? "Hide recipe photos" : "Show recipe photos"}
+        >
+          {showPhotos ? <Image className="h-4 w-4" /> : <ImageOff className="h-4 w-4" />}
+        </Button>
+
         {onAddRecipe && (
           <Button
             onClick={onAddRecipe}
@@ -293,6 +324,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                 viewMode={viewMode}
                 reactions={reactionsByRecipe[recipe.id] || []}
                 dependents={dependents}
+                showPhotos={showPhotos}
                 onReact={handleReact}
                 onClick={() => onRecipeSelect?.(recipe)}
                 onEdit={recipe.userId === user?.id ? onEditRecipe : undefined}
