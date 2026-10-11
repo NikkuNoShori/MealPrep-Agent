@@ -248,19 +248,29 @@ async function handleSendMessage(
 
     const isFirstMessage = !existingConv || !!findError;
 
-    // Upload chat images to Supabase Storage and collect public URLs
-    const imageUrls: string[] = [];
+    // Upload chat images to Supabase Storage and collect public URLs.
+    // imageUrls[i] stays aligned with images[i] — a failed slot is left
+    // `undefined` (rather than skipped) so the caller can fall back to that
+    // image's original base64 instead of silently dropping it.
+    const imageUrls: (string | undefined)[] = [];
+    let imageUploadFailures = 0;
     if (images.length > 0) {
       for (let i = 0; i < images.length; i++) {
         try {
           const base64Data = images[i];
           // Extract mime type and raw base64
           const mimeMatch = base64Data.match(/^data:(image\/\w+);base64,/);
-          if (!mimeMatch) continue;
+          if (!mimeMatch) {
+            imageUrls.push(undefined);
+            imageUploadFailures++;
+            continue;
+          }
           const mimeType = mimeMatch[1];
           const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
           if (!allowedTypes.includes(mimeType)) {
             console.warn(`Chat image rejected — disallowed MIME type: ${mimeType}`);
+            imageUrls.push(undefined);
+            imageUploadFailures++;
             continue;
           }
           const ext = mimeType.split("/")[1] || "jpg";
@@ -274,6 +284,8 @@ async function handleSendMessage(
 
           if (uploadError) {
             console.warn(`Chat image upload failed: ${uploadError.message}`);
+            imageUrls.push(undefined);
+            imageUploadFailures++;
             continue;
           }
 
@@ -282,14 +294,25 @@ async function handleSendMessage(
             .getPublicUrl(filePath);
           if (urlData?.publicUrl) {
             imageUrls.push(urlData.publicUrl);
+          } else {
+            imageUrls.push(undefined);
+            imageUploadFailures++;
           }
         } catch (e) {
           console.warn(`Failed to upload chat image ${i}:`, e.message);
+          imageUrls.push(undefined);
+          imageUploadFailures++;
         }
       }
     }
+    if (imageUploadFailures > 0) {
+      console.warn(
+        `${imageUploadFailures} of ${images.length} chat image(s) failed to upload to storage; falling back to inline data for those images.`
+      );
+    }
 
-    // Save user message with image URLs in metadata
+    // Save user message with image URLs in metadata (storage-persisted URLs only)
+    const persistedImageUrls = imageUrls.filter((url): url is string => !!url);
     await supabase.from("chat_messages").insert({
       conversation_id: conversationId,
       content: message || "[Images only]",
@@ -298,7 +321,8 @@ async function handleSendMessage(
       metadata: {
         imagesCount: images.length,
         hasImages: images.length > 0,
-        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+        imageUrls: persistedImageUrls.length > 0 ? persistedImageUrls : undefined,
+        imageUploadFailures: imageUploadFailures > 0 ? imageUploadFailures : undefined,
       },
     });
 
@@ -322,12 +346,19 @@ async function handleSendMessage(
         content: enrichMessageContent(msg),
       }));
 
+    // Per-image fallback: use the storage URL where upload succeeded, else
+    // the image's own original base64 — a single failed upload must not drop
+    // that image from what the vision model sees (MOP-0034 Phase 3).
+    const attachedImages =
+      images.length > 0 ? images.map((img, i) => imageUrls[i] ?? img) : [];
+
     const toolCtx: ToolContext = {
       user: { id: user.id, email: user.email },
       supabase,
       openRouter,
       userToken,
-      attachedImages: imageUrls.length > 0 ? imageUrls : images,
+      attachedImages,
+      attachedImagesCaption: images.length > 0 ? message : undefined,
     };
 
     // ── Run agent (streaming or non-streaming) ──────────────────────

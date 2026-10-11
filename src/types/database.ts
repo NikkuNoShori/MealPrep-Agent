@@ -1081,7 +1081,7 @@ export type Database = {
           image_url: string
           ingredients: Json
           instructions: Json
-          is_public: boolean
+          visibility: string
           prep_time: number
           rating: number
           searchable_text: string
@@ -1122,7 +1122,7 @@ export type Database = {
           image_url: string
           ingredients: Json
           instructions: Json
-          is_public: boolean
+          visibility: string
           prep_time: number
           rating: number
           recommendation_score: number
@@ -1186,7 +1186,7 @@ export type Database = {
           ingredient_match_score: number
           ingredients: Json
           instructions: Json
-          is_public: boolean
+          visibility: string
           prep_time: number
           rating: number
           searchable_text: string
@@ -1213,7 +1213,7 @@ export type Database = {
           image_url: string
           ingredients: Json
           instructions: Json
-          is_public: boolean
+          visibility: string
           prep_time: number
           rating: number
           searchable_text: string
@@ -1228,12 +1228,31 @@ export type Database = {
       search_recipes_text: {
         Args: { max_results?: number; search_query: string; user_uuid: string }
         Returns: {
+          id: string
+          user_id: string
+          title: string
           description: string
           ingredients: Json
           instructions: Json
+          prep_time: number
+          cook_time: number
+          total_time: number
+          servings: number
+          difficulty: string
+          cuisine: string
+          tags: string[]
+          dietary_tags: string[]
+          image_url: string
+          nutrition_info: Json
+          source_url: string
+          source_name: string
+          is_favorite: boolean
+          slug: string
+          visibility: string
+          searchable_text: string
+          created_at: string
+          updated_at: string
           rank_score: number
-          recipe_id: string
-          title: string
         }[]
       }
       set_user_id: { Args: { user_uuid: string }; Returns: undefined }

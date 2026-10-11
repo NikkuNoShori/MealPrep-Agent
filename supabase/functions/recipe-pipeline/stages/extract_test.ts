@@ -117,3 +117,39 @@ Deno.test("normalizeExtractedRecipe does not touch an already-correct unit", () 
 
   assertEquals(recipe.ingredients[0].unit, "cup");
 });
+
+// ── normalizeExtractedRecipe: instruction noise filter (MOP-0034 Phase 1c) ──
+//
+// The old filter dropped any step of 3 words or fewer, and any step starting
+// with "garnish with" or "serve immediately" — deleting real steps like
+// "Bake 20 minutes." The filter must now only drop a step that IS a filler
+// phrase in its entirety.
+
+Deno.test("short but real instruction steps survive normalization", () => {
+  const recipe = normalizeExtractedRecipe({
+    title: "Test Recipe",
+    ingredients: [{ name: "salt", amount: 1, unit: "tsp", category: "pantry" }],
+    instructions: [
+      "Bake 20 minutes.",
+      "Season to taste.",
+      "Garnish with parsley and serve.",
+      "Enjoy!",
+    ],
+  });
+
+  assertEquals(recipe.instructions, [
+    "Bake 20 minutes.",
+    "Season to taste.",
+    "Garnish with parsley and serve.",
+  ]);
+});
+
+Deno.test("pure filler closing remarks are dropped", () => {
+  const recipe = normalizeExtractedRecipe({
+    title: "Test Recipe",
+    ingredients: [{ name: "salt", amount: 1, unit: "tsp", category: "pantry" }],
+    instructions: ["Mix well.", "Enjoy!", "Dig in!", "Bon appétit!"],
+  });
+
+  assertEquals(recipe.instructions, ["Mix well."]);
+});

@@ -528,7 +528,7 @@ async function assignRecipeToMealPlanSlot(
 
   // 1. Resolve target meal plan: explicit id, else the active plan that
   //    covers this date, else create a new draft.
-  let plan: { id: string; meals: any } | null = null;
+  let plan: { id: string } | null = null;
 
   if (mealPlanId) {
     const { data, error } = await ctx.supabase
@@ -539,7 +539,7 @@ async function assignRecipeToMealPlanSlot(
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
     if (!data) return { ok: false, error: "Meal plan not found", retryable: false };
-    plan = data as { id: string; meals: any };
+    plan = data as { id: string };
   } else {
     const { data, error } = await ctx.supabase
       .from("meal_plans")
@@ -551,7 +551,7 @@ async function assignRecipeToMealPlanSlot(
       .limit(1)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    plan = (data as { id: string; meals: any } | null) || null;
+    plan = (data as { id: string } | null) || null;
   }
 
   // Verify recipe belongs to user.
@@ -581,7 +581,6 @@ async function assignRecipeToMealPlanSlot(
         last_edited_by: ctx.user.id,
         start_date: planStart,
         end_date: planEnd,
-        meals: {},
         status: "draft",
       })
       .select("id")
@@ -644,20 +643,9 @@ async function assignRecipeToMealPlanSlot(
     if (entryErr) return { ok: false, error: entryErr.message, retryable: true };
   }
 
-  // Dual-write: keep JSONB meals in sync during transition window.
-  const { data: allEntries } = await ctx.supabase
-    .from("meal_plan_entries" as any)
-    .select("date, slot, recipe_id")
-    .eq("meal_plan_id", plan.id)
-    .not("date", "is", null);
-  const rebuiltMeals: Record<string, Record<string, string>> = {};
-  for (const e of (allEntries || []) as any[]) {
-    if (!rebuiltMeals[e.date]) rebuiltMeals[e.date] = {};
-    rebuiltMeals[e.date][e.slot] = e.recipe_id;
-  }
   await ctx.supabase
     .from("meal_plans")
-    .update({ meals: rebuiltMeals, last_edited_by: ctx.user.id })
+    .update({ last_edited_by: ctx.user.id })
     .eq("id", plan.id);
 
   return {
@@ -873,9 +861,10 @@ async function saveRecipe(
     ?.default_recipe_visibility ?? "private";
 
   // 3. Build the insert row — map camelCase → snake_case for the DB.
+  // Note: recipes has no household_id column — household-level sharing is
+  // controlled entirely by the `visibility` field below (private/household/public).
   const insertRow: Record<string, unknown> = {
     user_id: ctx.user.id,
-    household_id: null, // will be resolved by RLS / trigger if needed
     title,
     description: recipeArg.description ?? null,
     ingredients: recipeArg.ingredients ?? [],
@@ -894,12 +883,6 @@ async function saveRecipe(
     visibility: defaultVisibility,
     needs_reembed: true, // triggers async embedding refresh (MOP-0015)
   };
-
-  // Resolve household_id from the user's current household (if any).
-  const { data: hhData } = await ctx.supabase.rpc("get_my_household");
-  if (hhData && typeof hhData === "object" && (hhData as any).id) {
-    insertRow.household_id = (hhData as any).id;
-  }
 
   const { data: saved, error: insertErr } = await ctx.supabase
     .from("recipes")
@@ -1345,7 +1328,6 @@ async function createMealPlan(
       title,
       start_date: startDate,
       end_date: endDate,
-      meals: {},
       status: "draft",
     })
     .select("id, title, start_date, end_date, status")
@@ -1426,20 +1408,9 @@ async function clearMealPlanSlot(
     .eq("slot", slot);
   if (delErr) return { ok: false, error: delErr.message, retryable: true };
 
-  // Dual-write: rebuild JSONB meals from remaining entries.
-  const { data: allEntries } = await ctx.supabase
-    .from("meal_plan_entries" as any)
-    .select("date, slot, recipe_id")
-    .eq("meal_plan_id", resolvedPlanId)
-    .not("date", "is", null);
-  const rebuiltMeals: Record<string, Record<string, string>> = {};
-  for (const e of (allEntries || []) as any[]) {
-    if (!rebuiltMeals[e.date]) rebuiltMeals[e.date] = {};
-    rebuiltMeals[e.date][e.slot] = e.recipe_id;
-  }
   await ctx.supabase
     .from("meal_plans")
-    .update({ meals: rebuiltMeals, last_edited_by: ctx.user.id })
+    .update({ last_edited_by: ctx.user.id })
     .eq("id", resolvedPlanId);
 
   return { ok: true, data: { cleared: true, date, slot, meal_plan_id: resolvedPlanId } };
@@ -1824,9 +1795,9 @@ export async function executeConfirmedTool(
   }
 
   if (name === "assign_recipe_to_meal_plan_slot") {
-    // Re-run the handler with the confirmed_overwrite flag — but the assign
-    // handler itself doesn't gate on that flag; we set the slot via the JSONB
-    // read-modify-write here.
+    // Re-run the handler with the confirmed_overwrite flag — the assign
+    // handler itself doesn't gate on that flag; we overwrite the slot's
+    // entry in meal_plan_entries directly here.
     const mealPlanId = args.meal_plan_id as string;
     const date = args.date as string;
     const slot = args.slot as string;
@@ -1834,7 +1805,7 @@ export async function executeConfirmedTool(
 
     const { data: plan, error: planErr } = await ctx.supabase
       .from("meal_plans")
-      .select("id, meals")
+      .select("id")
       .eq("id", mealPlanId)
       .eq("user_id", ctx.user.id)
       .maybeSingle();
@@ -1845,20 +1816,47 @@ export async function executeConfirmedTool(
         retryable: false,
       };
     }
-    const currentMeals = (((plan as { meals?: any }).meals as
-      | Record<string, Record<string, string>>
-      | undefined) || {}) as Record<string, Record<string, string>>;
-    const daySlots = { ...(currentMeals[date] || {}) };
-    daySlots[slot] = recipeId;
-    currentMeals[date] = daySlots;
-    const { error: updErr } = await ctx.supabase
+
+    const { data: recipe, error: recErr } = await ctx.supabase
+      .from("recipes")
+      .select("id, title, servings")
+      .eq("id", recipeId)
+      .maybeSingle();
+    if (recErr || !recipe) {
+      return { ok: false, error: "Recipe not found or you don't have access to it.", retryable: false };
+    }
+    const recipeTitle = (recipe as { title: string }).title;
+    const recipeServings = (recipe as { servings?: number }).servings ?? 1;
+
+    const { error: delErr } = await ctx.supabase
+      .from("meal_plan_entries" as any)
+      .delete()
+      .eq("meal_plan_id", mealPlanId)
+      .eq("date", date)
+      .eq("slot", slot);
+    if (delErr) return { ok: false, error: delErr.message, retryable: true };
+
+    const { error: insErr } = await ctx.supabase
+      .from("meal_plan_entries" as any)
+      .insert({
+        meal_plan_id: mealPlanId,
+        date,
+        slot,
+        recipe_id: recipeId,
+        recipe_name: recipeTitle,
+        servings: recipeServings,
+        position: 0,
+      });
+    if (insErr) return { ok: false, error: insErr.message, retryable: true };
+
+    await ctx.supabase
       .from("meal_plans")
-      .update({ meals: currentMeals, last_edited_by: ctx.user.id })
+      .update({ last_edited_by: ctx.user.id })
       .eq("id", mealPlanId);
-    if (updErr) return { ok: false, error: updErr.message, retryable: true };
+
     return {
       ok: true,
-      data: { meal_plan_id: mealPlanId, date, slot, recipe_id: recipeId },
+      data: { meal_plan_id: mealPlanId, date, slot, recipe_id: recipeId, recipe_title: recipeTitle },
     };
   }
 

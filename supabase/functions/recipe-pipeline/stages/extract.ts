@@ -62,7 +62,7 @@ export async function extract(
   const systemPrompt = hasUserImages ? IMAGE_EXTRACTION_PROMPT : RECIPE_EXTRACTION_PROMPT;
 
   const userPrompt = hasUserImages
-    ? `${rawText || "Extract the recipe from the provided images."}\n\n[${content.images.length} image(s) provided]\n\nExtract the recipe(s) and return structured JSON.`
+    ? `${rawText ? `User-provided context (may include servings, page order, corrections): ${rawText}` : "Extract the recipe from the provided images."}\n\n[${content.images.length} image(s) provided]\n\nExtract the recipe(s) and return structured JSON.`
     : `${rawText}\n\nExtract the recipe(s) and return structured JSON. If there are multiple recipes, return them in a "recipes" array.`;
 
   let response: string;
@@ -292,10 +292,13 @@ export function normalizeExtractedRecipe(raw: any): ExtractedRecipe {
         return inst.text || inst.step || inst.instruction || inst.description || String(inst);
       })
     : [];
-  // Filter out noise steps (very short or common filler phrases)
+  // Filter out noise steps — only drop a step if it IS a filler phrase in its
+  // entirety (e.g. "Enjoy!"). A short real step like "Bake 20 minutes." or a
+  // step that starts with "Garnish with..." must survive; word-count alone
+  // is not a signal of noise.
   const instructions = rawInstructions.filter((step: string) => {
     const trimmed = step.trim();
-    return trimmed.split(/\s+/).length > 3 && !INSTRUCTION_NOISE.test(trimmed);
+    return trimmed.length > 0 && !INSTRUCTION_NOISE.test(trimmed);
   });
 
   return {
@@ -422,8 +425,8 @@ const UNIT_CANONICAL: Record<string, string> = {
   clove: "clove", cloves: "clove",
 };
 
-/** Units that represent countable whole items — drop them so the item reads naturally */
-const COUNTABLE_UNITS = new Set(["piece", "pieces", "stalk", "stalks"]);
+/** Units that are meaningless measurement words — drop them (the count is already in amount) */
+const COUNTABLE_UNITS = new Set(["piece", "pieces"]);
 
 /** Expand common ingredient abbreviations and informal names to full names */
 const INGREDIENT_NAME_MAP: Record<string, string> = {
@@ -435,8 +438,13 @@ const INGREDIENT_NAME_MAP: Record<string, string> = {
   "parmigiano reggiano": "parmesan cheese",
 };
 
-/** Noise phrases that should be stripped from the end of instruction steps */
-const INSTRUCTION_NOISE = /^(enjoy|serve immediately|dig in|bon appétit|bon appetit|garnish with)/i;
+/**
+ * Whole-step social/filler phrases — a step is noise only if the ENTIRE step
+ * (after stripping trailing punctuation) matches one of these. A step that
+ * merely starts with "Garnish" or "Serve" (e.g. "Garnish with parsley and
+ * serve.") is real content and must not match.
+ */
+const INSTRUCTION_NOISE = /^(enjoy|dig in|bon appétit|bon appetit)[.!]*$/i;
 
 // ── Phase 2: Unicode fractions & written numbers ──
 

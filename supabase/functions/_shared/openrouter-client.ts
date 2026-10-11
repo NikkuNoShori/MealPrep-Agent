@@ -4,6 +4,7 @@
  */
 
 import { resolveOpenRouterKeys } from "./openrouter-keys.ts";
+import { MAX_VISION_IMAGES } from "./recipe-schema.ts";
 
 // ─────────────────────────────────────────────────────────────────────
 // Types for tool-using chat (OpenAI-compatible tool format)
@@ -163,13 +164,17 @@ export class OpenRouterClient {
       response_format?: { type: string };
     }
   ): Promise<string> {
-    const userContent = [
+    // Label each image with its position so the model can reason about page
+    // order, overlapping scroll captures, and which image a detail came from
+    // (MOP-0034 Phase 3b) — images were previously sent with no ordinal marker.
+    const capped = images.slice(0, MAX_VISION_IMAGES);
+    const userContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
       { type: "text", text: userMessage },
-      ...images.slice(0, 4).map((img) => ({
-        type: "image_url",
-        image_url: { url: img },
-      })),
     ];
+    for (let i = 0; i < capped.length; i++) {
+      userContent.push({ type: "text", text: `Image ${i + 1} of ${capped.length}:` });
+      userContent.push({ type: "image_url", image_url: { url: capped[i] } });
+    }
 
     const apiKey = this.mediaApiKey;
     const response = await fetch(`${this.baseUrl}/chat/completions`, {

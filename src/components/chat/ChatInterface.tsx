@@ -45,19 +45,34 @@ import {
 
 /** Maximum image file size in bytes (5MB) */
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-/** Maximum image dimension for compression */
-const MAX_IMAGE_DIMENSION = 1200;
-/** JPEG compression quality */
-const COMPRESSION_QUALITY = 0.8;
+/**
+ * Maximum SHORT-side dimension. Capping the short side (rather than the
+ * long side) preserves native width for typical tall phone screenshots —
+ * capping the long side instead squashed a 1170x2532 screenshot down to
+ * ~554x1200, and a 1170x6000 scrolling capture down to ~234x1200
+ * (unreadable). Text legibility depends on the short side staying large;
+ * the long side is left uncapped here (very tall captures are tiled in a
+ * later pass — MOP-0034 Phase 3 — rather than shrunk further).
+ */
+const MAX_IMAGE_SHORT_SIDE = 1280;
+/** JPEG compression quality — only applied when re-encoding to JPEG. */
+const COMPRESSION_QUALITY = 0.92;
+/** Mirrors MAX_VISION_IMAGES in supabase/functions/_shared/recipe-schema.ts. */
+const MAX_PENDING_IMAGES = 8;
 
 /** Client-side temp conversation ids are numeric timestamps. */
 function isLocalTempConversationId(id: string): boolean {
   return /^\d+$/.test(id);
 }
 
+/** Formats the pipeline/vision model can read natively — left untouched when no resize is needed. */
+const NATIVELY_SUPPORTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
 /**
- * Validate and compress an image file.
- * Returns the compressed File, or throws if invalid.
+ * Validate and (if needed) resize an image file. Returns the original File
+ * unchanged whenever it's already within the short-side limit and already a
+ * natively-supported format — screenshot text should never be re-encoded if
+ * it doesn't have to be. Throws if invalid.
  */
 async function validateAndCompressImage(file: File): Promise<File> {
   // Validate type
@@ -70,7 +85,6 @@ async function validateAndCompressImage(file: File): Promise<File> {
     throw new Error(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is 5MB.`);
   }
 
-  // Compress using canvas
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -78,24 +92,42 @@ async function validateAndCompressImage(file: File): Promise<File> {
     img.onload = () => {
       URL.revokeObjectURL(url);
 
-      let { width, height } = img;
+      const { width, height } = img;
+      const shortSide = Math.min(width, height);
+      const needsResize = shortSide > MAX_IMAGE_SHORT_SIDE;
+      const needsReencode = !NATIVELY_SUPPORTED_TYPES.has(file.type);
 
-      // Only resize if larger than max dimension
-      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
-        const ratio = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
+      // Already a supported format and within the short-side cap — skip the
+      // canvas round-trip entirely so screenshot text isn't re-encoded at all.
+      if (!needsResize && !needsReencode) {
+        resolve(file);
+        return;
+      }
+
+      let targetWidth = width;
+      let targetHeight = height;
+      if (needsResize) {
+        const ratio = MAX_IMAGE_SHORT_SIDE / shortSide;
+        targetWidth = Math.round(width * ratio);
+        targetHeight = Math.round(height * ratio);
       }
 
       const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         resolve(file); // Fallback: return original if canvas fails
         return;
       }
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+      // PNG screenshots keep lossless PNG — JPEG re-encoding introduces
+      // compression artifacts around small text. Any other source format
+      // (e.g. HEIC) normalizes to PNG for compatibility. Only genuine JPEG
+      // sources are re-encoded as JPEG, at a near-lossless quality.
+      const outputType = file.type === "image/jpeg" ? "image/jpeg" : "image/png";
+      const outputExt = outputType === "image/jpeg" ? "jpg" : "png";
 
       canvas.toBlob(
         (blob) => {
@@ -103,17 +135,20 @@ async function validateAndCompressImage(file: File): Promise<File> {
             resolve(file);
             return;
           }
-          const compressedFile = new File([blob], file.name, {
-            type: "image/jpeg",
+          const outputName = needsReencode
+            ? file.name.replace(/\.[^.]+$/, `.${outputExt}`)
+            : file.name;
+          const compressedFile = new File([blob], outputName, {
+            type: outputType,
             lastModified: Date.now(),
           });
           console.log(
-            `Image compressed: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB (${width}x${height})`
+            `Image resized: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB (${width}x${height} → ${targetWidth}x${targetHeight}, ${outputType})`
           );
           resolve(compressedFile);
         },
-        "image/jpeg",
-        COMPRESSION_QUALITY
+        outputType,
+        outputType === "image/jpeg" ? COMPRESSION_QUALITY : undefined
       );
     };
 
@@ -714,8 +749,8 @@ export const ChatInterface: React.FC = () => {
       }
     }
 
-    // Limit to 4 images total
-    const remainingSlots = 4 - pendingImages.length;
+    // Limit to MAX_PENDING_IMAGES images total
+    const remainingSlots = MAX_PENDING_IMAGES - pendingImages.length;
     const filesToAdd = imageFiles.slice(0, remainingSlots);
 
     // Validate and compress each image
@@ -744,8 +779,8 @@ export const ChatInterface: React.FC = () => {
     const items = Array.from(e.clipboardData.items);
     const imageItems = items.filter((item) => item.type.startsWith("image/"));
 
-    if (imageItems.length > 0 && pendingImages.length < 4) {
-      const remainingSlots = 4 - pendingImages.length;
+    if (imageItems.length > 0 && pendingImages.length < MAX_PENDING_IMAGES) {
+      const remainingSlots = MAX_PENDING_IMAGES - pendingImages.length;
       const itemsToProcess = imageItems.slice(0, remainingSlots);
 
       for (const item of itemsToProcess) {
@@ -2082,35 +2117,17 @@ export const ChatInterface: React.FC = () => {
                           ))}
                         </div>
                       )}
-                      {message.content && (() => {
-                        // Strip <extracted_recipe> XML that the server injects into
-                        // stored messages for context — render a recipe card instead.
-                        const xmlMatch = message.content.match(/<extracted_recipe>([\s\S]*?)<\/extracted_recipe>/);
-                        if (xmlMatch && message.sender === "ai") {
-                          let parsed: StructuredRecipe | null = null;
-                          try { parsed = JSON.parse(xmlMatch[1].trim()); } catch { /* ignore */ }
-                          const before = message.content.slice(0, xmlMatch.index).trim();
-                          const after = message.content.slice((xmlMatch.index ?? 0) + xmlMatch[0].length).trim();
-                          return (
-                            <>
-                              {before && <p className="text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100 mb-2">{before}</p>}
-                              {parsed && <StructuredRecipeDisplay recipe={parsed} />}
-                              {after && <p className="text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100 mt-2">{after}</p>}
-                            </>
-                          );
-                        }
-                        return (
-                          <p
-                            className={`text-sm whitespace-pre-wrap break-words ${
-                              message.sender === "user"
-                                ? "text-white"
-                                : "text-gray-900 dark:text-gray-100"
-                            }`}
-                          >
-                            {message.content}
-                          </p>
-                        );
-                      })()}
+                      {message.content && (
+                        <p
+                          className={`text-sm whitespace-pre-wrap break-words ${
+                            message.sender === "user"
+                              ? "text-white"
+                              : "text-gray-900 dark:text-gray-100"
+                          }`}
+                        >
+                          {message.content}
+                        </p>
+                      )}
                       <p
                         className={`text-xs opacity-70 mt-1 ${
                           message.sender === "user"
@@ -2289,16 +2306,16 @@ export const ChatInterface: React.FC = () => {
                   multiple
                   onChange={handleImageSelect}
                   className="hidden"
-                  disabled={pendingImages.length >= 4}
+                  disabled={pendingImages.length >= MAX_PENDING_IMAGES}
                 />
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                   variant="outline"
                   size="icon"
-                  disabled={pendingImages.length >= 4}
+                  disabled={pendingImages.length >= MAX_PENDING_IMAGES}
                   title={
-                    pendingImages.length >= 4
-                      ? "Maximum 4 images allowed"
+                    pendingImages.length >= MAX_PENDING_IMAGES
+                      ? `Maximum ${MAX_PENDING_IMAGES} images allowed`
                       : "Upload images or a saved recipe video"
                   }
                 >

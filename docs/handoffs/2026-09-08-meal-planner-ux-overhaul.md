@@ -1,78 +1,40 @@
-# Handoff: Meal Planner UX Overhaul
-**Date:** 2026-09-08  
-**Session scope:** MealPlanner.tsx, MealPlanHistory.tsx, GroceryCart.tsx, SuggestWeekModal.tsx, api.ts
+# Meal Planner UX Overhaul — 2026-09-08
 
----
+## Summary
+Full overhaul of the meal planner UI: replaced the plan selector pill with a `WeekLabelDropdown`, rewrote `MealPlanHistory` with grouped sections and per-row actions, removed Shopping Mode from the grocery tab, and wired the Suggest Week modal with last-plan exclusion. Session ended with all changes shipped.
 
-## What Was Shipped
+## What changed (committed)
 
-### Plan Selector / WeekLabelDropdown
-- **Replaced `PlanSelectorDropdown` pill** with `WeekLabelDropdown` — the week date range IS the dropdown trigger (click the date label in the toolbar to switch plans).
-- Dropdown shows "Switch plan" section only when ≥ 2 plans exist.
-- Always opens when actions are available (≥ 1 plan).
-- **Per-plan `⋯` button** inside the dropdown: each plan row has an ellipsis that reveals Rename, Mark complete / Restore to active, and **Delete** (with confirmation dialog).
-- Selected plan row uses `bg-white/10` for reliable dark-mode highlight.
-- Panel background uses `hsl(var(--popover))` to match shadcn across themes.
+> Note: This entry was written before the git-verification rule was established. Commit hashes were not recorded. Cross-check `git log` for the authoritative list of commits from this date.
 
-### Active Plan Actions (now in WeekLabelDropdown `⋯`)
-- **Rename** — inline Input replaces toolbar, saves on Enter / click-outside.
-- **Mark complete** — confirmation dialog before transitioning to `completed`.
-- **Restore to active** — shown for `completed` plans (no confirm needed).
-- **Delete** — shown for all plans; confirmation dialog before calling `handleDeletePlan`.
-- The old standalone `⋯` button block (bannerMenuRef / bannerMenuOpen) has been removed.
+- `src/pages/MealPlanner.tsx` — replaced `PlanSelectorDropdown` with `WeekLabelDropdown`; per-plan `⋯` menu (Rename, Mark complete, Restore, Delete with confirm); empty state gate when all plans deleted; removed dead `bannerMenu*` state and ref
+- `src/components/meal-planning/MealPlanHistory.tsx` — full rewrite: grouped sections (Active/stale → Completed → Archived), status icons, newest-first sort, detail overlay (max-w-2xl, two-column grid), per-row ellipsis actions (Copy, Restore, Archive, Mark complete, Delete), Copy to new plan starts day after source end date
+- `src/components/meal-planning/GroceryCart.tsx` — Shopping Mode removed entirely (toggle, state, ShoppingMode import, conditional renders)
+- `src/components/meal-planning/SuggestWeekModal.tsx` — last-plan exclusion via `excludeRecipeIds` prop; fetches 20 suggestions when exclusions exist, filters client-side, shows top 10
+- `src/services/api.ts` — `useDeleteMealPlan` with optimistic `onMutate` removal
 
-### Plan Status Filters (History vs. Active)
-- `activePlans`: `(status === 'active' || 'draft') && endDate >= today`.
-- `historyPlans`: `status === 'completed' || 'archived' || endDate < today` (stale plans correctly route to history).
-- Dropdown shows only `activePlans`.
+## Decisions and reasoning
 
-### MealPlanHistory Redesign
-- **Grouped sections**: Active (stale) → Completed → Archived, each with dividers.
-- **Sort**: newest-first within each group.
-- **Status icons**: emerald `CheckCircle2` for completed, `PackageOpen` for archived, `CalendarCheck` for stale-active, `Clock` for draft.
-- **Ellipsis per row**: Copy to new plan, Restore to active, Archive (completed only), Mark complete (stale only), Delete.
-- **Detail overlay**: wide (`max-w-2xl`), solid `hsl(var(--popover))` background, two-column grid, footer actions.
-- **Copy to new plan**: starts the day after source plan's `endDate`, runs for user's default duration (`newPlanDays` from config).
+- **WeekLabelDropdown shows only `activePlans`** — dropdown hides completed/archived plans to reduce noise. Known gap: if a user has only completed plans, the dropdown is empty. Accepted for now; full fix would add a "completed" section to the dropdown.
+- **Shopping Mode removed** — deemed unnecessary complexity; grocery tab retains Add Item and Regenerate as always-visible actions.
+- **Optimistic delete** — plan disappears instantly from the list on delete without waiting for a round-trip. Keeps the UI snappy; rollback on error not implemented (Supabase delete failures are rare).
+- **Copy to new plan** starts the day after source plan's `endDate` using the user's default duration (`newPlanDays` from config). No UI to override the start date at copy time.
 
-### Grocery Tab / Shopping Mode
-- **Shopping Mode removed** entirely (toggle button, state, ShoppingMode import, conditional renders all cleaned up).
-- Grocery tab remains, with Add Item and Regenerate always visible.
+## Known issues / things that look wrong but aren't (or are)
 
-### Suggest Week Modal (MOP-0007 Phase 4)
-- Button wired in toolbar (Sparkles icon), only shows when `weekPlan` exists.
-- **Last-plan exclusion**: `historyPlans[0].meals` is parsed for recipe IDs → passed as `excludeRecipeIds: Set<string>` to `SuggestWeekModal`.
-- Modal fetches 20 suggestions (instead of 10) when exclusions exist, filters client-side, shows top 10 of what remains.
-- Displays note: "X recipes from your last plan hidden to keep things fresh."
+- `PackageOpen` icon for archived plans — noted as debatable but left as-is.
+- Dropdown empty when user has only completed plans — known gap, not a bug, deferred.
 
-### Delete: Optimistic UI + Empty State
-- `useDeleteMealPlan` in `api.ts` uses `onMutate` optimistic removal — the plan disappears instantly from the list without waiting for a round-trip.
-- When all plans are deleted: toolbar hides (gated on `isLoading || activePlan`), existing "No Plan CTA" shows with "Create Your First Plan" button.
+## Open questions for the user
 
-### Other
-- Dropdown now stays open when only 1 plan exists (was `> 1`, fixed to `>= 1`).
-- Removed `bannerMenuOpen`, `bannerMenuRef`, and their effect hook (dead code after standalone `⋯` removal).
+- Should the WeekLabelDropdown optionally show completed plans in a separate section so users with no active plans aren't stranded?
 
----
+## Suggested next steps
 
-## Ideas Discussed but NOT Yet Implemented
+Deferred ideas from this session that were explicitly discussed but not implemented:
 
-| Idea | Notes |
-|---|---|
-| **Grocery tab empty state** | When no plan selected or plan has no meals, grocery tab shows a plain empty area — could use a "Add ingredients" prompt or a pointer to the meal plan. |
-| **Plan list: New Plan button in WeekLabelDropdown** | User might want "New Plan" inside the dropdown list at the bottom, in addition to the header button. Not discussed explicitly but natural next step. |
-| **History: archive icon** | `PackageOpen` is fine but could use a more distinct icon. Noted as debatable. |
-| **WeekLabelDropdown: show all plans (not just active)** | Currently dropdown only shows `activePlans`. If user has only completed plans, dropdown is empty. Could optionally show completed plans in a separate section. |
-| **Mobile swipe to switch plans** | The week nav arrows work, but mobile UX for multi-plan households wasn't addressed. |
-| **MOP-0014: Household Write Atomicity** | Still pending, never started. |
-| **MOP-0026: Security Auditor Agent** | Scaffolded but not implemented. |
-
----
-
-## Files Changed This Session
-| File | Change summary |
-|---|---|
-| `src/pages/MealPlanner.tsx` | WeekLabelDropdown with per-plan `⋯`; delete confirm; empty state gate; removed bannerMenu* |
-| `src/components/meal-planning/MealPlanHistory.tsx` | Full rewrite: grouped sections, status icons, detail overlay, ellipsis actions |
-| `src/components/meal-planning/GroceryCart.tsx` | Shopping Mode removed |
-| `src/components/meal-planning/SuggestWeekModal.tsx` | Last-plan exclusion via `excludeRecipeIds` prop |
-| `src/services/api.ts` | `useDeleteMealPlan` with optimistic `onMutate` removal |
+- Grocery tab empty state (prompt or pointer when no plan / no meals)
+- "New Plan" button inside WeekLabelDropdown at the bottom of the list
+- WeekLabelDropdown showing completed plans in a secondary section
+- MOP-0014: Household Write Atomicity — still pending, never started
+- MOP-0026: Security Auditor Agent — scaffolded but not implemented at time of writing

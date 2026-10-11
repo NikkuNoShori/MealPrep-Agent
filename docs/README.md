@@ -49,7 +49,7 @@ Setup guides, tooling, and operational procedures.
 | [E2E_TESTING.md](Development/E2E_TESTING.md) | Playwright E2E test setup, authoring guide, and CI notes (MOP-0013) |
 | [VECTOR_VS_TEXT_SEARCH.md](Development/VECTOR_VS_TEXT_SEARCH.md) | Vector vs text search comparison |
 | [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md) | Google OAuth configuration |
-| [SESSION_HANDOFF.md](SESSION_HANDOFF.md) | Latest session status and merge checklist (ephemeral — refresh each session) |
+| [handoffs/](handoffs/) | Dated per-session handoff notes (one file per session, `YYYY-MM-DD-topic-slug.md`) — supersedes the old standalone `SESSION_HANDOFF.md` |
 
 **Client config (code):** `src/config/queryCache.ts` (React Query stale times), `src/stores/draftRecipeStore.ts` (unsaved recipe preview cache).
 

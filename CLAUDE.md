@@ -57,6 +57,20 @@ Supabase Edge Functions are deployed separately and run on Deno (not Node).
 - `docs/MOPs/` — Method of Procedures for planned features (see `REGISTRY.md`)
 - `docs/DECISIONS/` — Architecture Decision Records (ADRs)
 - `docs/prompts/` — Authoritative procedure docs (`DOCUMENTATION_UPDATE_PROCEDURE.md`, `MOP_STATUS_LIFECYCLE.md`, `ADR_AUTHORING_GUIDE.md`)
+- `docs/handoffs/` — **Session handoff log.** One file per session, verified against `git status`/`git log`. Read the most recent 1–2 entries at the start of any new session. Write a new entry at the end of every session using `/handoff`. See `docs/handoffs/README.md` for the entry template and filename convention.
+
+## Session-start reflex
+
+At the start of every session on this repo, **before doing any work**, read the most recent entry in `docs/handoffs/` (list the folder sorted by name, read the last file). This is not optional — open questions and in-flight work from the prior session live there, not in git history. If the latest entry has an "Uncommitted / in-flight" section, cross-check it against the actual current `git status` before proceeding.
+
+## Session-end reflex
+
+When any of the following happen, **invoke `/handoff` before the session ends**:
+- The user says "that's all", "good session", "wrap it up", "let's stop", "switching chats", "new chat", or similar closing phrases
+- The conversation is approaching context limits
+- A task is left mid-way and the user is stopping
+
+Do not wait to be asked. Write the handoff entry, then confirm it was written as your final message.
 
 ## Surface-review reflex
 
@@ -100,6 +114,7 @@ Equivalent user-invoked path: `/surface` slash command.
 | `/verify-mop` | Verify MOP acceptance block (no human gates) |
 | `/surface` | User-invoked surface review |
 | `/security-audit [scope]` | Invoke `security-auditor` — full or scoped (`edge-functions`, `migrations`, `api`) |
+| `/handoff` | Write a session handoff entry to `docs/handoffs/` — **mandatory at end of every session** |
 
 ## Security audit rule
 

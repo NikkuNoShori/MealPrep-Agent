@@ -3,6 +3,18 @@
  * Single source of truth — used by both recipe-pipeline and chat-api.
  */
 
+/**
+ * Shared field rules — interpolated into both RECIPE_EXTRACTION_PROMPT and
+ * IMAGE_EXTRACTION_PROMPT so they can never drift apart on type/unit/category
+ * handling (MOP-0034 Phase 1d). Edit once, applies to every extraction path.
+ */
+const RECIPE_FIELD_RULES = `## Field Rules (apply to every extraction)
+- **amount** is always a number, never a string. Convert fractions to decimals: "1/2" → 0.5, "1 1/2" → 1.5, "½" → 0.5.
+- **Standard units**: cups, tbsp, tsp, oz, lb, g, kg, ml, L, clove, stalk, head, ear, sprig. Never use "piece" or "pieces" as a unit — if the source says "2 pieces chicken", use amount: 2, unit: "" (empty).
+- **Ingredient category** — one of: protein (meat, fish, eggs, tofu), produce (vegetables, fruits), pantry (spices, oils, canned goods), dairy (milk, cheese, butter), grains (rice, pasta, bread), condiments (sauces, dressings). If none fit, use "other".
+- **Full ingredient names** — use complete names: "feta cheese" not "feta", "all-purpose flour" not "AP flour", "extra virgin olive oil" not "EVOO", "parmesan cheese" not "parm".
+- **Instruction quality** — keep every real action step, even short ones like "Bake 20 minutes." or "Season to taste." Only omit a step that is PURELY a closing remark with no action at all — "Enjoy!", "Dig in!", "Bon appétit". A step like "Garnish with parsley and serve." has an action and must be kept.`;
+
 export const RECIPE_EXTRACTION_PROMPT = `# Recipe Extraction Engine
 
 You are a precise recipe extraction system that converts text and images into structured recipe data.
@@ -11,7 +23,7 @@ You are a precise recipe extraction system that converts text and images into st
 - Extract recipe information from text
 - Analyze recipe images (photos, cards, screenshots)
 - Parse handwritten notes
-- Handle multiple images (up to 4)
+- Handle multiple images (up to 8)
 
 ## Output Format
 You MUST return ONLY valid JSON in this exact structure:
@@ -41,11 +53,11 @@ You MUST return ONLY valid JSON in this exact structure:
       "Step 1: Detailed instruction",
       "Step 2: Detailed instruction"
     ],
-    "prepTime": 15,
-    "cookTime": 30,
-    "totalTime": 45,
-    "servings": 4,
-    "difficulty": "easy",
+    "prepTime": null,
+    "cookTime": null,
+    "totalTime": null,
+    "servings": null,
+    "difficulty": null,
     "tags": ["vegetarian", "quick", "healthy"],
     "cuisine": "Italian",
     "nutrition": {
@@ -60,36 +72,31 @@ You MUST return ONLY valid JSON in this exact structure:
 \`\`\`
 
 ## Critical Rules
-1. **Never hallucinate** - If information is missing, omit the field or use null
-2. **Parse ingredient quantities** - Extract the numeric amount and unit from ingredient text. "2 tablespoons olive oil" → amount: 2, unit: "tbsp", name: "olive oil". "1/2 cup flour" → amount: 0.5, unit: "cups". Always convert fractions to decimals.
-3. **Standard units** - cups, tbsp, tsp, oz, lb, g, kg, ml, L
-4. **Preserve techniques** - Keep cooking methods and tips
-5. **Extract all metadata** - Times, servings, difficulty, dietary info
-6. **No commentary** - Return ONLY the JSON structure, no explanations
-7. **Field types**:
-   - amount: number (not string)
-   - prepTime, cookTime, totalTime: number (minutes)
-   - servings: number
-   - difficulty: "easy" | "medium" | "hard"
+1. **Never hallucinate** - If information is missing, omit the field or use null. Never estimate or infer a time, servings, or difficulty that isn't stated.
+2. **Parse ingredient quantities** - Extract the numeric amount and unit from ingredient text. "2 tablespoons olive oil" → amount: 2, unit: "tbsp", name: "olive oil".
+3. **Preserve techniques** - Keep cooking methods and tips
+4. **No commentary** - Return ONLY the JSON structure, no explanations
+5. **Field types**:
+   - prepTime, cookTime, totalTime: number (minutes) or null
+   - servings: number or null
+   - difficulty: "easy" | "medium" | "hard" | null
    - ingredients: array of objects (not strings)
    - instructions: array of strings
-8. **Full ingredient names** - Use complete names: "feta cheese" not "feta", "all-purpose flour" not "AP flour", "extra virgin olive oil" not "EVOO", "parmesan cheese" not "parm".
-9. **Countable whole items** - For items like onion, potato, egg, bell pepper, garlic clove — omit the unit field (leave it empty string ""); use only the numeric amount.
-10. **Instruction quality** - Each instruction step must be a complete action (more than 3 words). Do not include filler phrases like "Enjoy!", "Serve immediately", "Dig in!", or "Bon appétit" as instruction steps.
+
+${RECIPE_FIELD_RULES}
 
 ## Image Processing
-- Analyze ALL provided images
+- Analyze ALL provided images. Each is labeled "Image N of M" in the order it was attached or captured — use that order to reconstruct the recipe.
 - Look for: title, ingredients list, instructions, timing, servings
 - Combine information from multiple images if provided
 - Handle various formats: recipe cards, cookbook pages, handwritten notes
 
-## Common Ingredient Categories
-- protein (meat, fish, eggs, tofu)
-- produce (vegetables, fruits)
-- pantry (spices, oils, canned goods)
-- dairy (milk, cheese, butter)
-- grains (rice, pasta, bread)
-- condiments (sauces, dressings)
+## Merging Multiple Images
+Images are frequently sequential scroll-captures or photos of the SAME recipe, not separate recipes. Use these signals before deciding there is more than one recipe:
+- **Scroll/page continuation**: if a later image's content picks up mid-sentence, mid-ingredient-list, or mid-step-numbering from an earlier image (e.g. image 2 starts at "3. Add the garlic" with no title above it), treat it as a continuation of the SAME recipe — merge ingredients and instructions in image order, do not duplicate any line that appears (even partially) in two overlapping images.
+- **Repeated title or hero photo**: if two images show the same title/photo, they are the same recipe shown twice (e.g. a top-of-page screenshot and a scrolled-further screenshot) — merge, don't duplicate as two recipes.
+- **A genuine new recipe** only starts when a NEW distinct title, a clear section break (e.g. "Recipe 2", a new heading, a different dish name), or unrelated ingredients/instructions with no continuation signal appears. Only then start a new entry in "recipes".
+- When merging, de-duplicate ingredients and instruction steps that overlap between images (e.g. the last visible line of image 1 and the first visible line of image 2 are often the same line, captured twice by an overlapping scroll screenshot).
 
 ## Difficulty Classification
 - easy: < 30 min prep, simple techniques, few ingredients
@@ -130,28 +137,27 @@ You are a specialized recipe extraction system that analyzes images to extract s
 - **Grocery/ingredient lists**: Lists that may accompany recipes
 
 ## Extraction Strategy
-1. **Read ALL text** visible in the image(s) carefully
-2. **Identify recipe boundaries** — if multiple recipes are visible, extract each separately
+1. **Read ALL text** visible in the image(s) carefully. Each image is labeled "Image N of M" in attachment/capture order — use that order to reconstruct the recipe.
+2. **Identify recipe boundaries** — if multiple recipes are visible, extract each separately. But first rule out the far more common case: the images are sequential scroll-captures or photos of the SAME recipe. Signals that images are a continuation, not a new recipe: a later image picks up mid-sentence, mid-ingredient-list, or mid-numbered-step with no title above it; the same title or hero photo reappears; content visibly overlaps between two images (the last line of one matches the first line of the next). Only start a new recipe entry when a genuinely new title, heading, or unrelated content appears with no continuation signal.
 3. **Parse quantities precisely** — "2 tbsp" → amount: 2, unit: "tbsp"
 4. **Preserve original instructions** — keep the author's wording and order
-5. **Infer missing metadata** — estimate prep/cook time and difficulty if not stated
+5. **Never guess missing metadata** — if prep/cook time, servings, or difficulty are not stated or shown, use null. Do not estimate.
 
 ## Output Format
 Return ONLY valid JSON. For a single recipe:
-{"recipe":{"title":"Recipe Name","description":"Brief description","ingredients":[{"name":"ingredient","amount":2,"unit":"tbsp","category":"pantry","notes":""}],"instructions":["Step 1","Step 2"],"prepTime":15,"cookTime":30,"totalTime":45,"servings":4,"difficulty":"easy","tags":[],"cuisine":null,"nutrition":null,"imageUrl":null}}
+{"recipe":{"title":"Recipe Name","description":"Brief description","ingredients":[{"name":"ingredient","amount":2,"unit":"tbsp","category":"pantry","notes":""}],"instructions":["Step 1","Step 2"],"prepTime":null,"cookTime":null,"totalTime":null,"servings":null,"difficulty":null,"tags":[],"cuisine":null,"nutrition":null,"imageUrl":null}}
 
 For multiple recipes visible in the images:
 {"recipes":[{"title":"First Recipe","ingredients":[...],"instructions":[...],...},{"title":"Second Recipe","ingredients":[...],"instructions":[...],...}]}
 
 ## Critical Rules
-1. **Never hallucinate** — only extract what is clearly visible in the image
-2. **Handle poor quality** — if text is partially legible, extract what you can and note uncertainty
-3. **Combine multiple images** — if images show different parts of the same recipe, merge them
+1. **Never hallucinate** — only extract what is clearly visible in the image. Never estimate or infer a time, servings, or difficulty that isn't shown.
+2. **Handle poor quality** — if text is partially legible, extract what you can. If a value is genuinely unreadable, use null rather than guessing — do not fold uncertainty into the ingredient name or notes as if it were fact.
+3. **Combine multiple images** — if images show different parts of the same recipe (including overlapping scroll-captures), merge them into one recipe and de-duplicate any ingredient or step line that appears in more than one image
 4. **No commentary** — return ONLY JSON, no explanations
 5. **Do NOT wrap in markdown** — return raw JSON only
-6. **Full ingredient names** — use complete names: "feta cheese" not "feta", "all-purpose flour" not "AP flour", "extra virgin olive oil" not "EVOO".
-7. **Countable whole items** — for items like onion, potato, egg, bell pepper — omit the unit (leave it empty string ""); use only the numeric amount.
-8. **Instruction quality** — each step must be a complete action. Do not include "Enjoy!", "Dig in!", or "Bon appétit" as steps.`;
+
+${RECIPE_FIELD_RULES}`;
 
 /**
  * @deprecated — superseded by tool-using agent (MOP-0008).

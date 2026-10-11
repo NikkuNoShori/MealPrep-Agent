@@ -275,3 +275,4 @@ Append to the update log at the bottom of this document:
 | 2026-09-21 | Nick Neal | main (MOP-0014 complete — household write atomicity RPCs; admin delete bug fix; invite email UX fix) | DATA_MODEL, API, CHANGELOG, MOP-0014, REGISTRY |
 | 2026-09-21 | Nick Neal | main (MOP-0028 complete — bulk recipe actions: multi-select UI, bulk RPCs, migration 038) | DATA_MODEL, API, CHANGELOG, MOP-0028, REGISTRY |
 | 2026-09-22 | Nick | main (MOP-0026 complete — security auditor agent, confirmAction verification, embedding-refresh JWT gate, MIME whitelist, error sanitization, migrations 039–041) | ARCHITECTURE, API, RUNBOOK, CHANGELOG, MOP-0026, REGISTRY |
+| 2026-09-25 | Nick | main (MOP-0031 complete — direct recipe sharing: recipe_shares table, 5 RLS policies, 5 SECURITY DEFINER RPCs, Shared with me feed, unseen badge, sharer attribution, migration 043) | DATA_MODEL, API, RUNBOOK, CHANGELOG, MOP-0031, REGISTRY |

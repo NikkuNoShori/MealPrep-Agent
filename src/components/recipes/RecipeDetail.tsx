@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { useMeasurementSystem } from '@/hooks/useMeasurementSystem'
 import { convertIngredient, optimizeUnit, formatConvertedValue, Unit } from '@/utils/unitConverter'
+import { parseAmount } from '@/utils/parseAmount'
 import { VisibilityPicker, type RecipeVisibility } from '@/components/recipes/VisibilityPicker'
 import { AddToCollectionMenu } from '@/components/recipes/AddToCollectionMenu'
 import AddToPlanButton from '@/components/meal-planning/AddToPlanButton'
@@ -348,7 +349,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                     <div className="space-y-0.5">
                       {visibleIngredients.map((ingredient, index) => {
                         const rawUnit = (ingredient.unit || '').toLowerCase().trim()
-                        const amount = ingredient.amount == null ? 0 : (typeof ingredient.amount === 'number' ? ingredient.amount : parseFloat(String(ingredient.amount)) || 0)
+                        const amount = parseAmount(ingredient.amount) ?? 0
                         const isQualitative = ['to taste', 'to serve', 'as needed', 'optional', 'pinch', 'dash', 'splash', 'garnish', 'for garnish', 'to garnish'].includes(rawUnit)
                         const isZeroAmount = amount === 0 || isNaN(amount)
 

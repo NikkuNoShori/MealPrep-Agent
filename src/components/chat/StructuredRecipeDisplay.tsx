@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Save, Clock, Users, ChefHat, Loader2, CheckCircle2, ChevronDown, ChevronRight, AlertTriangle, Copy, X, RefreshCw, Pencil, Check } from "lucide-react";
 import { useCreateRecipe, useUpdateRecipe, apiClient } from "@/services/api";
 import { fetchImageAsFile } from "@/utils/recipeImagePicker";
+import { parseAmount } from "@/utils/parseAmount";
 import { VisibilityPicker, type RecipeVisibility } from "@/components/recipes/VisibilityPicker";
 import { useDraftRecipeStore } from "@/stores/draftRecipeStore";
 import type { StructuredRecipe as StructuredRecipeType } from "@/types";
@@ -148,7 +149,7 @@ function CompactIngredientRow({
     onChange({
       ...ingredient,
       name: trimmedName,
-      amount: amount ? parseFloat(amount) || null : null,
+      amount: amount ? parseAmount(amount) : null,
       unit: unit.trim(),
     });
     setEditing(false);

@@ -3,6 +3,7 @@
 
 import type { GroceryItem, MealPlanMeals, PlannedMealEntry } from '@/types/mealPlan';
 import { convertValuePrecise, optimizeUnit, type Unit } from './unitConverter';
+import { parseAmount } from './parseAmount';
 
 interface RecipeIngredient {
   name: string;
@@ -101,22 +102,6 @@ function toCanonicalAmount(
 
 function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function parseAmount(amount: number | string | null | undefined): number | null {
-  if (amount === null || amount === undefined) return null;
-  if (typeof amount === 'number') return amount;
-  // Handle fraction strings like "1/2", "1 1/2"
-  const str = amount.toString().trim();
-  if (!str) return null;
-  // Simple fraction: "1/2"
-  const fractionMatch = str.match(/^(\d+)\s*\/\s*(\d+)$/);
-  if (fractionMatch) return parseInt(fractionMatch[1]) / parseInt(fractionMatch[2]);
-  // Mixed number: "1 1/2"
-  const mixedMatch = str.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
-  if (mixedMatch) return parseInt(mixedMatch[1]) + parseInt(mixedMatch[2]) / parseInt(mixedMatch[3]);
-  const num = parseFloat(str);
-  return isNaN(num) ? null : num;
 }
 
 // ── Grocery Key ──

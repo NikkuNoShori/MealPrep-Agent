@@ -1,4 +1,5 @@
 import type { IntermediateContent } from "./types.ts";
+import { MAX_VISION_IMAGES } from "../../_shared/recipe-schema.ts";
 
 const ADAPTER_VERSION = "1.0.0";
 
@@ -18,7 +19,7 @@ export async function textAdapter(
 
   return {
     raw_text: cleaned,
-    images: (images || []).slice(0, 4),
+    images: (images || []).slice(0, MAX_VISION_IMAGES),
     source_metadata: {
       source_type: "text",
       extracted_at: new Date().toISOString(),

@@ -170,6 +170,7 @@ export function makeCtx(overrides?: Partial<ToolContext>): ToolContext {
       ]).client,
     userToken: "fake-token",
     attachedImages: overrides?.attachedImages,
+    attachedImagesCaption: overrides?.attachedImagesCaption,
     attachedVideoMediaUrl: overrides?.attachedVideoMediaUrl,
     attachedVideoFrameUrls: overrides?.attachedVideoFrameUrls,
   };

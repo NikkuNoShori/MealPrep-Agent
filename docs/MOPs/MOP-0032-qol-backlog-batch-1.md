@@ -5,7 +5,7 @@
 | **MOP** | MOP-0032 |
 | **Title** | QoL Backlog Batch 1 — Extraction, Chat, Recipes, Planner, Grocery |
 | **Date Submitted** | 2026-09-28 |
-| **Date Updated** | 2026-09-28 |
+| **Date Updated** | 2026-10-04 |
 | **Date Completed** | — |
 | **Submitted By** | Nick Neal |
 | **Status** | draft |
@@ -256,5 +256,7 @@ verification:
 ---
 
 ## Notes
+
+> **2026-10-04 amendment (surface-reviewer):** Phase 1 item 6's "≤ 3 words" instruction filter (shipped in `fc61c7f`, `extract.ts:296-299`) silently deletes legitimate short steps ("Bake 20 minutes.", "Season to taste.") and any step starting "Garnish with" / "Serve immediately". It is superseded by **MOP-0034 Phase 1c** (whole-step noise match only). Phase 1 item 7's fraction representation must match MOP-0034 Phase 1d's shared prompt rule. Note also that this MOP is still `draft` in the registry despite `fc61c7f` shipping "9 phases". Reconcile the status via `/update-registry`.
 
 Phases 1 and 4 (extraction normalization and search fix) are independent and can be worked in parallel. Phases 2 and 3 are sequentially dependent (post-save link is trivial; in-chat editing is large and should be scoped further before starting). Phase 6 (slot confirmation) is a quick win and should be picked up alongside any Meal Planner session. Phase 8's "already owned" decision (reuse `is_removed` vs new column) needs a quick confirm from Nick before implementation.

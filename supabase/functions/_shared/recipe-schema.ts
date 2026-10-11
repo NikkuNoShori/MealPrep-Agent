@@ -2,6 +2,15 @@
  * Shared type definitions and validation for the recipe ETL pipeline.
  */
 
+/**
+ * Maximum images sent to a vision model call, shared across every caller
+ * (user screenshot uploads, video OCR frames). Previously hardcoded to 4 in
+ * three separate places while video's own frame cap was 8 — frames 5-8 were
+ * silently dropped by chatWithImages before ever reaching the model
+ * (MOP-0034 Phase 3a). One constant now, so every path agrees.
+ */
+export const MAX_VISION_IMAGES = 8;
+
 // ─── Intermediate format (output of all source adapters) ───
 
 export interface SourceMetadata {

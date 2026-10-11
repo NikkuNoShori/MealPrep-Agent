@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/services/api";
 import { useMeasurementUnits } from "@/hooks/useMeasurementUnits";
+import { parseAmount } from "@/utils/parseAmount";
 import {
   DndContext,
   closestCenter,
@@ -355,7 +356,7 @@ const EditableIngredientItem: React.FC<EditableIngredientItemProps> = ({
     onEdit({
       ...ingredient,
       name,
-      amount: isCustom ? 0 : parseFloat(editAmount) || 0,
+      amount: isCustom ? 0 : parseAmount(editAmount) ?? 0,
       unit: resolvedUnit,
     });
     setIsEditing(false);
@@ -694,7 +695,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
         ...prev.ingredients,
         {
           name: newIngredient.name.trim(),
-          amount: isCustom ? 0 : parseFloat(newIngredient.amount),
+          amount: isCustom ? 0 : parseAmount(newIngredient.amount) ?? 0,
           unit: resolvedUnit,
         },
       ],
@@ -765,11 +766,11 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
         );
       case "amount-asc":
         return [...entries].sort(
-          (a, b) => a.ingredient.amount - b.ingredient.amount
+          (a, b) => (parseAmount(a.ingredient.amount) ?? 0) - (parseAmount(b.ingredient.amount) ?? 0)
         );
       case "amount-desc":
         return [...entries].sort(
-          (a, b) => b.ingredient.amount - a.ingredient.amount
+          (a, b) => (parseAmount(b.ingredient.amount) ?? 0) - (parseAmount(a.ingredient.amount) ?? 0)
         );
       default:
         return entries;

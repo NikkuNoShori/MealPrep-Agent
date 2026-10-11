@@ -907,6 +907,7 @@ class ApiClient {
         sourceRecipeId: item.sourceRecipeId || undefined,
         isManual:       item.isManual       ?? false,
         isChecked:      item.isChecked      ?? false,
+        isRemoved:      item.isRemoved      ?? false,
         notes:          item.notes          || null,
         rawAmount:      item.rawAmount      ?? null,
         lastGenerated:  data.groceryList.lastGenerated || undefined,
@@ -1186,6 +1187,8 @@ class ApiClient {
     sourceRecipes?: string[];
     sourceRecipeId?: string;
     isManual?: boolean;
+    isChecked?: boolean;
+    isRemoved?: boolean;
     notes?: string;
     rawAmount?: number | null;
     lastGenerated?: string;
@@ -1214,6 +1217,8 @@ class ApiClient {
       source_recipes:   item.sourceRecipes    || [],
       source_recipe_id: item.sourceRecipeId   || null,
       is_manual:        item.isManual         ?? false,
+      is_checked:       item.isChecked        ?? false,
+      is_removed:       item.isRemoved        ?? false,
       notes:            item.notes            || null,
       raw_amount:       item.rawAmount        ?? null,
       last_generated:   lastGenerated,

@@ -5,7 +5,10 @@
       "Bash(grep -r n8n /c/dev/MealPrep-Agent/src --include=*.ts --include=*.tsx -i)",
       "Bash(find /c/dev/MealPrep-Agent -maxdepth 2 -name README* -o -name ARCHITECTURE* -o -name SETUP*)",
       "Bash(claude mcp:*)",
-      "Bash(printf '| 2026-09-21 | surface-reviewer | 2 findings from dashboard-redesign design session \\(color-preset system cannot change background/surface colors; deferred request to expand preset coverage w/ botanical palette\\) | 1 MOP + 1 ADR drafted; 2 additional latent defects found during inventory \\(no :root fallbacks for JS-set CSS vars; duplicated/divergent apply logic in ThemeProvider vs themeStore\\); 0 already-covered | yes — ADR-0006-theme-token-layering-and-preset-scope.md, MOP-0029-theme-token-layering-surface-presets.md, REGISTRY.md updated | Nick Neal \\(via /surface\\) |\\\\n' >> .claude/agents/agents-log.md)"
+      "Bash(printf '| 2026-09-21 | surface-reviewer | 2 findings from dashboard-redesign design session \\(color-preset system cannot change background/surface colors; deferred request to expand preset coverage w/ botanical palette\\) | 1 MOP + 1 ADR drafted; 2 additional latent defects found during inventory \\(no :root fallbacks for JS-set CSS vars; duplicated/divergent apply logic in ThemeProvider vs themeStore\\); 0 already-covered | yes — ADR-0006-theme-token-layering-and-preset-scope.md, MOP-0029-theme-token-layering-surface-presets.md, REGISTRY.md updated | Nick Neal \\(via /surface\\) |\\\\n' >> .claude/agents/agents-log.md)",
+      "Bash(grep -n \"dark\\\\\\\\\\\\\\\\:bg-\\\\[var\" /tmp/test-out2.css)",
+      "Read(//tmp/**)",
+      "Bash(grep -n \"rs-bg\\\\\\\\\\\\\\\\\\)\" /tmp/test-out2.css)"
     ],
     "additionalDirectories": [
       "c:\\dev\\MealPrep-Agent\\.claude\\agents"
