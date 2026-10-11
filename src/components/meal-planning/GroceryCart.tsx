@@ -307,8 +307,8 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
         <CardContent className="p-8">
           <div className="text-center py-8">
             <div className="relative inline-flex mb-5">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/10 flex items-center justify-center">
-                <ShoppingCart className="w-8 h-8 text-amber-500/60" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[rgb(var(--gradient-warm-from-rgb)/10%)] to-[rgb(var(--gradient-warm-to-rgb)/10%)] dark:from-[rgb(var(--gradient-warm-from-rgb)/20%)] dark:to-[rgb(var(--gradient-warm-to-rgb)/10%)] flex items-center justify-center">
+                <ShoppingCart className="w-8 h-8 text-[rgb(var(--gradient-warm-from-rgb)/60%)]" />
               </div>
             </div>
             <h3 className="text-lg font-semibold text-surface-800 dark:text-gray-200 mb-1.5">
@@ -328,7 +328,7 @@ const GroceryCart = ({ plan, isActive }: GroceryCartProps) => {
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/20">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-[var(--gradient-warm-from)] to-[var(--gradient-warm-to)] shadow-lg shadow-[var(--shadow-accent)]">
             <ShoppingCart className="h-4 w-4 text-white" />
           </div>
           <div>

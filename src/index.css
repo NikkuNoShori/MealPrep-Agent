@@ -187,6 +187,21 @@
     --gradient-brand: linear-gradient(135deg, var(--gradient-brand-from), var(--gradient-brand-to));
     --gradient-warm: linear-gradient(135deg, var(--gradient-warm-from), var(--gradient-warm-to));
     --gradient-subtle: linear-gradient(135deg, var(--gradient-subtle-from), var(--gradient-subtle-to));
+    /* MOP-0029 Phase 8 — "-rgb" triplet twin of the warm gradient stops.
+       GroceryCart.tsx's empty-state icon tint needs an opacity-modified
+       gradient stop (`from-[rgb(var(--gradient-warm-from-rgb)/10%)]`), and
+       Tailwind's arbitrary-value syntax cannot derive an alpha channel from
+       an opaque var() hex reference (confirmed by direct build testing —
+       the class is silently dropped, not merely wrong). Same fix pattern as
+       --surface-*-rgb. Only `warm` has an opacity-modified consumer today. */
+    --gradient-warm-from-rgb: 184 134 11;
+    --gradient-warm-to-rgb: 194 112 63;
+    /* MOP-0029 Phase 8 — accent-tinted shadow (COLOR_SCHEMA.md §8). The one
+       approved exception to the neutral-black shadow default, derived from
+       --gradient-warm-from so the glow matches the badge it shadows
+       (GroceryCart.tsx toolbar icon, Admin.tsx header icon). Not a general
+       pattern — new tinted shadows still require an explicit named token. */
+    --shadow-accent: rgba(184, 134, 11, 0.25);
 
     /* MOP-0029 Phase 4 — chrome/header surface (COLOR_SCHEMA.md §3 category 3).
        Structurally distinct from card surface. Seeded from Header.tsx's
@@ -361,6 +376,14 @@
     --gradient-brand: linear-gradient(135deg, var(--gradient-brand-from), var(--gradient-brand-to));
     --gradient-warm: linear-gradient(135deg, var(--gradient-warm-from), var(--gradient-warm-to));
     --gradient-subtle: linear-gradient(135deg, var(--gradient-subtle-from), var(--gradient-subtle-to));
+    /* MOP-0029 Phase 8 — "-rgb" triplet twin of the warm gradient stops
+       (dark). Same value as :root — gradient families don't vary by mode
+       per the approved Phase 9 spec. */
+    --gradient-warm-from-rgb: 184 134 11;
+    --gradient-warm-to-rgb: 194 112 63;
+    /* MOP-0029 Phase 8 — accent-tinted shadow (dark). Same value as :root —
+       --shadow-accent doesn't vary by mode per the warm-gradient spec. */
+    --shadow-accent: rgba(184, 134, 11, 0.25);
 
     /* MOP-0029 Phase 4 — chrome/header surface (dark). Matches Header.tsx's
        existing dark:bg-[#16171c]/80 literal (== --rs-bg dark) — same value,

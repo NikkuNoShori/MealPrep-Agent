@@ -970,6 +970,26 @@ export function applyColorSchemeToCSS(scheme: ColorScheme) {
   root.style.setProperty('--gradient-warm-to', scheme.gradient.warm.to)
   root.style.setProperty('--gradient-subtle-from', scheme.gradient.subtle.from)
   root.style.setProperty('--gradient-subtle-to', scheme.gradient.subtle.to)
+  // MOP-0029 Phase 8 — "-rgb" channel-triplet twins of the warm gradient
+  // stops, same rationale as --surface-*-rgb above: GroceryCart.tsx's
+  // empty-state icon tint needs an opacity-modified gradient stop
+  // (`from-[...]/10`), and Tailwind's arbitrary-value parser cannot derive
+  // an alpha channel from a plain hex-string var() reference (confirmed by
+  // direct testing — the class is silently dropped, not merely wrong).
+  // Only `warm` needs this twin today; brand/subtle have no opacity-modified
+  // consumer yet.
+  root.style.setProperty('--gradient-warm-from-rgb', hexToRGBTriplet(scheme.gradient.warm.from))
+  root.style.setProperty('--gradient-warm-to-rgb', hexToRGBTriplet(scheme.gradient.warm.to))
+
+  // MOP-0029 Phase 8 — --shadow-accent (COLOR_SCHEMA.md §8). The two
+  // confirmed shadow-amber-500/20|25 exceptions (GroceryCart.tsx, Admin.tsx)
+  // both sit on a --gradient-warm icon badge, so the glow is derived from
+  // that same color rather than introducing an unrelated accent. COLOR_SCHEMA
+  // §8 treats accent-tinted shadows as an approved exception, not the
+  // default (shadows stay neutral black everywhere else) — this is the one
+  // named token that exception is allowed to use, not a general pattern to
+  // repeat elsewhere.
+  root.style.setProperty('--shadow-accent', `rgba(${hexToRGBTriplet(scheme.gradient.warm.from).replace(/ /g, ', ')}, 0.25)`)
 }
 
 // Initialize theme on store creation

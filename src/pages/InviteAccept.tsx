@@ -206,8 +206,8 @@ const InviteAccept: React.FC = () => {
           {/* Accepted */}
           {state.status === 'accepted' && (
             <div className="px-8 py-10 text-center">
-              <div className="w-14 h-14 bg-gradient-to-br from-primary-100 to-green-100 dark:from-primary-900/30 dark:to-green-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="w-7 h-7 text-primary-600 dark:text-primary-400" />
+              <div className="w-14 h-14 bg-gradient-to-br from-status-success/10 to-status-success/20 dark:from-status-success/20 dark:to-status-success/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-7 h-7 text-status-success" />
               </div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                 Welcome!
@@ -228,8 +228,8 @@ const InviteAccept: React.FC = () => {
           {/* Error */}
           {state.status === 'error' && (
             <div className="px-8 py-10 text-center">
-              <div className="w-14 h-14 bg-gradient-to-br from-rose-100 to-red-100 dark:from-rose-900/30 dark:to-red-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <XCircle className="w-7 h-7 text-rose-600 dark:text-rose-400" />
+              <div className="w-14 h-14 bg-gradient-to-br from-status-error/10 to-status-error/20 dark:from-status-error/20 dark:to-status-error/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <XCircle className="w-7 h-7 text-status-error" />
               </div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                 Invite Error

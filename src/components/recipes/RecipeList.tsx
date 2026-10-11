@@ -459,7 +459,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                   <span className="text-3xl">📖</span>
                 </div>
               </div>
-              <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+              <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-[var(--gradient-warm-from)] to-[var(--gradient-warm-to)] rounded-full flex items-center justify-center shadow-lg">
                 <span className="text-sm">✨</span>
               </div>
             </div>

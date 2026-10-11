@@ -32,7 +32,7 @@ const Admin: React.FC = () => {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/25">
+        <div className="w-10 h-10 bg-gradient-to-br from-[var(--gradient-warm-from)] to-[var(--gradient-warm-to)] rounded-xl flex items-center justify-center shadow-lg shadow-[var(--shadow-accent)]">
           <Shield className="w-5 h-5 text-white" />
         </div>
         <div>
