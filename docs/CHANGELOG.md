@@ -5,6 +5,9 @@
 **Last reviewed:** 2026-09-25
 **Last updated:** 2026-09-25 (MOP-0031 complete — direct recipe sharing)
 
+## 2026-10-11 (Manual Editor)
+- ## **Model deprecation notice:** `qwen/qwen3-8b` will be retired on 2026-10-15. Please migrate to `qwen/qwen3.7-plus`.
+
 ---
 
 ## 2026-09-25 (MOP-0031: Direct Recipe Sharing) `main`

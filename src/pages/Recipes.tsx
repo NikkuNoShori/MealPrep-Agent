@@ -97,7 +97,7 @@ const Recipes = () => {
     <div className="bg-surface-50 dark:bg-[#0e0f13]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
         {(showAddForm || editingRecipe) && (
-          <div className="animate-fade-in">
+          <div className="max-w-7xl animate-fade-in">
             <RecipeForm
               recipe={editingRecipe}
               onSave={() => {
@@ -200,6 +200,9 @@ const Recipes = () => {
                 feedMode={viewMode}
               />
             </div>
+
+            {/* Ad rail — reserved width only, not shown until an ad provider is wired up */}
+            <div className="hidden xl:block w-[300px] shrink-0" />
           </div>
           </div>
         )}

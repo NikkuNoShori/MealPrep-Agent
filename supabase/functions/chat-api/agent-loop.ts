@@ -23,14 +23,14 @@ import { getToolSpecs } from "./tools/catalog.ts";
 export const MAX_ITERS = 5;
 /** Tool-use requires a model with function-calling on OpenRouter (2.5-7b has none). */
 export const AGENT_MODEL =
-  Deno.env.get("OPENROUTER_AGENT_MODEL")?.trim() || "qwen/qwen3-8b";
+  Deno.env.get("OPENROUTER_AGENT_MODEL")?.trim() || "qwen/qwen3.7-plus";
 
 /**
  * Models that advertise `tools` + pass OpenRouter `require_parameters: true`.
  * Vision-only models (e.g. gemini-2.0-flash-001 in extract.ts) are NOT valid here.
  */
 export const DEFAULT_AGENT_MODEL_FALLBACKS = [
-  "qwen/qwen3-8b",
+  "qwen/qwen3.7-plus",
   "qwen/qwen3-14b",
   "openai/gpt-4o-mini",
 ] as const;

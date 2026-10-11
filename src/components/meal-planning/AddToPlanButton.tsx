@@ -26,6 +26,7 @@ interface AddToPlanButtonProps {
   cookTime?: number;
   size?: 'sm' | 'default';
   compact?: boolean; // icon-only mode for card hover
+  panelAlign?: 'left' | 'right'; // which edge the dropdown panel hangs from; defaults by compact
 }
 
 function getWeekStart(date: Date): Date {
@@ -48,6 +49,7 @@ const AddToPlanButton = ({
   cookTime,
   size = 'sm',
   compact = false,
+  panelAlign,
 }: AddToPlanButtonProps) => {
   const [open, setOpen] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);

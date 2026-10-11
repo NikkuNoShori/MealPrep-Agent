@@ -755,7 +755,7 @@ curl -s -o /dev/null -w "%{http_code}" \
 - Missing `require_parameters` on OpenRouter provider routing
 
 ### Valid agent models (tool + `require_parameters`)
-- `qwen/qwen3-8b` (default; may hit shared-pool 429)
+- `qwen/qwen3.7-plus` (default; may hit shared-pool 429)
 - `qwen/qwen3-14b`
 - `openai/gpt-4o-mini` (reliable fallback; higher cost)
 

@@ -173,7 +173,7 @@ Persist AI message + metadata.toolCalls (audit log)
 | Utility | `scale_recipe`, `save_recipe` |
 | Destructive | `update_recipe`, `delete_recipe` — always return `pendingConfirmation`; user must reply via `context.confirmAction` |
 
-Models: **`qwen/qwen3-8b`** default for the agent loop (`OPENROUTER_AGENT_MODEL` override; `supabase/functions/chat-api/agent-loop.ts`). OpenRouter `chatWithTools` uses `provider.require_parameters: true` so only tool-capable endpoints are selected. Vision/text inside `recipe-pipeline` still uses `qwen/qwen-2.5-vl-7b-instruct` / `qwen/qwen-2.5-7b-instruct` as appropriate. Temperature 0.2, `tool_choice: auto`, `MAX_ITERS = 5`.
+Models: **`qwen/qwen3.7-plus`** default for the agent loop (`OPENROUTER_AGENT_MODEL` override; `supabase/functions/chat-api/agent-loop.ts`). OpenRouter `chatWithTools` uses `provider.require_parameters: true` so only tool-capable endpoints are selected. Vision/text inside `recipe-pipeline`. Temperature 0.2, `tool_choice: auto`, `MAX_ITERS = 5`.
 
 ### SSE Streaming (MOP-0017)
 

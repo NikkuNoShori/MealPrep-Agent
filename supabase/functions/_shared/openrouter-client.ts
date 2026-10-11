@@ -63,7 +63,7 @@ export class OpenRouterClient {
   async chat(
     systemPrompt: string,
     userMessage: string,
-    model = "qwen/qwen3-8b",
+    model = "qwen/qwen3.7-plus",
     options?: {
       temperature?: number;
       max_tokens?: number;
@@ -113,7 +113,7 @@ export class OpenRouterClient {
     systemPrompt: string,
     conversationHistory: any[],
     userMessage: string,
-    model = "qwen/qwen3-8b",
+    model = "qwen/qwen3.7-plus",
     options?: { temperature?: number; max_tokens?: number }
   ): Promise<string> {
     const messages = [
@@ -222,7 +222,7 @@ export class OpenRouterClient {
     systemPrompt: string,
     messages: ChatMessage[],
     tools: ToolSpec[],
-    model = "qwen/qwen3-8b",
+    model = "qwen/qwen3.7-plus",
     options?: {
       temperature?: number;
       max_tokens?: number;
@@ -296,7 +296,7 @@ export class OpenRouterClient {
     messages: ChatMessage[],
     tools: ToolSpec[],
     onDelta: (text: string) => void,
-    model = "qwen/qwen3-8b",
+    model = "qwen/qwen3.7-plus",
     options?: {
       temperature?: number;
       max_tokens?: number;

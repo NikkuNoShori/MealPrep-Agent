@@ -134,7 +134,7 @@ The `done` frame is the terminal success signal and carries the same metadata as
 4. The loop terminates on a plain content reply, a confirmation short-circuit, or `MAX_ITERS = 5`.
 5. Frontend renders `pendingConfirmation` as a Confirm/Cancel inline surface. On Confirm, resend with `context.confirmAction` — the runtime applies the change and replies with `intentMetadata.confirmAction: true`.
 
-Model: `qwen/qwen3-8b` (override via `OPENROUTER_AGENT_MODEL` on the edge function), temperature 0.2, `tool_choice: auto`. OpenRouter requests include `provider: { require_parameters: true }` for tool-capable routing.
+Model: `qwen/qwen3.7-plus` (override via `OPENROUTER_AGENT_MODEL` on the edge function), temperature 0.2, `tool_choice: auto`. OpenRouter requests include `provider: { require_parameters: true }` for tool-capable routing.
 
 **Error responses:**
 - `401` — Missing or invalid JWT
