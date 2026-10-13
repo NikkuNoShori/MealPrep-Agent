@@ -74,7 +74,7 @@ For each of URL, text, screenshot/image, video: the input path (adapter → stag
 **Files affected:** `docs/EXTRACTION_REQUIREMENTS.md`, possibly `docs/API.md`
 
 Record an explicit status for each: `supported` / `unsupported` / `planned`.
-- **Audio:** the backend accepts it, but the UI and `source_type` do not. Either declare it unsupported and open a cleanup task to stop accepting it, or open a MOP to make it real. Leaving an undocumented half-path open is the one option ruled out.
+- **Audio:** **more precise than originally written here (confirmed 2026-10-13):** the backend doesn't expose a dedicated audio path either, except nested inside video processing — `recipe-pipeline/pipeline.ts`'s `source_type` switch only has `"text"` / `"url"` / `"video"` cases, and the chat tool catalog's `source_type` enum (`catalog.ts`) is `["url", "text", "images", "video"]`. Speech-to-text (`transcribe-media.ts`, Whisper + Gemini fallback) only runs as an internal step of video intake, not as a standalone entry point a user could reach with a bare audio file. The user confirmed in the 2026-10-11 MOP-0034 session that the direction is "build it out as a real input type," not declare unsupported — see **MOP-0039** (drafted 2026-10-13), which makes this real rather than just documenting it.
 - **PDF / other documents:** declare `unsupported` and add a trigger condition for revisit (e.g., N user requests).
 
 ### Phase 4: Cross-link and enforce

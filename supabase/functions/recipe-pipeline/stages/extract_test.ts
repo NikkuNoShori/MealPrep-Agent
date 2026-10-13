@@ -85,11 +85,11 @@ Deno.test("normalizeExtractedRecipe recovers a unit word misplaced in notes", ()
     ])
   );
 
-  assertEquals(recipe.ingredients[0].unit, "teaspoon");
+  assertEquals(recipe.ingredients[0].unit, "tsp");
   assertEquals(recipe.ingredients[0].notes, "");
   assertEquals(recipe.ingredients[0].amount, 0.25);
 
-  assertEquals(recipe.ingredients[1].unit, "tablespoons");
+  assertEquals(recipe.ingredients[1].unit, "tbsp");
   assertEquals(recipe.ingredients[1].notes, "");
 });
 

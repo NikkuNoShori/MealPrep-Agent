@@ -92,11 +92,18 @@ export function makeFakeSupabase(): Record<string, unknown> {
 }
 
 /** Meal plan with an occupied dinner slot — for conditionally-destructive assign tests. */
+/**
+ * Simulates a meal plan whose target slot already holds a different recipe,
+ * for assignRecipeToMealPlanSlot's conditional-destructive confirmation path
+ * (handlers.ts). Post-migration 044/046, occupied-slot detection reads the
+ * meal_plan_entries child table, not a meal_plans.meals JSONB column (which
+ * no longer exists) — this fake must match that shape or the handler's
+ * `existingEntry` lookup silently returns null and no confirmation fires.
+ */
 export function makeOccupiedSlotSupabase(): ToolContext["supabase"] {
   const recipeId = "11111111-1111-1111-1111-111111111111";
   const occupiedRecipeId = "99999999-9999-9999-9999-999999999999";
   const planId = "22222222-2222-2222-2222-222222222222";
-  const date = "2026-06-18";
   let currentTable = "";
 
   const chain = {
@@ -125,16 +132,23 @@ export function makeOccupiedSlotSupabase(): ToolContext["supabase"] {
     maybeSingle() {
       if (currentTable === "meal_plans") {
         return Promise.resolve({
-          data: {
-            id: planId,
-            meals: { [date]: { dinner: occupiedRecipeId } },
-          },
+          data: { id: planId },
           error: null,
         });
       }
       if (currentTable === "recipes") {
         return Promise.resolve({
           data: { id: recipeId, title: "Chicken Parm" },
+          error: null,
+        });
+      }
+      if (currentTable === "meal_plan_entries") {
+        return Promise.resolve({
+          data: {
+            id: "33333333-3333-3333-3333-333333333333",
+            recipe_id: occupiedRecipeId,
+            recipe_name: "Spaghetti Bolognese",
+          },
           error: null,
         });
       }

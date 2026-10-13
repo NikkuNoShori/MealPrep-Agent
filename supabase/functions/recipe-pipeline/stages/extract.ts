@@ -91,8 +91,9 @@ export async function extract(
           bestFlags = flags;
         }
       } catch (error) {
-        console.warn(`Vision model ${model} failed: ${error.message}`);
-        errors.push(`${model}: ${error.message}`);
+        const msg = error instanceof Error ? error.message : String(error);
+        console.warn(`Vision model ${model} failed: ${msg}`);
+        errors.push(`${model}: ${msg}`);
       }
     }
     // Every model either errored or tripped a soft plausibility check.
@@ -124,10 +125,11 @@ export async function extract(
     } catch (error) {
       retries++;
       if (retries >= 2) {
+        const msg = error instanceof Error ? error.message : String(error);
         throw createPipelineError(
           "extract",
           "EXTRACTION_FAILED",
-          `Recipe extraction failed after ${retries} attempts: ${error.message}`,
+          `Recipe extraction failed after ${retries} attempts: ${msg}`,
           { raw_response: response! }
         );
       }
@@ -303,7 +305,7 @@ function parseRecipeResponse(response: string): ExtractedRecipe | ExtractedRecip
         // Apply same top-level merge for each item.
         results.push(normalizeExtractedRecipe({ ...topLevelFields, ...rawRecipe }));
       } catch (e) {
-        console.warn("Skipping malformed recipe in multi-recipe response:", e.message);
+        console.warn("Skipping malformed recipe in multi-recipe response:", e instanceof Error ? e.message : String(e));
       }
     }
     if (results.length === 0) {
