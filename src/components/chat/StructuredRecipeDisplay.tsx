@@ -935,7 +935,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
 
         {/* ── Phase 2 Prompt: Similar recipes found ── */}
         {savePhase === "similar_found" && similarRecipes.length > 0 && (
-          <div className="border border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-950/30 rounded-lg p-3 space-y-2">
+          <div className="border border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/30 rounded-lg p-3 space-y-2">
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-primary-500 dark:text-primary-400 mt-0.5 flex-shrink-0" />
               <div className="text-sm">

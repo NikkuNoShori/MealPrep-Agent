@@ -58,8 +58,13 @@ export async function extract(
   let response: string;
 
   if (hasUserImages) {
-    // Try each vision model in order until one succeeds
+    // Try each vision model in order until one succeeds AND passes the
+    // plausibility gate (MOP-0034 Phase 5a). A structurally valid but
+    // implausible result (e.g. a 17-ingredient screenshot collapsed to 1)
+    // escalates to the next model once rather than being accepted silently.
     const errors: string[] = [];
+    let bestResult: ExtractedRecipe | ExtractedRecipe[] | null = null;
+    let bestFlags: string[] = [];
     for (const model of VISION_MODELS) {
       try {
         console.log(`Trying vision model: ${model}`);
@@ -72,11 +77,30 @@ export async function extract(
           model,
           { temperature: 0.1, max_tokens: 4000 }
         );
-        return parseRecipeResponse(response!);
+        const result = parseRecipeResponse(response!);
+        const flags = plausibilityFlags(result);
+        if (flags.length === 0) {
+          return result;
+        }
+        console.warn(`Vision model ${model} passed structural checks but failed plausibility: ${flags.join(", ")} — escalating`);
+        // Keep the first result as a fallback in case every model trips the
+        // soft checks; never silently prefer a later model's result just
+        // because it ran last.
+        if (!bestResult) {
+          bestResult = result;
+          bestFlags = flags;
+        }
       } catch (error) {
         console.warn(`Vision model ${model} failed: ${error.message}`);
         errors.push(`${model}: ${error.message}`);
       }
+    }
+    // Every model either errored or tripped a soft plausibility check.
+    // Prefer returning the best soft-failed result over a hard failure —
+    // soft checks never reject, they only escalate once.
+    if (bestResult) {
+      console.warn(`All vision models flagged implausible output; returning first result with flags: ${bestFlags.join(", ")}`);
+      return bestResult;
     }
     throw createPipelineError(
       "extract",
@@ -113,6 +137,110 @@ export async function extract(
 
   // Unreachable, but satisfies TypeScript
   throw createPipelineError("extract", "EXTRACTION_FAILED", "Unexpected extraction failure");
+}
+
+/**
+ * MOP-0034 Phase 5a — soft plausibility checks on an otherwise structurally
+ * valid extraction. Never used to reject a result; only to decide whether to
+ * escalate to the next vision model. Returns an empty array when the result
+ * looks plausible.
+ */
+export function plausibilityFlags(result: ExtractedRecipe | ExtractedRecipe[]): string[] {
+  const recipes = Array.isArray(result) ? result : [result];
+  const flags: string[] = [];
+
+  for (const recipe of recipes) {
+    const ingredients = recipe.ingredients ?? [];
+
+    if (ingredients.length < 3) {
+      flags.push(`only ${ingredients.length} ingredient(s)`);
+    }
+
+    // An alternative-quantity phrase ("or 3 cups", "(2-3 lbs)") leaking into
+    // name/notes suggests two source lines were merged into one ingredient
+    // instead of the first-stated quantity being kept and the rest filed to
+    // notes as instructed — or worse, that neighboring ingredient lines were
+    // swallowed entirely.
+    const altMarker = /\bor\b\s+[\d½⅓⅔¼¾⅛]/i;
+    for (const ing of ingredients) {
+      if (altMarker.test(ing.name || "")) {
+        flags.push(`ingredient name contains an unresolved alternative-quantity marker: "${ing.name}"`);
+      }
+    }
+
+    // A null/missing amount is only legitimate when the ingredient is
+    // genuinely unquantifiable ("salt and pepper to taste"). If amount is
+    // null/empty but the ingredient's OWN NAME still contains a digit (a
+    // well-formed extraction always pulls the leading number out of the name
+    // and into amount), the model saw a quantity and failed to extract it —
+    // observed with range quantities like "4-6 cups of vegetable or chicken
+    // broth" staying in the name instead of becoming amount:4, unit:"cup".
+    // Digits inside NOTES alone are not flagged — "(2-3 lbs) diced" in notes
+    // is the expected, correct shape for an alternative quantity.
+    const hasDigit = /\d/;
+    for (const ing of ingredients) {
+      const amountMissing = ing.amount === null || ing.amount === undefined || ing.amount === ("" as unknown);
+      if (amountMissing && hasDigit.test(ing.name || "")) {
+        flags.push(`ingredient "${ing.name}" has no amount but its name contains a digit — quantity likely dropped`);
+      }
+    }
+
+    // Ingredient-like tokens mentioned in instructions/description that never
+    // appear anywhere in the parsed ingredient list — a sign the list is
+    // incomplete even when individual entries look well-formed. Kept
+    // intentionally crude (substring match on significant words) to avoid
+    // false confidence from a "smarter" parse of free text.
+    const ingredientText = ingredients
+      .map((i) => `${i.name} ${i.notes || ""}`)
+      .join(" ")
+      .toLowerCase();
+    const instructionText = [...(recipe.instructions ?? []), recipe.description ?? ""]
+      .join(" ")
+      .toLowerCase();
+    const COMMON_INGREDIENT_WORDS = [
+      "onion", "garlic", "carrot", "celery", "butter", "flour", "broth", "stock",
+      "cheese", "cream", "pickle", "pickles", "dill", "thyme", "bay leaf", "bay leaves",
+      "salt", "pepper", "sugar", "oil",
+    ];
+    const missing = COMMON_INGREDIENT_WORDS.filter(
+      (word) => instructionText.includes(word) && !ingredientText.includes(word)
+    );
+    if (missing.length > 0) {
+      flags.push(`instructions reference ingredients not in the list: ${missing.join(", ")}`);
+    }
+
+    // Duplicate ingredient names (case-insensitive) usually mean a garnish /
+    // "for serving" line was extracted as a second, separate entry instead of
+    // being folded into instructions per the garnish rule — especially when
+    // the duplicate has no amount.
+    const seenNames = new Map<string, number>();
+    for (const ing of ingredients) {
+      const key = (ing.name || "").trim().toLowerCase();
+      if (!key) continue;
+      seenNames.set(key, (seenNames.get(key) ?? 0) + 1);
+    }
+    const duplicates = [...seenNames.entries()].filter(([, count]) => count > 1).map(([name]) => name);
+    if (duplicates.length > 0) {
+      flags.push(`duplicate ingredient name(s), likely an unfolded garnish line: ${duplicates.join(", ")}`);
+    }
+
+    // A real unit is never a compound phrase containing a digit or a
+    // container word ("16 oz package", "10 1/2 ounce can"). That shape means
+    // the model kept a container count (e.g. "1 can"/"1 package") as amount
+    // and dumped the ACTUAL measurable size into unit as a literal string,
+    // instead of extracting that size into amount/unit per the container
+    // vs. real-measurement rule. A well-formed unit is a short standalone
+    // word (cup, tbsp, oz, can, package, clove, ...), never a phrase.
+    const CONTAINER_WORDS = /\b(can|package|box|jar|bag|bottle|carton|container|pkg)\b/i;
+    for (const ing of ingredients) {
+      const unit = ing.unit || "";
+      if (hasDigit.test(unit) || (CONTAINER_WORDS.test(unit) && /\s/.test(unit.trim()))) {
+        flags.push(`ingredient "${ing.name}" has a compound unit "${unit}" — a real measurable size was likely left unparsed`);
+      }
+    }
+  }
+
+  return flags;
 }
 
 function parseRecipeResponse(response: string): ExtractedRecipe | ExtractedRecipe[] {
@@ -370,7 +498,7 @@ function normalizeFieldNames(recipe: any): any {
 /** All known measurement units, grouped by category. Longest-first to avoid partial matches. */
 const KNOWN_UNITS = [
   // Volume
-  "tablespoons?", "teaspoons?", "cups?", "tbsp", "tsp", "fluid\\s*oz", "fl\\s*oz",
+  "tablespoons?", "teaspoons?", "cups?", "c\\.?", "tbsp", "tsp", "fluid\\s*oz", "fl\\s*oz",
   "gallons?", "gal", "quarts?", "qt", "pints?", "pt",
   "milliliters?", "liters?", "ml", "L",
   // Weight
@@ -405,7 +533,7 @@ const UNITS_CAPTURE = new RegExp(`^(${KNOWN_UNITS})(?:\\s|,|$)`, "i");
 const UNIT_CANONICAL: Record<string, string> = {
   tablespoon: "tbsp", tablespoons: "tbsp",
   teaspoon: "tsp", teaspoons: "tsp",
-  cup: "cup", cups: "cup",
+  cup: "cup", cups: "cup", c: "cup", "c.": "cup",
   ounce: "oz", ounces: "oz",
   pound: "lb", pounds: "lb",
   gram: "g", grams: "g",

@@ -13,7 +13,12 @@ const RECIPE_FIELD_RULES = `## Field Rules (apply to every extraction)
 - **Standard units**: cups, tbsp, tsp, oz, lb, g, kg, ml, L, clove, stalk, head, ear, sprig. Never use "piece" or "pieces" as a unit — if the source says "2 pieces chicken", use amount: 2, unit: "" (empty).
 - **Ingredient category** — one of: protein (meat, fish, eggs, tofu), produce (vegetables, fruits), pantry (spices, oils, canned goods), dairy (milk, cheese, butter), grains (rice, pasta, bread), condiments (sauces, dressings). If none fit, use "other".
 - **Full ingredient names** — use complete names: "feta cheese" not "feta", "all-purpose flour" not "AP flour", "extra virgin olive oil" not "EVOO", "parmesan cheese" not "parm".
-- **Instruction quality** — keep every real action step, even short ones like "Bake 20 minutes." or "Season to taste." Only omit a step that is PURELY a closing remark with no action at all — "Enjoy!", "Dig in!", "Bon appétit". A step like "Garnish with parsley and serve." has an action and must be kept.`;
+- **Instruction quality** — keep every real action step, even short ones like "Bake 20 minutes." or "Season to taste." Only omit a step that is PURELY a closing remark with no action at all — "Enjoy!", "Dig in!", "Bon appétit". A step like "Garnish with parsley and serve." has an action and must be kept.
+- **Extract every ingredient line** — a recipe with 15 ingredient lines must produce 15 ingredient objects. Do not summarize, merge unrelated ingredients into one entry, or stop early because the list is long.
+- **Alternative quantities** ("3 russet potatoes or 3c (2-3 lbs) diced") — use the FIRST stated quantity as amount/unit ("3 russet potatoes" → amount: 3, unit: ""), and put every alternative plus any prep note in notes ("or 3 cups (2-3 lbs); diced"). Never let the alternative phrase swallow the next ingredient line — each ingredient line in the source maps to exactly one ingredient object.
+- **Quantity ranges** ("4-6 cups", "2 to 3 tbsp") — amount is NEVER null just because a range was given. Use the LOW end of the range as amount ("4-6 cups" → amount: 4, unit: "cup"), and record the full range in notes ("range: 4-6 cups"). Never leave amount null for an ingredient that has ANY stated quantity, range or otherwise.
+- **Garnish / "for serving" sections** — a garnish line that repeats an ingredient already listed above (e.g. "heavy cream for drizzling" when heavy cream is already an ingredient) is a SERVING INSTRUCTION, not a new ingredient. Do not create a second ingredient entry for it — fold it into the instructions text instead ("drizzle with heavy cream, sriracha, and fresh dill before serving"). Only create a new ingredient entry for a garnish item that is NOT already listed above (e.g. a garnish-only item like lime wedges that never appeared in the main ingredient list), and even then it must have a real quantity — never a blank/null-amount entry.
+- **Container count vs. real measurement** — when a line gives BOTH a container count ("1 can", "1 package", "1 box", "1 jar") AND a real measurable size (a number with a unit, whether parenthesized or inline), the measurable size is the amount/unit — the container count is never useful on its own because container sizes vary by brand/store. Examples: "1 can condensed soup (10 1/2 ounce), undiluted" → amount: 10.5, unit: "oz", notes: "1 can, condensed, undiluted". "1 16oz package frozen tater tots" → amount: 16, unit: "oz", notes: "1 package, frozen". If a container line has NO real measurable size anywhere in it (just "1 can tomatoes", no size given), keep the container count as amount/unit ("amount: 1, unit: can") since it's all the source gives you — do not invent a size.`;
 
 export const RECIPE_EXTRACTION_PROMPT = `# Recipe Extraction Engine
 
@@ -47,6 +52,27 @@ You MUST return ONLY valid JSON in this exact structure:
         "unit": "",
         "category": "protein",
         "notes": "pounded thin"
+      },
+      {
+        "name": "russet potatoes",
+        "amount": 3,
+        "unit": "",
+        "category": "produce",
+        "notes": "or 3 cups (2-3 lbs); diced"
+      },
+      {
+        "name": "yellow onion",
+        "amount": 1,
+        "unit": "",
+        "category": "produce",
+        "notes": "diced"
+      },
+      {
+        "name": "garlic",
+        "amount": 6,
+        "unit": "clove",
+        "category": "produce",
+        "notes": "minced"
       }
     ],
     "instructions": [
@@ -122,7 +148,7 @@ If ONE recipe: your response MUST be a single JSON object with a "recipe" key at
 If MULTIPLE recipes: your response MUST be a single JSON object with a "recipes" key containing an array.
 Each recipe object MUST contain: "title" (string), "ingredients" (array of objects), and "instructions" (array of strings).
 Do NOT wrap in markdown. Do NOT add any text before or after the JSON.
-Example minimal valid response: {"recipe":{"title":"My Recipe","ingredients":[{"name":"salt","amount":1,"unit":"tsp","category":"pantry","notes":""}],"instructions":["Step 1"]}}`;
+Example minimal valid response: {"recipe":{"title":"My Recipe","ingredients":[{"name":"salt","amount":1,"unit":"tsp","category":"pantry","notes":""},{"name":"black pepper","amount":0.5,"unit":"tsp","category":"pantry","notes":""},{"name":"olive oil","amount":2,"unit":"tbsp","category":"pantry","notes":""},{"name":"garlic","amount":2,"unit":"clove","category":"produce","notes":"minced"}],"instructions":["Step 1"]}}`;
 
 export const IMAGE_EXTRACTION_PROMPT = `# Recipe Image Extraction Engine
 
@@ -145,7 +171,7 @@ You are a specialized recipe extraction system that analyzes images to extract s
 
 ## Output Format
 Return ONLY valid JSON. For a single recipe:
-{"recipe":{"title":"Recipe Name","description":"Brief description","ingredients":[{"name":"ingredient","amount":2,"unit":"tbsp","category":"pantry","notes":""}],"instructions":["Step 1","Step 2"],"prepTime":null,"cookTime":null,"totalTime":null,"servings":null,"difficulty":null,"tags":[],"cuisine":null,"nutrition":null,"imageUrl":null}}
+{"recipe":{"title":"Recipe Name","description":"Brief description","ingredients":[{"name":"russet potatoes","amount":3,"unit":"","category":"produce","notes":"or 3 cups (2-3 lbs); diced"},{"name":"olive oil","amount":2,"unit":"tbsp","category":"pantry","notes":""},{"name":"yellow onion","amount":1,"unit":"","category":"produce","notes":"diced"},{"name":"garlic","amount":4,"unit":"clove","category":"produce","notes":"minced"}],"instructions":["Step 1","Step 2"],"prepTime":null,"cookTime":null,"totalTime":null,"servings":null,"difficulty":null,"tags":[],"cuisine":null,"nutrition":null,"imageUrl":null}}
 
 For multiple recipes visible in the images:
 {"recipes":[{"title":"First Recipe","ingredients":[...],"instructions":[...],...},{"title":"Second Recipe","ingredients":[...],"instructions":[...],...}]}
