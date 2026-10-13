@@ -184,7 +184,7 @@ const AddToPlanButton = ({
 
       {open && (
         <div
-          className={`absolute top-full mt-2 z-50 w-72 rounded-xl border border-surface-200/80 dark:border-white/[0.08] bg-white dark:bg-[var(--rs-bg)] shadow-xl animate-scale-in ${compact ? 'left-0' : 'right-0'}`}
+          className={`absolute top-full mt-2 z-50 w-72 rounded-xl border border-surface-200/80 dark:border-white/[0.08] bg-white dark:bg-[var(--rs-bg)] shadow-xl animate-scale-in ${(panelAlign ?? (compact ? 'left' : 'right')) === 'left' ? 'left-0' : 'right-0'}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Week nav */}

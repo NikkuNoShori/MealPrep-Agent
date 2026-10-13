@@ -10,7 +10,8 @@ import { useShowTags } from '@/hooks/useShowTags'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Plus, Grid, List, X, Trash2, Eye, FolderOpen, ChevronDown, Share2 } from "lucide-react";
+import { Switch } from '@/components/ui/switch'
+import { Plus, Grid, List, X, Trash2, Eye, FolderOpen, ChevronDown, Share2, MoreHorizontal } from "lucide-react";
 import toast from 'react-hot-toast';
 
 const MAX_SELECTION = 100;
@@ -473,30 +474,30 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowViewOptionsPopover(v => !v)}
-                  className="rounded-xl border border-stone-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] shrink-0"
+                  className="rounded-xl border border-surface-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] shrink-0"
                   title="Card display options"
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
                 {showViewOptionsPopover && (
-                  <div className="absolute top-full right-0 mt-1.5 z-[200] bg-white dark:bg-[#1e1f26] border border-stone-200/60 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 py-1.5 min-w-[220px] animate-scale-in origin-top-right">
+                  <div className="absolute top-full right-0 mt-1.5 z-[200] bg-white dark:bg-[var(--rs-bg-elevated)] border border-surface-200/60 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 py-1.5 min-w-[220px] animate-scale-in origin-top-right">
                     <button
                       onClick={toggleShowPhotos}
-                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                     >
                       <span>Show photos</span>
                       <Switch checked={showPhotos} />
                     </button>
                     <button
                       onClick={toggleShowDescriptions}
-                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                     >
                       <span>Show descriptions</span>
                       <Switch checked={showDescriptions} />
                     </button>
                     <button
                       onClick={toggleShowTags}
-                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                     >
                       <span>Show tags</span>
                       <Switch checked={showTags} />

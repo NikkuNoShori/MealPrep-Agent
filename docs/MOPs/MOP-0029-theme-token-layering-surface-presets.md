@@ -5,14 +5,14 @@
 | **MOP** | MOP-0029 |
 | **Title** | Theme Token Layering & Surface-Aware Presets |
 | **Date Submitted** | 2026-09-21 |
-| **Date Updated** | 2026-10-04 (Phase 7 complete — stone-* migration finished) |
+| **Date Updated** | 2026-10-13 (doc corrected to reflect Phase 8's completion — commit `492f7c7` landed 2026-10-11 but this doc was never updated; caught via handoff review) |
 | **Date Completed** | — |
 | **Submitted By** | surface-reviewer |
 | **Status** | in_progress |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md). Valid values: `draft` / `evaluation` / `approved` / `planned` / `in_progress` / `verifying` / `complete` / `blocked` / `cancelled` / `deferred`.
 
-> **No longer deferred (2026-10-04).** The dashboard redesign (MOP-0030) shipped, clearing the trigger condition. **Phases 0–7 are implemented**: 0 (`48d965f`), 1/2/3/5 (`aeb2457`), 4 (`154f6ae`), 6 (`b87ad80`), 7 (`d05e455`, `8b9bcfb`, `b5c6eb1`, `83c8b40`). Remaining: Phase 8 (gradients/shadows/CI enforcement) and Phase 9 (which Phase 4 already substantively completed by authoring all five presets' full token specs — what's left there is verification against the acceptance criteria once Phase 8 lands).
+> **No longer deferred (2026-10-04).** The dashboard redesign (MOP-0030) shipped, clearing the trigger condition. **Phases 0–8 are implemented**: 0 (`48d965f`), 1/2/3/5 (`aeb2457`), 4 (`154f6ae`), 6 (`b87ad80`), 7 (`d05e455`, `8b9bcfb`, `b5c6eb1`, `83c8b40`), 8 (`492f7c7`, 2026-10-11). Remaining: Phase 9 verification only — Phase 4 already substantively completed Phase 9's design work by authoring all five presets' full token specs; what's left is checking the MOP's acceptance criteria against the now-complete implementation, not new design or engineering work.
 
 > **Scope expanded 2026-09-21.** This MOP originally covered page background + card surface only. A full audit of every color surface found the same root cause across thirteen categories. Phases 0, 3, 6, 7, 8 are new; Phase 5 (migration) and Phase 9 (preset) are widened. See ADR-0006 §Full-audit findings and [docs/COLOR_SCHEMA.md](../COLOR_SCHEMA.md).
 
@@ -169,8 +169,10 @@ Mechanical migration in batches, highest-density files first:
 
 > The Phase 4 aliases meant partial completion was shippable throughout — confirmed across all 4 batches, each landed and verified independently without the others.
 
-### Phase 8: Gradients, shadows, and CI enforcement
+### Phase 8: Gradients, shadows, and CI enforcement — **COMPLETE** (`492f7c7`, 2026-10-11)
 **Files affected:** `src/index.css`, `tailwind.config.js`, ESLint config / CI script, 16 gradient sites
+
+> **Shipped, with scope narrowed from "all 16" to 4.** Only 4 of the 16 `bg-gradient-to-*` sites were genuinely decorative/brand accents suited to `--gradient-*` tokenization (`GroceryCart.tsx`, `Admin.tsx`, `RecipeList.tsx`). The other 12 fell into different categories — status-state illustrations, structural skeleton/scrim gradients, or already-tokenized from earlier phases — and were deliberately left as-is. See [docs/CHANGELOG.md](../CHANGELOG.md)'s 2026-10-11 Phase 8 entry and the 2026-10-11-mop-0029-phase-8-complete handoff for the full categorization reasoning.
 
 - Replace all 16 hardcoded `bg-gradient-to-*` pairs with `--gradient-*` tokens. **Highest visual-clash risk when a new preset ships** — must land before Phase 9.
 - Resolve the accent-tinted shadow exceptions (`shadow-amber-500/20|25`, `Admin.tsx`): adopt a named `--shadow-accent` token or remove them. Neutral-black defaults stay.
@@ -274,7 +276,7 @@ Source of truth for the `surface`, `accentCategory`, `gradient`, and `status` ra
 
 ~~2. A surface-differentiated preset is still wanted in product...~~ — **Satisfied 2026-09-22.** All five presets have approved hex ramps across all four L1 families in both modes (see §Approved Phase 9 palette specs).
 
-Phases 4, 6, 7 executed and shipped once both conditions cleared. Phase 8 remains the only phase not yet started.
+Phases 4, 6, 7 executed and shipped once both conditions cleared. Phase 8 shipped 2026-10-11 (`492f7c7`). Only Phase 9 verification remains.
 
 ### Pull forward early if any of these fire
 

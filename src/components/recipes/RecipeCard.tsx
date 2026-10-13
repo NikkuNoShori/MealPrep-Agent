@@ -3,16 +3,6 @@ import { Clock, Users, ChefHat, Edit, Trash2, ThumbsUp, ThumbsDown, MoreVertical
 import AddToPlanButton from "@/components/meal-planning/AddToPlanButton";
 import { Button } from "@/components/ui/button";
 
-/** Shared across grid (2-line) and list (1-line) titles so both clip at the same length. */
-const TITLE_CHAR_LIMIT = 70;
-/** Shared across grid and list descriptions (both 2-line) so both clip at the same length. */
-const DESCRIPTION_CHAR_LIMIT = 140;
-
-function truncateText(text: string, limit: number): string {
-  if (text.length <= limit) return text;
-  return text.slice(0, limit - 1).trimEnd() + "…";
-}
-
 export interface RecipeReaction {
   id: string;
   recipeId: string;
@@ -539,7 +529,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
                   </div>
                 )}
               </div>
-              {recipe.description && (
+              {showDescriptions && recipe.description && (
                 <p className="text-[13px] text-surface-500 dark:text-surface-400 line-clamp-2 mt-1 leading-relaxed">
                   {recipe.description}
                 </p>
@@ -555,10 +545,10 @@ export const RecipeCard: React.FC<Props> = (props) => {
                     <Users className="h-3 w-3" /> {recipe.servings}
                   </span>
                 )}
-                {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
+                {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
                   <span key={i} className="text-surface-400 dark:text-surface-500">{tag}</span>
                 ))}
-                {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
+                {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
                   <span className="text-surface-300 dark:text-surface-600">+{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}</span>
                 )}
               </div>
@@ -689,7 +679,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
           )}
 
           {/* Description */}
-          {recipe.description && (
+          {showDescriptions && recipe.description && (
             <p className="text-[12px] text-surface-500 dark:text-surface-400 line-clamp-2 mt-1.5 leading-relaxed">
               {recipe.description}
             </p>
@@ -703,12 +693,12 @@ export const RecipeCard: React.FC<Props> = (props) => {
             {/* Tags (allergy badge first, then regular tags) */}
             <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden flex-wrap">
               <AllergyBadge />
-              {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
+              {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
                 <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-100 dark:bg-white/[0.06] text-[11px] font-medium text-surface-500 dark:text-surface-400 truncate max-w-[80px]">
                   {tag}
                 </span>
               ))}
-              {recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
+              {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
                 <span className="text-[11px] text-surface-300 dark:text-surface-600 font-medium flex-shrink-0">
                   +{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}
                 </span>

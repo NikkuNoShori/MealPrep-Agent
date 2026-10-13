@@ -2,11 +2,37 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-09-25
-**Last updated:** 2026-09-25 (MOP-0031 complete — direct recipe sharing)
+**Last reviewed:** 2026-10-13
+**Last updated:** 2026-10-13 (MOP-0032 closed complete — see entry below)
+
+## 2026-10-13 (MOP-0032: QoL Backlog Batch 1 — Closed) `main`
+
+**QoL Backlog Batch 1 (MOP-0032 — complete)**
+
+- MOP-0032's 9 phases (extraction normalization, chat save fixes, recipe search fix, recipes page UX, meal planner improvements, grocery list additions) were implemented across commits `fc61c7f`, `15def89`, `95c992a`, `87d7bec` but the MOP sat `draft` for over a week with no formal close. This entry closes it.
+- **Fixed a broken production build found during closure verification:** `RecipeList.tsx` referenced `MoreHorizontal` and `Switch` with no imports — `npm run build` was failing outright.
+- **Fixed the "card display options" toggles actually doing nothing:** `RecipeCard.tsx`'s `showDescriptions`/`showTags` preferences (set via `RecipeList.tsx`'s display-options popover) were computed but never read by the render — recipe descriptions and tags always showed regardless of the toggle.
+- **Fixed `AddToPlanButton`'s dropdown alignment ignoring its own `panelAlign` prop** — `RecipeCard.tsx` explicitly requests right-alignment for its compact button; the component was silently always using its `compact`-based default instead.
+- **Re-verified the 5 critical findings** from a 2026-10-11 `qa-auditor` adversarial review against current code — all 5 confirmed already resolved (dropped `is_public` column, nonexistent `household_id` write, grocery "Already have it" no-op, fraction-parsing data corruption, recipe card never rendering).
+- Commits: `fc61c7f`, `15def89`, `95c992a`, `87d7bec` (original implementation); today's fixes uncommitted pending review.
+
+---
 
 ## 2026-10-11 (Manual Editor)
 - ## **Model deprecation notice:** `qwen/qwen3-8b` will be retired on 2026-10-15. Please migrate to `qwen/qwen3.7-plus`.
+
+---
+
+## 2026-10-11 (MOP-0029 Phase 8: Gradients, Shadows, CI Governance) `main`
+
+**Theme Token Layering — Phase 8 (MOP-0029 — in progress, Phase 9 verification remaining)**
+
+- **4 decorative gradient sites tokenized** onto `--gradient-warm` (`GroceryCart.tsx` empty-state icon + toolbar badge, `Admin.tsx` header icon badge, `RecipeList.tsx` sparkle badge) — the only sites categorized as true brand/decorative accents out of 16 `bg-gradient-to-*` usages audited; the other 12 were left as-is (status-state illustrations, structural skeleton/scrim gradients, or already on tokens from earlier phases).
+- **`--gradient-warm-from-rgb` / `-to-rgb` triplet vars added**, same fix pattern as `--surface-*-rgb` from Phases 4/6 — Tailwind's arbitrary-value opacity syntax can't derive an alpha channel from an opaque `var()` reference.
+- **`--shadow-accent` token added** — the one approved exception to the neutral-black shadow default, derived per-preset from `scheme.gradient.warm.from` so it shifts with the active preset rather than being a static color.
+- **`InviteAccept.tsx` success/error icons** re-pointed onto existing `--status-success` / `--status-error` tokens instead of hardcoded rose/green literals.
+- **`scripts/check-color-governance.js`** — new CI check for COLOR_SCHEMA.md rules G1 (raw hex), G2 (`stone-*`), G3 (raw accent utilities), G5 (mixed light/dark token systems). Allowlist-driven with a committed ratcheting baseline (`.color-baseline.json`: G1 427, G2 2, G3 327, G5 0) — a count may only decrease, never increase. Wired into `npm run lint`.
+- Commit: `492f7c7`.
 
 ---
 

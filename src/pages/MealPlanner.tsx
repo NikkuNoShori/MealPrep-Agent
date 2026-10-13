@@ -176,6 +176,7 @@ function WeekLabelDropdown({
   weekLabel,
   weekSubLabel,
   plans,
+  historyPlans,
   activePlan,
   onSelect,
   onRename,
@@ -186,6 +187,10 @@ function WeekLabelDropdown({
   weekLabel: string;
   weekSubLabel?: string;
   plans: any[];
+  /** Completed/archived/stale plans. Shown as a secondary section — always
+   * when the user has no active plans (so they aren't stranded with an
+   * empty dropdown), otherwise collapsed behind a toggle to avoid noise. */
+  historyPlans?: any[];
   activePlan: any | null;
   onSelect: (id: string) => void;
   onRename?: () => void;
@@ -195,9 +200,14 @@ function WeekLabelDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [planMenuOpen, setPlanMenuOpen] = useState<string | null>(null); // plan id whose ⋯ is open
+  const [showHistory, setShowHistory] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const hasActions = !!(onRename || onComplete || onRestore || onDelete);
-  const canOpen = plans.length >= 1 || hasActions;
+  const history = historyPlans ?? [];
+  const canOpen = plans.length >= 1 || hasActions || history.length >= 1;
+  // No active plans at all — show history expanded by default so the user
+  // isn't looking at an empty "Switch plan" list with no way out.
+  const historyExpanded = showHistory || plans.length === 0;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -208,6 +218,10 @@ function WeekLabelDropdown({
     };
     if (open) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) setShowHistory(false);
   }, [open]);
 
   return (
@@ -342,6 +356,44 @@ function WeekLabelDropdown({
               </div>
             );
           })}
+
+          {history.length > 0 && (
+            <>
+              {plans.length > 0 && (
+                <div className="my-1 border-t border-surface-100 dark:border-white/[0.06]" />
+              )}
+
+              {!historyExpanded ? (
+                <button
+                  onClick={() => setShowHistory(true)}
+                  className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 hover:bg-white/[0.06] transition-colors"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                  Completed & archived ({history.length})
+                </button>
+              ) : (
+                <>
+                  <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">
+                    Completed & archived
+                  </p>
+                  {history.map((p: any) => (
+                    <button
+                      key={p.id}
+                      onClick={() => { onSelect(p.id); setPlanMenuOpen(null); setOpen(false); }}
+                      className="flex flex-col w-full text-left rounded-lg px-3 py-2 hover:bg-white/[0.06] transition-colors"
+                    >
+                      <span className="text-xs font-medium truncate text-surface-700 dark:text-surface-300">
+                        {p.title || 'Untitled'}
+                      </span>
+                      <span className="text-[10px] mt-0.5 text-surface-400 dark:text-surface-500">
+                        {formatPlanRange(p)} · {p.status}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -911,6 +963,7 @@ const MealPlanner = () => {
                   weekLabel={calendarView === 'meals' ? weekLabel : (activePlan?.title || weekLabel)}
                   weekSubLabel={calendarView === 'meals' && planWeeks.length > 1 ? `Week ${safeWeekOffset + 1} of ${planWeeks.length}` : undefined}
                   plans={activePlans}
+                  historyPlans={historyPlans}
                   activePlan={activePlan}
                   onSelect={selectPlan}
                   onRename={weekPlan ? () => { setEditedPlanTitle(weekPlan.title || ''); setIsEditingPlanTitle(true); } : undefined}
