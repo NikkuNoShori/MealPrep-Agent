@@ -5,6 +5,7 @@
 
 import { resolveOpenRouterKeys } from "./openrouter-keys.ts";
 import { MAX_VISION_IMAGES } from "./recipe-schema.ts";
+import { DEFAULT_CHAT_MODEL, VISION_MODEL } from "./models.ts";
 
 // ─────────────────────────────────────────────────────────────────────
 // Types for tool-using chat (OpenAI-compatible tool format)
@@ -63,7 +64,7 @@ export class OpenRouterClient {
   async chat(
     systemPrompt: string,
     userMessage: string,
-    model = "qwen/qwen3.7-plus",
+    model = DEFAULT_CHAT_MODEL,
     options?: {
       temperature?: number;
       max_tokens?: number;
@@ -113,7 +114,7 @@ export class OpenRouterClient {
     systemPrompt: string,
     conversationHistory: any[],
     userMessage: string,
-    model = "qwen/qwen3.7-plus",
+    model = DEFAULT_CHAT_MODEL,
     options?: { temperature?: number; max_tokens?: number }
   ): Promise<string> {
     const messages = [
@@ -157,7 +158,7 @@ export class OpenRouterClient {
     systemPrompt: string,
     userMessage: string,
     images: string[],
-    model = "qwen/qwen3-vl-8b-instruct", // qwen-2.5-vl-7b retired; Qwen3 VL 8B is the successor
+    model = VISION_MODEL,
     options?: {
       temperature?: number;
       max_tokens?: number;
@@ -222,7 +223,7 @@ export class OpenRouterClient {
     systemPrompt: string,
     messages: ChatMessage[],
     tools: ToolSpec[],
-    model = "qwen/qwen3.7-plus",
+    model = DEFAULT_CHAT_MODEL,
     options?: {
       temperature?: number;
       max_tokens?: number;
@@ -236,15 +237,20 @@ export class OpenRouterClient {
       ...messages,
     ];
 
+    const toolChoice = options?.tool_choice ?? "auto";
     const body: Record<string, unknown> = {
       model,
       messages: fullMessages,
       tools,
-      tool_choice: options?.tool_choice ?? "auto",
+      tool_choice: toolChoice,
       temperature: options?.temperature ?? 0.2,
       max_tokens: options?.max_tokens ?? 1024,
       // Only route to providers that advertise tool/function-calling support.
       provider: { require_parameters: true },
+      // Reasoning models (e.g. Qwen "thinking mode") reject tool_choice:
+      // "required"/object — forcing a tool call is incompatible with letting
+      // the model think first. Disable reasoning whenever we need that guarantee.
+      ...(toolChoice === "required" ? { reasoning: { enabled: false } } : {}),
     };
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -296,7 +302,7 @@ export class OpenRouterClient {
     messages: ChatMessage[],
     tools: ToolSpec[],
     onDelta: (text: string) => void,
-    model = "qwen/qwen3.7-plus",
+    model = DEFAULT_CHAT_MODEL,
     options?: {
       temperature?: number;
       max_tokens?: number;
@@ -310,15 +316,18 @@ export class OpenRouterClient {
       ...messages,
     ];
 
+    const toolChoice = options?.tool_choice ?? "none";
     const body: Record<string, unknown> = {
       model,
       messages: fullMessages,
       tools,
-      tool_choice: options?.tool_choice ?? "none",
+      tool_choice: toolChoice,
       temperature: options?.temperature ?? 0.2,
       max_tokens: options?.max_tokens ?? 1024,
       provider: { require_parameters: true },
       stream: true,
+      // See chatWithTools: reasoning models reject tool_choice:"required" in thinking mode.
+      ...(toolChoice === "required" ? { reasoning: { enabled: false } } : {}),
     };
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {

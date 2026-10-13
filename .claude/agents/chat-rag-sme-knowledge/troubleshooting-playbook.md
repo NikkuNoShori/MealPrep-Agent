@@ -71,7 +71,7 @@
    - If `search_recipes` returned recipe X but the model described recipe Y, the model is misreading tool output.
 
 3. **Is the recipe in the response a real database row?**
-   - `agent-loop.ts:186-189` captures `lastRecipe` / `lastRecipes` from tool results into the response envelope. If the response has a `recipe` field, it came from a tool. If it has only `content` (prose), the model wrote it as text.
+   - `agent-loop.ts:312-321` captures `lastRecipe` / `lastRecipes` from tool results into the response envelope (verified 2026-10-12). The destructive-confirmation short-circuit (`agent-loop.ts:284-308`) also carries them through, so a recipe card still renders when a confirmation follows an extraction in the same turn. `lastRecipes` starts as `undefined` (line 209), so always guard it with `?.`. If the response has a `recipe` field, it came from a tool. If it has only `content` (prose), the model wrote it as text.
    - Verify: `SELECT title FROM recipes WHERE id = '<id from response>'`. If empty, model invented.
 
 4. **Was retrieved content interpreted as instructions?** (Prompt injection)
@@ -83,7 +83,8 @@
 If the model is consistently hallucinating: don't change code. Re-verify CHAT_AGENT_SYSTEM_PROMPT is unchanged (`recipe-prompts.ts`) and ask `cooking-bot-architect` to evaluate whether the prompt needs tightening.
 
 ### Code references
-- Capture-from-tool: `agent-loop.ts:186-189` `[verify exact lines]`
+- Capture-from-tool: `agent-loop.ts:312-321` (verified 2026-10-12)
+- Confirmation short-circuit (preserves recipe payload): `agent-loop.ts:284-308`
 - System prompt: `_shared/recipe-prompts.ts CHAT_AGENT_SYSTEM_PROMPT`
 - Tool-result wrapping: `agent-loop.ts:~69`
 

@@ -19,33 +19,15 @@ import type {
 import { CHAT_AGENT_SYSTEM_PROMPT } from "../_shared/recipe-prompts.ts";
 import { dispatchTool, type ToolContext, type ToolResult } from "./tools/dispatch.ts";
 import { getToolSpecs } from "./tools/catalog.ts";
+import { AGENT_MODEL, AGENT_MODEL_FALLBACKS } from "../_shared/models.ts";
 
 export const MAX_ITERS = 5;
-/** Tool-use requires a model with function-calling on OpenRouter (2.5-7b has none). */
-export const AGENT_MODEL =
-  Deno.env.get("OPENROUTER_AGENT_MODEL")?.trim() || "qwen/qwen3.7-plus";
-
-/**
- * Models that advertise `tools` + pass OpenRouter `require_parameters: true`.
- * Vision-only models (e.g. gemini-2.0-flash-001 in extract.ts) are NOT valid here.
- */
-export const DEFAULT_AGENT_MODEL_FALLBACKS = [
-  "qwen/qwen3.7-plus",
-  "qwen/qwen3-14b",
-  "openai/gpt-4o-mini",
-] as const;
+export { AGENT_MODEL };
 
 export function resolveAgentModels(): string[] {
-  const primary = AGENT_MODEL;
-  const fromEnv = Deno.env.get("OPENROUTER_AGENT_MODEL_FALLBACKS")
-    // Accept comma-separated OR space-separated values (both are common in Supabase secrets UI)
-    ?.split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const fallbacks = fromEnv ?? [...DEFAULT_AGENT_MODEL_FALLBACKS];
   const seen = new Set<string>();
   const ordered: string[] = [];
-  for (const model of [primary, ...fallbacks]) {
+  for (const model of [AGENT_MODEL, ...AGENT_MODEL_FALLBACKS]) {
     if (!seen.has(model)) {
       seen.add(model);
       ordered.push(model);
@@ -319,7 +301,7 @@ export async function runAgentLoop(
           // Preserve any recipe extracted earlier in this same turn so the
           // card still renders when a destructive tool follows an extraction.
           recipe: lastRecipe || undefined,
-          recipes: lastRecipes.length ? lastRecipes : undefined,
+          recipes: lastRecipes?.length ? lastRecipes : undefined,
           iterations: iteration,
           hitMaxIters: false,
         };

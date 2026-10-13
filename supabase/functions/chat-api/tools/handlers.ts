@@ -16,6 +16,7 @@
 import type { ToolContext } from "./dispatch.ts";
 import { SUBSTITUTION_PROMPT } from "../../_shared/recipe-prompts.ts";
 import { webSearch } from "../../_shared/web-search-client.ts";
+import { UTILITY_TEXT_MODEL } from "../../_shared/models.ts";
 
 export type ToolHandlerResult =
   | { ok: true; data: unknown }
@@ -762,7 +763,7 @@ async function proposeSubstitution(
     raw = await ctx.openRouter.chat(
       SUBSTITUTION_PROMPT,
       userMessage,
-      "qwen/qwen-2.5-7b-instruct",
+      UTILITY_TEXT_MODEL,
       {
         temperature: 0.3,
         max_tokens: 500,

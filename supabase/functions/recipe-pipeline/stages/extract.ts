@@ -6,20 +6,10 @@ import type { OpenRouterClient } from "../../_shared/openrouter-client.ts";
 import type { IntermediateContent, ExtractedRecipe } from "../../_shared/recipe-schema.ts";
 import { createPipelineError } from "../../_shared/recipe-schema.ts";
 import { RECIPE_EXTRACTION_PROMPT, IMAGE_EXTRACTION_PROMPT } from "../../_shared/recipe-prompts.ts";
+import { VISION_MODELS, UTILITY_TEXT_MODEL } from "../../_shared/models.ts";
 
 /** Maximum number of recipes allowed per request */
 const MAX_RECIPES_PER_REQUEST = 5;
-
-/**
- * Vision models to try in order — fallback chain if primary fails.
- * qwen-2.5-vl-7b was retired from OpenRouter; replaced with Qwen3 VL family.
- * Updated 2026-09-05: confirmed live slugs via GET /api/v1/models.
- */
-const VISION_MODELS = [
-  "qwen/qwen3-vl-8b-instruct",    // Qwen3 VL 8B — successor to retired qwen-2.5-vl-7b
-  "qwen/qwen2.5-vl-72b-instruct", // Qwen2.5 VL 72B — quality fallback (larger, slower)
-  "google/gemini-2.0-flash-001",  // Google fallback
-];
 
 /** Minimum caption/OCR text before we skip vision re-processing in extract. */
 const VIDEO_TEXT_EXTRACT_THRESHOLD = 80;
@@ -103,7 +93,7 @@ export async function extract(
       response = await openRouter.chat(
         systemPrompt,
         userPrompt,
-        "qwen/qwen-2.5-7b-instruct",
+        UTILITY_TEXT_MODEL,
         { temperature: 0.1, max_tokens: 4000, response_format: { type: "json_object" } }
       );
       return parseRecipeResponse(response!);

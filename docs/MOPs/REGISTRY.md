@@ -3,7 +3,7 @@
 > **Method of Procedure** — Tracks planned, in-progress, and completed improvement initiatives for the MealPrep Agent project.
 
 **Last reviewed:** 2026-09-28
-**Last updated:** 2026-10-04 (MOP-0029 Phase 7 complete — stone-* migration finished; MOP-0034 + MOP-0035 drafted by surface-reviewer from screenshot-extraction audit; MOP-0033 number reserved by MOP-0032 for nutrition/frequency/family-requests)
+**Last updated:** 2026-10-12 (MOP-0036 drafted by surface-reviewer — Deno edge-function tests in CI). Previous: 2026-10-04 (MOP-0029 Phase 7 complete — stone-* migration finished; MOP-0034 + MOP-0035 drafted by surface-reviewer from screenshot-extraction audit; MOP-0033 number reserved by MOP-0032 for nutrition/frequency/family-requests)
 
 ---
 
@@ -66,6 +66,9 @@
 | [MOP-0032](MOP-0032-qol-backlog-batch-1.md) | QoL Backlog Batch 1 — Extraction, Chat, Recipes, Planner, Grocery | draft | 2026-09-28 | 2026-10-04 | — | Nick Neal |
 | [MOP-0034](MOP-0034-screenshot-extraction-accuracy.md) | Screenshot / Image Recipe Extraction Accuracy | draft | 2026-10-04 | 2026-10-04 | — | surface-reviewer |
 | [MOP-0035](MOP-0035-extraction-requirements-spec.md) | Per-Modality Recipe Extraction Requirements Spec | draft | 2026-10-04 | 2026-10-04 | — | surface-reviewer |
+| [MOP-0036](MOP-0036-edge-function-deno-tests-in-ci.md) | Edge-Function Deno Tests in CI + Local Toolchain | draft | 2026-10-12 | 2026-10-12 | — | surface-reviewer |
+
+> **MOP-0036 (2026-10-12):** Drafted after an `agent-loop.ts` crash (`lastRecipes.length` on undefined, from dc8bf5d) sat on `main` for about 5 weeks. The existing Deno test that covers that path was never run, because CI has no Deno job and Deno isn't installed locally. Recommended P1. Phase 4 re-checks MOPs whose `deno test` verification assertions may never have actually executed (MOP-0008, MOP-0016, MOP-0034).
 
 > **MOP-0034 / MOP-0035 (2026-10-04):** Drafted from the recipe-pipeline-sme screenshot-extraction audit. Backed by ADR-0007 (absent = null, uncertainty → `warnings[]`). MOP-0034 Phase 1c supersedes MOP-0032 Phase 1 item 6's ≤3-word instruction filter. MOP-0012's deferral trigger has likely fired (second image-path extraction bug) and awaits a user decision on promotion. MOP-0033 is intentionally unassigned: MOP-0032 reserves it for nutrition / meal frequency / family meal requests.
 

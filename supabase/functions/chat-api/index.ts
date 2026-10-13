@@ -15,6 +15,7 @@ import { executeConfirmedTool } from "./tools/handlers.ts";
 import type { ToolContext } from "./tools/dispatch.ts";
 import { enrichMessageContent } from "./conversation-context.ts";
 import { handleBatchExtract } from "./batch-extract.ts";
+import { UTILITY_TEXT_MODEL } from "../_shared/models.ts";
 
 // ═══════════════════════════════════════════════════════════════════
 // CONFIRM-ACTION VERIFICATION
@@ -434,7 +435,7 @@ async function handleSendMessage(
                 const t = await openRouter.chat(
                   "Generate a very short title (4-6 words max) for this conversation. Return ONLY the title text, nothing else.",
                   `User: ${(message || "").substring(0, 200)}\nAssistant: ${aiResponse.substring(0, 200)}`,
-                  "qwen/qwen-2.5-7b-instruct",
+                  UTILITY_TEXT_MODEL,
                   { temperature: 0.3, max_tokens: 20, billing: "chat" }
                 );
                 generatedTitle = t.trim().replace(/^["']|["']$/g, "");
@@ -563,7 +564,7 @@ async function handleSendMessage(
         const titleResponse = await openRouter.chat(
           "Generate a very short title (4-6 words max) for this conversation. Return ONLY the title text, nothing else.",
           `User: ${(message || "").substring(0, 200)}\nAssistant: ${aiResponse.substring(0, 200)}`,
-          "qwen/qwen-2.5-7b-instruct",
+          UTILITY_TEXT_MODEL,
           { temperature: 0.3, max_tokens: 20, billing: "chat" }
         );
         generatedTitle = titleResponse.trim().replace(/^["']|["']$/g, "");

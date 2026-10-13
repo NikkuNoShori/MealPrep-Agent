@@ -3,6 +3,8 @@
  * Uses OpenRouter-compatible transcription — never downloads from TikTok CDN.
  */
 
+import { TRANSCRIPTION_MODEL, WHISPER_MODEL } from "./models.ts";
+
 const MAX_MEDIA_BYTES = 24 * 1024 * 1024; // ~24MB edge payload guard
 
 export async function transcribeMediaBytes(
@@ -52,7 +54,7 @@ async function whisperTranscribe(
 ): Promise<string> {
   const formData = new FormData();
   formData.append("file", new Blob([bytes], { type: mimeType }), filename);
-  formData.append("model", "openai/whisper-large-v3");
+  formData.append("model", WHISPER_MODEL);
 
   const response = await fetch("https://openrouter.ai/api/v1/audio/transcriptions", {
     method: "POST",
@@ -100,7 +102,7 @@ async function geminiAudioTranscribe(
       "X-Title": "MealPrep Agent",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: TRANSCRIPTION_MODEL,
       messages: [
         {
           role: "user",

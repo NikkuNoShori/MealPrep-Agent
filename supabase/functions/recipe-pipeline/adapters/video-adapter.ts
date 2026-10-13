@@ -12,6 +12,7 @@ import {
 } from "../../_shared/transcribe-media.ts";
 import { resolveMediaApiKey } from "../../_shared/openrouter-keys.ts";
 import { urlAdapter } from "./url-adapter.ts";
+import { VISION_MODEL } from "../../_shared/models.ts";
 
 const ADAPTER_VERSION = "1.1.0";
 const MAX_OCR_FRAMES = 8;
@@ -226,7 +227,7 @@ async function extractTextFromFrames(
       "You are an OCR system. Extract ALL visible text from these video frames. Include recipe titles, ingredients, instructions, and any other text. Return only the extracted text, no commentary.",
       "Extract all visible text from these video frames. Focus on recipe content: titles, ingredient lists, cooking instructions, measurements, and cooking times.",
       frameUrls.slice(0, MAX_OCR_FRAMES),
-      "qwen/qwen3-vl-8b-instruct", // qwen-2.5-vl-7b retired; Qwen3 VL 8B is the successor
+      VISION_MODEL,
       { temperature: 0.1, max_tokens: 3000 }
     );
     return response;

@@ -49,13 +49,14 @@ When asked "what's the vector vs text weight?", the answer is "there isn't one i
 
 | Knob | Value | Source |
 |---|---|---|
-| Model | `qwen/qwen-2.5-7b-instruct` | `agent-loop.ts` (top of file `[verify line]`) |
-| Temperature (in loop) | 0.2 | `agent-loop.ts` `[verify line]` |
-| `tool_choice` | `"auto"` | `agent-loop.ts` |
-| Max tokens (in-loop call) | 1024 | `agent-loop.ts` `[verify line]` |
-| Max tokens (closing call) | 600 | `agent-loop.ts` `[verify line]` |
-| MAX_ITERS | 5 | `agent-loop.ts:21` (near constants) `[verify]` |
-| Tool result wrapping | `<tool_result>{json}</tool_result>` | `agent-loop.ts:~69` `[verify]` |
+| Model | `AGENT_MODEL` (default `qwen/qwen3.7-plus`) → fallbacks `AGENT_MODEL_FALLBACKS` | imported from `_shared/models.ts` at `agent-loop.ts:22`; fallback loop at `agent-loop.ts:30` (verified 2026-10-12) |
+| Temperature (in loop) | 0.2 | `agent-loop.ts:225` |
+| `tool_choice` | `"required"` on iteration 1 **when images are attached**, else `"auto"` | `agent-loop.ts:213-219`. Exists so small models can't ignore the image hint and reply in prose. If an image upload yields prose instead of a recipe card, check this first. |
+| `tool_choice` (closing call after MAX_ITERS) | `"none"` | `agent-loop.ts:348,357` |
+| Max tokens (in-loop call) | 1024 | `agent-loop.ts:225` |
+| Max tokens (closing call) | 600 | `agent-loop.ts:348,357` |
+| MAX_ITERS | 5 | `agent-loop.ts:24` |
+| Tool result wrapping | `<tool_result>{json}</tool_result>` | `wrapToolResult` at `agent-loop.ts:171` |
 
 ## Tool catalog
 
@@ -63,21 +64,39 @@ When asked "what's the vector vs text weight?", the answer is "there isn't one i
 |---|---|---|
 | Total tools | 12 (11 always + 1 capability-gated) | `catalog.ts TOOL_CATALOG.length` |
 | Effective tools when web search gate off | 11 | `catalog.ts available()` predicate |
-| `DESTRUCTIVE_TOOLS` | `{update_recipe, delete_recipe}` | `catalog.ts DESTRUCTIVE_TOOLS` |
-| `CONDITIONALLY_DESTRUCTIVE` | `{assign_recipe_to_meal_plan_slot}` | `catalog.ts CONDITIONALLY_DESTRUCTIVE` |
+| `DESTRUCTIVE_TOOLS` | `{update_recipe, delete_recipe, update_member_allergens}` | `catalog.ts:768-772` (verified 2026-10-12) |
+| `CONDITIONALLY_DESTRUCTIVE` | `{assign_recipe_to_meal_plan_slot}` | `catalog.ts:778-780` |
 | Capability gate | `WEB_SEARCH_API_KEY` env var | `catalog.ts:337` `available()` predicate `[verify]` |
+
+## Model registry — `_shared/models.ts` (single source of truth)
+
+> Added 2026-10-12. At time of writing `models.ts` is **untracked/uncommitted** in the working tree. Verify it is on `main` before relying on these line refs. Every model slug in `chat-api` and `recipe-pipeline` now resolves here. **Env var overrides win over the file default.** On a model deprecation, update the default **and** run `supabase secrets unset <VAR>` (user runs this; never run it yourself), or a stale override silently brings the retired slug back.
+
+| Token | Default | Env override | Consumers |
+|---|---|---|---|
+| `AGENT_MODEL` | `qwen/qwen3.7-plus` | `OPENROUTER_AGENT_MODEL` | `chat-api/agent-loop.ts:22,30` (must support tool calling) |
+| `AGENT_MODEL_FALLBACKS` | `["qwen/qwen3.7-plus", "openai/gpt-4o-mini"]` | `OPENROUTER_AGENT_MODEL_FALLBACKS` (comma/space-separated) | `agent-loop.ts:30`. Every entry must support `tools`; vision-only models are invalid here |
+| `UTILITY_TEXT_MODEL` | `qwen/qwen-2.5-7b-instruct` | `OPENROUTER_UTILITY_MODEL` | title generation `chat-api/index.ts:438,567`; substitution `tools/handlers.ts:766`; text extraction `recipe-pipeline/stages/extract.ts:96` |
+| `DEFAULT_CHAT_MODEL` | `qwen/qwen3.7-plus` | `OPENROUTER_CHAT_MODEL` | `_shared/openrouter-client.ts` default param for chat / chatWithHistory / chatWithTools |
+| `VISION_MODELS` | `["qwen/qwen3-vl-8b-instruct", "qwen/qwen2.5-vl-72b-instruct", "google/gemini-2.0-flash-001"]` | `OPENROUTER_VISION_MODELS` | image extraction loop `extract.ts:63` |
+| `VISION_MODEL` | `VISION_MODELS[0]` | (derived) | `openrouter-client.ts` `chatWithImages` default; `recipe-pipeline/adapters/video-adapter.ts` frame OCR |
+| `WHISPER_MODEL` | `openai/whisper-large-v3` | `OPENROUTER_WHISPER_MODEL` | `_shared/transcribe-media.ts:57` |
+| `TRANSCRIPTION_MODEL` | `google/gemini-2.5-flash` | `OPENROUTER_TRANSCRIPTION_MODEL` | `transcribe-media.ts:105` (fallback when Whisper fails) |
+
+**Gotcha (2026-10-12):** `qwen/qwen3.7-plus` is **text-only**. Do not use it in a vision slot. `qwen/qwen3-8b` (bare, no `vl`) was retired by OpenRouter on 2026-10-09. A live 404 naming it means the deployed `chat-api` predates HEAD or a stale `OPENROUTER_AGENT_MODEL*` secret is set.
 
 ## Models used (across the entire AI surface)
 
-| Use | Model | Where called | Temperature |
+| Use | Model token (see registry above) | Where called | Temperature |
 |---|---|---|---|
-| Chat agent loop | `qwen/qwen-2.5-7b-instruct` | `agent-loop.ts` `[verify]` | 0.2 |
-| Title generation (first chat msg) | `qwen/qwen-2.5-7b-instruct` | `chat-api/index.ts:322` `[verify]` | 0.3 |
-| General chat (legacy `handleGeneralChat` — removed?) | — | post-MOP-0008, this path was deleted from `chat-api/index.ts` | n/a |
-| Recipe extraction (text) | `qwen/qwen-2.5-7b-instruct` | `recipe-pipeline/stages/extract.ts` `[verify exact ID]` | 0.1 |
-| Recipe extraction (image/vision) | `qwen/qwen-2.5-vl-7b-instruct` | `recipe-pipeline/stages/extract.ts` `[verify]` | 0.1 |
-| Vision fallback | `google/gemini-2.0-flash-001` | `recipe-pipeline/stages/extract.ts` `[verify chain]` | 0.1 |
-| Substitution suggestions (chat tool) | `qwen/qwen-2.5-7b-instruct` (per MOP-0008 design) | `handlers.ts proposeSubstitution` `[verify]` | 0.3 |
+| Chat agent loop | `AGENT_MODEL` + `AGENT_MODEL_FALLBACKS` | `agent-loop.ts` | 0.2 |
+| Title generation (first chat msg) | `UTILITY_TEXT_MODEL` | `chat-api/index.ts:438,567` | 0.3 `[verify]` |
+| General chat (legacy `handleGeneralChat`) | — | deleted post-MOP-0008 | n/a |
+| Recipe extraction (text) | `UTILITY_TEXT_MODEL` | `recipe-pipeline/stages/extract.ts:96` | 0.1 `[verify]` |
+| Recipe extraction (image/vision) | `VISION_MODELS` (ordered chain) | `extract.ts:63` | 0.1 `[verify]` |
+| Video frame OCR | `VISION_MODEL` | `video-adapter.ts` | `[verify]` |
+| Audio transcription | `WHISPER_MODEL` → `TRANSCRIPTION_MODEL` | `_shared/transcribe-media.ts` | n/a |
+| Substitution suggestions (chat tool) | `UTILITY_TEXT_MODEL` | `tools/handlers.ts:766` | 0.3 `[verify]` |
 
 ## Token budgets (verified where possible)
 
@@ -120,4 +139,6 @@ When investigating discrepancies between docs and code, check these high-drift a
 1. **Migration defaults vs handler overrides** — already noted; 4 RPCs affected.
 2. **The 384-dim `recipe_embeddings` table** — referenced in migrations but never written; expectation of "RAG uses two tables" is wrong.
 3. **Audit's claim of `0.7/0.3` hybrid weighting** — that was the old retired `server.js`. Current code dedupes only.
-4. **`apiClient.rag*` methods in `api.ts`** — point at non-existent endpoints. Dead.
+4. **`apiClient.rag*` methods in `api.ts`**: point at non-existent endpoints. Dead.
+5. **Deployed vs HEAD model slugs**: env overrides (`OPENROUTER_*_MODEL*`) win over `_shared/models.ts` defaults, and the deployed function can lag HEAD. When logs name a model that isn't in HEAD, suspect a stale deploy or stale secret before suspecting the code.
+6. **Line-number refs in this KB**: `agent-loop.ts` has grown a lot since MOP-0008 (resilient fallback, streaming, image `tool_choice`). Refs marked "verified 2026-10-12" are current as of that date. Re-verify anything else before citing it.
