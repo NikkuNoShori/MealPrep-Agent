@@ -2,7 +2,7 @@
 
 **Purpose:** Self-contained instructions for performing a canonical documentation update after code changes are merged. This document contains all context needed — point an AI assistant here and say "follow these instructions" to execute a full documentation audit and update.
 
-**Last updated:** 2026-06-01 (added references to MOP_STATUS_LIFECYCLE, ADR_AUTHORING_GUIDE, DECISIONS directory; integrated lockticket Verification flow)
+**Last updated:** 2026-10-16 (added COLOR_SCHEMA.md to the Step 2 canonical doc inventory — closes a MOP-0029 Phase 0 acceptance-criterion gap found during its Phase 9 closeout). Previous: 2026-06-01 (added references to MOP_STATUS_LIFECYCLE, ADR_AUTHORING_GUIDE, DECISIONS directory; integrated lockticket Verification flow)
 
 ### Key references
 - **MOPs:** `docs/MOPs/` — operational change plans with status tracking
@@ -72,6 +72,7 @@ These are the documents that must be checked and potentially updated. Each has a
 | **RUNBOOK.md** | `docs/RUNBOOK.md` | Operational debugging checklists | New failure modes, new troubleshooting scenarios, new verification SQL queries |
 | **CHANGELOG.md** | `docs/CHANGELOG.md` | User-visible changes by date | Every merge to main (always) |
 | **Docs README** | `docs/README.md` | Doc index + navigation | New canonical docs added, structural changes |
+| **COLOR_SCHEMA.md** | `docs/COLOR_SCHEMA.md` | Color token layering, coverage-surface taxonomy, governance rules G1–G8 (MOP-0029) | New color surfaces, new ramp families, governance rule changes, `.color-baseline.json` ratchet changes |
 
 ### MOP Registry (always review):
 
@@ -276,3 +277,4 @@ Append to the update log at the bottom of this document:
 | 2026-09-21 | Nick Neal | main (MOP-0028 complete — bulk recipe actions: multi-select UI, bulk RPCs, migration 038) | DATA_MODEL, API, CHANGELOG, MOP-0028, REGISTRY |
 | 2026-09-22 | Nick | main (MOP-0026 complete — security auditor agent, confirmAction verification, embedding-refresh JWT gate, MIME whitelist, error sanitization, migrations 039–041) | ARCHITECTURE, API, RUNBOOK, CHANGELOG, MOP-0026, REGISTRY |
 | 2026-09-25 | Nick | main (MOP-0031 complete — direct recipe sharing: recipe_shares table, 5 RLS policies, 5 SECURITY DEFINER RPCs, Shared with me feed, unseen badge, sharer attribution, migration 043) | DATA_MODEL, API, RUNBOOK, CHANGELOG, MOP-0031, REGISTRY |
+| 2026-10-16 | Nick Neal | main (MOP-0029 complete — Phase 9 `/verify-mop` run found and fixed 2 real hardcoded dark-mode hex bugs, `-rgb` triplet tokens added, 10 files migrated, `.color-baseline.json` ratcheted 427→416; ADR-0006 → accepted; COLOR_SCHEMA.md → normative; COLOR_SCHEMA.md added to this procedure's Step 2 inventory and doc-adherence's scope, closing a Phase 0 acceptance-criterion gap found during closeout) | CHANGELOG, COLOR_SCHEMA, ADR-0006, MOP-0029, REGISTRY, DOCUMENTATION_UPDATE_PROCEDURE, doc-adherence |

@@ -2,8 +2,22 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-10-13
-**Last updated:** 2026-10-13 (MOP-0032 closed complete — see entry below)
+**Last reviewed:** 2026-10-16
+**Last updated:** 2026-10-16 (MOP-0029 closed complete — see entry below)
+
+## 2026-10-16 (MOP-0029: Theme Token Layering & Surface-Aware Presets — Closed) `main`
+
+**Theme Token Layering & Surface-Aware Presets (MOP-0029 — complete)**
+
+- MOP-0029's 9 phases (governance standard, token layering, surface-aware presets, CI enforcement) were implemented across commits `48d965f`, `aeb2457`, `154f6ae`, `b87ad80`, `d05e455`, `8b9bcfb`, `b5c6eb1`, `83c8b40`, `492f7c7` over the prior month, but Phase 9's own acceptance-criteria verification had never been run as its own dedicated pass. This entry closes it.
+- **Ran `/verify-mop MOP-0029`** against all 22 verification-block assertions — found and fixed 2 real hardcoded-dark-mode-hex bugs: `#0e0f13` in `src/index.css`'s `.dark body` rule, and `#1e1f26` in `Header.tsx`'s opacity-modified user-menu dropdown (`dark:bg-[#1e1f26]/95`) — the latter is exactly the gap this MOP's own Phase 7 notes had already flagged as open pending RGB-triplet token infrastructure.
+- **Root cause:** Tailwind's arbitrary-value opacity syntax (`bg-[...]/NN`) can't derive an alpha channel from a `var()` reference to a hex custom property — only from an RGB triplet. Added `--rs-bg-elevated-rgb` and `--rs-page-bg-rgb` tokens (light + dark) in `src/index.css`, following the existing `--surface-*-rgb` precedent from Phase 4.
+- **Found and fixed the same literal in 8 more files** beyond the 2 the verification block directly checks: `Layout.tsx`, `main.tsx`, `MealPlanner.tsx`, `Recipes.tsx`, `PlannerSettingsMenu.tsx`, `AddToCollectionMenu.tsx`, `CollectionsSidebar.tsx`, `RecipeCard.tsx`, `VisibilityPicker.tsx`, `Household.tsx`.
+- **Governance effect:** the raw-hex-literal (G1) count dropped from 427 → 416; `.color-baseline.json` ratcheted down to lock in the improvement.
+- ADR-0006 flipped `proposed` → `accepted`; `docs/COLOR_SCHEMA.md` status flipped `proposed` → `normative`.
+- Commits: `48d965f` through `492f7c7` (original 9-phase implementation, 2026-09-21 through 2026-10-11); today's verification fixes uncommitted pending review.
+
+---
 
 ## 2026-10-13 (MOP-0032: QoL Backlog Batch 1 — Closed) `main`
 

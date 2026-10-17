@@ -25,6 +25,7 @@ Your job is to audit documentation for adherence to the project's canonical stru
 5. `docs/README.md` — Canonical doc index
 6. `docs/MOPs/REGISTRY.md` — Current MOP status inventory
 7. `docs/AI_INTEGRATION_AUDIT.md` — Strategic AI surface audit (recent)
+8. `docs/COLOR_SCHEMA.md` — Normative color standard (MOP-0029); token layering, 13-category coverage-surface taxonomy, governance rules G1–G8
 
 ## Checks to Perform
 
@@ -44,6 +45,7 @@ Your job is to audit documentation for adherence to the project's canonical stru
 | Doc update procedure | `docs/prompts/DOCUMENTATION_UPDATE_PROCEDURE.md` | Yes |
 | ADR authoring guide | `docs/prompts/ADR_AUTHORING_GUIDE.md` | Yes |
 | MOP status lifecycle | `docs/prompts/MOP_STATUS_LIFECYCLE.md` | Yes |
+| Color schema standard | `docs/COLOR_SCHEMA.md` | Yes |
 
 Architecture subfolder structure — **not yet a hard requirement for MealPrep**, but flag absence as `Suggestion` so the user can decide when to introduce it:
 - `docs/architecture/<domain>/README.md` + `flows.md` (e.g., `recipe-pipeline/`, `chat-api/`, `auth/`)
@@ -84,6 +86,7 @@ Cross-doc compliance:
 - Docs that describe migrations must not show `supabase db push` or `--linked` invocations as recommended workflows (HARD RULE)
 - Docs that describe data flow must mention RLS enforcement where tables are involved
 - Docs that describe `api.ts` patterns must reference the camelCase ↔ snake_case mapping
+- Docs or code that add color to the UI must be consistent with `docs/COLOR_SCHEMA.md` (no raw hex in `className`/`style`; no new `stone-*`; no raw accent utilities outside the §11 allowlist) — flag new violations as Warning, citing the current `.color-baseline.json` ratchet count so regressions are caught before CI does
 
 ### 6. Cooking-Bot Knowledge Base Drift
 

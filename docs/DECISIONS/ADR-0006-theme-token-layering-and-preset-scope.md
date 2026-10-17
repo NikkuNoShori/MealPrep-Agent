@@ -1,11 +1,13 @@
 # ADR-0006: Theme Token Layering and the Scope of Color Presets
 
-**Status:** proposed
+**Status:** accepted
 **Created:** 2026-09-21
 **Author:** Nick Neal
-**Last reviewed:** 2026-09-21
+**Last reviewed:** 2026-10-16
 **Related MOP:** MOP-0029
 **Standard:** [docs/COLOR_SCHEMA.md](../COLOR_SCHEMA.md)
+
+> **Accepted 2026-10-16.** MOP-0029 (all 9 phases) shipped and passed `/verify-mop`. The three-layer token model, thirteen-category taxonomy, and ratcheting CI governance check described below are implemented and enforced in `npm run lint`.
 
 > **Revision 2026-09-21 — scope expanded.** This ADR originally framed the gap as "page background / card surface." A full audit of every color surface showed the same root cause extends across thirteen categories (status colors, accent categories, gradients, shadows, overlays, interactive states, chrome, data-viz). The decision below now covers the full taxonomy, and the normative rules are extracted into `docs/COLOR_SCHEMA.md`. No prior decision is reversed — the scope is widened.
 

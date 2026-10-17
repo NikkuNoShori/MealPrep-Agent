@@ -4,8 +4,8 @@
 
 **Publisher:** Nick Neal
 **Created:** 2026-09-21
-**Last updated:** 2026-09-21
-**Status:** proposed — normative once ADR-0006 is `accepted`
+**Last updated:** 2026-10-16
+**Status:** normative — ADR-0006 accepted, MOP-0029 complete
 **Governing ADR:** [ADR-0006](DECISIONS/ADR-0006-theme-token-layering-and-preset-scope.md)
 **Implementing MOP:** [MOP-0029](MOPs/MOP-0029-theme-token-layering-surface-presets.md)
 
