@@ -103,14 +103,14 @@ These already exist and can be wrapped as tools in a tool-using agent:
 
 ## `meal_plans` schema shape
 
-`meal_plans` is one row per plan, with `meals` and `grocery_list` stored as JSONB columns (per migration `20251201000000_001_core_schema.sql:136`) — NOT as normalized child tables. Tool catalogs, queries, and tool handlers must accommodate JSONB read-modify-write patterns:
+**As of MOP-0011 (complete 2026-10-16, migrations 044–046), `meal_plans` holds plan-level metadata only.** Meal assignments and grocery items are normalized into two child tables — the old JSONB read-modify-write pattern described in earlier versions of this note no longer applies.
 
-- `meals` is keyed by date string, with sub-keys per slot (`breakfast` / `lunch` / `dinner` / `snack`) pointing at `recipe_id`.
-- `grocery_list` is an array of item objects with `{ item, amount, unit, category, source }` shape.
-- No FK to `recipes` from inside the JSONB — a deleted recipe can leave a dangling `recipe_id`. Handle gracefully on read.
-- Concurrent edits use last-write-wins on the whole row. Two household members editing the same week can lose each other's writes.
+- `meal_plan_entries` (migration 044) — one row per planned meal assignment. `date` + `slot` for calendar entries, or `list_key` for plan-level lists (e.g. a snacks list) — never both, enforced by a check constraint. `recipe_id` is a real FK to `recipes(id) ON DELETE SET NULL` (no more dangling references from inside JSONB).
+- `grocery_list_items` (migration 044) — one row per grocery item, column shape matches the frontend `GroceryItem` type. `is_removed` is a soft-delete boolean (not array filtering).
+- Both tables use the `is_meal_plan_owner(meal_plan_id)` `SECURITY DEFINER` helper for RLS — per-row policies, not document-level last-write-wins. Concurrent household edits to different rows (different dates/slots/items) no longer clobber each other.
+- Tool catalogs, queries, and tool handlers should query/write these child tables directly (`chat-api/tools/handlers.ts` already does, confirmed `meal_plan_entries` references throughout) — not `meal_plans.meals`/`grocery_list`, which no longer exist as columns.
 
-**Normalization is a documented follow-on (MOP-0011, deferred).** When designing features that need cross-plan aggregation, per-row RLS, or concurrent-edit safety, check whether MOP-0011's trigger conditions have fired. If yes, the normalization migration takes priority over building on JSONB.
+See `docs/DATA_MODEL.md` (`meal_plan_entries`/`grocery_list_items` sections) for full column definitions.
 
 ## Prompts registry
 
