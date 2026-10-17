@@ -21,6 +21,7 @@ export interface Ingredient {
   unit: string
   category: IngredientCategory
   alternatives?: string[]
+  notes?: string
 }
 
 export type IngredientCategory = 

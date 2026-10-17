@@ -44,6 +44,7 @@ interface RecipeDetailProps {
       amount: number
       unit: string
       category?: string
+      notes?: string
     }>
     instructions?: string[]
     visibility?: RecipeVisibility
@@ -354,10 +355,17 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                         const amount = parseAmount(ingredient.amount) ?? 0
                         const isQualitative = ['to taste', 'to serve', 'as needed', 'optional', 'pinch', 'dash', 'splash', 'garnish', 'for garnish', 'to garnish'].includes(rawUnit)
                         const isZeroAmount = amount === 0 || isNaN(amount)
+                        // LLM-extracted recipes store a qualifier like "to taste" in `notes`
+                        // with amount/unit both empty, rather than the manual-entry convention
+                        // of putting the qualifier directly in `unit` (isQualitative above).
+                        const hasNoAmountOrUnit = !ingredient.amount && !ingredient.unit
+                        const notesAsValue = isZeroAmount && hasNoAmountOrUnit && ingredient.notes
 
                         let displayValue: string
                         if (isQualitative) {
                           displayValue = ingredient.unit
+                        } else if (notesAsValue) {
+                          displayValue = ingredient.notes!
                         } else if (isZeroAmount) {
                           displayValue = ingredient.unit || ''
                         } else {
@@ -374,8 +382,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                               index !== visibleIngredients.length - 1 ? 'border-b border-border/30' : ''
                             }`}
                           >
-                            <span className="font-medium text-sm">{ingredient.name}</span>
-                            <span className={`text-sm text-muted-foreground ml-3 shrink-0 ${isQualitative ? 'italic' : 'font-mono tabular-nums'}`}>
+                            <span className="min-w-0">
+                              <span className="font-medium text-sm">{ingredient.name}</span>
+                              {ingredient.notes && !notesAsValue && (
+                                <span className="block text-xs text-muted-foreground italic">{ingredient.notes}</span>
+                              )}
+                            </span>
+                            <span className={`text-sm text-muted-foreground ml-3 shrink-0 ${isQualitative || notesAsValue ? 'italic' : 'font-mono tabular-nums'}`}>
                               {displayValue}
                             </span>
                           </div>

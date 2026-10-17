@@ -97,6 +97,7 @@ function normalizeRecipeForDraft(recipe: StructuredRecipe): StructuredRecipeType
       amount: ing.amount ?? 0,
       unit: ing.unit,
       category: (ing.category ?? "other") as StructuredRecipeType["ingredients"][number]["category"],
+      ...(ing.notes ? { notes: ing.notes } : {}),
     })),
     instructions: recipe.instructions,
     imageUrl: (recipe.imageUrl ?? recipe.image_url ?? undefined) as string | undefined,
@@ -141,7 +142,9 @@ function CompactIngredientRow({
     setUnit(ingredient.unit);
   }, [ingredient]);
 
-  const qtyLabel = [ingredient.amount, ingredient.unit].filter(Boolean).join(" ");
+  const qtyLabel = ingredient.amount || ingredient.unit
+    ? [ingredient.amount, ingredient.unit].filter(Boolean).join(" ")
+    : ingredient.notes || "";
 
   const save = () => {
     const trimmedName = name.trim();
@@ -395,6 +398,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           amount: ing.amount ?? 0,
           unit: ing.unit,
           category: (ing.category ?? "other") as StructuredRecipeType["ingredients"][number]["category"],
+          ...(ing.notes ? { notes: ing.notes } : {}),
         })),
         instructions,
       },
