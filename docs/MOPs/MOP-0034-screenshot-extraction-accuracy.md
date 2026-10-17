@@ -5,7 +5,7 @@
 | **MOP** | MOP-0034 |
 | **Title** | Screenshot / Image Recipe Extraction Accuracy |
 | **Date Submitted** | 2026-10-04 |
-| **Date Updated** | 2026-10-16 (MOP-0036 Phase 4 retroactive note: `extract_test.ts` run for the first time, 20/20 pass — closes the "Not run" gap noted 2026-10-13). Previous: 2026-10-13 (1f, 1g, 1h, 5a implemented; 3e Step 0 confirmed root cause was model-side, 3e fix deferred; live retest surfaced two more gaps — dropped range quantities, unfolded garnish duplicates — new prompt rules + plausibility checks added same day) |
+| **Date Updated** | 2026-10-16 (Phase 5c added — container-size loss, user-reported via screenshot; also related: a sibling fix shipped outside this MOP renders `notes` in the UI for the first time, which was masking whether this is an extraction bug or a display bug — see Phase 5c's open question). Previous: 2026-10-16 (MOP-0036 Phase 4 retroactive note: `extract_test.ts` run for the first time, 20/20 pass — closes the "Not run" gap noted 2026-10-13). Previous: 2026-10-13 (1f, 1g, 1h, 5a implemented; 3e Step 0 confirmed root cause was model-side, 3e fix deferred; live retest surfaced two more gaps — dropped range quantities, unfolded garnish duplicates — new prompt rules + plausibility checks added same day) |
 | **Date Completed** | — |
 | **Submitted By** | surface-reviewer (from recipe-pipeline-sme audit, 2026-10-04) |
 | **Status** | in_progress |
@@ -124,6 +124,12 @@ Today the fallback chain (`qwen3-vl-8b` → `qwen2.5-vl-72b` → `gemini-2.0-fla
 **5b — JSON mode (P2):**
 - Request `response_format: { type: "json_object" }` where the model supports it. Verify OpenRouter support per model slug (the comment at `extract.ts:66-67` says vision models don't reliably support it).
 
+**5c — Container-size loss (P1, found 2026-10-16 via recipe-pipeline-sme, user-reported):** `_shared/recipe-prompts.ts:21` has no example for a per-container size pattern ("2 cans (10.75 ounces, each)" or "1 (15 ounce) jar" — size before the container word). A real extraction returned `amount: 2, unit: "can"` with the 10.75 oz size dropped or (unverified — see below) only in `notes`, which the fix in the sibling commit now at least displays but the model may not be reliably capturing in the first place. This is the same bug family as `95a8491` (2026-10-13's "container-count-vs-real-measurement" fix) but that fix's examples don't cover the "each"/pre-size-before-container phrasing.
+- Extend `RECIPE_FIELD_RULES` (`recipe-prompts.ts:21`) with explicit examples for both phrasings. **Decision needed first:** keep the shopping unit (`amount: 2, unit: "can"`, full size text in `notes`) rather than computing a total (21.5 oz) — stores sell by can size, not by total ounces, so the shopping unit is what a grocery list needs. Record this as a short note in the MOP (an ADR is not warranted for a single prompt-rule decision).
+- Extend the 5a plausibility gate (`extract.ts:236-241`) to flag a container-word unit (`can`, `jar`, `package`, etc.) when neither the ingredient `name` nor `notes` contains a size+unit pattern (`/\d+(\.\d+)?\s*(oz|ounce|lb|g|ml|l)\b/i`) — today a bare `unit: "can"` with nothing else passes silently (confirmed via `extract_test.ts:357-369`, which explicitly allows single-word container units with no size).
+- Add a matching `extract_test.ts` case: a container ingredient with a per-unit size in the source text, asserting the plausibility flag fires when the size doesn't survive into `name`/`notes`.
+- **Open question, needs a one-off DB check (not blocking):** whether "10.75 ounces, each" is actually reaching `notes` today and only the *display* was broken (now fixed — see the sibling ingredient-notes-rendering fix), or whether the model drops it during extraction and nothing was ever saved. A read-only look at one affected recipe's `ingredients` JSONB resolves this. If the size was reaching `notes` all along, this phase narrows to "add the plausibility check" only — the prompt-rule extension becomes a smaller, optional precision improvement rather than a hard fix.
+
 > **Planning required:** final plausibility thresholds (the `< 3` cutoff); whether to try 72B first for >2 images; whether 5a ships before Phase 4, since it needs `warnings[]` from 4a. If it ships first, add `warnings` to the schema early or log-only.
 
 ### Phase 6: Doc corrections (P3, can land any time)
@@ -146,6 +152,7 @@ Replace `qwen-2.5-vl-7b` / Gemini 1.5 references with the current chain: `qwen/q
 | — | ~~Phase 5a — plausibility gate + escalate (revised 2026-10-12)~~ | Small–Medium | **Done 2026-10-13** |
 | defer | Phase 3e fix — array-field merge precedence | Small | Not needed for the 2026-10-12 failure (ruled out). Kept as a latent-bug note; revisit only if a future raw log starts with `"recipes":[`. |
 | P2 | Phase 5b — JSON mode | Small | Medium |
+| P1 | Phase 5c — container-size loss (found 2026-10-16, user-reported) | Small | Medium — grocery lists need the container size to shop correctly |
 | P3 | Phase 6 — doc model-name drift | Small | Low |
 
 ---

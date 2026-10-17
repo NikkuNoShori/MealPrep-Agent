@@ -3,7 +3,19 @@
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
 **Last reviewed:** 2026-10-16
-**Last updated:** 2026-10-16 (MOP-0036 closed complete — see entry below)
+**Last updated:** 2026-10-16 (ingredient notes display fix — see entry below)
+
+## 2026-10-16 (Ingredient qualifiers: "to taste", container sizes now visible) `main`
+
+**Fix: per-ingredient notes ("to taste", container sizes, "if desired") were saved but never shown**
+
+- Extraction correctly captured non-numeric ingredient qualifiers into each ingredient's `notes` field (e.g. "to taste" for salt/pepper, "10.75 ounces, each" for canned goods) and the backend saved them, but no frontend surface ever read `notes` — ingredients like salt/pepper rendered with a blank amount, and container sizes the model had correctly captured vanished from the screen.
+- Root cause: two display conventions had drifted apart. Manual entry puts a qualifier directly in `unit` ("to taste" as the literal unit value); LLM extraction puts it in `notes`. `RecipeDetail.tsx` only ever handled the first.
+- Fixed: `RecipeDetail.tsx` and the chat recipe preview (`StructuredRecipeDisplay.tsx`) now show `notes` as muted text under the ingredient name, and fall back to showing `notes` in the value column (instead of a blank cell) when amount/unit are both empty. Added `notes?: string` to the frontend `Ingredient` type (`src/types/index.ts`) and the two chat-side draft normalizers that were silently dropping it.
+- Found via user-reported screenshot during a `recipe-pipeline-sme` diagnosis; also surfaced two related, not-yet-fixed gaps now tracked separately: container-size extraction accuracy (MOP-0034 Phase 5c) and a dedicated optional-ingredient indicator (new MOP-0041, drafted — not started).
+- Not browser-verified against live data. Build, lint, and the recipes/chat component test suites all pass.
+
+---
 
 ## 2026-10-16 (MOP-0036: Edge-Function Deno Tests in CI + Local Toolchain — Closed) `main`
 
