@@ -3,7 +3,7 @@
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
 **Last reviewed:** 2026-10-16
-**Last updated:** 2026-10-16 (MOP-0036: Deno edge-function test entry)
+**Last updated:** 2026-10-16 (corrected stale `qwen3-8b` model guidance in the "Agent returns 404" entry — pointed at `_shared/models.ts` as the single source of truth instead of the deleted `src/lib/openrouter.ts`). Previous: 2026-10-16 (MOP-0036: Deno edge-function test entry)
 
 ---
 
@@ -139,7 +139,7 @@ curl -s https://openrouter.ai/api/v1/models | grep "qwen/qwen-2.5-7b-instruct"
 ### Fix steps
 1. Verify API key at https://openrouter.ai/keys
 2. Check credit balance at https://openrouter.ai/activity
-3. If model deprecated, update model IDs in `src/lib/openrouter.ts` and `supabase/functions/chat-api/index.ts`
+3. If model deprecated, update the default in `supabase/functions/_shared/models.ts` (single source of truth for every model slug) and clear any matching env override (`supabase secrets unset <VAR>`) so the stale slug doesn't silently win over the new default
 4. Restart dev server after env changes
 
 **Added:** 2026-03-10
@@ -783,12 +783,11 @@ curl -s -o /dev/null -w "%{http_code}" \
 
 ### Valid agent models (tool + `require_parameters`)
 - `qwen/qwen3.7-plus` (default; may hit shared-pool 429)
-- `qwen/qwen3-14b`
 - `openai/gpt-4o-mini` (reliable fallback; higher cost)
 
 Filter live list: `https://openrouter.ai/api/v1/models?supported_parameters=tools`
 
-**Do not use for agent:** `google/gemini-2.0-flash-001`, `qwen/qwen-2.5-7b-instruct`, `qwen/qwen-2.5-vl-7b-instruct` (vision/extract only).
+**Do not use for agent:** `google/gemini-2.0-flash-001`, `qwen/qwen-2.5-7b-instruct` (vision/extract-only models — see `VISION_MODELS` in `_shared/models.ts` for the current vision chain, `qwen/qwen3-vl-8b-instruct` → `qwen/qwen2.5-vl-72b-instruct` → `google/gemini-2.0-flash-001`; `qwen/qwen-2.5-vl-7b-instruct` itself is retired, superseded by `qwen3-vl-8b-instruct`).
 
 ### Verification steps
 ```bash
@@ -796,7 +795,7 @@ supabase functions logs chat-api --project-ref <project-ref>
 # Look for OpenRouter 404 or "No endpoints found"
 ```
 
-Check `supabase/functions/chat-api/agent-loop.ts` — default should be `qwen/qwen3-8b` with fallbacks `qwen/qwen3-14b`, `openai/gpt-4o-mini`.
+Check `supabase/functions/_shared/models.ts` — the single source of truth for every model slug (as of the `OPENROUTER_AGENT_MODEL`/`_FALLBACKS` env-var hot-swap pattern it documents, env wins over the file default, so a stale secret can silently reintroduce a retired model even after this file is updated). Default `AGENT_MODEL` should be `qwen/qwen3.7-plus` with `AGENT_MODEL_FALLBACKS` `qwen/qwen3.7-plus`, `openai/gpt-4o-mini`.
 
 ### Fix steps
 1. Deploy latest `chat-api` (includes model fallback chain on 429/404)
@@ -806,14 +805,14 @@ Check `supabase/functions/chat-api/agent-loop.ts` — default should be `qwen/qw
    # or pick a tool-capable model:
    npx supabase secrets set OPENROUTER_AGENT_MODEL=openai/gpt-4o-mini
    ```
-3. Optional fallback override:
+3. **Do not** set `OPENROUTER_AGENT_MODEL_FALLBACKS` to a retired slug like `qwen/qwen3-8b` — check `_shared/models.ts`'s current default first, since the env var overrides the file and will silently reintroduce whatever you set here:
    ```bash
-   npx supabase secrets set OPENROUTER_AGENT_MODEL_FALLBACKS=qwen/qwen3-8b,qwen/qwen3-14b,openai/gpt-4o-mini
+   npx supabase secrets set OPENROUTER_AGENT_MODEL_FALLBACKS=qwen/qwen3.7-plus,openai/gpt-4o-mini
    ```
 4. Confirm `_shared/openrouter-client.ts` `chatWithTools` sends `provider: { require_parameters: true }`
 
 **Added:** 2026-06-16  
-**Updated:** 2026-06-19 (gemini-2.0-flash agent mismatch; fallback chain)
+**Updated:** 2026-10-16 (corrected stale `qwen3-8b` references — retired, current default is `qwen/qwen3.7-plus` per `_shared/models.ts`; pointed model-update guidance at `_shared/models.ts` instead of the deleted `src/lib/openrouter.ts`). Previous: 2026-06-19 (gemini-2.0-flash agent mismatch; fallback chain)
 
 ---
 

@@ -3,7 +3,19 @@
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
 **Last reviewed:** 2026-10-16
-**Last updated:** 2026-10-16 (ingredient notes display fix — see entry below)
+**Last updated:** 2026-10-16 (doc-adherence audit fixes — see entry below)
+
+## 2026-10-16 (Documentation: fixed 3 critical doc/code contradictions) `main`
+
+**Docs-only — no code change.** A full `doc-adherence` audit found DATA_MODEL.md, API.md, and RUNBOOK.md contradicting shipped code:
+
+- **DATA_MODEL.md/API.md** still described `meal_plans.meals`/`grocery_list` as JSONB columns, which migration 046 (MOP-0011) dropped months ago in favor of `meal_plan_entries`/`grocery_list_items` child tables — neither new table was documented at all. Also rebuilt the migration index: the 001–020 range listed filenames that never existed on disk (pre-dating the actual migration files), and 039–050 were missing entirely (including a duplicate migration number 050, now noted).
+- **RUNBOOK.md** told operators to restore the model `qwen/qwen3-8b` via `OPENROUTER_AGENT_MODEL_FALLBACKS` — that model is retired; the current default is `qwen/qwen3.7-plus` per `_shared/models.ts`. Also pointed stale guidance at the deleted `src/lib/openrouter.ts` to the real model registry.
+- **API.md**'s OpenRouter section named a deleted frontend client, listed retired/removed models (`qwen-2.5-vl-7b-instruct`, intent-detection routing), and was missing `chatWithTools`/`streamChatWithTools`/`tool_choice` entirely. Rebuilt against `_shared/models.ts`.
+
+19 Warning + 10 Suggestion findings from the same audit remain open, tracked for follow-up (ADR-0001 needs a superseding ADR now that MOP-0011 shipped; MOP-0012/0015 have forbidden `type: human` verification gates; docs/README.md is significantly stale; CHANGELOG itself is missing entries for several completed MOPs).
+
+---
 
 ## 2026-10-16 (Ingredient qualifiers: "to taste", container sizes now visible) `main`
 

@@ -2,8 +2,8 @@
 
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
-**Last reviewed:** 2026-09-25
-**Last updated:** 2026-09-25 (MOP-0031: recipe_shares table + 5 sharing RPCs — migration 043)
+**Last reviewed:** 2026-10-16
+**Last updated:** 2026-10-16 (MOP-0011: meal_plans JSONB → meal_plan_entries + grocery_list_items child tables, migrations 044–046; get_dashboard_stats rewritten to JOIN child tables, migration 045; migration index extended through 050 and corrected — the previous 001–020 range listed filenames that don't exist on disk). Previous: 2026-09-25 (MOP-0031: recipe_shares table + 5 sharing RPCs — migration 043)
 
 ---
 
@@ -189,7 +189,7 @@ Per-user cooking and display preferences.
 
 ### meal_plans
 
-Weekly/custom meal plans with grocery lists.
+Weekly/custom meal plans. **As of migration 046 (MOP-0011), this table holds plan-level metadata only** — meal assignments and grocery items live in the child tables `meal_plan_entries` and `grocery_list_items` below. The `meals` and `grocery_list` JSONB columns this table used to carry were dropped in migration 046 after a dual-write + backfill phase (migrations 044–045).
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
@@ -198,8 +198,6 @@ Weekly/custom meal plans with grocery lists.
 | `title` | VARCHAR(255) | | |
 | `start_date` | DATE | | |
 | `end_date` | DATE | | |
-| `meals` | JSONB | | Structured meal assignments by day/slot |
-| `grocery_list` | JSONB | | Generated shopping list |
 | `total_cost` | DECIMAL(10,2) | | |
 | `status` | VARCHAR(20) | DEFAULT 'draft' | `draft` \| `active` \| `completed` \| `archived` |
 | `copied_from` | UUID | FK → `meal_plans(id)` ON DELETE SET NULL | Source plan when copied (migration 036) |
@@ -211,6 +209,64 @@ Weekly/custom meal plans with grocery lists.
 **Triggers:** `update_meal_plans_updated_at`
 
 **Status lifecycle:** `draft` → `active` → `completed` → `archived`. Plans with `end_date < today` and status `active`/`draft` are treated as stale by the UI and shown in History.
+
+---
+
+### meal_plan_entries (migration 044, MOP-0011)
+
+One row per planned meal assignment. Replaces the old `meal_plans.meals` JSONB. Two row shapes share this table: calendar entries (`date` + `slot` set, `list_key` null) and plan-level list entries like a snacks list (`list_key` set, `date`/`slot` null) — enforced by the `mpe_date_or_list` check constraint.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `meal_plan_id` | UUID | FK → `meal_plans(id)` ON DELETE CASCADE | |
+| `date` | DATE | | Null for plan-level list entries |
+| `slot` | TEXT | CHECK IN (`breakfast`, `lunch`, `dinner`, `snacks`) | Null for plan-level list entries |
+| `list_key` | TEXT | | Non-null for plan-level lists (e.g. `snacks`); underscore prefix from the old JSONB key is stripped on backfill |
+| `recipe_id` | UUID | FK → `recipes(id)` ON DELETE SET NULL | |
+| `recipe_name` | TEXT | | Denormalized snapshot — survives recipe deletion |
+| `recipe_image` | TEXT | | Denormalized snapshot |
+| `servings` | INT | | |
+| `prep_time` | INT | | |
+| `cook_time` | INT | | |
+| `notes` | TEXT | | |
+| `position` | INT | DEFAULT 0, NOT NULL | Ordering within a date+slot or list_key group |
+| `created_at` | TIMESTAMPTZ | DEFAULT now() | |
+| `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
+
+**Indexes:** meal_plan_id; (meal_plan_id, date); (meal_plan_id, date, slot); recipe_id
+**RLS:** Uses the `is_meal_plan_owner(meal_plan_id)` `SECURITY DEFINER` helper (avoids an N+1 per-row subquery against `meal_plans`). Four policies (`mpe_select`/`mpe_insert`/`mpe_update`/`mpe_delete`), all gated on `is_meal_plan_owner()`.
+**Triggers:** `update_meal_plan_entries_updated_at`
+
+---
+
+### grocery_list_items (migration 044, MOP-0011)
+
+One row per grocery item. Replaces the old `meal_plans.grocery_list` JSONB. Column shape matches the frontend `GroceryItem` type exactly.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `meal_plan_id` | UUID | FK → `meal_plans(id)` ON DELETE CASCADE | |
+| `name` | TEXT | NOT NULL | |
+| `amount` | NUMERIC | | |
+| `unit` | TEXT | DEFAULT '', NOT NULL | |
+| `category` | TEXT | DEFAULT 'other', NOT NULL | |
+| `source_recipes` | TEXT[] | DEFAULT '{}', NOT NULL | Recipe ids as text, matching `GroceryItem.sourceRecipes` |
+| `source_recipe_id` | UUID | FK → `recipes(id)` ON DELETE SET NULL | |
+| `is_manual` | BOOLEAN | DEFAULT false, NOT NULL | |
+| `is_checked` | BOOLEAN | DEFAULT false, NOT NULL | |
+| `is_removed` | BOOLEAN | DEFAULT false, NOT NULL | Soft-delete so "un-remove" (e.g. "Already have it" undo) doesn't need a re-insert |
+| `notes` | TEXT | | |
+| `raw_amount` | NUMERIC | | Pre-aggregation amount, for display/audit |
+| `position` | INT | DEFAULT 0, NOT NULL | |
+| `last_generated` | TIMESTAMPTZ | | Carried per-row since there's no longer a plan-level column for it |
+| `created_at` | TIMESTAMPTZ | DEFAULT now() | |
+| `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
+
+**Indexes:** meal_plan_id; source_recipe_id
+**RLS:** Same `is_meal_plan_owner(meal_plan_id)` helper as `meal_plan_entries`. Four policies (`gli_select`/`gli_insert`/`gli_update`/`gli_delete`).
+**Triggers:** `update_grocery_list_items_updated_at`
 
 ---
 
@@ -458,8 +514,9 @@ All use `SECURITY DEFINER` to bypass RLS for cross-user profile reads, validate 
 Notes:
 - Recipe counts mirror the "Users can view accessible recipes" RLS OR-filter (own / household-shared / public) as true `COUNT(*)` totals, not page-limited fetches.
 - `this_week.today_meals` is the overlapping plan's `meals->>CURRENT_DATE` slots (falls back to the most-recently-created plan if none overlaps today).
-- `grocery_progress` is computed server-side via `jsonb_array_elements` over the active (or most-recent) plan's `grocery_list->'items'`, excluding `isRemoved` items — checked/total plus a per-category breakdown.
-- `most_cooked_this_month` aggregates `recipeId` occurrences across `meal_plans.meals` JSONB (via `jsonb_each` + `jsonb_array_elements`), **bounded to plans with `start_date >= date_trunc('month', CURRENT_DATE)`** to keep the scan bounded rather than scanning all-time history. Plan-level list keys (e.g. `_snacks`, `_non_recipe`) are excluded from the date-keyed iteration.
+- As of migration 045 (MOP-0011), `grocery_progress` and `most_cooked_this_month` are computed via direct JOINs on `grocery_list_items` / `meal_plan_entries` instead of `jsonb_array_elements`/`jsonb_each` gymnastics over the (now-dropped) `meal_plans.meals`/`grocery_list` JSONB columns.
+- `grocery_progress` JOINs the active (or most-recent) plan's `grocery_list_items`, excluding `is_removed` rows — checked/total plus a per-category breakdown.
+- `most_cooked_this_month` JOINs `meal_plan_entries` → `meal_plans`, grouping by `recipe_id`, **bounded to plans with `start_date >= date_trunc('month', CURRENT_DATE)`** to keep the scan bounded rather than scanning all-time history. Plan-level list entries (`list_key` set) are excluded via `mpe.date IS NOT NULL` — only calendar entries count toward "cooked."
 - `top_cuisines` groups by `lower(trim(cuisine))` over the caller's visible recipes (same OR-filter as the recipe counts), excluding `NULL`/empty cuisine. **Known data-quality caveat:** `cuisine` is free-text (`VARCHAR(100)`, no enum), so casing/spelling variants can still bucket separately after normalization — not a bug this RPC fixes.
 
 ### Write-Atomicity RPCs (Migration 037 — MOP-0014)
@@ -511,29 +568,30 @@ Five `SECURITY DEFINER set search_path = public` RPCs for user-to-user recipe sh
 
 ## Migration Index
 
+> **Note (corrected 2026-10-16):** this table previously listed a `20251101*`/`20251122*`/`20251123*`-timestamp sequence (numbers 001–020) that does not correspond to any file in `supabase/migrations/` — likely drafted before the actual migration files were written and never reconciled. Replaced below with the real file list. The unprefixed legacy files (`009`–`019`, plus a stray `20251110000000_remove_stack_auth_columns.sql`) predate the `YYYYMMDDHHMMSS_NNN_description.sql` naming convention adopted at `001`; they ran once, in filename-sort order, and are kept for historical reference only.
+
 | Migration | Number | Description |
 |-----------|--------|-------------|
-| `20251101000000_001_initial_schema.sql` | 001 | Initial tables (profiles, ingredients, user_ingredients, meal_plans, shopping_lists, receipts, roles, user_roles, family_members) |
-| `20251101000001_002_chat_messages.sql` | 002 | Original chat_messages (later dropped) |
-| `20251101000002_003_create_missing_tables.sql` | 003 | Fill gaps in schema |
-| `20251101000003_004_add_test_user.sql` | 004 | Test user data |
-| `20251101000004_005_drop_chat_messages.sql` | 005 | Drop original chat_messages |
-| `20251101000005_006_drop_unused_tables.sql` | 006 | Cleanup |
-| `20251101000006_007_create_recipes_table.sql` | 007 | Recipes table with full schema |
-| `20251101000007_008_add_rag_support.sql` | 008 | pgvector, recipe_embeddings, embedding columns, search functions |
-| `20251101000008_008_enable_rls_recipes.sql` | 008b | RLS policies for recipes |
-| `20251101000009_009_add_semantic_search_functions.sql` | 009 | Semantic search RPCs |
-| `20251122000000_010_sync_auth_users.sql` | 010 | Sync auth.users trigger |
-| `20251122000001_011_restructure_auth_and_profiles.sql` | 011 | Auth restructure |
-| `20251122000002_012_create_missing_tables.sql` | 012 | Additional missing tables |
-| `20251123000000_013_comprehensive_rls_policies.sql` | 013 | Comprehensive RLS policies for all tables |
-| `20251124000000_014_add_unique_recipe_title.sql` | 014 | UNIQUE constraint on recipe title per user |
-| `20251124000001_015_create_recipe_images_bucket.sql` | 015 | Supabase Storage bucket for recipe images |
-| `20251125000000_016_add_measurement_system_preference.sql` | 016 | measurement_system column on user_preferences |
-| `20251125000001_017_fix_measurement_system_column.sql` | 017 | Fix measurement_system column |
-| `20251126000000_018_create_chat_messages_table.sql` | 018 | chat_conversations + chat_messages (current schema) |
-| `20251127000000_019_drop_unused_tables.sql` | 019 | Drop deprecated tables |
-| `20251128000000_020_cleanup_user_preferences.sql` | 020 | Cleanup user_preferences |
+| `009_fix_rls_for_stack_auth.sql` | — | Pre-convention. Fix RLS for Stack Auth (legacy auth provider, since replaced by Supabase Auth) |
+| `010_add_is_public_to_recipes.sql` | — | Pre-convention. Added `is_public` to recipes (later dropped, migration 013) |
+| `011_update_rls_for_public_recipes.sql` | — | Pre-convention. RLS for public recipes |
+| `012_add_slug_to_recipes.sql` | — | Pre-convention. Added `slug` to recipes |
+| `013_rename_users_to_profiles_add_first_last_name.sql` | — | Pre-convention. Renamed `users` → `profiles`, added name fields |
+| `014_fix_profiles_table_schema.sql` | — | Pre-convention. Fixed `profiles` schema |
+| `015_add_uuid_support_to_profiles.sql` | — | Pre-convention. UUID support on `profiles` |
+| `016_update_rls_for_supabase_auth.sql` | — | Pre-convention. Migrated RLS from Stack Auth to Supabase Auth |
+| `017_create_supabase_rpc_functions.sql` | — | Pre-convention. Early RPC functions |
+| `018_auto_create_profile_trigger.sql` | — | Pre-convention. Auto-create profile on signup trigger |
+| `019_remove_stack_auth_columns.sql` | — | Pre-convention. Dropped remaining Stack Auth columns |
+| `20251110000000_remove_stack_auth_columns.sql` | — | Stray duplicate of 019 under the new timestamp convention; both ran, idempotent |
+| `20251201000000_001_core_schema.sql` | 001 | Initial tables (profiles, ingredients, user_ingredients, meal_plans, shopping_lists, receipts, roles, user_roles, family_members) |
+| `20251201000001_002_auth_and_roles.sql` | 002 | Auth and role tables |
+| `20251201000002_003_rls_policies.sql` | 003 | RLS policies |
+| `20251201000003_004_search_and_embeddings.sql` | 004 | pgvector, recipe_embeddings, embedding columns, search functions |
+| `20251201000004_005_chat.sql` | 005 | chat_conversations + chat_messages |
+| `20251201000005_006_recipe_constraints_and_storage.sql` | 006 | Recipe constraints + Supabase Storage bucket for recipe images |
+| `20251201000006_007_fix_handle_new_user_trigger.sql` | 007 | Fixed `handle_new_user()` trigger |
+| `20251201000007_008_chat_images_storage.sql` | 008 | Chat image storage |
 | `20260312000000_009_household_and_visibility.sql` | 009b | Households, household_members, household_invites, recipe visibility, updated handle_new_user() trigger |
 | `20260312000001_010_fix_household_rls_recursion.sql` | 010 | Fix RLS infinite recursion: SECURITY DEFINER helpers (`is_household_member`, `get_household_role`), updated all household-related policies |
 | `20260312000002_011_recipe_collections.sql` | 011 | recipe_collections + collection_recipes tables, RLS, indexes, updated handle_new_user() with default collections |
@@ -564,5 +622,18 @@ Five `SECURITY DEFINER set search_path = public` RPCs for user-to-user recipe sh
 | `20260907000002_036_meal_plans_copied_from_cascade.sql` | 036 | `meal_plans.copied_from` self-referential FK with ON DELETE SET NULL |
 | `20260916000000_037_household_write_atomicity_rpcs.sql` | 037 | Two write-atomicity SECURITY DEFINER RPCs: `transfer_household_ownership` + `respond_to_household_invite` (MOP-0014) |
 | `20260921000000_038_bulk_recipe_actions.sql` | 038 | Three bulk recipe action RPCs: `bulk_update_recipe_visibility`, `bulk_delete_recipes`, `bulk_add_to_collection` (MOP-0028) |
+| `20260922000000_039_drop_search_similar_recipes.sql` | 039 | Dropped orphan `search_similar_recipes()` — a 384-dim RPC against `recipe_embeddings`, which has no active write path (all current embeddings are 1536-dim on `recipes.embedding_vector`) |
+| `20260922000003_040_embedding_refresh_cron.sql` | 040 | Scheduled `embedding-refresh` edge function via `pg_cron` + `pg_net`; service-role JWT auth |
+| `20260922000004_041_drop_btree_embedding_index.sql` | 041 | Dropped `idx_recipes_with_embeddings` — a leftover 384-dim-era btree index that was never usable with 1536-dim vectors (exceeds btree's row-size limit, every embedding write silently failed to index) |
 | `20260922000005_042_get_dashboard_stats.sql` | 042 | `get_dashboard_stats()` SECURITY DEFINER RPC: recipe counts, this week's meals, active plan count, grocery progress, reactions given, most-cooked this month, top cuisines (MOP-0030) |
 | `20260922000006_043_recipe_shares.sql` | 043 | `recipe_shares` table + 5 RLS policies + 5 SECURITY DEFINER RPCs for direct user-to-user recipe sharing (MOP-0031) |
+| `20261001000000_044_meal_plan_child_tables.sql` | 044 | `meal_plan_entries` + `grocery_list_items` tables, RLS via `is_meal_plan_owner()` helper, backfill from `meal_plans.meals`/`grocery_list` JSONB. Dual-write phase — JSONB columns not yet dropped (MOP-0011) |
+| `20261002000000_045_get_dashboard_stats_child_tables.sql` | 045 | Rewrote `get_dashboard_stats()`'s `this_week`/`grocery_progress`/`most_cooked_this_month` sections to JOIN the new child tables instead of `jsonb_each`/`jsonb_array_elements` over `meal_plans` JSONB (MOP-0011) |
+| `20261003000000_046_drop_meal_plan_jsonb_columns.sql` | 046 | Dropped `meal_plans.meals` and `meal_plans.grocery_list` JSONB columns now that all reads/writes use the child tables (MOP-0011 Phase 5, dual-write cleanup) |
+| `20261003000001_047_backfill_searchable_text.sql` | 047 | Backfilled `recipes.searchable_text` for rows saved before migration 004, where the trigger hadn't fired retroactively — those recipes were silently invisible to `search_recipes_text` |
+| `20261003000002_048_profiles_default_visibility.sql` | 048 | Added `default_recipe_visibility` preference to `profiles` — edge functions read this instead of hardcoding `'private'` |
+| `20261003000003_049_search_recipes_text_full_row.sql` | 049 | `search_recipes_text` now returns the full recipe row instead of 6 columns — the migration 028 version was missing `id`, `image_url`, `tags`, `prep_time`, `slug`, `created_at`, etc. that `RecipeList` needs to render server search results as `RecipeCard` objects |
+| `20261004000000_050_fix_respond_to_household_invite_ambiguity.sql` | 050a | Fixed a "household_id is ambiguous" error in `respond_to_household_invite()` (migration 037) caused by `household_id` being both a `RETURNS TABLE` column and a local variable name |
+| `20261011000000_050_fix_dropped_is_public_column.sql` | 050b | **Duplicate migration number** — see note below. Fixed 5 RPCs still referencing `recipes.is_public`, dropped by migration 013 and superseded by the `visibility` text column (migration 009) |
+
+> **Duplicate number 050 (unresolved as of 2026-10-16):** two files share migration number 050 — `20261004000000_050_fix_respond_to_household_invite_ambiguity.sql` and `20261011000000_050_fix_dropped_is_public_column.sql`. Both ran (filename-timestamp order makes this safe; Supabase's migration runner orders by filename, not by the embedded number), and the table above labels them 050a/050b to disambiguate in prose, but the files on disk are not renamed. Future migrations should use `051` next, not continue the collision.

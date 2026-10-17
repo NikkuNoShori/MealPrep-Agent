@@ -2,8 +2,8 @@
 
 > Edge functions, RPC contracts, OpenRouter endpoints, and request/response shapes for MealPrep Agent.
 
-**Last reviewed:** 2026-09-25
-**Last updated:** 2026-09-25 (MOP-0031: 5 direct recipe sharing RPCs added)
+**Last reviewed:** 2026-10-16
+**Last updated:** 2026-10-16 (rebuilt the OpenRouter API section against `_shared/models.ts` — removed the deleted `src/lib/openrouter.ts` frontend-client reference and retired `qwen-2.5-vl-7b-instruct`/intent-detection mentions; added `chatWithTools`/`streamChatWithTools`, `tool_choice`, and corrected the embedding-generation path; `get_dashboard_stats` updated for migration 045's child-table rewrite). Previous: 2026-09-25 (MOP-0031: 5 direct recipe sharing RPCs added)
 
 ---
 
@@ -272,7 +272,7 @@ Full pipeline: adapter → extract → transform → load.
 
 **Short-form video URLs:** `source_type: "url"` with a TikTok/YouTube/Reels URL auto-routes to the video adapter (oEmbed + link mining), not HTML scrape. See [MOP-0016](MOPs/MOP-0016-short-form-video-intake.md).
 
-**Models (OpenRouter, server-side):** Whisper `openai/whisper-large-v3` (uploaded audio) → Qwen VL `qwen/qwen-2.5-vl-7b-instruct` (frame OCR) → Qwen `qwen/qwen-2.5-7b-instruct` or VL (recipe JSON extract). Requires `OPENROUTER_API_KEY` Supabase secret.
+**Models (OpenRouter, server-side, see `_shared/models.ts`):** `WHISPER_MODEL` (`openai/whisper-large-v3`, uploaded audio) → `VISION_MODELS` chain (`qwen/qwen3-vl-8b-instruct` → `qwen/qwen2.5-vl-72b-instruct` → `google/gemini-2.0-flash-001`, frame OCR) → `UTILITY_TEXT_MODEL` (`qwen/qwen-2.5-7b-instruct`, recipe JSON extract). Requires `OPENROUTER_API_KEY` Supabase secret.
 
 **Response (`PipelineResult`):**
 ```json
@@ -384,7 +384,7 @@ Admin-only endpoints for user/household/invite management.
 
 1. **Select/Paste** → `validateAndCompressImage()` validates type, size, compresses via canvas
 2. **Send** → converted to base64 data URL via `FileReader.readAsDataURL()`
-3. **Extract** → sent to vision model (`qwen/qwen-2.5-vl-7b-instruct`) as `image_url` content parts
+3. **Extract** → sent to the `VISION_MODELS` chain (`_shared/models.ts`; `qwen/qwen3-vl-8b-instruct` → `qwen/qwen2.5-vl-72b-instruct` → `google/gemini-2.0-flash-001`) as `image_url` content parts
 4. **Save** (optional) → on recipe save, first user image uploaded to Supabase Storage (`recipe-images` bucket), public URL set as recipe `image_url`
 
 ### Image Upload
@@ -705,7 +705,7 @@ get_my_pending_invites()  -- uses auth.uid()
 
 ---
 
-### get_dashboard_stats *(Migration 042 — MOP-0030)*
+### get_dashboard_stats *(Migration 042 — MOP-0030; rewritten in Migration 045 — MOP-0011)*
 
 Single-round-trip aggregation for the dashboard widgets: recipe counts, this week's meals, active plan count, grocery progress, reactions given, most-cooked this month, and top cuisines. Replaces the old pattern of fetching capped/paginated recipe and meal-plan lists client-side just to read `.length`.
 
@@ -735,7 +735,7 @@ get_dashboard_stats()  -- uses auth.uid()
 Notes:
 - Recipe counts and top-cuisines mirror the **live** recipes RLS SELECT policy (migration 012, not the superseded migration 009): own, household-visible, public, OR shared via a visible collection (collection visibility acts as a floor regardless of the recipe's own visibility flag). `collection_shared_count` is the 4th bucket — recipes visible only through collection membership, not already counted in own/household/public.
 - `today_meals` comes from the plan overlapping `CURRENT_DATE` (falls back to the most-recently-created plan if none overlaps).
-- `grocery_progress` excludes `isRemoved` items and is computed via `jsonb_array_elements` server-side.
+- `grocery_progress` excludes `is_removed` rows and is computed via a JOIN on `grocery_list_items` server-side (migration 045 — previously `jsonb_array_elements` over `meal_plans.grocery_list`, dropped in migration 046).
 - `most_cooked_this_month` is bounded to plans with `start_date >= date_trunc('month', CURRENT_DATE)` — not an all-time scan.
 - `top_cuisines` normalizes via `lower(trim(cuisine))`; free-text cuisine entry can still fragment counts across spelling/casing variants.
 
@@ -936,14 +936,21 @@ The API client automatically converts between frontend camelCase and database sn
 
 **Base URL:** `https://openrouter.ai/api/v1`
 **Backend Client:** `supabase/functions/_shared/openrouter-client.ts`
-**Frontend Client (legacy):** `src/lib/openrouter.ts`
+**Model registry (single source of truth for every slug):** `supabase/functions/_shared/models.ts` — each model has an env-var override (e.g. `OPENROUTER_AGENT_MODEL`) so an operator can hot-swap on deprecation without a redeploy. The env var wins over the file default.
+
+All AI calls go through Supabase Edge Functions — there is no frontend OpenRouter client (per CLAUDE.md's edge-functions-only rule; `src/lib/openrouter.ts` has been deleted).
 
 ### Models Used
 
-| Model ID | Purpose | Used In |
-|----------|---------|---------|
-| `qwen/qwen-2.5-7b-instruct` | Intent detection, general chat, RAG responses, text extraction | Chat API, Extract stage |
-| `qwen/qwen-2.5-vl-7b-instruct` | Vision — recipe image extraction, video frame OCR | Extract stage (when images present) |
+| Export (`_shared/models.ts`) | Default | Purpose | Used In |
+|---|---|---|---|
+| `AGENT_MODEL` | `qwen/qwen3.7-plus` | Agent loop's primary tool-calling model | `chat-api` agent loop |
+| `AGENT_MODEL_FALLBACKS` | `qwen/qwen3.7-plus`, `openai/gpt-4o-mini` | Retry chain on 429/502/503/no-endpoints | `chat-api` agent loop |
+| `UTILITY_TEXT_MODEL` | `qwen/qwen-2.5-7b-instruct` | Cheap one-shot jobs (titles, substitution lookup) | `chat-api` |
+| `DEFAULT_CHAT_MODEL` | `qwen/qwen3.7-plus` | Default for `chat`/`chatWithHistory`/`chatWithTools` call sites with no explicit model | `chat-api` |
+| `VISION_MODELS` (chain) | `qwen/qwen3-vl-8b-instruct` → `qwen/qwen2.5-vl-72b-instruct` → `google/gemini-2.0-flash-001` | Image-based recipe extraction, video-frame OCR | `recipe-pipeline` extract stage, `video-adapter.ts` |
+| `WHISPER_MODEL` | `openai/whisper-large-v3` | Audio transcription, via `/audio/transcriptions` | `transcribe-media.ts` |
+| `TRANSCRIPTION_MODEL` | `google/gemini-2.5-flash` | Audio transcription fallback, via multimodal chat endpoint | `transcribe-media.ts` |
 
 ### Client Methods (Backend)
 
@@ -951,7 +958,9 @@ The API client automatically converts between frontend camelCase and database sn
 |--------|-----------|-------------|
 | `chat` | `(systemPrompt, message, model, options?)` | Simple text completion |
 | `chatWithHistory` | `(systemPrompt, history, message, model, options?)` | Multi-turn conversation |
+| `chatWithTools` | `(systemPrompt, messages, tools, model, options?)` | Tool-calling completion (agent loop); `options.tool_choice` can force `"required"`/`"auto"`/`"none"` |
 | `chatWithImages` | `(systemPrompt, message, images, model, options?)` | Vision/multi-modal (max 4 images) |
+| `streamChatWithTools` | `(systemPrompt, messages, tools, model, options?)` | SSE-streamed variant of `chatWithTools` (MOP-0017) |
 | `generateEmbedding` | `(text)` | Generate embedding vector |
 
 ### LLM Options
@@ -961,6 +970,7 @@ The API client automatically converts between frontend camelCase and database sn
 | `temperature` | number | varies | Randomness (0.1 for extraction, 0.5-0.7 for chat) |
 | `max_tokens` | number | varies | Max response tokens (4000 for extraction, 500-800 for chat) |
 | `response_format` | object | — | `{ type: "json_object" }` for structured extraction |
+| `tool_choice` | `"auto"` \| `"none"` \| `"required"` | `"auto"` | Forces the next `chatWithTools` call to make a tool call (`"required"`) — used on the first agent-loop turn when images are attached, since small models can otherwise ignore the image hint and reply in prose |
 
 ### Embedding Model
 
@@ -968,10 +978,9 @@ The API client automatically converts between frontend camelCase and database sn
 |-------|-----------|---------|
 | `text-embedding-ada-002` | 1536 | Recipe embeddings for semantic search |
 
-Generated via `src/services/embeddingService.js` methods:
-- `generateEmbedding(text)` — single text
-- `generateEmbeddings(texts)` — batch
-- `generateRecipeEmbedding(recipe)` — recipe-specific (concatenates title + description + ingredients + instructions)
+Generated via `OpenRouterClient.generateEmbedding()` (`_shared/openrouter-client.ts`), called from `_shared/embedding-utils.ts` and directly in `recipe-pipeline/index.ts` on recipe save — this is the production path for every recipe saved through the app.
+
+`src/services/embeddingService.js` is a separate, legacy Node implementation used only by `server.js` (the standalone Express server under ADR-0002) — not part of the production edge-function pipeline above, and not reachable from the frontend bundle.
 
 ---
 
