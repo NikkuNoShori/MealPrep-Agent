@@ -49,7 +49,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Sentry.ErrorBoundary
       fallback={({ error, resetError }) => (
-        <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[#0e0f13] p-8">
+        <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-8">
           <div className="max-w-md text-center space-y-4">
             <h1 className="text-xl font-semibold text-surface-800 dark:text-surface-200">
               Something went wrong

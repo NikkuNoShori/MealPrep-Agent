@@ -19,7 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children, hideFooter }) => {
 
   return (
     <MeasurementSystemProvider>
-      <div className="h-screen flex flex-col bg-surface-50 dark:bg-[#0e0f13]">
+      <div className="h-screen flex flex-col bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))]">
         <Header />
         <main className="flex-1 min-h-0 overflow-y-auto relative z-10">{children}</main>
         {!hideFooter && <Footer />}

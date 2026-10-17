@@ -65,6 +65,10 @@
        background should visually shift with `surface` too. */
     --rs-bg: #ffffff;
     --rs-bg-elevated: #f9fafb;
+    /* -rgb triplet so Tailwind arbitrary-value opacity (bg-[rgb(var(--rs-bg-elevated-rgb)/0.95)])
+       can derive an alpha channel — var(--rs-bg-elevated) alone cannot (MOP-0029 Phase 7). */
+    --rs-bg-elevated-rgb: 249 250 251;
+    --rs-page-bg-rgb: 255 255 255;
     --rs-border: var(--surface-200);
     --rs-border-subtle: var(--surface-100);
     --rs-text-primary: #1c1917;
@@ -271,6 +275,8 @@
        dark chrome/page background should visually shift with `surface`. */
     --rs-bg: #16171c;
     --rs-bg-elevated: #1e1f26;
+    --rs-bg-elevated-rgb: 30 31 38;
+    --rs-page-bg-rgb: 14 15 19;
     --rs-border: #28292f;
     --rs-border-subtle: #212229;
     --rs-text-primary: #f0efe9;
@@ -437,7 +443,7 @@
   }
 
   .dark body {
-    background-color: #0e0f13;
+    background-color: rgb(var(--rs-page-bg-rgb));
     color: #f0efe9;
   }
 

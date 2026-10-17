@@ -385,7 +385,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                     </button>
 
                     {isMenuOpen && (
-                      <div className="absolute z-[100] top-full right-0 mt-1 origin-top-right animate-scale-in bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-surface-200/50 dark:border-white/[0.08] py-1 min-w-[150px]">
+                      <div className="absolute z-[100] top-full right-0 mt-1 origin-top-right animate-scale-in bg-white/95 dark:bg-[rgb(var(--rs-bg-elevated-rgb)/0.95)] backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-surface-200/50 dark:border-white/[0.08] py-1 min-w-[150px]">
                         <button
                           onClick={() => handleStartRename(collection)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"

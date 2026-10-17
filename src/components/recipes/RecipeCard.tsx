@@ -354,7 +354,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
         </button>
         {showOverflowMenu && (
           <div
-            className="absolute z-[100] top-full right-0 mt-1.5 origin-top-right animate-scale-in bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-surface-200/50 dark:border-white/[0.08] py-1 min-w-[140px]"
+            className="absolute z-[100] top-full right-0 mt-1.5 origin-top-right animate-scale-in bg-white/95 dark:bg-[rgb(var(--rs-bg-elevated-rgb)/0.95)] backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-surface-200/50 dark:border-white/[0.08] py-1 min-w-[140px]"
             onClick={(e) => e.stopPropagation()}
           >
             <button

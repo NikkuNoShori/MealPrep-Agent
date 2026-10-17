@@ -94,7 +94,7 @@ const Recipes = () => {
   const showList = !showAddForm && !selectedRecipe && !editingRecipe;
 
   return (
-    <div className="bg-surface-50 dark:bg-[#0e0f13]">
+    <div className="bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
         {(showAddForm || editingRecipe) && (
           <div className="max-w-7xl animate-fade-in">

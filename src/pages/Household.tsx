@@ -582,7 +582,7 @@ const Household = () => {
                                   <ChevronDown className="h-4 w-4" />
                                 </Button>
                                 {memberMenuOpen === member.id && (
-                                  <div className="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border border-surface-200/50 dark:border-white/[0.08] bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl p-1 shadow-lg shadow-black/10 dark:shadow-black/30">
+                                  <div className="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border border-surface-200/50 dark:border-white/[0.08] bg-white/95 dark:bg-[rgb(var(--rs-bg-elevated-rgb)/0.95)] backdrop-blur-xl p-1 shadow-lg shadow-black/10 dark:shadow-black/30">
                                     {member.role === 'member' ? (
                                       <button
                                         className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"

@@ -81,7 +81,7 @@ export function PlannerSettingsMenu({
       {open && (
         <div
           className="absolute right-0 top-full mt-1.5 z-50 origin-top-right animate-scale-in
-            bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl
+            bg-white/95 dark:bg-[rgb(var(--rs-bg-elevated-rgb)/0.95)] backdrop-blur-xl
             rounded-xl shadow-lg shadow-black/10 dark:shadow-black/30
             border border-surface-200/50 dark:border-white/[0.08]
             py-1.5 min-w-[200px]"

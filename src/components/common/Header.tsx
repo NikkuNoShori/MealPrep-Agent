@@ -148,7 +148,7 @@ const Header = () => {
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-1.5 w-48 bg-white/95 dark:bg-[#1e1f26]/95 backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-surface-200/50 dark:border-white/[0.08] py-1 z-50 animate-scale-in origin-top-right">
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white/95 dark:bg-[rgb(var(--rs-bg-elevated-rgb)/0.95)] backdrop-blur-xl rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 border border-surface-200/50 dark:border-white/[0.08] py-1 z-50 animate-scale-in origin-top-right">
                     <div className="px-3.5 py-2 border-b border-surface-100 dark:border-white/[0.06]">
                       <p className="text-sm font-medium text-surface-900 dark:text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>{user?.display_name || getFirstName()}</p>
                       <p className="text-xs text-surface-400 dark:text-gray-500 truncate">{user?.email}</p>
