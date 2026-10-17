@@ -1,10 +1,12 @@
 # ADR-0001: `meal_plans` Stores Meals + Grocery List as JSONB
 
-**Status:** accepted
+**Status:** superseded — see [ADR-0008](ADR-0008-meal-plans-normalized-child-tables.md)
 **Created:** 2026-06-01
 **Author:** Nick Neal
-**Last reviewed:** 2026-06-01
-**Related MOP:** MOP-0011 (deferred — trigger-conditioned normalization)
+**Last reviewed:** 2026-10-16
+**Related MOP:** MOP-0011 (verifying — trigger fired 2026-09-27, normalization implemented)
+
+> **Superseded 2026-10-16.** The trigger conditions below fired (MOP-0008 tool friction + analytics query-cost threshold, both confirmed 2026-09-27). MOP-0011 executed the normalization this ADR's own §Trigger for revisit anticipated. See [ADR-0008](ADR-0008-meal-plans-normalized-child-tables.md) for the resulting decision. This record is kept for historical context — the reasoning for the original JSONB choice and its documented trade-offs remain accurate as a record of what was true from 2026-06-01 through 2026-09-27.
 
 ## Context
 

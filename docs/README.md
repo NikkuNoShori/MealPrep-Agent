@@ -2,8 +2,8 @@
 
 > Navigation index for all project documentation. Start here to find what you need.
 
-**Last reviewed:** 2026-09-05
-**Last updated:** 2026-09-05 (MOP-0016 and MOP-0018 marked complete)
+**Last reviewed:** 2026-10-16
+**Last updated:** 2026-10-16 (ADR table extended through ADR-0008 — was stopping at ADR-0003; ADR-0001 marked superseded. **Note:** the MOP status table below and other sections of this file are still stale per a 2026-10-16 doc-adherence audit — only the Architecture Decisions section was touched in this pass). Previous: 2026-09-05 (MOP-0016 and MOP-0018 marked complete)
 
 ---
 
@@ -106,9 +106,14 @@ Durable rationale for non-trivial architectural choices. ADRs are enumerated by 
 | Document | Description |
 |----------|-------------|
 | [DECISIONS/](DECISIONS/) | ADR directory (`ADR-XXXX-*.md`) — see [DECISIONS/README.md](DECISIONS/README.md) for the index protocol |
-| [ADR-0001](DECISIONS/ADR-0001-meal-plans-jsonb-shape.md) | `meal_plans.meals` + `grocery_list` as JSONB columns (not normalized child tables) |
+| [ADR-0001](DECISIONS/ADR-0001-meal-plans-jsonb-shape.md) | **Superseded by ADR-0008.** `meal_plans.meals` + `grocery_list` as JSONB columns — historical record of the pre-MOP-0011 shape |
 | [ADR-0002](DECISIONS/ADR-0002-legacy-express-dev-server.md) | Keep the legacy Express dev server alongside Supabase Edge Functions |
 | [ADR-0003](DECISIONS/ADR-0003-documentation-and-agent-pattern-adoption.md) | Documentation and agent pattern adoption |
+| [ADR-0004](DECISIONS/ADR-0004-retire-vercel-rag-and-chat-functions.md) | Retire legacy Vercel `api/` serverless functions |
+| [ADR-0005](DECISIONS/ADR-0005-household-dietary-rbac-and-unified-profile-ux.md) | Household dietary profile RBAC and unified profile UX |
+| [ADR-0006](DECISIONS/ADR-0006-theme-token-layering-and-preset-scope.md) | Theme token layering and the scope of color presets |
+| [ADR-0007](DECISIONS/ADR-0007-extraction-absence-and-provenance-semantics.md) | Recipe extraction — absent means null, uncertainty goes in `warnings` |
+| [ADR-0008](DECISIONS/ADR-0008-meal-plans-normalized-child-tables.md) | `meal_plans` normalized into `meal_plan_entries` + `grocery_list_items` child tables (supersedes ADR-0001) |
 
 ---
 
