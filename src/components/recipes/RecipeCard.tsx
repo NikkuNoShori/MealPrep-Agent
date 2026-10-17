@@ -665,7 +665,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
         {/* Content area */}
         <div className="flex flex-col flex-1 px-3.5 pt-3 pb-3">
           {/* Title */}
-          <h3 className="font-semibold text-[15px] text-surface-900 dark:text-white leading-snug line-clamp-1" title={recipe.title}>
+          <h3 className="font-semibold text-[15px] text-surface-900 dark:text-white leading-snug line-clamp-2" title={recipe.title}>
             {recipe.title}
           </h3>
 

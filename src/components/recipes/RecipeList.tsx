@@ -571,7 +571,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
         <div
           className={
             viewMode === "grid"
-              ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
+              ? "grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3 sm:gap-5"
               : "space-y-4"
           }
         >

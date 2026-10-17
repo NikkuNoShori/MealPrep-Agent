@@ -95,9 +95,11 @@ const Recipes = () => {
 
   return (
     <div className="bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+      {/* Wide cap (not max-w-7xl): the list row must fit sidebar (280) + grid + ad rail (324).
+          A 1280px cap left ~610px for the grid at xl and produced ~135px cards. */}
+      <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
         {(showAddForm || editingRecipe) && (
-          <div className="max-w-7xl animate-fade-in">
+          <div className="max-w-7xl mx-auto animate-fade-in">
             <RecipeForm
               recipe={editingRecipe}
               onSave={() => {
@@ -201,8 +203,9 @@ const Recipes = () => {
               />
             </div>
 
-            {/* Ad rail — reserved width only, not shown until an ad provider is wired up */}
-            <div className="hidden xl:block w-[300px] shrink-0" />
+            {/* Ad rail — reserved width only, not shown until an ad provider is wired up.
+                Reserved from 2xl (1536px) up: below that, the 324px reservation starves the grid. */}
+            <div className="hidden 2xl:block w-[300px] shrink-0" aria-hidden="true" />
           </div>
           </div>
         )}
