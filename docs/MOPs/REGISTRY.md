@@ -79,7 +79,7 @@
 
 > **MOP-0036 (2026-10-12):** Drafted after an `agent-loop.ts` crash (`lastRecipes.length` on undefined, from dc8bf5d) sat on `main` for about 5 weeks. The existing Deno test that covers that path was never run, because CI has no Deno job and Deno isn't installed locally. Recommended P1. Phase 4 re-checks MOPs whose `deno test` verification assertions may never have actually executed (MOP-0008, MOP-0016, MOP-0034).
 
-> **MOP-0034 addendum (2026-10-12):** A 17-ingredient Instagram screenshot was extracted as 1 ingredient. Added 1f (example ingredient array has only 1 item), 1g (rule for inline alternative quantities), 1h (`c` → `cup`), and 3e (`recipes[]` unwrap lets the item win over a fuller top-level list; confirm via raw log first). Revised Phase 5: its original "≥1 ingredient" check would have passed this output. Split into 5a plausibility gate (P1) and 5b JSON mode (P2). **Status drift:** Phases 1–3 (partial) are committed in `286c34e`, but the status still reads `draft`. Needs a project-lead move to `in_progress`.
+> **MOP-0034 addendum (2026-10-12):** A 17-ingredient Instagram screenshot was extracted as 1 ingredient. Added 1f (example ingredient array has only 1 item), 1g (rule for inline alternative quantities), 1h (`c` → `cup`), and 3e (`recipes[]` unwrap lets the item win over a fuller top-level list; confirm via raw log first). Revised Phase 5: its original "≥1 ingredient" check would have passed this output. Split into 5a plausibility gate (P1) and 5b JSON mode (P2). **Status drift note resolved (2026-10-16):** this note originally flagged status still reading `draft` despite Phases 1–3 being committed — status has since moved to `in_progress` (2026-10-13) and the MOP has continued through Phase 5c (2026-10-16). Kept for historical context only.
 >
 > **MOP-0034 / MOP-0035 (2026-10-04):** Drafted from the recipe-pipeline-sme screenshot-extraction audit. Backed by ADR-0007 (absent = null, uncertainty → `warnings[]`). MOP-0034 Phase 1c supersedes MOP-0032 Phase 1 item 6's ≤3-word instruction filter. MOP-0012's deferral trigger has likely fired (second image-path extraction bug) and awaits a user decision on promotion. MOP-0033 is intentionally unassigned: MOP-0032 reserves it for nutrition / meal frequency / family meal requests.
 
@@ -89,7 +89,7 @@
 
 > **MOP-0016 (2026-10-13, corrected):** Formally closed out — commits `95fcd6c`, `fe3beb6`, `7eea367` marked Phases 1–3b complete and ran `/update-docs`. This line previously said deploy/smoke-test work was still outstanding; that was stale (the entry dated from 2026-06-16, before closure). MOP-0004 and MOP-0005 promoted from legacy `draft` → `in_progress` after status audit. Each MOP now carries a "Shipped as of" callout with explicit outstanding items. Promotion to `verifying`/`complete` is gated by the lockticket Verification block (MOP-0010).
 
-> **MOP-0017:** Phase 1 shipped 2026-09-03. Phases 2–5 (SSE edge function, agent-loop onDelta, frontend reader, verification) implemented 2026-09-04. Status `verifying` — pending `/verify-mop` and `chat-api` deploy.
+> **MOP-0017:** Phase 1 shipped 2026-09-03. Phases 2–5 (SSE edge function, agent-loop onDelta, frontend reader, verification) implemented 2026-09-04. **Resolved (2026-10-16):** this note originally said status was `verifying`, pending `/verify-mop` and deploy — status has since moved to `complete` (2026-09-04, per the registry table above). Kept for historical context only.
 
 > **MOP-0011 (2026-10-16):** `/verify-mop` run — all 13 verification-block assertions pass (a stale one, filtering on a filename that never existed, was corrected). 10 of 11 acceptance criteria now checked off. Held at `verifying`, not `complete`: "Read parity verified on production-shape sample (≥100 plans)" needs the Supabase MCP connection, which requires an interactive OAuth sign-in this non-interactive session can't perform. User explicitly wants this run for real once authorized, not worked around — do not close this MOP without it. Previous (2026-09-27): All 5 phases implemented. Migration 046 authored locally — user deploys. After deploy: run `npm run types:supabase` to regenerate `database.ts` and remove `(supabase as any)` casts.
 >
@@ -99,13 +99,13 @@
 
 ## How to Create a New MOP
 
-1. Copy [MOP_TEMPLATE.md](MOP_TEMPLATE.md) to `MOP-XXXX.md` (next sequential number)
+1. Use the `/new-mop` skill, or copy [MOP_TEMPLATE.md](MOP_TEMPLATE.md) to `MOP-NNNN-short-kebab-title.md` (next sequential number — current MOPs use a descriptive kebab-case suffix, not a bare `MOP-NNNN.md`)
 2. Fill in all header fields and scope of work
 3. Add an entry to the registry table above
-4. Set status to `draft` or `planned`
+4. Set status to `draft`
 
 ## How MOPs Get Updated
 
 - MOPs are reviewed during every [Documentation Update Procedure](../prompts/DOCUMENTATION_UPDATE_PROCEDURE.md) execution
 - When work is completed on a MOP phase, update the MOP and bump the registry `Updated` date
-- When all phases are done, set status to `completed` and fill in the `Completed` date
+- When all phases are done and `/verify-mop` passes, set status to `complete` and fill in the `Completed` date — see [MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md) for the full status vocabulary (MOPs predating 2026-06-01 may still carry the legacy `completed` string per the backwards-compatibility note above)
