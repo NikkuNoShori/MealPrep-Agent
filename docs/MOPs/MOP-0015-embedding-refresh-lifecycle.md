@@ -5,7 +5,7 @@
 | **MOP** | MOP-0015 |
 | **Title** | Embedding Refresh Lifecycle — fix stale embeddings from edited recipes |
 | **Date Submitted** | 2026-06-04 |
-| **Date Updated** | 2026-09-06 |
+| **Date Updated** | 2026-10-16 (moved 3 `type: human` items — 2 of them `hard_gate: true` — from the gating `## Verification` block to `## Manual Follow-up (non-blocking)`; converted `refresh-function-uses-service-role` to a real `grep` assertion since it's mechanically checkable. This MOP was marked `complete` in violation of MOP_VERIFICATION_POLICY.md, which forbids `type: human` as a completion gate — found during a doc-adherence audit). Previous: 2026-09-06 |
 | **Date Completed** | 2026-09-06 |
 | **Submitted By** | Nick Neal (via `chat-rag-sme` audit surfacing during KB build) |
 | **Status** | complete |
@@ -221,9 +221,11 @@ verification:
     path: supabase/functions/embedding-refresh/index.ts
 
   - id: refresh-function-uses-service-role
-    type: human
-    description: Edge function uses service-role client (since it crosses user boundaries via cron). Verify auth posture.
-    hard_gate: true
+    type: grep
+    path: supabase/functions/embedding-refresh/index.ts
+    pattern: 'createServiceClient'
+    expect: present
+    description: Edge function uses service-role client (since it crosses user boundaries via cron).
 
   - id: refresh-function-batch-bounded
     type: grep
@@ -272,18 +274,14 @@ verification:
     type: command
     run: npm run test:run
     expect_exit: 0
-
-  # Post-deploy human checks (after Nick deploys)
-  - id: zero-stale-after-refresh-window
-    type: human
-    description: After deploy + 24h of cron runs, `SELECT COUNT(*) FROM recipes WHERE embedding_vector IS NULL OR needs_reembed = true` should be 0 for active users. Some non-zero is fine for recently-edited rows (within the 5-min window).
-    hard_gate: true
-
-  - id: semantic-search-returns-edited-recipes
-    type: human
-    description: After backfill, a user with edited recipes can find them via the chat agent's `search_recipes` tool (which uses semantic + text hybrid).
-    hard_gate: true
 ```
+
+## Manual Follow-up (non-blocking)
+
+> Optional human review **after** `complete`. Never gates status. Moved here 2026-10-16 from the `## Verification` block, where `type: human` items are forbidden as completion gates per [MOP_VERIFICATION_POLICY.md](../prompts/MOP_VERIFICATION_POLICY.md) — this MOP had been marked `complete` with two `hard_gate: true` human items still in the gating block, which the policy explicitly disallows.
+
+- [ ] **Zero stale after refresh window:** After deploy + 24h of cron runs, `SELECT COUNT(*) FROM recipes WHERE embedding_vector IS NULL OR needs_reembed = true` should be 0 for active users. Some non-zero is fine for recently-edited rows (within the 5-min window).
+- [ ] **Semantic search returns edited recipes:** After backfill, a user with edited recipes can find them via the chat agent's `search_recipes` tool (which uses semantic + text hybrid).
 
 ---
 
