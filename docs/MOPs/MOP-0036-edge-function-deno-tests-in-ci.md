@@ -5,10 +5,10 @@
 | **MOP** | MOP-0036 |
 | **Title** | Edge-Function Deno Tests in CI + Local Toolchain |
 | **Date Submitted** | 2026-10-12 |
-| **Date Updated** | 2026-10-12 |
-| **Date Completed** | — |
+| **Date Updated** | 2026-10-16 (all 4 phases implemented and verified — see §Implementation notes) |
+| **Date Completed** | 2026-10-16 |
 | **Submitted By** | surface-reviewer |
-| **Status** | draft |
+| **Status** | complete |
 
 > Status vocabulary defined in [docs/prompts/MOP_STATUS_LIFECYCLE.md](../prompts/MOP_STATUS_LIFECYCLE.md). Valid values: `draft` / `evaluation` / `approved` / `planned` / `in_progress` / `verifying` / `complete` / `blocked` / `cancelled` / `deferred`.
 
@@ -141,14 +141,14 @@ verification:
 
 ## Acceptance Criteria
 
-- [ ] All `verification` block items pass (`/verify-mop`)
-- [ ] All 5 existing Deno test files pass locally and in CI
-- [ ] Deno CI job is blocking (no `|| true`)
-- [ ] `deno check` covers `chat-api`, `recipe-pipeline`, and `_shared`
-- [ ] Agent-loop tests cover: destructive-without-extraction (recipes undefined), extraction-then-destructive (recipes preserved), images force `tool_choice: "required"` on turn 1
-- [ ] RUNBOOK documents local Deno install
-- [ ] Retroactive notes added to any MOP whose Deno verification never actually ran
-- [ ] Documentation updated per `/update-docs` procedure
+- [x] All `verification` block items pass (`/verify-mop`) — all 7 assertions confirmed 2026-10-16
+- [x] All 5 existing Deno test files pass locally and in CI — 46/46 (44 original + 2 new)
+- [x] Deno CI job is blocking (no `|| true`)
+- [x] `deno check` covers `chat-api`, `recipe-pipeline`, and `_shared` — extended to all 5 entrypoints (`admin-api`, `embedding-refresh`, `household-invite` too)
+- [x] Agent-loop tests cover: destructive-without-extraction (recipes undefined), extraction-then-destructive (recipes preserved), images force `tool_choice: "required"` on turn 1
+- [x] RUNBOOK documents local Deno install
+- [x] Retroactive notes added to any MOP whose Deno verification never actually ran — MOP-0008, MOP-0016 (confirmed no correction needed), MOP-0034 (real gap, corrected)
+- [x] Documentation updated per `/update-docs` procedure
 
 ---
 
@@ -166,3 +166,26 @@ verification:
 - **Affected tools:** every tool that returns `requiresConfirmation`, per `catalog.ts` `DESTRUCTIVE_TOOLS` / `CONDITIONALLY_DESTRUCTIVE`: `update_recipe`, `delete_recipe`, `update_member_allergens`, `assign_recipe_to_meal_plan_slot` (when overwriting).
 - The fix is not live until `chat-api` is redeployed. The user handles deploys.
 - No DB or migration work. No HARD RULE conflict.
+
+## Implementation notes (2026-10-16)
+
+**Phase 1 (baseline the existing suite):** ran all 5 Deno test files for the first time end-to-end. 3 passed clean (`conversation-context.test.ts` 3/3, `extract_test.ts` 20/20, `link-extractor_test.ts` 4/4). 2 failed on `deno check` type errors in `chat-api/tools/handlers.ts` (`agent-loop.test.ts`, `golden-routing.test.ts` share the same import chain) — not test bit-rot, a real type-narrowing bug: a `let planRow: {...} | null` reassigned via `as typeof planRow` inside nested `if/else` branches collapsed to `never` under Deno's TS 6.0.3 checker (self-referential `typeof` narrowing across a control-flow join with early returns). Fixed by naming the type (`type PlanRow = {...}`) instead of self-referencing `typeof planRow`, plus an explicit type annotation on a ternary-built `upsert` row that was inferring an unneeded discriminated union. Both are real type-safety improvements, not workarounds — confirmed via `deno check` clean afterward.
+
+Running `deno check` over all 5 edge-function entrypoints (`chat-api`, `recipe-pipeline`, `admin-api`, `embedding-refresh`, `household-invite` — `embedding-refresh` was already clean) surfaced 9 more real issues, all fixed:
+- 7× `catch (e) { ...e.message }` where `e` is `unknown` under strict TS — narrowed via `e instanceof Error ? e.message : ...` (`chat-api/index.ts` ×4, `admin-api/index.ts` ×1 block covering 3 call sites, `household-invite/index.ts` ×1).
+- 1× genuine logic bug caught by the same class of check: `chat-api/index.ts`, `(userMessage as string | undefined)?.length > 50` — optional chaining binds tighter than comparison, so `undefined > 50` always evaluates `false`, silently always taking the "else" branch regardless of message length. Fixed to `((userMessage as string | undefined)?.length ?? 0) > 50`.
+- 1× deprecated `import ... assert { type: "json" }` in `recipe-pipeline/_shared/tos-check.ts` — import assertions were removed from more recent V8/Deno releases in favor of import attributes (`with`). This was a latent runtime-break risk on any future Deno version bump, not just a lint nag. Fixed to `with { type: "json" }`.
+- 1× `Blob([bytes], ...)` in `_shared/transcribe-media.ts` rejected by a stricter `lib.dom.d.ts` `BlobPart` type (`Uint8Array<ArrayBufferLike>` vs. `ArrayBufferView<ArrayBuffer>`) — a type-level strictness gap only; the runtime behavior is correct. Fixed with a narrow `as BlobPart` cast at the call site.
+
+Added two of the three test cases the MOP's Phase 1 spec required to `agent-loop.test.ts` (the third — pinning `reply.recipes === undefined` on the existing destructive-short-circuit test — was a one-line addition to that test, not a new one):
+- Pinned `reply.recipes`/`reply.recipe` as `undefined` on the existing "destructive tool short-circuits" test (the exact dc8bf5d regression surface).
+- New test: extraction (`extract_recipe_from_source`, via a stubbed `globalThis.fetch` + `SUPABASE_URL`/`SUPABASE_ANON_KEY` env vars since the real handler calls the recipe-pipeline edge function over HTTP) followed by a destructive tool in the same turn — asserts `reply.recipes` (2 items) survives into the `pendingConfirmation` short-circuit, per `agent-loop.ts`'s own "Preserve any recipe extracted earlier in this same turn" comment.
+- New test: attached images force `tool_choice: "required"` on the first LLM turn only, `"auto"` on subsequent turns — verified by wrapping `chatWithTools` to record each call's `tool_choice`. Caught one implementation subtlety: `chatWithToolsResilient` calls `openRouter.chatWithTools(systemPrompt, messages, tools, model, options)` — `options` is the 5th positional argument, not a 4th-argument object as an initial draft of this test assumed.
+
+44 → 46 Deno tests total (2 new). All passing.
+
+**Phase 2:** added `npm run test:edge` (all 5 files, `--allow-env` only — confirmed none need `--allow-net`, including `golden-routing.test.ts` despite its existing separate `test:golden-routing` script carrying `--allow-net`; left that script as-is per the MOP's own instruction) and `npm run check:edge` (all 5 entrypoints) to `package.json`. Added a `deno` job to `.github/workflows/ci.yml` running both, with no `needs:` dependency and no `|| true` — blocking by construction, unlike the existing `e2e` job's non-blocking pattern.
+
+**Phase 3:** added a RUNBOOK.md entry ("Edge functions: Deno tests won't run locally") covering install commands per OS and the two new npm scripts. Removed the two "(when Deno available)" hedges in `DOMAIN_TEST_MATRIX.md` (chat-rag, recipe-pipeline domains), pointing both at `npm run test:edge` instead.
+
+**Phase 4:** audited MOP-0008, MOP-0016, and MOP-0034 for verification-block claims about Deno tests. MOP-0008 and MOP-0016's Deno-related assertions were always `file-exists`/`grep` structural checks, never a `deno test` command assertion — their prior `/verify-mop` passes never actually claimed the tests executed, so no correction was needed beyond a confirming note. MOP-0034 was the one real gap: its own text said extraction tests were "Not run — Deno isn't installed locally." Now run for the first time as part of this MOP's Phase 1 baseline (20/20 pass) — corrected in place.

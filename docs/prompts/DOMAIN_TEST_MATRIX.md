@@ -2,7 +2,7 @@
 
 > **Source of truth** for routing integrity checks and domain SME invocation. Consumed by `integrity-orchestrator`, `/integrity-check`, and MOP `## Verification` authoring.
 
-**Last updated:** 2026-06-14
+**Last updated:** 2026-10-16 (MOP-0036 — removed "when Deno available" hedges now that Deno runs in CI; chat-rag and recipe-pipeline integrity commands point at `npm run test:edge`)
 
 ---
 
@@ -24,7 +24,7 @@
 | **Domain SME** | `chat-rag-sme` |
 | **KB** | `.claude/agents/chat-rag-sme-knowledge/` |
 | **Scope globs** | `supabase/functions/chat-api/**`, `supabase/functions/_shared/openrouter-client.ts`, `supabase/functions/_shared/web-search-client.ts`, `src/components/chat/**`, `src/services/api.ts` (sendMessage section), `supabase/migrations/*search*`, `supabase/migrations/*embedding*` |
-| **Integrity commands** | `npm run test:run -- src/services/__tests__/chat-agent.test.ts`, `npm run test:run -- src/components/chat/__tests__`, `deno test --config supabase/functions/deno.json --allow-env --allow-net supabase/functions/chat-api/__tests__/agent-loop.test.ts`, `deno test --config supabase/functions/deno.json --allow-env --allow-net supabase/functions/chat-api/__tests__/golden-routing.test.ts` (or `npm run test:golden-routing`) |
+| **Integrity commands** | `npm run test:run -- src/services/__tests__/chat-agent.test.ts`, `npm run test:run -- src/components/chat/__tests__`, `npm run test:edge` (runs `agent-loop.test.ts`, `conversation-context.test.ts`, `golden-routing.test.ts` — Deno required locally, see RUNBOOK §Deno Edge-Function Tests; CI runs this job unconditionally) |
 | **Optional integration** | Golden set eval script (MOP-0008 — not yet automated) |
 | **Data-integrity targets** | — |
 
@@ -36,7 +36,7 @@
 | **Domain SME** | `recipe-pipeline-sme` |
 | **KB** | `.claude/agents/recipe-pipeline-sme-knowledge/` |
 | **Scope globs** | `supabase/functions/recipe-pipeline/**`, `supabase/functions/_shared/recipe-prompts.ts`, `supabase/functions/_shared/platform-oembed.ts`, `supabase/functions/_shared/link-extractor.ts`, `supabase/functions/_shared/transcribe-media.ts`, `supabase/functions/_shared/video-url-utils.ts`, `src/utils/videoFrameExtractor.ts`, `src/services/videoIntake.ts` |
-| **Integrity commands** | `npm run build` (TypeScript surfaces broken imports), `deno test supabase/functions/_shared/link-extractor_test.ts` (when Deno available), `deno test supabase/functions/recipe-pipeline/__tests__` (when fixtures exist per MOP-0012) |
+| **Integrity commands** | `npm run build` (TypeScript surfaces broken imports), `npm run test:edge` (includes `link-extractor_test.ts` and `extract_test.ts` — Deno required locally, see RUNBOOK §Deno Edge-Function Tests), `deno test supabase/functions/recipe-pipeline/__tests__` (when fixtures exist per MOP-0012) |
 | **Data-integrity targets** | Embedding shape (1536-dim), duplicate detection RPC |
 
 ### `recipes-library`
@@ -137,3 +137,4 @@ npm run test:run
 | 0015 | chat-rag, recipe-pipeline |
 | 0016 | recipe-pipeline |
 | 0030 | meal-planning, recipes-library, household-sharing (no dedicated dashboard domain — spans all three) |
+| 0036 | chat-rag, recipe-pipeline (testing-infra — adds the Deno CI job itself) |

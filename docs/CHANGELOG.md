@@ -3,7 +3,20 @@
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
 **Last reviewed:** 2026-10-16
-**Last updated:** 2026-10-16 (MOP-0029 closed complete — see entry below)
+**Last updated:** 2026-10-16 (MOP-0036 closed complete — see entry below)
+
+## 2026-10-16 (MOP-0036: Edge-Function Deno Tests in CI + Local Toolchain — Closed) `main`
+
+**Edge-Function Deno Tests in CI + Local Toolchain (MOP-0036 — complete)**
+
+- Added a blocking `deno` job to `.github/workflows/ci.yml` (type-check + all 5 Deno test files) and `npm run test:edge` / `npm run check:edge` scripts — `supabase/functions/` previously had zero CI coverage; a crash (`dc8bf5d`, 2026-09-03) sat on `main` for ~5 weeks because the test that covered it had never actually run.
+- **Found and fixed 10 real bugs while baselining the suite:** 2 TypeScript type-narrowing bugs in `chat-api/tools/handlers.ts` (a `let` variable reassigned via self-referential `typeof` casts collapsed to `never` under Deno's checker); 1 deprecated `assert { type: "json" }` import (replaced with `with` — a latent runtime-break risk on a future Deno version bump, not just a lint nag) in `recipe-pipeline/_shared/tos-check.ts`; 7 untyped `catch (e) { e.message }` sites across `chat-api/index.ts`, `admin-api/index.ts`, and `household-invite/index.ts`, one of which was a genuine logic bug — `(userMessage)?.length > 50` always evaluated `false` due to optional-chaining operator precedence, silently always taking the "else" branch regardless of message length.
+- Added 2 new `agent-loop.test.ts` regression tests (extraction-then-destructive-tool recipe preservation; images forcing `tool_choice: "required"` on the first turn only) plus pinned the existing destructive-short-circuit test to assert `recipes`/`recipe` come back `undefined`, not just "doesn't throw." 44 → 46 Deno tests total, all passing.
+- Retroactively audited MOP-0008, MOP-0016, MOP-0034 for Deno-test claims in their verification blocks. MOP-0008/MOP-0016 were already honest (structural `file-exists`/`grep` checks, never claimed execution). MOP-0034's note ("Not run — Deno isn't installed locally") was the one real gap — corrected now that `extract_test.ts` has actually run (20/20 pass).
+- RUNBOOK.md and DOMAIN_TEST_MATRIX.md updated with local Deno install instructions and `npm run test:edge` routing, removing the "(when Deno available)" hedges.
+- Commits: today's session (uncommitted at time of writing, pending review).
+
+---
 
 ## 2026-10-16 (MOP-0029: Theme Token Layering & Surface-Aware Presets — Closed) `main`
 

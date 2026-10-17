@@ -2,8 +2,35 @@
 
 > Operational debugging checklists for MealPrep Agent. Each entry covers a known failure mode with symptoms, causes, verification, and fix steps.
 
-**Last reviewed:** 2026-09-25
-**Last updated:** 2026-09-25 (MOP-0031: recipe sharing troubleshooting entry)
+**Last reviewed:** 2026-10-16
+**Last updated:** 2026-10-16 (MOP-0036: Deno edge-function test entry)
+
+---
+
+## Edge functions: Deno tests won't run locally / `npm run test:edge` fails with "command not found"
+
+### Symptom
+- `npm run test:edge` or `npm run check:edge` fails with `deno: command not found` (or PowerShell's equivalent)
+- Edge-function changes ship without any local test confirmation, relying only on `tsc`/Vitest which don't cover `supabase/functions/`
+
+### Likely causes
+- Deno isn't installed on this machine. `supabase/functions/` runs on Deno (not Node — see CLAUDE.md), so the five `*_test.ts` / `*.test.ts` files under it (`agent-loop.test.ts`, `conversation-context.test.ts`, `golden-routing.test.ts`, `extract_test.ts`, `link-extractor_test.ts`) require the Deno CLI, not Node/Vitest.
+
+### Verification steps
+```bash
+deno --version   # confirm install + version; CI pins v2.x via denoland/setup-deno
+```
+
+### Fix steps
+1. Install Deno:
+   - **Windows:** `winget install DenoLand.Deno`
+   - **macOS:** `brew install deno`
+   - **Linux:** `curl -fsSL https://deno.land/install.sh | sh`
+2. Run the full edge-function suite: `npm run test:edge` (44 tests across 5 files as of MOP-0036)
+3. Run the edge-function type check: `npm run check:edge` (covers `chat-api`, `recipe-pipeline`, `admin-api`, `embedding-refresh`, `household-invite` entrypoints — `tsc --noEmit` at the repo root does **not** check Deno code, so this is the only type-check coverage for `supabase/functions/`)
+4. CI runs both automatically in the `deno` job (`.github/workflows/ci.yml`) on every push/PR to `main` — blocking, not best-effort. If CI's `deno` job fails but these pass locally, check the pinned Deno version (`denoland/setup-deno@v2`, `deno-version: v2.x`) against your local `deno --version`.
+
+**Added:** 2026-10-16 (MOP-0036 — prior to this, Deno wasn't installed on the primary dev machine and these 5 test files had never actually executed; see `docs/handoffs/2026-10-13-device-switch-chat-fix-and-deno-enabled.md` for the first-ever run)
 
 ---
 

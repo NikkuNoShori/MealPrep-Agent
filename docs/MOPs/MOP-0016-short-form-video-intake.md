@@ -32,6 +32,8 @@
 >
 > **Blocked on operator (Nick):** `recipe-pipeline` deploy + live smoke tests (see §Operator Requirements). `chat-api` deployed 2026-06-16.
 
+> **Retroactive note (MOP-0036 Phase 4, 2026-10-16):** This MOP's `link-extractor` verification assertion (§Verification, `id: link-extractor`) is a `file-exists` structural check, never a `deno test` command assertion — so its prior `/verify-mop` pass did not claim the test had actually executed. MOP-0036 (2026-10-16) has now run `link-extractor_test.ts` for the first time: 4/4 pass. No retroactive correction needed.
+
 ---
 
 ## Summary
