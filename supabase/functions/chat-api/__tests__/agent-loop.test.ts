@@ -183,6 +183,123 @@ Deno.test("agent loop: destructive tool short-circuits with pendingConfirmation"
   assertEquals(reply.toolCalls.length, 1);
   assertEquals(reply.toolCalls[0].name, "delete_recipe");
   // The model is NOT consulted a second time — only one LLM call.
+  // Regression pin for dc8bf5d (agent-loop.ts:304 lastRecipes.length crashed
+  // on undefined): with no prior extraction this turn, recipes/recipe must
+  // come back undefined, not throw.
+  assertEquals(reply.recipes, undefined);
+  assertEquals(reply.recipe, undefined);
+});
+
+Deno.test("agent loop: extraction then destructive tool in the same turn preserves recipes", async () => {
+  // Turn 1: extract_recipe_from_source finds multiple recipes (its handler
+  // calls the real recipe-pipeline edge function via fetch — stubbed here).
+  // Turn 2: the model follows up with a destructive tool call. agent-loop.ts's
+  // destructive short-circuit (~line 303-304) must preserve the recipes
+  // captured in turn 1 so the card still renders alongside the confirmation.
+  const originalFetch = globalThis.fetch;
+  const hadUrl = Deno.env.has("SUPABASE_URL");
+  const hadKey = Deno.env.has("SUPABASE_ANON_KEY");
+  const prevUrl = Deno.env.get("SUPABASE_URL");
+  const prevKey = Deno.env.get("SUPABASE_ANON_KEY");
+  Deno.env.set("SUPABASE_URL", "https://fake.supabase.co");
+  Deno.env.set("SUPABASE_ANON_KEY", "fake-anon-key");
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({
+          success: true,
+          recipe: { title: "Carbonara" },
+          recipes: [{ title: "Carbonara" }, { title: "Cacio e Pepe" }],
+          source_metadata: null,
+        }),
+        { status: 200 }
+      )
+    )) as typeof fetch;
+
+  try {
+    const { client } = makeFakeOpenRouter([
+      () => ({
+        content: null,
+        tool_calls: [
+          makeToolCall(
+            "extract_recipe_from_source",
+            { source_type: "url", url: "https://example.com" },
+            "call_extract"
+          ),
+        ],
+        finish_reason: "tool_calls",
+      }),
+      () => ({
+        content: null,
+        tool_calls: [
+          makeToolCall(
+            "delete_recipe",
+            { recipe_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
+            "call_delete"
+          ),
+        ],
+        finish_reason: "tool_calls",
+      }),
+    ]);
+    const ctx = makeCtx({ openRouter: client });
+
+    const reply = await runAgentLoop(
+      { message: "pull that recipe in and then delete the old one", conversationHistory: [] },
+      ctx,
+      client
+    );
+
+    assert(reply.pendingConfirmation, "expected pendingConfirmation from the destructive tool");
+    assertEquals(reply.pendingConfirmation?.tool, "delete_recipe");
+    assertEquals(reply.recipes?.length, 2, "recipes extracted in turn 1 must survive the turn-2 short-circuit");
+    assertEquals(reply.recipes?.[0].title, "Carbonara");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (hadUrl) Deno.env.set("SUPABASE_URL", prevUrl!); else Deno.env.delete("SUPABASE_URL");
+    if (hadKey) Deno.env.set("SUPABASE_ANON_KEY", prevKey!); else Deno.env.delete("SUPABASE_ANON_KEY");
+  }
+});
+
+Deno.test("agent loop: attached images force tool_choice=required on the first turn only", async () => {
+  const toolChoices: Array<"auto" | "none" | "required" | undefined> = [];
+  const script: ChatWithToolsCall[] = [
+    () => ({
+      content: null,
+      tool_calls: [makeToolCall("search_recipes", { query: "pasta" }, "call_1")],
+      finish_reason: "tool_calls",
+    }),
+    () => ({ content: "Here you go.", tool_calls: [], finish_reason: "stop" }),
+  ];
+  let i = 0;
+  const recordingClient = {
+    chatWithTools(
+      systemPrompt: string,
+      messages: ChatMessage[],
+      tools: ToolSpec[],
+      _model: string,
+      options: { tool_choice?: "auto" | "none" | "required" }
+    ): Promise<ChatWithToolsResult> {
+      toolChoices.push(options?.tool_choice);
+      const step = script[Math.min(i, script.length - 1)];
+      i++;
+      return Promise.resolve(step(systemPrompt, messages, tools));
+    },
+    chat: () => Promise.resolve("{}"),
+    chatWithHistory: () => Promise.resolve(""),
+    chatWithImages: () => Promise.resolve(""),
+    generateEmbedding: () => Promise.resolve(new Array(1536).fill(0)),
+  } as unknown as OpenRouterClient;
+
+  const ctx = makeCtx({ openRouter: recordingClient, attachedImages: ["data:image/png;base64,fake"] });
+
+  await runAgentLoop(
+    { message: "what's in this photo", conversationHistory: [], images: ["data:image/png;base64,fake"] },
+    ctx,
+    recordingClient
+  );
+
+  assertEquals(toolChoices[0], "required", "first turn with images must force tool_choice=required");
+  assertEquals(toolChoices[1], "auto", "subsequent turns must fall back to auto");
 });
 
 Deno.test("agent loop: enforces MAX_ITERS cap and falls back to closing call", async () => {

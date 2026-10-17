@@ -247,13 +247,14 @@ serve(async (req: Request) => {
         return corsError(`Unknown route: ${path}`, 404);
     }
   } catch (error) {
-    if (error.message === "Forbidden: admin role required") {
-      return corsError(error.message, 403);
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === "Forbidden: admin role required") {
+      return corsError(message, 403);
     }
-    if (error.message === "Missing authorization" || error.message === "Invalid token") {
-      return corsError(error.message, 401);
+    if (message === "Missing authorization" || message === "Invalid token") {
+      return corsError(message, 401);
     }
     console.error("Unhandled error:", error);
-    return corsError(error.message || "Internal server error", 500);
+    return corsError(message || "Internal server error", 500);
   }
 });

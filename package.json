@@ -18,6 +18,8 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:golden-routing": "deno test --config supabase/functions/deno.json --allow-env --allow-net supabase/functions/chat-api/__tests__/golden-routing.test.ts",
+    "test:edge": "deno test --config supabase/functions/deno.json --allow-env supabase/functions/chat-api/__tests__/agent-loop.test.ts supabase/functions/chat-api/__tests__/conversation-context.test.ts supabase/functions/chat-api/__tests__/golden-routing.test.ts supabase/functions/recipe-pipeline/stages/extract_test.ts supabase/functions/_shared/link-extractor_test.ts",
+    "check:edge": "deno check --config supabase/functions/deno.json supabase/functions/chat-api/index.ts supabase/functions/recipe-pipeline/index.ts supabase/functions/admin-api/index.ts supabase/functions/embedding-refresh/index.ts supabase/functions/household-invite/index.ts",
     "types:supabase": "supabase gen types typescript --linked > src/types/database.ts",
     "deploy:edge": "vercel --prod",
     "server": "node server.js",

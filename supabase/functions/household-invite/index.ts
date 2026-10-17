@@ -440,6 +440,7 @@ serve(async (req: Request) => {
     }
   } catch (error) {
     console.error("Unhandled error:", error);
-    return corsError(error.message || "Internal server error", 500);
+    const message = error instanceof Error ? error.message : String(error);
+    return corsError(message || "Internal server error", 500);
   }
 });

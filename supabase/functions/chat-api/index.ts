@@ -300,7 +300,7 @@ async function handleSendMessage(
             imageUploadFailures++;
           }
         } catch (e) {
-          console.warn(`Failed to upload chat image ${i}:`, e.message);
+          console.warn(`Failed to upload chat image ${i}:`, e instanceof Error ? e.message : e);
           imageUrls.push(undefined);
           imageUploadFailures++;
         }
@@ -351,7 +351,7 @@ async function handleSendMessage(
     // the image's own original base64 — a single failed upload must not drop
     // that image from what the vision model sees (MOP-0034 Phase 3).
     const attachedImages =
-      images.length > 0 ? images.map((img, i) => imageUrls[i] ?? img) : [];
+      images.length > 0 ? images.map((img: string, i: number) => imageUrls[i] ?? img) : [];
 
     const toolCtx: ToolContext = {
       user: { id: user.id, email: user.email },
@@ -443,7 +443,7 @@ async function handleSendMessage(
                   await supabase.from("chat_conversations")
                     .update({ title: generatedTitle }).eq("id", conversationId);
                 }
-              } catch (e) { console.warn("Title generation failed:", e.message); }
+              } catch (e) { console.warn("Title generation failed:", e instanceof Error ? e.message : e); }
             }
 
             // Terminal SSE events.
@@ -575,7 +575,7 @@ async function handleSendMessage(
             .eq("id", conversationId);
         }
       } catch (e) {
-        console.warn("Title generation failed (non-fatal):", e.message);
+        console.warn("Title generation failed (non-fatal):", e instanceof Error ? e.message : e);
       }
     }
 
@@ -760,7 +760,7 @@ async function handlePersistExtraction(
         conversationId = existingConv.id;
       } else {
         const placeholderTitle =
-          (userMessage as string | undefined)?.length > 50
+          ((userMessage as string | undefined)?.length ?? 0) > 50
             ? String(userMessage).substring(0, 50) + "..."
             : userMessage || "Video recipe extraction";
         const { data: newConv, error: convError } = await supabase

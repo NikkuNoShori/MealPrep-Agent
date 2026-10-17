@@ -53,7 +53,7 @@ async function whisperTranscribe(
   filename: string
 ): Promise<string> {
   const formData = new FormData();
-  formData.append("file", new Blob([bytes], { type: mimeType }), filename);
+  formData.append("file", new Blob([bytes as BlobPart], { type: mimeType }), filename);
   formData.append("model", WHISPER_MODEL);
 
   const response = await fetch("https://openrouter.ai/api/v1/audio/transcriptions", {

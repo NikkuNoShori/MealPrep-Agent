@@ -1053,7 +1053,8 @@ async function getGroceryList(
 ): Promise<ToolHandlerResult> {
   const mealPlanId = args.meal_plan_id as string | undefined;
 
-  let planRow: { id: string; title: string } | null = null;
+  type PlanRow = { id: string; title: string };
+  let planRow: PlanRow | null = null;
 
   if (mealPlanId) {
     const { data, error } = await ctx.supabase
@@ -1063,7 +1064,7 @@ async function getGroceryList(
       .eq("user_id", ctx.user.id)
       .maybeSingle();
     if (error) return { ok: false, error: error.message, retryable: true };
-    planRow = data as typeof planRow;
+    planRow = data as unknown as PlanRow | null;
   } else {
     const { data: activePlan } = await ctx.supabase
       .from("meal_plans")
@@ -1075,7 +1076,7 @@ async function getGroceryList(
       .maybeSingle();
 
     if (activePlan) {
-      planRow = activePlan as typeof planRow;
+      planRow = activePlan as unknown as PlanRow;
     } else {
       const { data: draftPlan, error } = await ctx.supabase
         .from("meal_plans")
@@ -1086,7 +1087,7 @@ async function getGroceryList(
         .limit(1)
         .maybeSingle();
       if (error) return { ok: false, error: error.message, retryable: true };
-      planRow = draftPlan as typeof planRow;
+      planRow = draftPlan as unknown as PlanRow | null;
     }
   }
 
@@ -1479,7 +1480,7 @@ async function reactToRecipe(
   }
 
   // Upsert reaction.
-  const row = familyMemberId
+  const row: { recipe_id: string; user_id: string | null; family_member_id: string | null; reaction: typeof reaction } = familyMemberId
     ? { recipe_id: recipeId, family_member_id: familyMemberId, user_id: null, reaction }
     : { recipe_id: recipeId, user_id: ctx.user.id, family_member_id: null, reaction };
 

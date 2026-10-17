@@ -30,7 +30,7 @@ interface BlockedDomain {
 
 // Imported at module load time — parsed once, shared across all invocations
 // within this edge function instance.
-import BLOCKED_DOMAINS_RAW from "./blocked-domains.json" assert { type: "json" };
+import BLOCKED_DOMAINS_RAW from "./blocked-domains.json" with { type: "json" };
 const BLOCKED_DOMAINS: BlockedDomain[] = BLOCKED_DOMAINS_RAW as BlockedDomain[];
 
 /**
