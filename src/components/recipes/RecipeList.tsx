@@ -205,7 +205,16 @@ export const RecipeList: React.FC<RecipeListProps> = ({
     : (recipes as any)?.recipes || [];
 
   const useServerSearch = !!debouncedQuery.trim() && feedMode !== 'collection' && feedMode !== 'household' && feedMode !== 'public' && feedMode !== 'shared' && feedMode !== 'all';
-  const { data: serverSearchResults } = useRecipeTextSearch(useServerSearch ? debouncedQuery : "");
+  const { data: serverSearchResults, error: searchError } = useRecipeTextSearch(useServerSearch ? debouncedQuery : "");
+  useEffect(() => {
+    if (searchError) {
+      toast.error(
+        searchError instanceof Error
+          ? `Search failed: ${searchError.message}`
+          : "Search failed. Please try again."
+      );
+    }
+  }, [searchError]);
   const recipesAfterSearch = useServerSearch
     ? (serverSearchResults || [])
     : searchQuery
@@ -536,14 +545,18 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             </div>
 
             <h3 className="text-2xl font-bold text-surface-900 dark:text-white mb-3">
-              {searchQuery || Object.values(filters).some((f) => f && f.length > 0)
+              {searchError
+                ? "Search failed"
+                : searchQuery || Object.values(filters).some((f) => f && f.length > 0)
                 ? "No recipes match your search"
                 : feedMode === 'shared'
                 ? "Nothing shared with you yet"
                 : "Start building your recipe collection"}
             </h3>
-            <p className="text-surface-600 dark:text-surface-400 mb-8 text-lg leading-relaxed">
-              {searchQuery || Object.values(filters).some((f) => f && f.length > 0)
+            <p className={`mb-8 text-lg leading-relaxed ${searchError ? 'text-status-error' : 'text-surface-600 dark:text-surface-400'}`}>
+              {searchError
+                ? "Something went wrong while searching. Please try again, or contact support if this keeps happening."
+                : searchQuery || Object.values(filters).some((f) => f && f.length > 0)
                 ? "Try adjusting your search terms or filters to find what you're looking for."
                 : feedMode === 'shared'
                 ? "When someone shares a recipe with you by username or email, it will appear here."
