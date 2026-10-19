@@ -359,8 +359,18 @@
     --surface-100: #292524;
     --surface-200: #3a352e;
     --surface-300: #44403c;
-    --surface-400: #57534e;
-    --surface-500: #78716c;
+    /* surface-400/500 lightened 2026-10-19 — the original dark-mode values
+       (#57534e, #78716c) measured 2.15-3.74:1 contrast against this app's
+       actual dark surfaces (card bg ~#16171a, --rs-bg-elevated #1e1f26),
+       failing WCAG AA's 4.5:1 minimum for normal text. These two tokens are
+       used as secondary/muted TEXT color at 250+ call sites (recipe
+       descriptions, menu items, labels) — the original values were tuned
+       as background-ramp steps, not validated for text-on-dark-surface
+       legibility. New values: 4.52-6.06:1, passes AA against both
+       backgrounds while keeping 400 visibly darker than 500 and both
+       distinct from 600 (#a8a29e). */
+    --surface-400: #8c857f;
+    --surface-500: #9c958e;
     --surface-600: #a8a29e;
     --surface-700: #d6d3d1;
     --surface-800: #e7e5e4;

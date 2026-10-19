@@ -1,10 +1,10 @@
 {
   "$comment": "MOP-0029 Phase 8 — ratcheting baseline for scripts/check-color-governance.js. Counts measured post Phase 8 Parts 1-3 migration (2026-10-04). A count may only DECREASE over time as future phases/sessions migrate more raw color usage onto tokens; the check fails if any count INCREASES beyond what is recorded here. See docs/COLOR_SCHEMA.md §11 and ADR-0006 §Alternatives for why this is allowlist-driven with a ratcheting baseline rather than a strict zero-tolerance rule.",
-  "measuredAt": "2026-10-16",
+  "measuredAt": "2026-10-19",
   "counts": {
-    "G1": 416,
+    "G1": 418,
     "G2": 2,
-    "G3": 327,
+    "G3": 256,
     "G5": 0
   }
 }

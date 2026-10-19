@@ -229,8 +229,11 @@ const defaultColorScheme: ColorScheme = {
       100: '#292524',
       200: '#3a352e',
       300: '#44403c',
-      400: '#57534e',
-      500: '#78716c',
+      // 400/500 lightened 2026-10-19 — see matching comment in index.css.
+      // Original values (#57534e, #78716c) measured 2.15-3.74:1 contrast as
+      // text against this app's actual dark surfaces, failing WCAG AA.
+      400: '#8c857f',
+      500: '#9c958e',
       600: '#a8a29e',
       700: '#d6d3d1',
       800: '#e7e5e4',
