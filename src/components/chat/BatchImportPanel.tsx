@@ -416,7 +416,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
             </>
           ) : (
             <>
-              <CheckCheck className="h-3.5 w-3.5 text-green-500" />
+              <CheckCheck className="h-3.5 w-3.5 text-status-success" />
               <span className="text-xs text-muted-foreground">
                 Extraction complete —{" "}
                 {cards.length > 0
@@ -450,9 +450,9 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
 
       {/* ── All saved confirmation ── */}
       {phase === "done" && doneSaving && cards.length > 0 && (
-        <div className="flex items-center justify-center gap-2 p-4 bg-green-500/5 border-t border-green-500/20 shrink-0">
-          <CheckCheck className="h-4 w-4 text-green-500" />
-          <span className="text-sm font-medium text-green-600 dark:text-green-400">
+        <div className="flex items-center justify-center gap-2 p-4 bg-status-success/5 border-t border-status-success/20 shrink-0">
+          <CheckCheck className="h-4 w-4 text-status-success" />
+          <span className="text-sm font-medium text-status-success">
             All recipes saved to your library
           </span>
           <Button

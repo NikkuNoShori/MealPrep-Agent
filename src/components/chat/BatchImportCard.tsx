@@ -199,7 +199,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
   if (status === "saved") {
     return (
       <div data-testid={`batch-card-${entry.index}`} className="min-w-0">
-        <div className="flex items-stretch gap-4 p-3 rounded-2xl bg-green-50/60 dark:bg-green-900/10 border border-green-200/60 dark:border-green-800/30">
+        <div className="flex items-stretch gap-4 p-3 rounded-2xl bg-status-success/10 border border-status-success/30">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -208,7 +208,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
             />
           ) : (
             <div className="w-28 h-28 rounded-xl flex-shrink-0 bg-gradient-to-br from-green-100 to-green-200/60 dark:from-green-900/30 dark:to-green-800/20 flex items-center justify-center">
-              <BookOpen className="h-8 w-8 text-green-600/50 dark:text-green-400/40" />
+              <BookOpen className="h-8 w-8 text-status-success/50" />
             </div>
           )}
           <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
@@ -216,7 +216,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
               <h3 className="font-semibold text-[15px] leading-snug truncate">{editedTitle}</h3>
               <p className="text-[13px] text-surface-500 dark:text-surface-400 mt-0.5">{displayUrl}</p>
             </div>
-            <p className="text-[12px] text-green-600 dark:text-green-400 font-medium mt-auto">Saved to library</p>
+            <p className="text-[12px] text-status-success font-medium mt-auto">Saved to library</p>
           </div>
         </div>
       </div>

@@ -1755,7 +1755,7 @@ export const ChatInterface: React.FC = () => {
                     : ""
                 } ${
                   selectedConversations.has(conversation.id)
-                    ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700"
+                    ? "bg-status-error/10 border-status-error/30"
                     : ""
                 }`}
                 onClick={() => {
@@ -1968,7 +1968,7 @@ export const ChatInterface: React.FC = () => {
                           title="Copy message"
                         >
                           {copiedMessageId === message.id ? (
-                            <Check className="h-3 w-3 text-green-500" />
+                            <Check className="h-3 w-3 text-status-success" />
                           ) : (
                             <Copy className="h-3 w-3 text-gray-500 dark:text-gray-400" />
                           )}
@@ -2159,7 +2159,7 @@ export const ChatInterface: React.FC = () => {
                       title="Copy message"
                     >
                       {copiedMessageId === message.id ? (
-                        <Check className="h-3 w-3 text-green-500" />
+                        <Check className="h-3 w-3 text-status-success" />
                       ) : (
                         <Copy className="h-3 w-3 text-gray-500 dark:text-gray-400" />
                       )}
@@ -2266,7 +2266,7 @@ export const ChatInterface: React.FC = () => {
                         />
                         <button
                           onClick={() => removeImage(index)}
-                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 w-5 h-5 bg-status-error hover:bg-status-error/90 rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                           aria-label="Remove image"
                         >
                           <X className="h-3 w-3 text-white" />

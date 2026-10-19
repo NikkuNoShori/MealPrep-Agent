@@ -316,7 +316,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
     return (
       <Card>
         <CardContent className="text-center py-12">
-          <p className="text-red-600">
+          <p className="text-status-error">
             Failed to load recipes. Please try again.
           </p>
         </CardContent>

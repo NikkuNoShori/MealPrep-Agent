@@ -59,7 +59,7 @@ export function ReasoningDisplay({ steps, isStreaming }: ReasoningDisplayProps) 
         ) : anyFailed ? (
           <XCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
         ) : (
-          <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+          <CheckCircle className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
         )}
 
         <span className="flex-1 font-medium text-muted-foreground truncate">
@@ -87,7 +87,7 @@ export function ReasoningDisplay({ steps, isStreaming }: ReasoningDisplayProps) 
               ) : step.ok === false ? (
                 <XCircle className="h-3 w-3 text-destructive flex-shrink-0" />
               ) : (
-                <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                <CheckCircle className="h-3 w-3 text-status-success flex-shrink-0" />
               )}
 
               {/* Tool icon + label */}

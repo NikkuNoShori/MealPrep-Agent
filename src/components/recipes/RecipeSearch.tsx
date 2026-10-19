@@ -113,15 +113,15 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
           <Filter className="h-4 w-4 mr-1.5" />
           Filters
           {hasActiveFilters && (
-            <div className="ml-1.5 w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+            <div className="ml-1.5 w-1.5 h-1.5 bg-status-error rounded-full"></div>
           )}
         </Button>
         {hasActiveFilters && (
-          <Button 
+          <Button
             variant="outline"
             size="sm"
             onClick={clearAllFilters}
-            className="h-9 px-4 rounded-lg border border-surface-200 dark:border-white/[0.08] hover:border-red-500 dark:hover:border-red-400 bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+            className="h-9 px-4 rounded-lg border border-surface-200 dark:border-white/[0.08] hover:border-status-error bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm text-status-error hover:text-status-error/80"
           >
             <X className="h-4 w-4 mr-1.5" />
             Clear
@@ -149,11 +149,11 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               </Badge>
             ))}
             {filters.prepTime && (
-              <Badge variant="secondary" className="gap-1.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-0 px-2 py-0.5 rounded-md text-xs">
+              <Badge variant="secondary" className="gap-1.5 bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-200 border-0 px-2 py-0.5 rounded-md text-xs">
                 {PREP_TIME_RANGES.find(r => r.value === filters.prepTime)?.label}
                 <button
                   onClick={() => updateFilter('prepTime', '')}
-                  className="ml-0.5 hover:bg-green-200 dark:hover:bg-green-800 rounded-full p-0.5 transition-colors duration-200"
+                  className="ml-0.5 hover:bg-primary-200 dark:hover:bg-primary-800 rounded-full p-0.5 transition-colors duration-200"
                 >
                   <X className="h-2.5 w-2.5" />
                 </button>
@@ -219,8 +219,8 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               {/* Prep Time */}
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-md flex items-center justify-center">
-                    <Clock className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                  <div className="w-6 h-6 bg-primary-100 dark:bg-primary-900/30 rounded-md flex items-center justify-center">
+                    <Clock className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
                   </div>
                   <h4 className="text-sm font-semibold text-surface-900 dark:text-white">Prep Time</h4>
                 </div>
@@ -231,8 +231,8 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                       variant={filters.prepTime === range.value ? 'default' : 'outline'}
                       className={`cursor-pointer min-w-0 justify-center text-center leading-tight px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         filters.prepTime === range.value
-                          ? 'bg-green-600 hover:bg-green-700 text-white shadow'
-                          : 'border border-surface-300 dark:border-white/[0.18] hover:border-green-500 dark:hover:border-green-400 bg-white dark:bg-white/[0.07]'
+                          ? 'bg-primary-600 hover:bg-primary-700 text-white shadow'
+                          : 'border border-surface-300 dark:border-white/[0.18] hover:border-primary-500 dark:hover:border-primary-400 bg-white dark:bg-white/[0.07]'
                       }`}
                       onClick={() => updateFilter('prepTime', filters.prepTime === range.value ? '' : range.value)}
                     >

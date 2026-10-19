@@ -120,7 +120,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+            <div className="text-sm text-status-error bg-status-error/10 p-3 rounded-md">
               {error}
             </div>
           )}
