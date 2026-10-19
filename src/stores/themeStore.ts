@@ -139,11 +139,22 @@ export interface ThemeState {
   setColorScheme: (schemeName: string) => void
   addColorScheme: (name: string, scheme: ColorScheme) => void
   removeColorScheme: (name: string) => void
-  
-  // Computed values
-  currentTheme: 'light' | 'dark'
-  isDark: boolean
-  isLight: boolean
+}
+
+// Derived values — intentionally NOT stored on ThemeState. Zustand's set()
+// does Object.assign(state, partial) internally, which flattens a `get x()`
+// accessor into a frozen plain value on the very first set() call (MOP-0029
+// qa-auditor finding, 2026-10-11: after the first setTheme()/setSystemTheme(),
+// currentTheme/isDark/isLight stopped updating on every toggle after). Use
+// these as Zustand selectors instead: useThemeStore(selectCurrentTheme).
+export function selectCurrentTheme(state: ThemeState): 'light' | 'dark' {
+  return state.theme === 'system' ? state.systemTheme : state.theme
+}
+export function selectIsDark(state: ThemeState): boolean {
+  return selectCurrentTheme(state) === 'dark'
+}
+export function selectIsLight(state: ThemeState): boolean {
+  return selectCurrentTheme(state) === 'light'
 }
 
 // Default color scheme — warm emerald + amber
@@ -801,20 +812,6 @@ export const useThemeStore = create<ThemeState>()(
         });
       },
 
-      // Computed values
-      get currentTheme() {
-        const { theme, systemTheme } = get();
-        if (theme === "system") return systemTheme;
-        return theme;
-      },
-
-      get isDark() {
-        return get().currentTheme === "dark";
-      },
-
-      get isLight() {
-        return get().currentTheme === "light";
-      },
     }),
     {
       name: "theme-store",
@@ -1022,9 +1019,10 @@ export const initializeTheme = () => {
 
 // Export theme utilities
 export const getThemeColors = () => {
-  const { colorScheme, currentTheme } = useThemeStore.getState()
+  const state = useThemeStore.getState()
+  const currentTheme = selectCurrentTheme(state)
   return {
-    scheme: colorScheme,
+    scheme: state.colorScheme,
     theme: currentTheme,
     isDark: currentTheme === 'dark',
     isLight: currentTheme === 'light',

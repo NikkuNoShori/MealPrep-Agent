@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react'
-import { useThemeStore, initializeTheme, applyColorSchemeToCSS } from '../stores/themeStore'
+import { useThemeStore, initializeTheme, applyColorSchemeToCSS, selectCurrentTheme } from '../stores/themeStore'
 
 interface ThemeProviderProps {
   children: React.ReactNode
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const { colorScheme, currentTheme } = useThemeStore();
+  const { colorScheme } = useThemeStore();
+  const currentTheme = useThemeStore(selectCurrentTheme);
 
   useEffect(() => {
     // Initialize theme system

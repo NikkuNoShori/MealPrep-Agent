@@ -1,11 +1,8 @@
-import { useThemeStore } from '@/stores/themeStore';
+import { useThemeStore, selectCurrentTheme, selectIsDark, selectIsLight } from '@/stores/themeStore';
 
 export const useTheme = () => {
   const {
     theme,
-    currentTheme,
-    isDark,
-    isLight,
     colorScheme,
     availableColorSchemes,
     setTheme,
@@ -13,6 +10,9 @@ export const useTheme = () => {
     addColorScheme,
     removeColorScheme,
   } = useThemeStore();
+  const currentTheme = useThemeStore(selectCurrentTheme);
+  const isDark = useThemeStore(selectIsDark);
+  const isLight = useThemeStore(selectIsLight);
 
   return {
     theme,
