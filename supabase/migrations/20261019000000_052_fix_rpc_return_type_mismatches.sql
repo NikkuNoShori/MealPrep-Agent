@@ -104,8 +104,13 @@ REVOKE ALL ON FUNCTION search_recipes_text(TEXT, UUID, INTEGER) FROM public;
 GRANT EXECUTE ON FUNCTION search_recipes_text(TEXT, UUID, INTEGER) TO authenticated;
 
 -- ── get_shared_with_me: match recipes.title's real type (varchar) ─────────
+-- CREATE OR REPLACE cannot change a function's OUT-parameter types (fails
+-- with 42P13, confirmed against the live database 2026-10-19) -- DROP
+-- FUNCTION first, same pattern migration 050b used for search_recipes_text.
 
-CREATE OR REPLACE FUNCTION get_shared_with_me()
+DROP FUNCTION IF EXISTS get_shared_with_me();
+
+CREATE FUNCTION get_shared_with_me()
 RETURNS TABLE(
   share_id UUID,
   recipe_id UUID,
