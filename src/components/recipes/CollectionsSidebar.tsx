@@ -6,6 +6,8 @@ import {
   useDeleteCollection,
   useUpdateCollection,
   useUnseenShareCount,
+  useDashboardStats,
+  useSharedWithMe,
 } from '@/services/api'
 import {
   BookOpen,
@@ -60,6 +62,8 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
 }) => {
   const { data: collections, isLoading } = useMyCollections()
   const { data: unseenCount = 0 } = useUnseenShareCount()
+  const { data: stats } = useDashboardStats()
+  const { data: sharedWithMe } = useSharedWithMe()
   const createCollection = useCreateCollection()
   const deleteCollection = useDeleteCollection()
   const updateCollection = useUpdateCollection()
@@ -209,12 +213,21 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
     onViewModeChange?.('all')
   }
 
+  const ownCount = stats?.recipeCounts?.ownCount ?? 0
+  const householdCount = stats?.recipeCounts?.householdCount ?? 0
+  const publicCount = stats?.recipeCounts?.publicVisibleCount ?? 0
+  const sharedCount = sharedWithMe?.length ?? 0
+  // "All Recipes" sums the categories below rather than computing a true
+  // deduplicated union (a household recipe can also be public, etc.) — per
+  // user decision 2026-10-18, overlap is acceptable here.
+  const allCount = ownCount + householdCount + publicCount
+
   const feedItems = [
-    { key: 'all' as const, label: 'All Recipes', icon: BookOpen, handler: handleSelectAll, badge: 0 },
-    { key: 'mine' as const, label: 'My Recipes', icon: FolderOpen, handler: handleSelectMine, badge: 0 },
-    { key: 'household' as const, label: 'Household', icon: Home, handler: handleSelectHousehold, badge: 0 },
-    { key: 'shared' as const, label: 'Shared with me', icon: Share2, handler: handleSelectShared, badge: unseenCount as number },
-    { key: 'public' as const, label: 'Public', icon: Globe, handler: handleSelectPublic, badge: 0 },
+    { key: 'all' as const, label: 'All Recipes', icon: BookOpen, handler: handleSelectAll, badge: 0, count: allCount },
+    { key: 'mine' as const, label: 'My Recipes', icon: FolderOpen, handler: handleSelectMine, badge: 0, count: ownCount },
+    { key: 'household' as const, label: 'Household', icon: Home, handler: handleSelectHousehold, badge: 0, count: householdCount },
+    { key: 'shared' as const, label: 'Shared with me', icon: Share2, handler: handleSelectShared, badge: unseenCount as number, count: sharedCount },
+    { key: 'public' as const, label: 'Public', icon: Globe, handler: handleSelectPublic, badge: 0, count: publicCount },
   ]
 
   return (
@@ -239,13 +252,17 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             >
               <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
               <span className="truncate flex-1 text-left">{item.label}</span>
-              {item.badge > 0 && (
+              {item.badge > 0 ? (
                 <span className="shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary-500 text-white text-[10px] font-semibold px-1">
                   {item.badge > 99 ? '99+' : item.badge}
                 </span>
-              )}
+              ) : item.count > 0 ? (
+                <span className="shrink-0 text-[11px] tabular-nums text-surface-400 dark:text-surface-500">
+                  {item.count > 999 ? '999+' : item.count}
+                </span>
+              ) : null}
               {isActive && item.badge === 0 && (
-                <div className="ml-auto w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400" />
+                <div className="w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400" />
               )}
             </button>
           )
