@@ -19,7 +19,6 @@ import {
   Trash2,
   Check,
   X,
-  Lock,
   Home,
   Globe,
   Pencil,
@@ -46,12 +45,6 @@ const visibilityLabels: Record<string, string> = {
   private: 'Private',
   household: 'Household',
   public: 'Public',
-}
-
-const visibilityIcons: Record<string, React.ElementType> = {
-  private: Lock,
-  household: Home,
-  public: Globe,
 }
 
 export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
@@ -334,7 +327,6 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
             const Icon = iconMap[collection.icon] || FolderOpen
             const isActive = viewMode === 'collection' && selectedCollectionId === collection.id
             const isDefault = collection.name === 'Favorites'
-            const VisIcon = visibilityIcons[collection.visibility || 'private'] || Lock
             const isEditing = editingId === collection.id
             const isMenuOpen = openMenuId === collection.id
 
@@ -389,7 +381,6 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                       {collection.recipeCount > 999 ? '999+' : collection.recipeCount}
                     </span>
                   )}
-                  <VisIcon className="h-3 w-3 shrink-0 text-surface-300 dark:text-surface-600" />
                 </button>
 
                 {/* Ellipsis menu trigger */}
