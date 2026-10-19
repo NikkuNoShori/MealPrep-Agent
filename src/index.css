@@ -44,10 +44,17 @@
     --ring: 158 70% 37%;
     --radius: 0.75rem;
 
-    /* Status tokens (MOP-0029 Phase 3) — fallbacks match
-       hexToHSL(defaultColorScheme.semantic.{success,warning}[800]). */
-    --status-success: 143 64% 24%;
-    --status-warning: 23 83% 31%;
+    /* Status tokens (MOP-0029 Phase 3; dark-mode-tuned values + error/info
+       added 2026-10-18 per COLOR_SCHEMA.md §5 — the four status roles are
+       success/error/warning/info, "No others without amending this doc").
+       Light values match the MOP-0029 approved palette spec (hexToHSL of
+       #178c66/#b45309/#dc2626/#2563eb). --status-error intentionally equals
+       --destructive (COLOR_SCHEMA.md §5 rule 1: destructive is the L2 alias
+       for error, not a separate color). */
+    --status-success: 161 72% 32%;
+    --status-warning: 26 90% 37%;
+    --status-error: 0 72% 51%;
+    --status-info: 221 83% 53%;
 
     /* Design system tokens.
        MOP-0029 Phase 4: --rs-border / --rs-border-subtle / --rs-search-bg
@@ -256,10 +263,18 @@
     --border: 240 4% 16%;
     --input: 240 4% 16%;
 
-    /* Status tokens (MOP-0029 Phase 3) — dark fallback, same seed as :root
-       (applyColorSchemeToCSS does not vary success/warning shades by mode). */
-    --status-success: 143 64% 24%;
-    --status-warning: 23 83% 31%;
+    /* Status tokens, dark-mode-tuned (2026-10-18). The old values here were
+       byte-identical to :root's light values — a color tuned for a light
+       background reads as washed-out/near-invisible against a dark one.
+       Same +12 saturation / lifted-lightness treatment already used for
+       --destructive's light->dark jump (0 72% 51% -> 0 84% 60%), applied to
+       success/warning/info so all four land in a similar readable-on-dark
+       55-65% lightness band. --status-error matches --destructive exactly,
+       same rule as the light block above. */
+    --status-success: 161 84% 55%;
+    --status-warning: 26 95% 55%;
+    --status-error: 0 84% 60%;
+    --status-info: 221 95% 65%;
     --ring: 160 67% 70%;
 
     /* Design system tokens — dark.

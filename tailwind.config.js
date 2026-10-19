@@ -59,15 +59,18 @@ export default {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
-        // Status roles (MOP-0029 Phase 3) — wires the previously-dead
-        // --success-*/--warning-*/--error-* vars to Tailwind utilities so
-        // they are no longer set-but-unconsumed. `error` aliases `destructive`
-        // since ColorScheme.semantic.error is the single source of truth for
-        // both (COLOR_SCHEMA.md §5).
+        // Status roles (MOP-0029 Phase 3; error + info added 2026-10-18) —
+        // wires the four COLOR_SCHEMA.md §5 status roles to Tailwind
+        // utilities. `error` equals `destructive`'s value (both ultimately
+        // derive from ColorScheme.semantic.error, the single source of
+        // truth for both — COLOR_SCHEMA.md §5 rule 1) but is its own CSS
+        // var so it can be referenced without borrowing the shadcn-specific
+        // destructive name in non-shadcn status UI (alerts, toasts, badges).
         status: {
           success: 'hsl(var(--status-success))',
           warning: 'hsl(var(--status-warning))',
-          error: 'hsl(var(--destructive))',
+          error: 'hsl(var(--status-error))',
+          info: 'hsl(var(--status-info))',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

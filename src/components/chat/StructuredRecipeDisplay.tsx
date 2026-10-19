@@ -882,14 +882,14 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
 
         {/* ── Phase 1 Prompt: Duplicate title found ── */}
         {savePhase === "duplicate_found" && (
-          <div className="border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg p-3 space-y-2">
+          <div className="border border-status-warning/40 bg-status-warning/10 rounded-lg p-3 space-y-2">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-status-warning mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <p className="font-medium text-yellow-800 dark:text-yellow-200">
+                <p className="font-medium text-status-warning">
                   Duplicate recipe name
                 </p>
-                <p className="text-yellow-700 dark:text-yellow-300 mt-0.5">
+                <p className="text-status-warning/90 mt-0.5">
                   A recipe named "{saveTitle}" already exists in your collection.
                 </p>
               </div>
@@ -913,14 +913,14 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
 
         {/* ── Phase 1b: Confirm overwrite ── */}
         {savePhase === "confirm_overwrite" && (
-          <div className="border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 rounded-lg p-3 space-y-2">
+          <div className="border border-status-error/40 bg-status-error/10 rounded-lg p-3 space-y-2">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-status-error mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <p className="font-medium text-red-800 dark:text-red-200">
+                <p className="font-medium text-status-error">
                   Confirm overwrite
                 </p>
-                <p className="text-red-700 dark:text-red-300 mt-0.5">
+                <p className="text-status-error/90 mt-0.5">
                   This will replace your existing "{saveTitle}" recipe. This action cannot be undone.
                 </p>
               </div>
@@ -939,21 +939,21 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
 
         {/* ── Phase 2 Prompt: Similar recipes found ── */}
         {savePhase === "similar_found" && similarRecipes.length > 0 && (
-          <div className="border border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/30 rounded-lg p-3 space-y-2">
+          <div className="border border-status-info/40 bg-status-info/10 rounded-lg p-3 space-y-2">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-primary-500 dark:text-primary-400 mt-0.5 flex-shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-status-info mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <p className="font-medium text-primary-800 dark:text-primary-200">
+                <p className="font-medium text-status-info">
                   Similar recipes detected
                 </p>
-                <p className="text-primary-700 dark:text-primary-300 mt-0.5">
+                <p className="text-status-info/90 mt-0.5">
                   We found recipes in your collection that look similar:
                 </p>
                 <ul className="mt-1.5 space-y-1">
                   {similarRecipes.map((match) => (
-                    <li key={match.id} className="text-primary-700 dark:text-primary-300">
+                    <li key={match.id} className="text-status-info/90">
                       <span className="font-medium">{match.title}</span>
-                      <span className="text-primary-500 dark:text-primary-400 ml-1.5">
+                      <span className="text-status-info/70 ml-1.5">
                         ({Math.round(match.similarity * 100)}% similar)
                       </span>
                     </li>
@@ -990,7 +990,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           >
             {isSaved ? (
               <>
-                <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                <CheckCircle2 className="h-4 w-4 mr-2 text-status-success" />
                 Saved
               </>
             ) : isBusy ? (
