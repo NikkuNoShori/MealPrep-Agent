@@ -335,13 +335,31 @@
     --secondary-800: #92400e;
     --secondary-900: #78350f;
 
+    /* gray-500/600 lightened 2026-10-19 — like surface-400/500 (see comment
+       above), these were byte-identical to :root's light values, so a color
+       tuned for a light background measured 3.40-3.71 (500) and ~2.37 (600)
+       contrast against this app's actual dark surfaces, failing WCAG AA.
+       gray-400 was already light enough (7.06/6.47) and is unchanged.
+       gray-700/800/900 are not used as dark-mode text anywhere (confirmed
+       via grep) and are also left unchanged.
+       KNOWN INCOMPLETE: this is the static pre-JS fallback only — it fixes
+       the brief flash before hydration but NOT the steady-state color,
+       because applyColorSchemeToCSS() (themeStore.ts) writes --gray-* from
+       ColorScheme.neutral with ZERO light/dark branching (unlike `surface`,
+       which has its own neutral.dark-equivalent ramp and an isDark branch).
+       `neutral` never got that treatment, so JS always overwrites this
+       fallback with the light-mode value on every page load, regardless of
+       theme. Properly fixing this needs a neutral.dark ramp added to the
+       ColorScheme type + all 5 presets + an isDark branch in
+       applyColorSchemeToCSS, mirroring the surface pattern — scoped as a
+       follow-up MOP, not done here. See docs/handoffs for the write-up. */
     --gray-50: #f9fafb;
     --gray-100: #f3f4f6;
     --gray-200: #e5e7eb;
     --gray-300: #d1d5db;
     --gray-400: #9ca3af;
-    --gray-500: #6b7280;
-    --gray-600: #4b5563;
+    --gray-500: #9199a8;
+    --gray-600: #838a99;
     --gray-700: #374151;
     --gray-800: #1f2937;
     --gray-900: #111827;
