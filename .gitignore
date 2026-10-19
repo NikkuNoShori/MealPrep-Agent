@@ -94,6 +94,10 @@ logs
 *.swo
 *~
 
+# Claude Code local settings (per-machine permission allowlist, etc.)
+# .claude/settings.json (shared project config) stays tracked.
+.claude/settings.local.json
+
 # OS generated files
 .DS_Store
 .DS_Store?
