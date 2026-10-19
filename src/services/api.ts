@@ -1894,13 +1894,19 @@ class ApiClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    // PostgREST embedded-resource count: each row gets collection_recipes
+    // as [{ count: N }] instead of the full joined rows.
     const { data, error } = await supabase.from("recipe_collections")
-      .select("*")
+      .select("*, collection_recipes(count)")
       .eq("user_id", user.id)
       .order("sort_order", { ascending: true });
 
     if (error) throw error;
-    return (data || []).map((c: any) => snakeToCamel(c));
+    return (data || []).map((c: any) => {
+      const recipeCount = c.collection_recipes?.[0]?.count ?? 0;
+      const { collection_recipes: _collection_recipes, ...rest } = c;
+      return { ...snakeToCamel(rest), recipeCount };
+    });
   }
 
   async getCollection(collectionId: string) {

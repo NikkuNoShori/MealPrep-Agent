@@ -720,8 +720,47 @@ describe('apiClient.getMyCollections', () => {
         icon: null,
         sortOrder: 0,
         createdAt: '2026-04-01T00:00:00Z',
+        recipeCount: 0,
       },
     ]);
+  });
+
+  it('extracts recipeCount from the PostgREST embedded collection_recipes(count) resource', async () => {
+    mockCurrentUser({ id: 'u-current' });
+    server.use(
+      supabaseSelect('recipe_collections', [
+        {
+          id: 'c-1',
+          user_id: 'u-current',
+          name: 'Weeknight Dinners',
+          description: null,
+          icon: null,
+          sort_order: 0,
+          created_at: '2026-04-01T00:00:00Z',
+          collection_recipes: [{ count: 7 }],
+        },
+        {
+          id: 'c-2',
+          user_id: 'u-current',
+          name: 'Empty Collection',
+          description: null,
+          icon: null,
+          sort_order: 1,
+          created_at: '2026-04-02T00:00:00Z',
+          collection_recipes: [{ count: 0 }],
+        },
+      ])
+    );
+
+    const result = await apiClient.getMyCollections();
+
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'c-1', recipeCount: 7 }),
+      expect.objectContaining({ id: 'c-2', recipeCount: 0 }),
+    ]);
+    // The raw embedded-resource field must not leak into the mapped result.
+    expect(result[0]).not.toHaveProperty('collectionRecipes');
+    expect(result[0]).not.toHaveProperty('collection_recipes');
   });
 
   it('throws when the query errors', async () => {

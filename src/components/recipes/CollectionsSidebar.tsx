@@ -8,6 +8,7 @@ import {
   useUnseenShareCount,
   useDashboardStats,
   useSharedWithMe,
+  useHouseholdRecipes,
 } from '@/services/api'
 import {
   BookOpen,
@@ -64,6 +65,7 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
   const { data: unseenCount = 0 } = useUnseenShareCount()
   const { data: stats } = useDashboardStats()
   const { data: sharedWithMe } = useSharedWithMe()
+  const { data: householdRecipesData } = useHouseholdRecipes({ limit: 1 })
   const createCollection = useCreateCollection()
   const deleteCollection = useDeleteCollection()
   const updateCollection = useUpdateCollection()
@@ -214,7 +216,12 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
   }
 
   const ownCount = stats?.recipeCounts?.ownCount ?? 0
-  const householdCount = stats?.recipeCounts?.householdCount ?? 0
+  // Not stats.recipeCounts.householdCount -- that field excludes the
+  // current user's own household-visible recipes (by design, for the
+  // Dashboard KPI strip's "other members'" framing). This nav item shows
+  // ALL household-visible recipes including the user's own, so it needs
+  // get_household_recipes()'s own total instead.
+  const householdCount = (householdRecipesData as any)?.total ?? 0
   const publicCount = stats?.recipeCounts?.publicVisibleCount ?? 0
   const sharedCount = sharedWithMe?.length ?? 0
   // "All Recipes" sums the categories below rather than computing a true
@@ -261,9 +268,6 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                   {item.count > 999 ? '999+' : item.count}
                 </span>
               ) : null}
-              {isActive && item.badge === 0 && (
-                <div className="w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400" />
-              )}
             </button>
           )
         })}
@@ -380,10 +384,12 @@ export const CollectionsSidebar: React.FC<CollectionsSidebarProps> = ({
                 >
                   <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`} />
                   <span className="truncate flex-1 text-left">{collection.name}</span>
-                  <VisIcon className="h-3 w-3 shrink-0 text-surface-300 dark:text-surface-600" />
-                  {isActive && (
-                    <div className="w-1 h-1 rounded-full bg-primary-500 dark:bg-primary-400 shrink-0" />
+                  {collection.recipeCount > 0 && (
+                    <span className="shrink-0 text-[11px] tabular-nums text-surface-400 dark:text-surface-500">
+                      {collection.recipeCount > 999 ? '999+' : collection.recipeCount}
+                    </span>
                   )}
+                  <VisIcon className="h-3 w-3 shrink-0 text-surface-300 dark:text-surface-600" />
                 </button>
 
                 {/* Ellipsis menu trigger */}
