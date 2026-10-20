@@ -1,12 +1,13 @@
 /**
  * MOP-0007 Phase 4 — "Suggest meals for this week" modal
  *
- * Opens from the Meal Planner header. Calls get_recipe_recommendations with
- * optional filters (difficulty, max prep time, tags) and lets the user
- * assign the suggested recipes to empty slots in the current plan.
+ * Opens from the Meal Planner header. Calls get_recipe_recommendations
+ * (no filters — ranked purely by rating/reaction/recency signal, per user
+ * request 2026-10-19: "I don't want those options, I just want to click
+ * the randomizer and it give me a recipe") and lets the user assign the
+ * suggested recipes to empty slots in the current plan.
  *
  * Design:
- *  - Two-step UX: (1) filter preferences → (2) scored results
  *  - "Fill empty slots" shortcut assigns the top N suggestions to unfilled
  *    dinner slots (or whichever slot the user picks) in one click
  *  - Individual cards can be clicked to assign to a specific slot via the
@@ -32,15 +33,6 @@ interface SuggestWeekModalProps {
    */
   excludeRecipeIds?: Set<string>
 }
-
-type Difficulty = 'easy' | 'medium' | 'hard' | ''
-const PREP_OPTIONS = [
-  { label: 'Any', value: undefined },
-  { label: '≤ 15 min', value: 15 },
-  { label: '≤ 30 min', value: 30 },
-  { label: '≤ 45 min', value: 45 },
-  { label: '≤ 60 min', value: 60 },
-]
 
 const difficultyLabel: Record<string, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
 const difficultyColor: Record<string, string> = {
@@ -76,16 +68,13 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
   emptySlotCount,
   excludeRecipeIds,
 }) => {
-  const [difficulty, setDifficulty] = useState<Difficulty>('')
-  const [maxPrep, setMaxPrep] = useState<number | undefined>(undefined)
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
 
   // Fetch extra to compensate for excluded recipes — if 5 might be excluded, ask for 15
   const fetchLimit = excludeRecipeIds && excludeRecipeIds.size > 0 ? 20 : 10
 
+  // No filters — ranked by the RPC's rating/reaction/recency signal only.
   const { data: rawSuggestions = [], isLoading } = useGetRecipeRecommendations({
-    preferenceDifficulty: difficulty || undefined,
-    maxPrepTimeMinutes: maxPrep,
     limit: fetchLimit,
   })
 
@@ -140,47 +129,13 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="px-5 py-3 border-b border-surface-100 dark:border-white/[0.06] flex-shrink-0">
-          {excludedCount > 0 && (
-            <p className="text-[10px] text-surface-400 dark:text-surface-500 mb-2">
+        {excludedCount > 0 && (
+          <div className="px-5 py-2 border-b border-surface-100 dark:border-white/[0.06] flex-shrink-0">
+            <p className="text-[10px] text-surface-400 dark:text-surface-500">
               {excludedCount} recipe{excludedCount !== 1 ? 's' : ''} from your last plan hidden to keep things fresh
             </p>
-          )}
-          <div className="flex flex-wrap gap-2 items-center">
-            {/* Difficulty */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-surface-500 dark:text-surface-400">Difficulty:</span>
-              {(['', 'easy', 'medium', 'hard'] as Difficulty[]).map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDifficulty(d)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                    difficulty === d
-                      ? 'bg-primary-500 text-white shadow-sm'
-                      : 'bg-surface-100 dark:bg-white/[0.05] text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-white/[0.08]'
-                  }`}
-                >
-                  {d === '' ? 'Any' : difficultyLabel[d]}
-                </button>
-              ))}
-            </div>
-
-            {/* Prep time */}
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-surface-400" />
-              <select
-                value={maxPrep ?? ''}
-                onChange={e => setMaxPrep(e.target.value ? Number(e.target.value) : undefined)}
-                className="text-xs rounded-lg border border-surface-200 dark:border-white/[0.08] bg-surface-50 dark:bg-white/[0.04] text-surface-700 dark:text-surface-300 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              >
-                {PREP_OPTIONS.map(o => (
-                  <option key={o.label} value={o.value ?? ''}>{o.label}</option>
-                ))}
-              </select>
-            </div>
           </div>
-        </div>
+        )}
 
         {/* Results */}
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
@@ -193,7 +148,7 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
             <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
               <ChefHat className="h-8 w-8 text-surface-300 dark:text-surface-600" />
               <p className="text-sm text-surface-500 dark:text-surface-400">
-                No recipes match those filters.<br />Try relaxing the difficulty or prep time.
+                No recipes to suggest right now.<br />Add some recipes to your library first.
               </p>
             </div>
           ) : (

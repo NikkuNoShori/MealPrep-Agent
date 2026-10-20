@@ -814,6 +814,48 @@ const MealPlanner = () => {
     );
   };
 
+  // ── Day-level randomizer — fills all 3 daily slots (breakfast/lunch/dinner)
+  // in one click. User request 2026-10-19: "I would like the randomizer to
+  // be at the daily level to generate all 3 of the meals for that day."
+  // Reuses selectRandomMeals's existing multi-slot support — maxRepeat:1
+  // (its default) means the 3 picks won't repeat the same recipe unless the
+  // library is smaller than 3 recipes.
+  const handleRandomizeDay = (dateStr: string) => {
+    if (!activePlan) {
+      toast.error('No active plan — select a plan first');
+      return;
+    }
+    if (!recipesLight?.length) {
+      toast.error('No recipes in your library yet');
+      return;
+    }
+    const pool: RandomizerPoolRecipe[] = recipesLight.map(r => ({
+      id: r.id,
+      title: r.title,
+      tags: r.tags ?? [],
+      visibility: (r.visibility as any) ?? 'private',
+    }));
+    const slotTargets = DAILY_SLOTS.map(slot => ({ dateStr, slotKey: slot.key as MealSlot }));
+    const assignments = selectRandomMeals(pool, slotTargets);
+    if (!assignments.length) {
+      toast.error('No eligible recipes after allergy filtering');
+      return;
+    }
+    const currentMeals = { ...(weekPlan.meals || {}) };
+    const dayMeals: any = { ...(currentMeals[dateStr] || {}) };
+    for (const assignment of assignments) {
+      dayMeals[assignment.slotKey] = [...(dayMeals[assignment.slotKey] || []), toPlanEntry(assignment.recipe)];
+    }
+    currentMeals[dateStr] = dayMeals;
+    updateMealPlan.mutate(
+      { id: weekPlan.id, data: { meals: currentMeals } },
+      {
+        onSuccess: () => toast.success(`Added ${assignments.length} meal${assignments.length !== 1 ? 's' : ''}`),
+        onError: (err: any) => toast.error(err?.message || 'Failed to add meals'),
+      }
+    );
+  };
+
   const weekLabel = weekDates.length >= 7
     ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
     : weekDates.length
@@ -1060,7 +1102,7 @@ const MealPlanner = () => {
                               className="flex-shrink-0 w-[82%] sm:w-[45%] md:w-auto snap-center md:snap-align-none"
                             >
                               {/* Day header */}
-                              <div className="text-center pb-1">
+                              <div className="relative text-center pb-1">
                                 <p className="text-xs font-medium text-surface-400 dark:text-gray-500 uppercase tracking-widest">
                                   {DAYS_SHORT[i]}
                                 </p>
@@ -1071,6 +1113,13 @@ const MealPlanner = () => {
                                 }`}>
                                   {date.getDate()}
                                 </p>
+                                <button
+                                  className="absolute top-0 right-0 p-1 rounded-lg text-surface-300 dark:text-gray-600 hover:text-primary-500 hover:bg-primary-500/[0.08] transition-colors"
+                                  onClick={() => handleRandomizeDay(dateStr)}
+                                  title="Randomize all 3 meals for this day"
+                                >
+                                  <Shuffle className="h-3 w-3" />
+                                </button>
                               </div>
 
                               <div
