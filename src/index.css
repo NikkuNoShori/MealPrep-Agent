@@ -468,11 +468,33 @@
     --btn-secondary-border-hover: rgba(255, 255, 255, 0.14);
   }
 
+  /* height:100% on html resolves against the browser's own viewport
+     sizing, which has proven unreliable on real mobile engines (confirmed
+     live 2026-10-19 on iOS Safari and Chrome on a Galaxy S26 Ultra — the
+     chat composer rendered fully missing below the fold, while 100svh on
+     the Layout div further down the tree had no effect, and desktop
+     Chrome device emulation never reproduced it at all). Setting svh
+     directly at the root removes the %-based indirection instead of
+     trusting it to agree with the viewport-unit-based sizing used deeper
+     in the tree. svh (small viewport height, floor value — never larger
+     than what's actually visible) needs no settle/recalculation, unlike
+     dvh. The @supports guard is required, not stylistic: CSS minifiers
+     collapse repeated `height:` declarations down to the last one
+     unconditionally (confirmed in this project's own build output), which
+     would silently delete the height:100% fallback for browsers that
+     don't support svh — @supports branches survive minification as
+     distinct rules instead of competing declarations. */
   html, body, #root {
     height: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;
+  }
+
+  @supports (height: 100svh) {
+    html, body, #root {
+      height: 100svh;
+    }
   }
 
   html {

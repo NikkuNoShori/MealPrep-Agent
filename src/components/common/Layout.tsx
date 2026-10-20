@@ -19,23 +19,17 @@ const Layout: React.FC<LayoutProps> = ({ children, hideFooter }) => {
 
   return (
     <MeasurementSystemProvider>
-      {/* h-screen (100vh) is sized against the mobile browser's largest
-          possible viewport (address bar collapsed), not what's actually
-          visible — on phones that pushes content below the real fold with
-          no way to scroll back to it (confirmed: Chat's composer/input box
-          was invisible below the fold on mobile).
-          100dvh (dynamic) was tried first but recomputes on a timer as the
-          browser chrome animates — confirmed live on Chrome Android: on
-          first load it briefly used the larger pre-settle value, clipping
-          the composer until a tap/scroll forced a reflow. 100svh (small
-          viewport height) is the browser's chrome-fully-expanded size, so
-          it's never larger than what's actually visible on first paint —
-          no recalculation race, at the cost of a few px of unused space
-          once the address bar auto-hides (harmless here since <main>
-          scrolls independently). Tailwind's h-svh/h-dvh utilities need
-          v3.4+; this project is pinned to 3.3.3, so it's spelled out as an
-          arbitrary value instead. */}
-      <div className="h-screen h-[100svh] flex flex-col bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))]">
+      {/* h-full (100%) — the actual viewport-unit fix now lives on
+          html/body/#root in index.css (set to 100svh directly at the
+          root), since relying on viewport units only at this level while
+          html/body stayed on a %-based height created two independent
+          height sources that could disagree on real mobile engines
+          (confirmed live 2026-10-19: both 100dvh and 100svh here, with
+          html/body still on height:100%, left the chat composer fully
+          missing on iOS Safari and Chrome on a Galaxy S26 Ultra, despite
+          working in desktop Chrome's device emulation). With the root
+          chain fixed, this div just inherits via percentage. */}
+      <div className="h-full flex flex-col bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))]">
         <Header />
         <main className="flex-1 min-h-0 overflow-y-auto relative z-10">{children}</main>
         {!hideFooter && <Footer />}

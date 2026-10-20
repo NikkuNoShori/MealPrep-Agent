@@ -2223,8 +2223,17 @@ export const ChatInterface: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
-        <div className="border-t p-4 flex-shrink-0">
+        {/* Input Area.
+            pb-[max(1rem,env(safe-area-inset-bottom))] — on some mobile
+            Chrome devices the composer still rendered flush against (or
+            just past) the visible edge on first load even with 100svh,
+            and only snapped into place once the keyboard's focus-driven
+            viewport resize forced a relayout (confirmed live 2026-10-19:
+            scrolling didn't fix it, only tapping the input did). Extra
+            bottom breathing room plus the iOS/Android safe-area inset
+            guards against the browser's own UI chrome overlapping the
+            last few px of content regardless of root cause. */}
+        <div className="border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex-shrink-0">
           {/* MOP-0019 — Batch Import Panel (drawer above input).
               Rendered but hidden (display:none) when closed so card state
               survives panel open/close — the user can reopen and review results. */}
