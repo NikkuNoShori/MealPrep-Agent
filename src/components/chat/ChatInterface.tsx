@@ -1654,10 +1654,14 @@ export const ChatInterface: React.FC = () => {
           instead of squeezing it down to a sliver. */}
       <div
         ref={sidebarRef}
-        className={`bg-surface-100 dark:bg-white/[0.03] border-r border-surface-200/60 dark:border-white/[0.06] flex flex-col min-h-0 transition-all duration-200 ease-in-out ${
+        className={`border-r border-surface-200/60 dark:border-white/[0.06] flex flex-col min-h-0 transition-all duration-200 ease-in-out ${
           isMobile
-            ? `absolute inset-y-0 left-0 z-40 shadow-xl ${isSidebarCollapsed ? "-translate-x-full" : "translate-x-0"}`
-            : `relative ${isSidebarCollapsed ? "overflow-hidden" : ""}`
+            ? // Mobile: floats over the chat as an overlay drawer, so it needs
+              // a fully opaque background — the desktop inline column's
+              // near-transparent white/[0.03] tint left chat/recipe content
+              // visibly bleeding through underneath it here.
+              `absolute inset-y-0 left-0 z-40 shadow-xl bg-white dark:bg-[var(--rs-bg)] ${isSidebarCollapsed ? "-translate-x-full" : "translate-x-0"}`
+            : `relative bg-surface-100 dark:bg-white/[0.03] ${isSidebarCollapsed ? "overflow-hidden" : ""}`
         }`}
         style={{
           width: isMobile ? "min(85vw, 320px)" : isSidebarCollapsed ? "0px" : `${sidebarWidth}px`,
@@ -1949,8 +1953,13 @@ export const ChatInterface: React.FC = () => {
                     )}
                   </div>
                 ) : (message.recipe || message.recipes) && message.sender === "ai" ? (
-                  // Full-width recipe display (single or multi)
-                  <div className="flex-1">
+                  // Full-width recipe display (single or multi).
+                  // min-w-0 overrides flex's default min-width:auto — without
+                  // it, unshrinkable content inside the card (badge rows,
+                  // ingredient rows) forces this flex item wider than the
+                  // viewport instead of wrapping, pushing the Save button and
+                  // right-side content off-screen on mobile.
+                  <div className="flex-1 min-w-0">
                     {/* MOP-0020 — tool step summary on finished recipe messages */}
                     {message.toolSteps && message.toolSteps.length > 0 && (
                       <div className="mb-2 max-w-[90%] sm:max-w-[70%]">
