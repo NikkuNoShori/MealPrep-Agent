@@ -36,11 +36,13 @@ Supabase Edge Functions are deployed separately and run on Deno (not Node).
 
 **RAG search:** User query → ada-002 embedding → hybrid semantic (cosine similarity) + full-text PostgreSQL search → deduplicated results as LLM context.
 
-**Layout pattern (sealed height chain):** `html/body/#root` all `height:100%; overflow:hidden`. Layout component fills viewport with `h-screen flex flex-col`. The `<main>` element is the single scroll container (`flex-1 min-h-0 overflow-y-auto`). Pages render content directly — never add wrapper scroll divs. Chat page is an exception: uses `absolute inset-0 overflow-hidden` for its own scroll management.
+**Layout pattern (sealed height chain):** `html/body/#root` all `height:100%; overflow:hidden`. Layout component fills viewport with `h-screen flex flex-col`. The `<main>` element is the single scroll container (`flex-1 min-h-0 overflow-y-auto`). Pages render content directly — never add wrapper scroll divs. Chat page is an exception: uses `absolute inset-0 overflow-hidden` for its own scroll management. `LandingPage` (the public `/` route) renders outside `Layout`, so it owns an `h-full overflow-y-auto` root.
 
 ## Key Rules
 
 - Do not add `min-h-screen` to page roots (breaks sealed height chain, causes double scrollbars)
+- **Text color uses only the contrast-contract tokens:** `text-fg`, `text-fg-secondary`, `text-fg-muted`, `text-fg-faint` (icons only), `text-brand`, `text-primary-foreground` (on `bg-primary`). Never `text-surface-*`, `text-gray-*` or `text-muted-foreground` (rule G9) — those ramps are not contrast-validated. No `dark:` partner on `fg`/`brand` tokens (they swap per mode). See `docs/COLOR_SCHEMA.md` §4a
+- Run `npm run audit:contrast` (rendered-pixel WCAG audit of the real app) before shipping palette or UI-wide color changes
 - Use `src/services/api.ts` for all HTTP calls — never call APIs directly from components
 - Edge functions handle all LLM/AI work — no AI calls from the frontend except through edge functions
 - All database tables use RLS (Row Level Security)

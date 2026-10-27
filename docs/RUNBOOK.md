@@ -436,8 +436,52 @@ grep -rn 'min-h-screen' src/pages/
 3. Remove any `h-full overflow-y-auto` wrapper divs from page components — pages should render content directly
 4. Remove `min-h-screen` from page root elements
 5. Chat.tsx must use `absolute inset-0 overflow-hidden` to opt out of main's scroll
+6. Pages rendered **outside** `Layout` (currently only `LandingPage`, the public `/` route) have no `<main overflow-y-auto>` above them and html/body/#root are `overflow: hidden`, so they **must** own a `h-full overflow-y-auto` root — without it their content is silently clipped instead of scrolling
 
 **Added:** 2026-03-11
+
+---
+
+## Theme: Text or icons unreadable (low contrast), or a palette fix "doesn't show up"
+
+### Symptom
+- Grey-on-grey text, near-invisible labels, white text on a bright brand button/badge, dimmed chat timestamps
+- Only in one preset (Forest/Ocean/Sunset/Botanical) or only in light/dark mode
+- A palette or contrast fix is deployed but some users still see the old colors
+
+### Likely causes
+- Text coloured with a **background-depth ramp** (`text-surface-*`, `text-gray-*`, `text-stone-*`) or `text-muted-foreground`. Those ramps are not contrast-validated against what sits behind the text (COLOR_SCHEMA.md §4) — use `text-fg` / `-secondary` / `-muted` / `text-brand`
+- A solid fill that changes per mode carrying a fixed text colour (`bg-primary-500 dark:bg-primary-400` + `text-white`) — use `bg-primary text-primary-foreground`
+- `opacity-60/70` on text or icons (dims below AA)
+- Raw palette text (`text-amber-500`, `text-teal-500`) on a light surface — needs a 700 shade in light mode and a 400 in dark
+- **Stale persisted theme (themeStore < v3):** the whole `ColorScheme` object was saved in `localStorage["theme-store"]`, so a browser kept the palette it had when it first saved settings and ignored later code fixes. v3+ persists only `{ theme, colorSchemeName }`
+
+### Verification steps
+```bash
+# 1. Contract test — every preset x mode, tiers + brand + computed foregrounds
+npx vitest run --project unit src/stores/__tests__/themeStore.contrast.test.ts
+
+# 2. Rendered-pixel audit of the real app (mocked backend; start `npm run dev` first)
+npm run audit:contrast -- --presets=Evergreen --modes=light,dark
+node scripts/contrast-audit/report.cjs scripts/contrast-audit/out/results.json anc 40
+
+# 3. Click-through audit of menus / modals / popovers
+npm run audit:contrast -- --phase=explore --presets=Evergreen
+
+# 4. Governance: no new text-surface/gray/stone/muted-foreground (G9)
+npm run lint:color
+
+# 5. In the browser: confirm the persisted theme is the v3 shape
+#    DevTools > Application > Local Storage > theme-store  ->  {"state":{"theme":"..","colorSchemeName":".."},"version":3}
+```
+
+### Fix steps
+1. Replace the offending text utilities with the contract tokens (see COLOR_SCHEMA.md §4a). Do **not** add a `dark:` partner to `text-fg*`/`text-brand` — they swap per mode
+2. If a preset's palette itself fails, fix the values in `src/stores/themeStore.ts` (`ColorScheme.fg` / `.brand` / `.primary`) and the Evergreen fallbacks in `src/index.css`; the contract test must pass — never loosen its thresholds
+3. A user still seeing old colors: clear `localStorage["theme-store"]` (or just reload once on a build with themeStore v3 — it migrates automatically)
+4. Re-run the audit; the bar is **zero failing class groups**
+
+**Added:** 2026-10-20
 
 ---
 

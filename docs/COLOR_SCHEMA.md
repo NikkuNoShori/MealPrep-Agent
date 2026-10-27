@@ -4,7 +4,7 @@
 
 **Publisher:** Nick Neal
 **Created:** 2026-09-21
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-20
 **Status:** normative — ADR-0006 accepted, MOP-0029 complete
 **Governing ADR:** [ADR-0006](DECISIONS/ADR-0006-theme-token-layering-and-preset-scope.md)
 **Implementing MOP:** [MOP-0029](MOPs/MOP-0029-theme-token-layering-surface-presets.md)
@@ -52,7 +52,7 @@ Thirteen categories. **Every color decision in this app belongs to exactly one.*
 | 3 | **Header / chrome surface** | `--chrome-bg` | `TARGET` | Nav, header, footer, sidebar — **structurally distinct from cards**; currently undifferentiated |
 | 4 | **Widget / section headers** | `--surface-header-bg`, `--surface-header-border` | `TARGET` | Requires a shared `SectionHeader` primitive; ~58 ad hoc instances today |
 | 5 | **Borders / dividers / rings** | `--surface-300` / `--surface-400` | `TARGET` | Includes focus rings |
-| 6 | **Text** | `--gray-*` ramp | partial | Both sides of a light/dark pair must come from the same system |
+| 6 | **Text** | `--fg-*-rgb` / `--brand-rgb` (`text-fg`, `text-fg-secondary`, `text-fg-muted`, `text-fg-faint`, `text-brand`) | `NORMATIVE NOW` | Contrast-guaranteed per preset and mode — see §4a. `surface-*` / `gray-*` are **never** text colors |
 | 7 | **Brand accents** | `--primary-*`, `--secondary-*` | done | Already preset-driven |
 | 8 | **Status / semantic** | `status.{success,error,warning,info}` | `TARGET` | Single source of truth; see §5 |
 | 9 | **Accent categories** | `--accent-cat-*` | `TARGET` | Meal slots, status icons; see §6 |
@@ -66,14 +66,61 @@ Thirteen categories. **Every color decision in this app belongs to exactly one.*
 
 ## 4. Surface vs. text neutrals
 
-`surface-*` and `gray-*` are **separate ramps and must stay separate.**
+`surface-*` and `gray-*` are **background / border / decoration ramps. They are not text colors.**
 
-- `gray-*` is the **text** neutral ramp (284 usages).
-- `surface-*` is the **background/border** ramp.
-
-They are not interchangeable. Collapsing them means a warm surface tint drags body-text color with it — this was explicitly rejected in ADR-0006 §Alternatives.
+They were authored as depth steps (page → card → chip → border) and are only ever validated against each other, never against the text drawn on top of them. Using one as a text color is how a 1.9:1 "Sign in" button and 2.3:1 breadcrumbs shipped. Text color has its own sanctioned tokens (§4a).
 
 The deprecated `stone` Tailwind key aliases `--surface-*` during migration. `stone-*` is **frozen**: existing usages keep working, new usages are rejected by CI.
+
+---
+
+## 4a. Contrast contract (text, brand, fills)
+
+`NORMATIVE NOW`. Every preset, in **both** modes, must satisfy WCAG 2.x AA for the text that actually sits on its surfaces. This is enforced by a unit test, not by review.
+
+### Sanctioned text tokens
+
+| Utility | Role | Min contrast (worst-case bg) | Typical use |
+|---|---|---|---|
+| `text-fg` | Primary text | 11:1 light / 12:1 dark | Headings, body copy, values |
+| `text-fg-secondary` | Secondary text | 6:1 / 8:1 | Labels, menu items, descriptions |
+| `text-fg-muted` | Muted text | **4.5:1** / 5:1 | Captions, timestamps, helper text, placeholders |
+| `text-fg-faint` | Decorative glyphs | 3:1 | Icons and affordances only — **never text** |
+| `text-brand` | Brand text / links / active state | 4.5:1 | Links, active nav, emphasis |
+| `border-input` (`--input`, from `ColorScheme.fg.*.control`) | Form-field border | **3:1** (WCAG 1.4.11) | Every `Input` / `Textarea` / `Select`. Never override it with a decorative `border-surface-*` / `border-white/*` on a field |
+
+Each token is a CSS variable set per **preset and mode** by `applyColorSchemeToCSS()` from `ColorScheme.fg` / `ColorScheme.brand` (`src/stores/themeStore.ts`). Because the value swaps automatically, **do not add a `dark:` partner** to these utilities (rule G6).
+
+### Reference backgrounds ("worst case")
+
+Measured from the rendered app, not guessed: light mode = page tint (`surface-50`), chip (`surface-100`) and white cards; dark mode = `#0e0f13` page → `#16171a` card → `#1e1f26` elevated → `#2b2c30` chips/overlays. A tier must clear its minimum on **all** of them.
+
+### Non-text contrast (WCAG 1.4.11)
+
+- **Form fields** must be distinguishable from their surroundings at 3:1: use `border-input` (resolved per preset/mode from `ColorScheme.fg.*.control`). Decorative card/divider borders (`border-surface-*`) are exempt but must never be used on a field.
+- **Keyboard focus** must be visible at 3:1 against the adjacent surface. `index.css` sets a global `:focus-visible { outline: 2px solid rgb(var(--brand-rgb)) }` (brand passes ≥4.5:1 on every surface in both modes). Components that replace it must use a **full-strength** ring (`focus-visible:ring-2 focus-visible:ring-ring`) — never `ring-ring/50`, never `focus:outline-none` without a ring replacement. (The UA default measured 1.01:1 on dark surfaces; `ring/50` measured ~2:1.)
+- **Icons that carry meaning** need 3:1. Decorative `text-fg-faint` is for glyphs that sit beside a text label or are purely ornamental.
+
+### Alpha-capable ramps
+
+Tailwind **silently drops** any opacity-modified utility whose color is a plain `var(--x)` hex (`bg-primary-500/10`, `dark:bg-primary-900/30`, `ring-primary-500/30`, shadcn `bg-primary/10` …) — the class simply isn't emitted. For a long time ~80 such tints/rings/shadows never rendered, and `dark:` partners that didn't exist left light tiles in dark mode. `primary`, `secondary` and `gray` therefore also emit `--*-N-rgb` channel triplets (like `surface`) and the Tailwind color keys use `rgb(var(--x-N-rgb) / <alpha-value>)`; shadcn HSL tokens use `hsl(var(--x) / <alpha-value>)`. When adding a new ramp, give it the same twin or its opacity variants will vanish.
+
+### Brand fills
+
+- `ColorScheme.primary[500]` **is** the AA-safe solid fill (white text ≥ 4.5:1) and the light-mode brand text color. `bg-primary-500 text-white` is therefore always legal.
+- `ColorScheme.primary[400]` is the dark-mode brand color. `bg-primary` / `text-primary` (shadcn tokens) resolve to the right one per mode.
+- Text on a brand fill must be `text-primary-foreground` (or `text-white` on `bg-primary-500`). Foregrounds for `primary`, `secondary` and `destructive` fills are **computed from the actual fill** (`onColor()`), never a fixed light/dark constant.
+- Never put `text-white` on a fill that changes per mode (`bg-primary-500 dark:bg-primary-400`): use `bg-primary text-primary-foreground`.
+
+### Persistence
+
+Only the user's **choices** (`theme`, preset **name**) are persisted. Palettes are resolved from code on load — presets are application data, not user data. (Before v3 the whole scheme object was persisted, which silently pinned every browser to the palette it had when it first saved settings and hid every later fix.)
+
+### Enforcement
+
+1. `src/stores/__tests__/themeStore.contrast.test.ts` — asserts every tier, brand, computed foreground, control border and error-on-tint for every preset in both modes. **If it fails, fix the palette; never loosen a threshold.**
+2. `scripts/contrast-audit/` — drives the real app in a headless browser against a mocked backend, across every preset × mode, and measures the rendered contrast of every text node, icon, field **and keyboard-focus indicator** against the actual pixels behind it, and clicks through every control to reach menus, modals and popovers. Run before releasing palette or UI-wide changes (see RUNBOOK).
+3. `npm run lint` — rule G9 (below) blocks new uses of `surface-*`/`gray-*`/`muted-foreground` as text color.
 
 ---
 
@@ -167,6 +214,8 @@ Requirements when the first chart lands: an ordered `--viz-1..8` categorical ram
 | G6 | Any element with a color utility that can differ by mode has a `dark:` counterpart, **or** uses a token that swaps automatically (preferred). |
 | G7 | Color maps are defined once and imported, never copy-pasted. |
 | G8 | New UI surfaces declare their §3 taxonomy category. No category fit → surface the gap. |
+| G9 | Text color uses only `text-fg*` / `text-brand` / `text-primary*` / `text-primary-foreground` / status tokens. **No `text-surface-*`, `text-gray-*`, `text-stone-*` or `text-muted-foreground`** — those ramps are not contrast-validated (§4, §4a). |
+| G10 | A solid color fill that carries text must pass 4.5:1 for that text in every preset and mode. Prefer `bg-primary text-primary-foreground`. |
 
 ### Allowlist (G3)
 

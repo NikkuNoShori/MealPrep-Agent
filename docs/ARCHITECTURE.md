@@ -317,7 +317,7 @@ The frontend has **no LLM client** — `src/lib/openrouter.ts` is deprecated; al
 ### State Management
 - **Zustand stores** (`src/stores/`):
   - `authStore` — session, household membership
-  - `themeStore` — dark/light
+  - `themeStore` — light/dark mode + color-scheme preset. Persists only `{ theme, colorSchemeName }` (v3); the palette itself is always resolved from the code-defined presets, so palette/contrast fixes reach every user. Sets the contrast-contract CSS variables (`--fg-*`, `--brand`, `--primary-*-rgb`, …) per preset and mode — see `docs/COLOR_SCHEMA.md` §4a
   - **`draftRecipeStore`** — unsaved recipe preview edits keyed by `conversationId:messageId:recipeIndex`. Recipe JSON + `thumbnailUrl` persist to `sessionStorage` (24h TTL). **`previewImageDataUrl` is memory-only** (never written to sessionStorage or `chat_messages` metadata).
 - **React Query** (`src/services/api.ts` + `src/config/queryCache.ts`):
   - Server state for recipes, chat history, meal plans, preferences

@@ -29,6 +29,11 @@
  *        red/orange/amber/yellow/lime/green/emerald/teal/cyan/sky/blue/
  *        indigo/violet/purple/fuchsia/pink/rose + shade) outside the
  *        src/theme/** allowlist (COLOR_SCHEMA.md §11 "Allowlist (G3)").
+ *   G9 — Text colour must come from the contrast-contract tokens (text-fg*, text-brand,
+ *        text-primary*, status). `text-surface-*`, `text-gray-*`, `text-stone-*` and
+ *        `text-muted-foreground` are background/border ramps or unvalidated shadcn
+ *        tokens, not contrast-guaranteed (COLOR_SCHEMA.md §4a). Comment lines, tests and
+ *        the theme store (which documents the ban) are excluded.
  *   G5 — A single class-attribute string whose light-mode utility and its
  *        `dark:` counterpart are drawn from two different color *systems*
  *        (e.g. `text-stone-500 dark:text-gray-400`) rather than one.
@@ -84,6 +89,9 @@ const ACCENT_HUES = [
 
 const HEX_PATTERN = /#[0-9a-fA-F]{6}\b/g;
 const STONE_PATTERN = /\bstone-[0-9]{2,3}\b/g;
+// G9: text colour drawn from a non-contrast-validated ramp.
+const G9_PATTERN = /\btext-(?:(?:surface|gray|stone)-[0-9]{2,3}|muted-foreground)\b/g;
+const G9_EXCLUDED_PATH_FRAGMENTS = [`${path.sep}stores${path.sep}`, `${path.sep}__tests__${path.sep}`];
 const ACCENT_UTILITY_PATTERN = new RegExp(
   `\\b(?:text|bg|border|ring)-(?:${ACCENT_HUES.join('|')})-[0-9]{2,3}\\b`,
   'g'
@@ -138,7 +146,7 @@ function countG5InLine(line) {
 
 function scan() {
   const files = walk(SRC_DIR);
-  const counts = { G1: 0, G2: 0, G3: 0, G5: 0 };
+  const counts = { G1: 0, G2: 0, G3: 0, G5: 0, G9: 0 };
 
   for (const filePath of files) {
     const content = fs.readFileSync(filePath, 'utf8');
@@ -151,8 +159,10 @@ function scan() {
     }
 
     const lines = content.split('\n');
+    const g9Excluded = G9_EXCLUDED_PATH_FRAGMENTS.some((f) => filePath.includes(f));
     for (const line of lines) {
       counts.G5 += countG5InLine(line);
+      if (!g9Excluded && !/^\s*(\/\/|\*|\/\*)/.test(line)) counts.G9 += countMatches(line, G9_PATTERN);
     }
   }
 
@@ -177,7 +187,7 @@ function main() {
   const baseline = loadBaseline();
   const current = scan();
 
-  const rules = ['G1', 'G2', 'G3', 'G5'];
+  const rules = ['G1', 'G2', 'G3', 'G5', 'G9'];
   let hasRegression = false;
   let hasImprovement = false;
 

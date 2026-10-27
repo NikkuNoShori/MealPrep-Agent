@@ -2,8 +2,29 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-10-16
-**Last updated:** 2026-10-16 (doc-adherence audit fixes — see entry below)
+**Last reviewed:** 2026-10-21
+**Last updated:** 2026-10-21 (end-to-end color contrast overhaul — see entry below)
+
+## 2026-10-21 (Color contrast: end-to-end overhaul, measured in a real browser) `main`
+
+**Fix: unreadable text/icons across light and dark mode, every preset. Verified by rendering the real app, not by grep.**
+
+Earlier "sweeps" fixed individual tokens found by grep and kept missing real failures. This pass measured the rendered contrast of every text node, icon, placeholder, form-field border and keyboard-focus indicator against the pixels actually behind it (headless Chromium, mocked backend, 5 presets x light/dark, desktop + mobile, plus a click-through explorer that opens every menu/modal/popover). Baseline: **439 failing styles** in the base matrix. Now: **0 failing** across text (1,383), icons (576), placeholders, field boundaries and 855 focus rings; mobile 0; the click-through explorer's remainder are overlap artifacts.
+
+Root causes found and fixed:
+- **Stale persisted theme (why fixes "didn't show up").** `theme-store` persisted the entire `ColorScheme` object, pinning each browser to the palette it first saved and ignoring every later code fix. Now only `{ theme, colorSchemeName }` persists (v3, auto-migrated); palettes always come from code.
+- **Text drawn with background ramps.** `text-surface-*`, `text-gray-*`, `text-muted-foreground` (~750 sites) were never validated against what sits behind them. New contrast-guaranteed tokens `text-fg` / `-secondary` / `-muted` / `-faint` / `text-brand`, solved per preset and mode; AST codemod migrated the call sites. Enforced by `themeStore.contrast.test.ts` and lint rule G9.
+- **Brand fill + white text** (buttons, badges, avatars, chat bubbles) failed in both modes. `primary[500]` is now the AA-safe fill; foregrounds for primary/secondary/destructive are computed from the actual fill.
+- **Tailwind silently dropped every opacity-modified brand/gray utility** (`bg-primary-500/10`, `dark:bg-primary-900/30`, `ring-primary-500/30`, shadcn `bg-primary/10` ...): ~80 tints/rings/shadows never rendered and light tiles appeared in dark mode. Ramps now emit `-rgb` twins.
+- **Non-text contrast:** form-field borders were ~1.2:1 (now >=3:1 via `border-input`); keyboard focus was near-black on dark surfaces (1.01:1) and `ring/50` (~2:1) — global brand focus outline + full-strength rings.
+- Dark `gray` backgrounds were cool navy on warm themes (chat bubbles, admin cards) — now preset-tinted.
+- Mode-aware status colors (`text-status-success` was dark green on near-black), `opacity-60/70` on text, completed grocery rows, hover-reveal actions, raw `amber/teal/...-500` accents, warm-gradient badge glyphs, image-overlay pills, the plan-switcher dropdown (white-on-white active plan, clipped off-screen), the grid/list toggle on hover.
+
+New light palettes from the approved designs: Forest (Warm pantry), Botanical (Herb garden), Ocean (Slate and saffron); brand colors are deepened where needed to carry AA text. Visible changes beyond color: collection rows no longer show icons; landing page scrolls; sign-in/auth pages use theme surfaces (not navy); public recipe count matches the Public page; light/dark toggle in the user menu; live theme preview in Settings (committed only on Save); duplicate Supabase client removed (fixes sessions invalidating after reopening the browser).
+
+New: `npm run audit:contrast` (`scripts/contrast-audit/`), documented in `docs/COLOR_SCHEMA.md` §4a and `docs/RUNBOOK.md`.
+
+---
 
 ## 2026-10-16 (Documentation: fixed 3 critical doc/code contradictions) `main`
 

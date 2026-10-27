@@ -1,10 +1,11 @@
 {
-  "$comment": "MOP-0029 Phase 8 — ratcheting baseline for scripts/check-color-governance.js. Counts measured post Phase 8 Parts 1-3 migration (2026-10-04). A count may only DECREASE over time as future phases/sessions migrate more raw color usage onto tokens; the check fails if any count INCREASES beyond what is recorded here. See docs/COLOR_SCHEMA.md §11 and ADR-0006 §Alternatives for why this is allowlist-driven with a ratcheting baseline rather than a strict zero-tolerance rule.",
-  "measuredAt": "2026-10-19",
+  "$comment": "MOP-0029 Phase 8 — ratcheting baseline for scripts/check-color-governance.js. Counts measured post Phase 8 Parts 1-3 migration (2026-10-04). A count may only DECREASE as raw usage migrates onto tokens -- EXCEPT for a deliberate, reviewed increase to G1 when genuinely new, compliant L1 hex literals are added to themeStore.ts's ColorScheme ramps (the one case the check's own source comments flag it cannot distinguish from a real violation; see check-color-governance.js's 'Known baseline composition' note). The 2026-10-20 bump is exactly that: 25 new hex literals for ColorScheme.neutral's new `dark` sub-ramp (5 presets x 5 shades), not new raw-literal violations in components. See docs/COLOR_SCHEMA.md §11 and ADR-0006 §Alternatives for why this is allowlist-driven with a ratcheting baseline rather than a strict zero-tolerance rule. 2026-10-21 contrast-contract change: G1 443->563 = new, compliant L1 hex literals in themeStore.ts (per-preset fg tiers + control, brand, regenerated primary ramps, neutral.dark 600-900) plus the contrast contract test's reference backgrounds — not component violations. G3 256->285 = the AA-safe light/dark pair for raw accent text colours (text-amber-800 dark:text-amber-400 ...) that replaced unreadable text-amber-500; migrating these to status/accent-category tokens is the follow-up that ratchets G3 down. G9 (new) = text colour from a non-contrast-validated ramp; baseline 0.",
+  "measuredAt": "2026-10-21",
   "counts": {
-    "G1": 418,
+    "G1": 563,
     "G2": 2,
-    "G3": 256,
-    "G5": 0
+    "G3": 285,
+    "G5": 0,
+    "G9": 0
   }
 }

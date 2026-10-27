@@ -98,6 +98,11 @@ logs
 # .claude/settings.json (shared project config) stays tracked.
 .claude/settings.local.json
 
+# level-up-vault Agents library junction (machine-specific absolute target —
+# see Methodology/Modular Agent Factory.md "symlinks (shared agents)";
+# re-create per machine, see docs/ for setup command)
+/.agents
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -153,3 +158,6 @@ test-api.ps1
 *.backup
 *.dump
 *.sql.gz
+
+# contrast audit output
+scripts/contrast-audit/out/
