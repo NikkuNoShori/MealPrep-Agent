@@ -32,7 +32,7 @@ export default function ResetPassword() {
 
   if (!code) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-4">
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <Link to="/" className="inline-block">
@@ -40,7 +40,7 @@ export default function ResetPassword() {
                 <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">M</span>
                 </div>
-                <span className="text-xl font-bold text-surface-900 dark:text-white">
+                <span className="text-xl font-bold text-fg">
                   MealPrep Agent
                 </span>
               </div>
@@ -52,7 +52,7 @@ export default function ResetPassword() {
               <CardTitle className="text-2xl font-bold">Invalid Reset Link</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-muted-foreground text-center">
+              <p className="text-fg-muted text-center">
                 This password reset link is invalid or has expired. Please request a new one.
               </p>
               <div className="space-y-2">
@@ -76,7 +76,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-4">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <Link to="/" className="inline-block">
@@ -84,7 +84,7 @@ export default function ResetPassword() {
               <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">M</span>
               </div>
-              <span className="text-xl font-bold text-surface-900 dark:text-white">
+              <span className="text-xl font-bold text-fg">
                 MealPrep Agent
               </span>
             </div>
@@ -94,7 +94,7 @@ export default function ResetPassword() {
         <ResetPasswordForm code={code} onSuccess={handleSuccess} />
         
         <div className="mt-6 text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-fg-muted">
             Remember your password?{' '}
             <Link to="/signin" className="text-primary hover:underline font-medium">
               Sign in

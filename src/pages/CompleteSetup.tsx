@@ -134,7 +134,7 @@ const CompleteSetup: React.FC = () => {
   }, [])
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-gray-950 p-4">
+    <div className="h-full overflow-y-auto bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-4">
       <div className="w-full max-w-md mx-auto my-8">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -142,8 +142,8 @@ const CompleteSetup: React.FC = () => {
             <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25">
               <span className="text-white font-bold text-sm">M</span>
             </div>
-            <span className="text-lg font-bold text-surface-900 dark:text-white tracking-tight">
-              MealPrep <span className="text-primary-500">Agent</span>
+            <span className="text-lg font-bold text-fg tracking-tight">
+              MealPrep <span className="text-brand">Agent</span>
             </span>
           </Link>
         </div>
@@ -151,17 +151,17 @@ const CompleteSetup: React.FC = () => {
         {/* Card */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl shadow-black/[0.06] dark:shadow-black/30 border border-gray-200/60 dark:border-white/[0.06] overflow-hidden">
           <div className="px-8 py-8">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-1.5">
+            <h1 className="text-xl font-bold text-fg text-center mb-1.5">
               Complete Your Account
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-6">
+            <p className="text-fg-muted text-center text-sm mb-6">
               Set your name and choose how you'll sign in.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* First Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-fg-secondary mb-1.5">
                   First Name
                 </label>
                 <input
@@ -169,7 +169,7 @@ const CompleteSetup: React.FC = () => {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Enter your first name"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-input bg-gray-50 dark:bg-white/[0.03] text-fg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
                   required
                   minLength={1}
                 />
@@ -177,7 +177,7 @@ const CompleteSetup: React.FC = () => {
 
               {/* Last Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-fg-secondary mb-1.5">
                   Last Name
                 </label>
                 <input
@@ -185,7 +185,7 @@ const CompleteSetup: React.FC = () => {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Enter your last name"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-input bg-gray-50 dark:bg-white/[0.03] text-fg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
                   required
                   minLength={1}
                 />
@@ -193,26 +193,26 @@ const CompleteSetup: React.FC = () => {
 
               {/* Username */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-fg-secondary mb-1.5">
                   Username
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm">@</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-fg-muted text-sm">@</span>
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => handleUsernameChange(e.target.value)}
                     placeholder="choose_a_username"
-                    className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                    className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-input bg-gray-50 dark:bg-white/[0.03] text-fg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
                     autoComplete="username"
                     maxLength={30}
                     required
                   />
                 </div>
                 {usernameError ? (
-                  <p className="text-xs text-red-500 mt-1">{usernameError}</p>
+                  <p className="text-xs text-red-700 dark:text-red-400 mt-1">{usernameError}</p>
                 ) : (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  <p className="text-xs text-fg-muted mt-1">
                     Lowercase letters, numbers, and underscores only.
                   </p>
                 )}
@@ -224,7 +224,7 @@ const CompleteSetup: React.FC = () => {
                   <div className="w-full border-t border-gray-200 dark:border-white/10" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="px-3 bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500">
+                  <span className="px-3 bg-white dark:bg-gray-900 text-fg-muted">
                     Choose a sign-in method
                   </span>
                 </div>
@@ -241,7 +241,7 @@ const CompleteSetup: React.FC = () => {
                 >
                   {googleLinked ? (
                     <>
-                      <Check className="w-4 h-4 mr-2 text-primary-500" />
+                      <Check className="w-4 h-4 mr-2 text-brand" />
                       Google Account Linked
                     </>
                   ) : isLinkingGoogle ? (
@@ -269,7 +269,7 @@ const CompleteSetup: React.FC = () => {
                   <div className="w-full border-t border-gray-200 dark:border-white/10" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="px-3 bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500">
+                  <span className="px-3 bg-white dark:bg-gray-900 text-fg-muted">
                     or set a password
                   </span>
                 </div>
@@ -278,7 +278,7 @@ const CompleteSetup: React.FC = () => {
               {/* Password */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1.5">
                     Password
                   </label>
                   <input
@@ -286,7 +286,7 @@ const CompleteSetup: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 6 characters"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                    className="w-full px-4 py-2.5 rounded-xl border border-input bg-gray-50 dark:bg-white/[0.03] text-fg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
                     autoComplete="new-password"
                     minLength={6}
                     disabled={googleLinked}
@@ -294,7 +294,7 @@ const CompleteSetup: React.FC = () => {
                 </div>
                 {password.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <label className="block text-sm font-medium text-fg-secondary mb-1.5">
                       Confirm Password
                     </label>
                     <input
@@ -302,7 +302,7 @@ const CompleteSetup: React.FC = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm your password"
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                      className="w-full px-4 py-2.5 rounded-xl border border-input bg-gray-50 dark:bg-white/[0.03] text-fg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
                       autoComplete="new-password"
                       minLength={6}
                     />
@@ -327,7 +327,7 @@ const CompleteSetup: React.FC = () => {
               </Button>
 
               {!canSubmit && (
-                <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+                <p className="text-xs text-fg-muted text-center">
                   Fill in your name, choose a username, and either link Google or set a password to continue.
                 </p>
               )}
@@ -335,7 +335,7 @@ const CompleteSetup: React.FC = () => {
               <button
                 type="button"
                 onClick={handleCancel}
-                className="w-full text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                className="w-full text-sm text-fg-muted hover:text-fg-secondary transition-colors"
               >
                 Cancel and return to login
               </button>

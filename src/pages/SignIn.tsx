@@ -33,7 +33,7 @@ const SignIn: React.FC = () => {
   // Show loading while checking auth
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
@@ -44,7 +44,7 @@ const SignIn: React.FC = () => {
     return null
   }
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-4">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <Link to="/" className="inline-block">
@@ -52,7 +52,7 @@ const SignIn: React.FC = () => {
               <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">M</span>
               </div>
-              <span className="text-xl font-bold text-surface-900 dark:text-white">
+              <span className="text-xl font-bold text-fg">
                 MealPrep Agent
               </span>
             </div>
@@ -70,7 +70,7 @@ const SignIn: React.FC = () => {
               Forgot your password?
             </Link>
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-fg-muted">
             Don't have an account?{' '}
             <Link to="/signup" className="text-primary hover:underline font-medium">
               Sign up

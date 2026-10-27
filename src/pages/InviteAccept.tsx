@@ -125,7 +125,7 @@ const InviteAccept: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-gray-950 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -133,8 +133,8 @@ const InviteAccept: React.FC = () => {
             <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25">
               <span className="text-white font-bold text-sm">M</span>
             </div>
-            <span className="text-lg font-bold text-surface-900 dark:text-white tracking-tight">
-              MealPrep <span className="text-primary-500">Agent</span>
+            <span className="text-lg font-bold text-fg tracking-tight">
+              MealPrep <span className="text-brand">Agent</span>
             </span>
           </Link>
         </div>
@@ -144,8 +144,8 @@ const InviteAccept: React.FC = () => {
           {/* Loading */}
           {(state.status === 'loading' || state.status === 'accepting') && (
             <div className="px-8 py-16 text-center">
-              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-primary-500" />
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
+              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-brand" />
+              <p className="text-fg-muted text-sm">
                 {state.status === 'loading' ? 'Loading invite details...' : 'Joining household...'}
               </p>
             </div>
@@ -155,20 +155,20 @@ const InviteAccept: React.FC = () => {
           {state.status === 'details' && !user && !authLoading && (
             <div className="px-8 py-10">
               <div className="w-14 h-14 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Home className="w-7 h-7 text-primary-500 dark:text-primary-400" />
+                <Home className="w-7 h-7 text-brand" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">
+              <h1 className="text-xl font-bold text-fg text-center mb-2">
                 You're invited!
               </h1>
-              <p className="text-gray-500 dark:text-gray-400 text-center text-sm leading-relaxed mb-8">
-                <span className="font-semibold text-gray-700 dark:text-gray-200">{state.inviterName}</span> has invited you to join{' '}
-                <span className="font-semibold text-gray-700 dark:text-gray-200">{state.householdName}</span>{' '}
+              <p className="text-fg-muted text-center text-sm leading-relaxed mb-8">
+                <span className="font-semibold text-fg-secondary">{state.inviterName}</span> has invited you to join{' '}
+                <span className="font-semibold text-fg-secondary">{state.householdName}</span>{' '}
                 on MealPrep Agent.
               </p>
 
               <div className="bg-gray-50 dark:bg-white/[0.03] rounded-xl p-4 mb-6 text-center">
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Invited email</p>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{state.invitedEmail}</p>
+                <p className="text-xs text-fg-muted mb-1">Invited email</p>
+                <p className="text-sm font-medium text-fg-secondary">{state.invitedEmail}</p>
               </div>
 
               <div className="space-y-3">
@@ -189,7 +189,7 @@ const InviteAccept: React.FC = () => {
                 </Button>
               </div>
 
-              <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-6">
+              <p className="text-xs text-fg-muted text-center mt-6">
                 Expires {new Date(state.expiresAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
               </p>
             </div>
@@ -198,8 +198,8 @@ const InviteAccept: React.FC = () => {
           {/* Details loaded but user is authenticated — accepting happens via useEffect */}
           {state.status === 'details' && user && (
             <div className="px-8 py-16 text-center">
-              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-primary-500" />
-              <p className="text-gray-500 dark:text-gray-400 text-sm">Joining household...</p>
+              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-brand" />
+              <p className="text-fg-muted text-sm">Joining household...</p>
             </div>
           )}
 
@@ -209,10 +209,10 @@ const InviteAccept: React.FC = () => {
               <div className="w-14 h-14 bg-gradient-to-br from-status-success/10 to-status-success/20 dark:from-status-success/20 dark:to-status-success/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="w-7 h-7 text-status-success" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              <h1 className="text-xl font-bold text-fg mb-2">
                 Welcome!
               </h1>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mb-8">
+              <p className="text-fg-muted text-sm mb-8">
                 {state.message}
               </p>
               <Button
@@ -231,10 +231,10 @@ const InviteAccept: React.FC = () => {
               <div className="w-14 h-14 bg-gradient-to-br from-status-error/10 to-status-error/20 dark:from-status-error/20 dark:to-status-error/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <XCircle className="w-7 h-7 text-status-error" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              <h1 className="text-xl font-bold text-fg mb-2">
                 Invite Error
               </h1>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mb-8">
+              <p className="text-fg-muted text-sm mb-8">
                 {state.reason}
               </p>
               <Button

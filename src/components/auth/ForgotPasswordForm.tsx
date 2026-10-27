@@ -70,7 +70,7 @@ export const ForgotPasswordForm: React.FC = () => {
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
-        <p className="text-muted-foreground">
+        <p className="text-fg-muted">
           Enter your email address and we'll send you a link to reset your password
         </p>
       </CardHeader>

@@ -80,7 +80,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-        <p className="text-muted-foreground">Sign up for your account</p>
+        <p className="text-fg-muted">Sign up for your account</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -98,7 +98,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               className={inviteEmail ? 'bg-muted' : ''}
             />
             {inviteEmail && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-fg-muted">
                 This email matches your invite and cannot be changed.
               </p>
             )}
@@ -120,7 +120,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg-secondary"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
@@ -148,7 +148,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg-secondary"
                 aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
                 {showConfirmPassword ? (
@@ -189,7 +189,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
               <Separator />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              <span className="bg-card px-2 text-fg-muted">Or continue with</span>
             </div>
           </div>
 

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/services/supabase'
 import { ToastService } from '@/services/toast'
 import { Logger } from '@/services/logger'
 import { Loader2, Lock } from 'lucide-react'
@@ -85,7 +85,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ code, onSu
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
-        <p className="text-muted-foreground">
+        <p className="text-fg-muted">
           Enter your new password below
         </p>
       </CardHeader>

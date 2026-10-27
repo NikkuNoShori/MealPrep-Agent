@@ -202,20 +202,20 @@ const AuthCallback: React.FC = () => {
   }, [navigate, refreshUser])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))]">
       <div className="text-center">
         {error ? (
           <>
-            <div className="text-red-600 dark:text-red-400 mb-4">
+            <div className="text-red-700 dark:text-red-400 mb-4">
               <p className="font-semibold">Sign in failed</p>
-              <p className="text-sm text-muted-foreground mt-2">{error}</p>
-              <p className="text-xs text-muted-foreground mt-4">Redirecting to sign in...</p>
+              <p className="text-sm text-fg-muted mt-2">{error}</p>
+              <p className="text-xs text-fg-muted mt-4">Redirecting to sign in...</p>
             </div>
           </>
         ) : (
           <>
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Completing sign in...</p>
+            <p className="text-fg-muted">Completing sign in...</p>
           </>
         )}
       </div>

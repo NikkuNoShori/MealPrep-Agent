@@ -71,7 +71,7 @@ export default function VerifyEmail() {
 
   if (isVerified) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-4">
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <Link to="/" className="inline-block">
@@ -79,7 +79,7 @@ export default function VerifyEmail() {
                 <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">M</span>
                 </div>
-                <span className="text-xl font-bold text-surface-900 dark:text-white">
+                <span className="text-xl font-bold text-fg">
                   MealPrep Agent
                 </span>
               </div>
@@ -89,12 +89,12 @@ export default function VerifyEmail() {
           <Card>
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                <CheckCircle className="h-8 w-8 text-green-800 dark:text-green-400" />
               </div>
               <CardTitle className="text-2xl font-bold">Email Verified!</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-muted-foreground text-center">
+              <p className="text-fg-muted text-center">
                 Your email has been successfully verified. Redirecting to your dashboard...
               </p>
             </CardContent>
@@ -106,7 +106,7 @@ export default function VerifyEmail() {
 
   if (error && !code) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-4">
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <Link to="/" className="inline-block">
@@ -114,7 +114,7 @@ export default function VerifyEmail() {
                 <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">M</span>
                 </div>
-                <span className="text-xl font-bold text-surface-900 dark:text-white">
+                <span className="text-xl font-bold text-fg">
                   MealPrep Agent
                 </span>
               </div>
@@ -124,12 +124,12 @@ export default function VerifyEmail() {
           <Card>
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-                <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+                <XCircle className="h-8 w-8 text-red-700 dark:text-red-400" />
               </div>
               <CardTitle className="text-2xl font-bold">Invalid Verification Link</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-muted-foreground text-center">
+              <p className="text-fg-muted text-center">
                 {error}
               </p>
               <div className="space-y-2">
@@ -155,7 +155,7 @@ export default function VerifyEmail() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-[rgb(var(--rs-page-bg-rgb))] p-4">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <Link to="/" className="inline-block">
@@ -163,7 +163,7 @@ export default function VerifyEmail() {
               <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">M</span>
               </div>
-              <span className="text-xl font-bold text-surface-900 dark:text-white">
+              <span className="text-xl font-bold text-fg">
                 MealPrep Agent
               </span>
             </div>
@@ -178,16 +178,16 @@ export default function VerifyEmail() {
             {isVerifying ? (
               <div className="flex flex-col items-center space-y-4">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-muted-foreground text-center">
+                <p className="text-fg-muted text-center">
                   Verifying your email address...
                 </p>
               </div>
             ) : error ? (
               <>
                 <div className="mx-auto mb-4 w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-                  <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+                  <XCircle className="h-8 w-8 text-red-700 dark:text-red-400" />
                 </div>
-                <p className="text-muted-foreground text-center">
+                <p className="text-fg-muted text-center">
                   {error}
                 </p>
                 <div className="space-y-2">
@@ -214,7 +214,7 @@ export default function VerifyEmail() {
                 </div>
               </>
             ) : (
-              <p className="text-muted-foreground text-center">
+              <p className="text-fg-muted text-center">
                 Please wait while we verify your email...
               </p>
             )}

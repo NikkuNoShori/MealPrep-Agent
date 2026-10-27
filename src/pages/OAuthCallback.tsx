@@ -107,30 +107,30 @@ export default function OAuthCallback() {
           {status === 'loading' && (
             <div className="text-center space-y-4">
               <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-              <p className="text-muted-foreground">Completing sign in with Google...</p>
+              <p className="text-fg-muted">Completing sign in with Google...</p>
             </div>
           )}
 
           {status === 'success' && (
             <div className="text-center space-y-4">
               <div className="w-8 h-8 mx-auto bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-green-800 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-muted-foreground">Sign in successful! Redirecting...</p>
+              <p className="text-fg-muted">Sign in successful! Redirecting...</p>
             </div>
           )}
 
           {status === 'error' && (
             <div className="text-center space-y-4">
               <div className="w-8 h-8 mx-auto bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-red-700 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <p className="text-red-600">{error || 'OAuth callback failed'}</p>
-              <p className="text-sm text-muted-foreground">Redirecting to sign in...</p>
+              <p className="text-red-700 dark:text-red-400">{error || 'OAuth callback failed'}</p>
+              <p className="text-sm text-fg-muted">Redirecting to sign in...</p>
             </div>
           )}
         </CardContent>
