@@ -6,10 +6,11 @@ import {
   type ColorScheme,
 } from '@/stores/themeStore';
 
-// MOP-0029 Phase 4 coverage: the persisted-state migration (the riskiest
-// path here — it runs against every existing user's real localStorage on
-// their next visit) and applyColorSchemeToCSS's new surface/accentCategory/
-// gradient wiring. themeStore had zero test coverage before this file.
+// Persistence contract (v3): only the user's CHOICES (theme mode + preset name)
+// are stored. The palette is always resolved from the code-defined presets, so
+// shipping a palette/contrast fix reaches every existing user on their next
+// visit. (v0-v2 persisted the whole ColorScheme object, which silently pinned
+// each browser to whatever palette it had when it first saved settings.)
 
 const RAMP_KEYS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900] as const;
 
@@ -20,100 +21,48 @@ function getPreset(name: string): ColorScheme {
 }
 
 describe('migrateThemeStoreState', () => {
-  it('passes through unchanged when version is already current (>= 1)', () => {
-    const currentState = {
+  it('keeps only the user choices from a current-shape payload', () => {
+    expect(migrateThemeStoreState({ theme: 'dark', colorSchemeName: 'Forest' }, 3)).toEqual({
       theme: 'dark',
-      colorScheme: getPreset('Forest'),
-      availableColorSchemes: { Forest: getPreset('Forest') },
-    };
-
-    const result = migrateThemeStoreState(currentState, 1);
-
-    expect(result).toEqual(currentState);
+      colorSchemeName: 'Forest',
+    });
   });
 
-  it('backfills a v0 persisted scheme with its own preset ramps by name match', () => {
-    // Simulate pre-Phase-4 localStorage: a persisted "Forest" colorScheme
-    // that predates surface/accentCategory/gradient/viz entirely.
-    const v0Forest = getPreset('Forest');
-    const { surface, accentCategory, gradient, viz, ...v0ForestWithoutNewFields } = v0Forest;
-    void surface; void accentCategory; void gradient; void viz;
-
-    const persistedV0 = {
+  it('extracts just the preset NAME from a legacy payload that stored the whole scheme', () => {
+    const legacy = {
       theme: 'light',
-      colorScheme: v0ForestWithoutNewFields,
-      availableColorSchemes: { Forest: v0ForestWithoutNewFields },
+      colorScheme: getPreset('Ocean'),
+      availableColorSchemes: { Ocean: getPreset('Ocean') },
     };
-
-    const result = migrateThemeStoreState(persistedV0, 0);
-
-    // Backfilled from FOREST's own new ramps, not Evergreen's — this is the
-    // behavior that most needs a regression guard, since a naive migration
-    // could easily default everyone to Evergreen's ramps regardless of
-    // their actual selected preset.
-    expect(result.colorScheme.surface).toEqual(getPreset('Forest').surface);
-    expect(result.colorScheme.accentCategory).toEqual(getPreset('Forest').accentCategory);
-    expect(result.colorScheme.gradient).toEqual(getPreset('Forest').gradient);
-    expect(result.colorScheme.viz).toEqual(getPreset('Forest').viz);
-    // Pre-existing fields must survive the migration untouched.
-    expect(result.colorScheme.name).toBe('Forest');
-    expect(result.colorScheme.primary).toEqual(v0Forest.primary);
+    // Result must not carry the stale palette snapshot forward.
+    expect(migrateThemeStoreState(legacy, 2)).toEqual({ theme: 'light', colorSchemeName: 'Ocean' });
   });
 
-  it('falls back to Evergreen ramps for an unrecognized custom preset name', () => {
-    const customV0Scheme = {
-      ...getPreset('Ocean'),
-      name: 'MyCustomTheme',
-    };
-    const { surface, accentCategory, gradient, viz, ...customWithoutNewFields } = customV0Scheme;
-    void surface; void accentCategory; void gradient; void viz;
-
-    const result = migrateThemeStoreState(
-      { theme: 'system', colorScheme: customWithoutNewFields, availableColorSchemes: {} },
-      0
-    );
-
-    // Not Ocean's ramps (name doesn't match any built-in preset) — must not
-    // silently crash or leave the new fields `undefined`.
-    expect(result.colorScheme.surface).toEqual(getPreset('Evergreen').surface);
-    expect(result.colorScheme.name).toBe('MyCustomTheme');
-    expect(result.colorScheme.surface).not.toBeUndefined();
-    expect(result.colorScheme.accentCategory).not.toBeUndefined();
-  });
-
-  it('migrates every entry in availableColorSchemes, not just the active colorScheme', () => {
-    const v0Sunset = getPreset('Sunset');
-    const { surface: _s, accentCategory: _a, gradient: _g, viz: _v, ...v0SunsetStripped } = v0Sunset;
-    void _s; void _a; void _g; void _v;
-
-    const result = migrateThemeStoreState(
-      {
-        theme: 'light',
-        colorScheme: v0SunsetStripped,
-        availableColorSchemes: { Sunset: v0SunsetStripped },
-      },
-      0
-    );
-
-    expect(result.availableColorSchemes.Sunset.surface).toEqual(getPreset('Sunset').surface);
-  });
-
-  it('falls back to the full built-in preset set when availableColorSchemes is empty', () => {
-    const result = migrateThemeStoreState(
-      { theme: 'light', colorScheme: undefined, availableColorSchemes: {} },
-      0
-    );
-
-    expect(Object.keys(result.availableColorSchemes)).toEqual(
-      expect.arrayContaining(['Evergreen', 'Forest', 'Ocean', 'Sunset', 'Botanical'])
-    );
-    expect(result.colorScheme).toEqual(getPreset('Evergreen'));
-  });
-
-  it('handles a completely empty persisted payload without throwing', () => {
+  it('handles a completely empty or missing payload without throwing', () => {
     expect(() => migrateThemeStoreState({}, 0)).not.toThrow();
-    const result = migrateThemeStoreState({}, 0);
-    expect(result.colorScheme).toEqual(getPreset('Evergreen'));
+    expect(() => migrateThemeStoreState(undefined, 0)).not.toThrow();
+    expect(migrateThemeStoreState({}, 0)).toEqual({ theme: undefined, colorSchemeName: undefined });
+  });
+});
+
+describe('persisted state rehydration', () => {
+  it('resolves the palette from code, ignoring any stale colour values in storage', async () => {
+    // A browser that saved settings under the OLD schema, with an old/stale
+    // Forest primary colour baked into the stored scheme object.
+    const stale = { ...getPreset('Forest'), primary: { ...getPreset('Forest').primary, 500: '#ff00ff' } };
+    localStorage.setItem(
+      'theme-store',
+      JSON.stringify({ state: { theme: 'dark', colorScheme: stale, availableColorSchemes: { Forest: stale } }, version: 2 })
+    );
+
+    await useThemeStore.persist.rehydrate();
+
+    const state = useThemeStore.getState();
+    expect(state.theme).toBe('dark');
+    expect(state.colorScheme.name).toBe('Forest');
+    expect(state.colorScheme.primary[500]).toBe(getPreset('Forest').primary[500]);
+    expect(state.colorScheme.primary[500]).not.toBe('#ff00ff');
+    localStorage.removeItem('theme-store');
   });
 });
 
@@ -237,12 +186,15 @@ describe('preset catalog shape (all five presets satisfy the Phase 4 schema)', (
     }
   );
 
-  it('Botanical is the only preset with a distinct primary/secondary brand pair (terracotta/olive)', () => {
+  it('Botanical is the only preset with a distinct primary/secondary brand pair (olive/tomato-red)', () => {
     const botanical = getPreset('Botanical');
     const evergreen = getPreset('Evergreen');
 
-    expect(botanical.primary[500]).toBe('#b5542f');
-    expect(botanical.secondary[500]).toBe('#5b6b3f');
+    // 2026-10-20 "Herb garden" palette swap replaced the original
+    // terracotta/olive pair with olive/tomato-red.
+    // primary[500] is the contrast-contract brand fill (solved, so asserted structurally, not by hex).
+    expect(botanical.primary[500]).toBe(botanical.brand.light);
+    expect(botanical.secondary[500]).toBe('#B5482F');
     expect(botanical.primary[500]).not.toBe(evergreen.primary[500]);
   });
 });

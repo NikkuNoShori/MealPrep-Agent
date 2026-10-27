@@ -26,7 +26,7 @@
     --card-foreground: 25 20% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 25 20% 10%;
-    --primary: 158 70% 37%;
+    --primary: 161 69% 27%;
     --primary-foreground: 0 0% 100%;
     --secondary: 40 20% 95%;
     --secondary-foreground: 25 20% 10%;
@@ -37,11 +37,11 @@
     /* --destructive fallback matches hexToHSL(defaultColorScheme.semantic.error[600])
        from themeStore.ts so applyColorSchemeToCSS() (MOP-0029 Phase 3) does not
        cause a visible flash on first paint. */
-    --destructive: 0 72% 51%;
+    --destructive: 0 72% 38%;
     --destructive-foreground: 0 0% 100%;
     --border: 30 10% 90%;
-    --input: 30 10% 90%;
-    --ring: 158 70% 37%;
+    --input: 32 5% 54%;
+    --ring: 161 69% 27%;
     --radius: 0.75rem;
 
     /* Status tokens (MOP-0029 Phase 3; dark-mode-tuned values + error/info
@@ -53,7 +53,7 @@
        for error, not a separate color). */
     --status-success: 161 72% 32%;
     --status-warning: 26 90% 37%;
-    --status-error: 0 72% 51%;
+    --status-error: 0 72% 38%;
     --status-info: 221 83% 53%;
 
     /* Design system tokens.
@@ -78,12 +78,19 @@
     --rs-page-bg-rgb: 255 255 255;
     --rs-border: var(--surface-200);
     --rs-border-subtle: var(--surface-100);
-    --rs-text-primary: #1c1917;
-    --rs-text-secondary: #78716c;
-    --rs-text-tertiary: #a8a29e;
-    --rs-accent: #1D9E75;
-    --rs-accent-light: #d1fae5;
-    --rs-accent-hover: #178c66;
+    --rs-text-primary: rgb(var(--fg-rgb));
+    --rs-text-secondary: rgb(var(--fg-secondary-rgb));
+    --rs-text-tertiary: rgb(var(--fg-muted-rgb));
+    --rs-accent: #157356;
+    --rs-accent-light: #e9f1ef;
+    --rs-accent-hover: #115c45;
+    /* Contrast-contract text tiers + brand (ColorScheme.fg/.brand, Evergreen) — static fallback; JS overwrites per preset. */
+    --fg-rgb: 28 25 23;
+    --fg-secondary-rgb: 87 83 78;
+    --fg-muted-rgb: 105 101 95;
+    --fg-faint-rgb: 135 128 121;
+    --brand-rgb: 21 115 86;
+    --on-warm-rgb: 11 13 16;
     --rs-overlay: rgba(0, 0, 0, 0.4);
     /* MOP-0029 Phase 6 fix — a standard modal backdrop and a fullscreen
        image lightbox are not the same thing: the lightbox wants the image
@@ -105,16 +112,27 @@
        Seeded from defaultColorScheme (Evergreen) in src/stores/themeStore.ts.
        JS overwrites these at runtime via applyColorSchemeToCSS(); these values
        only govern the first paint before that JS executes (MOP-0029 Phase 1). */
-    --primary-50: #ecfdf5;
-    --primary-100: #d1fae5;
-    --primary-200: #a7f3d0;
-    --primary-300: #6ee7b7;
-    --primary-400: #34d399;
-    --primary-500: #1D9E75;
-    --primary-600: #178c66;
-    --primary-700: #15754f;
-    --primary-800: #115e3e;
-    --primary-900: #064e3b;
+    --primary-50: #f5f9f8;
+    --primary-100: #e9f1ef;
+    --primary-200: #c9e9df;
+    --primary-300: #9ad5c3;
+    --primary-400: #23c190;
+    --primary-500: #157356;
+    --primary-600: #115c45;
+    --primary-700: #0d4735;
+    --primary-800: #0a3528;
+    --primary-900: #06231a;
+    /* -rgb twins: let Tailwind apply opacity modifiers (bg-primary-500/10 ...). Set per preset by applyColorSchemeToCSS(). */
+    --primary-50-rgb: 245 249 248;
+    --primary-100-rgb: 233 241 239;
+    --primary-200-rgb: 201 233 223;
+    --primary-300-rgb: 154 213 195;
+    --primary-400-rgb: 35 193 144;
+    --primary-500-rgb: 21 115 86;
+    --primary-600-rgb: 17 92 69;
+    --primary-700-rgb: 13 71 53;
+    --primary-800-rgb: 10 53 40;
+    --primary-900-rgb: 6 35 26;
 
     --secondary-50: #fffbeb;
     --secondary-100: #fef3c7;
@@ -127,6 +145,28 @@
     --secondary-800: #92400e;
     --secondary-900: #78350f;
 
+    /* -rgb twins: let Tailwind apply opacity modifiers (bg-secondary-500/10 ...). Set per preset by applyColorSchemeToCSS(). */
+
+    --secondary-50-rgb: 255 251 235;
+
+    --secondary-100-rgb: 254 243 199;
+
+    --secondary-200-rgb: 253 230 138;
+
+    --secondary-300-rgb: 252 211 77;
+
+    --secondary-400-rgb: 251 191 36;
+
+    --secondary-500-rgb: 245 158 11;
+
+    --secondary-600-rgb: 217 119 6;
+
+    --secondary-700-rgb: 180 83 9;
+
+    --secondary-800-rgb: 146 64 14;
+
+    --secondary-900-rgb: 120 53 15;
+
     --gray-50: #f9fafb;
     --gray-100: #f3f4f6;
     --gray-200: #e5e7eb;
@@ -138,11 +178,33 @@
     --gray-800: #1f2937;
     --gray-900: #111827;
 
+    /* -rgb twins: let Tailwind apply opacity modifiers (bg-gray-500/10 ...). Set per preset by applyColorSchemeToCSS(). */
+
+    --gray-50-rgb: 249 250 251;
+
+    --gray-100-rgb: 243 244 246;
+
+    --gray-200-rgb: 229 231 235;
+
+    --gray-300-rgb: 209 213 219;
+
+    --gray-400-rgb: 156 163 175;
+
+    --gray-500-rgb: 107 114 128;
+
+    --gray-600-rgb: 75 85 99;
+
+    --gray-700-rgb: 55 65 81;
+
+    --gray-800-rgb: 31 41 55;
+
+    --gray-900-rgb: 17 24 39;
+
     --success-100: #dcfce7;
     --success-800: #166534;
     --success-900: #14532d;
-    --error-500: #ef4444;
-    --error-600: #dc2626;
+    --error-500: #f87171;
+    --error-600: #a91b1b;
     --warning-100: #fef3c7;
     --warning-800: #92400e;
 
@@ -248,8 +310,8 @@
     --card-foreground: 30 10% 96%;
     --popover: 240 5% 10%;
     --popover-foreground: 30 10% 96%;
-    --primary: 160 67% 52%;
-    --primary-foreground: 160 70% 8%;
+    --primary: 161 69% 45%;
+    --primary-foreground: 216 19% 5%;
     --secondary: 240 4% 16%;
     --secondary-foreground: 30 10% 96%;
     --muted: 240 4% 14%;
@@ -258,10 +320,10 @@
     --accent-foreground: 30 10% 96%;
     /* --destructive fallback matches hexToHSL(defaultColorScheme.semantic.error[500])
        — dark mode derives from the lighter error shade (MOP-0029 Phase 3). */
-    --destructive: 0 84% 60%;
+    --destructive: 0 91% 71%;
     --destructive-foreground: 30 10% 96%;
     --border: 240 4% 16%;
-    --input: 240 4% 16%;
+    --input: 26 3% 43%;
 
     /* Status tokens, dark-mode-tuned (2026-10-18). The old values here were
        byte-identical to :root's light values — a color tuned for a light
@@ -273,9 +335,9 @@
        same rule as the light block above. */
     --status-success: 161 84% 55%;
     --status-warning: 26 95% 55%;
-    --status-error: 0 84% 60%;
+    --status-error: 0 91% 71%;
     --status-info: 221 95% 65%;
-    --ring: 160 67% 70%;
+    --ring: 161 69% 45%;
 
     /* Design system tokens — dark.
        MOP-0029 Phase 4: unlike light mode, NONE of --rs-bg / --rs-bg-elevated
@@ -294,12 +356,18 @@
     --rs-page-bg-rgb: 14 15 19;
     --rs-border: #28292f;
     --rs-border-subtle: #212229;
-    --rs-text-primary: #f0efe9;
-    --rs-text-secondary: #9a9890;
-    --rs-text-tertiary: #6b6965;
-    --rs-accent: #34d399;
-    --rs-accent-light: rgba(52, 211, 153, 0.12);
-    --rs-accent-hover: #2cc48a;
+    --rs-text-primary: rgb(var(--fg-rgb));
+    --rs-text-secondary: rgb(var(--fg-secondary-rgb));
+    --rs-text-tertiary: rgb(var(--fg-muted-rgb));
+    --rs-accent: #23c190;
+    --rs-accent-light: rgba(35, 193, 144, 0.14);
+    --rs-accent-hover: #3fcf9c;
+    /* Contrast-contract text tiers + brand (ColorScheme.fg/.brand, Evergreen) — static fallback; JS overwrites per preset. */
+    --fg-rgb: 252 251 251;
+    --fg-secondary-rgb: 209 208 207;
+    --fg-muted-rgb: 167 164 162;
+    --fg-faint-rgb: 127 123 120;
+    --brand-rgb: 35 193 144;
     --rs-overlay: rgba(0, 0, 0, 0.6);
     --rs-overlay-heavy: rgba(0, 0, 0, 0.9);
     --rs-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -313,16 +381,27 @@
     /* Layer 1 primitive scales — static fallbacks (dark mode).
        Same Evergreen seed as :root; applyColorSchemeToCSS() does not
        currently vary the numeric ramps by mode (MOP-0029 Phase 1). */
-    --primary-50: #ecfdf5;
-    --primary-100: #d1fae5;
-    --primary-200: #a7f3d0;
-    --primary-300: #6ee7b7;
-    --primary-400: #34d399;
-    --primary-500: #1D9E75;
-    --primary-600: #178c66;
-    --primary-700: #15754f;
-    --primary-800: #115e3e;
-    --primary-900: #064e3b;
+    --primary-50: #f5f9f8;
+    --primary-100: #e9f1ef;
+    --primary-200: #c9e9df;
+    --primary-300: #9ad5c3;
+    --primary-400: #23c190;
+    --primary-500: #157356;
+    --primary-600: #115c45;
+    --primary-700: #0d4735;
+    --primary-800: #0a3528;
+    --primary-900: #06231a;
+    /* -rgb twins: let Tailwind apply opacity modifiers (bg-primary-500/10 ...). Set per preset by applyColorSchemeToCSS(). */
+    --primary-50-rgb: 245 249 248;
+    --primary-100-rgb: 233 241 239;
+    --primary-200-rgb: 201 233 223;
+    --primary-300-rgb: 154 213 195;
+    --primary-400-rgb: 35 193 144;
+    --primary-500-rgb: 21 115 86;
+    --primary-600-rgb: 17 92 69;
+    --primary-700-rgb: 13 71 53;
+    --primary-800-rgb: 10 53 40;
+    --primary-900-rgb: 6 35 26;
 
     --secondary-50: #fffbeb;
     --secondary-100: #fef3c7;
@@ -335,48 +414,72 @@
     --secondary-800: #92400e;
     --secondary-900: #78350f;
 
-    /* gray-500/600 lightened 2026-10-19 — like surface-400/500 (see comment
-       above), these were byte-identical to :root's light values, so a color
-       tuned for a light background measured 3.40-3.71 (500) and ~2.37 (600)
-       contrast against this app's actual dark surfaces, failing WCAG AA.
-       gray-400 was already light enough (7.06/6.47) and is unchanged.
-       gray-700/800/900 are not used as dark-mode text anywhere (confirmed
-       via grep) and are also left unchanged.
-       KNOWN INCOMPLETE: this is the static pre-JS fallback only — it fixes
-       the brief flash before hydration but NOT the steady-state color,
-       because applyColorSchemeToCSS() (themeStore.ts) writes --gray-* from
-       ColorScheme.neutral with ZERO light/dark branching (unlike `surface`,
-       which has its own neutral.dark-equivalent ramp and an isDark branch).
-       `neutral` never got that treatment, so JS always overwrites this
-       fallback with the light-mode value on every page load, regardless of
-       theme. Properly fixing this needs a neutral.dark ramp added to the
-       ColorScheme type + all 5 presets + an isDark branch in
-       applyColorSchemeToCSS, mirroring the surface pattern — scoped as a
-       follow-up MOP, not done here. See docs/handoffs for the write-up. */
+    /* -rgb twins: let Tailwind apply opacity modifiers (bg-secondary-500/10 ...). Set per preset by applyColorSchemeToCSS(). */
+
+    --secondary-50-rgb: 255 251 235;
+
+    --secondary-100-rgb: 254 243 199;
+
+    --secondary-200-rgb: 253 230 138;
+
+    --secondary-300-rgb: 252 211 77;
+
+    --secondary-400-rgb: 251 191 36;
+
+    --secondary-500-rgb: 245 158 11;
+
+    --secondary-600-rgb: 217 119 6;
+
+    --secondary-700-rgb: 180 83 9;
+
+    --secondary-800-rgb: 146 64 14;
+
+    --secondary-900-rgb: 120 53 15;
+
+    /* Dark-mode gray (Evergreen fallback; themeStore.ts applies the per-preset ColorScheme.neutral.dark at runtime).
+       100-500 are text-capable tiers lightened for AA on dark surfaces; 600-900 are preset-tinted dark backgrounds/borders
+       (previously identical to the light ramp => cool navy on a warm theme). */
     --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
-    --gray-500: #9199a8;
-    --gray-600: #838a99;
-    --gray-700: #374151;
-    --gray-800: #1f2937;
-    --gray-900: #111827;
+    --gray-100: #d1d5dc;
+    --gray-200: #b5bcc7;
+    --gray-300: #99a3b1;
+    --gray-400: #7a889a;
+    --gray-500: #8995a6;
+    --gray-600: #44403c;
+    --gray-700: #3a352e;
+    --gray-800: #292524;
+    --gray-900: #1c1917;
+    /* -rgb twins: let Tailwind apply opacity modifiers (bg-gray-500/10 ...). Set per preset by applyColorSchemeToCSS(). */
+    --gray-50-rgb: 249 250 251;
+    --gray-100-rgb: 209 213 220;
+    --gray-200-rgb: 181 188 199;
+    --gray-300-rgb: 153 163 177;
+    --gray-400-rgb: 122 136 154;
+    --gray-500-rgb: 137 149 166;
+    --gray-600-rgb: 68 64 60;
+    --gray-700-rgb: 58 53 46;
+    --gray-800-rgb: 41 37 36;
+    --gray-900-rgb: 28 25 23;
 
     --success-100: #dcfce7;
     --success-800: #166534;
     --success-900: #14532d;
-    --error-500: #ef4444;
-    --error-600: #dc2626;
+    --error-500: #f87171;
+    --error-600: #a91b1b;
     --warning-100: #fef3c7;
     --warning-800: #92400e;
 
     /* MOP-0029 Phase 4 — surface ramp static fallback (Evergreen dark). */
     --surface-50: #1c1917;
     --surface-100: #292524;
-    --surface-200: #3a352e;
-    --surface-300: #44403c;
+    /* 200/300 lightened 2026-10-20 — see matching comment in themeStore.ts
+       (ColorScheme.surface.dark). Same bug class as 400/500 below: authored
+       as background-depth steps but used as dark-mode TEXT at 47 call sites
+       (e.g. the landing page's "Sign in" button), measuring ~1.7-1.9:1
+       contrast. Confirmed unused as a dark-mode bg/border/ring anywhere in
+       the app, so raising these is safe. */
+    --surface-200: #d8d4cf;
+    --surface-300: #a39b92;
     /* surface-400/500 lightened 2026-10-19 — the original dark-mode values
        (#57534e, #78716c) measured 2.15-3.74:1 contrast against this app's
        actual dark surfaces (card bg ~#16171a, --rs-bg-elevated #1e1f26),
@@ -398,10 +501,20 @@
        exist (opacity-modifier support in @apply / Tailwind color functions). */
     --surface-50-rgb: 28 25 23;
     --surface-100-rgb: 41 37 36;
-    --surface-200-rgb: 58 53 46;
-    --surface-300-rgb: 68 64 60;
-    --surface-400-rgb: 87 83 78;
-    --surface-500-rgb: 120 113 108;
+    --surface-200-rgb: 216 212 207;
+    --surface-300-rgb: 163 155 146;
+    /* 400/500 corrected 2026-10-20 — these were left at the OLD pre-fix
+       values (#57534e/#78716c as RGB triplets) when surface-400/500's plain
+       hex fallback above was lightened on 2026-10-18. Tailwind's
+       text-surface-400/500 utilities resolve through THIS -rgb variable
+       (rgb(var(--surface-400-rgb) / <alpha-value>)), not the hex one, so the
+       2026-10-18 fix never actually took effect for any text rendered via a
+       Tailwind class — only for raw var(--surface-400) CSS usage. Confirmed
+       user-visible: landing-page hero subtitle and the secondary "Sign in"
+       button text were unreadable in dark mode. These now match the hex
+       fallback (#8c857f / #9c958e) as RGB triplets. */
+    --surface-400-rgb: 140 133 127;
+    --surface-500-rgb: 156 149 142;
     --surface-600-rgb: 168 162 158;
     --surface-700-rgb: 214 211 209;
     --surface-800-rgb: 231 229 228;
@@ -495,6 +608,18 @@
     html, body, #root {
       height: 100svh;
     }
+  }
+
+  /* Keyboard focus baseline: the UA default (near-black) measured 1.01:1 on dark surfaces. Brand colour passes >= 4.5:1 in every preset and mode. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand-rgb));
+    outline-offset: 2px;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--fg-muted-rgb));
+    opacity: 1;
   }
 
   html {

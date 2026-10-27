@@ -29,6 +29,18 @@ export interface ColorScheme {
     800: string
     900: string
   }
+  // `neutral` (-> --gray-*) gained a `dark` sub-ramp 2026-10-20, mirroring
+  // `surface.dark` below. Found live: applyColorSchemeToCSS wrote this ramp
+  // with zero light/dark branching, so every `dark:text-gray-*` site (150+
+  // call sites — chat, modals, dashboard widgets, grocery cart) rendered
+  // the LIGHT-mode value even in dark mode, regardless of how dark that
+  // mode's page background was. A 2026-10-18 fix lightened the CSS
+  // fallback for 500/600 only, but JS overwrote it back on every load —
+  // never actually took effect. Only 100-500 get a dark variant: 600-900
+  // are also used as dark-mode backgrounds/borders (confirmed via grep —
+  // e.g. `border-surface-300 dark:border-gray-600`, `dark:bg-gray-800/900`
+  // card surfaces) where the original darker value is exactly what's
+  // wanted, so those stay identical to light mode as before.
   neutral: {
     50: string
     100: string
@@ -40,7 +52,29 @@ export interface ColorScheme {
     700: string
     800: string
     900: string
+    dark: {
+      100: string
+      200: string
+      300: string
+      400: string
+      500: string
+      // 600-900 are dark-mode BACKGROUNDS/BORDERS (cards, chat bubbles, dividers), tinted per preset so
+      // they match the surface family instead of the cool Tailwind slate/navy the light gray ramp implies.
+      600: string
+      700: string
+      800: string
+      900: string
+    }
   }
+  // Contrast-guaranteed text tiers per mode + accessible brand color. These are the ONLY
+  // sanctioned sources for text color (text-fg / text-fg-secondary / text-fg-muted /
+  // text-fg-faint / text-brand). Raw surface-*/gray-* ramps are background/border ramps.
+  fg: {
+    // control = form-field border colour (WCAG 1.4.11: >= 3:1 against the surface the field sits on). Wired to --input.
+    light: { primary: string; secondary: string; muted: string; faint: string; control: string }
+    dark: { primary: string; secondary: string; muted: string; faint: string; control: string }
+  }
+  brand: { light: string; dark: string }
   semantic: {
     success: {
       100: string
@@ -160,17 +194,19 @@ export function selectIsLight(state: ThemeState): boolean {
 // Default color scheme — warm emerald + amber
 const defaultColorScheme: ColorScheme = {
   name: 'Evergreen',
+  // 2026-10-20 contrast contract: 500 is the AA-safe solid fill (white text) and
+  // light-mode brand text; 400 is the dark-mode brand text/fill. See fg/brand below.
   primary: {
-    50: '#ecfdf5',
-    100: '#d1fae5',
-    200: '#a7f3d0',
-    300: '#6ee7b7',
-    400: '#34d399',
-    500: '#1D9E75',
-    600: '#178c66',
-    700: '#15754f',
-    800: '#115e3e',
-    900: '#064e3b',
+    50: '#f5f9f8',
+    100: '#e9f1ef',
+    200: '#c9e9df',
+    300: '#9ad5c3',
+    400: '#23c190',
+    500: '#157356',
+    600: '#115c45',
+    700: '#0d4735',
+    800: '#0a3528',
+    900: '#06231a',
   },
   secondary: {
     50: '#fffbeb',
@@ -195,7 +231,36 @@ const defaultColorScheme: ColorScheme = {
     700: '#374151',
     800: '#1f2937',
     900: '#111827',
+    dark: {
+      100: '#d1d5dc',
+      200: '#b5bcc7',
+      300: '#99a3b1',
+      400: '#7a889a',
+      500: '#8995a6',
+      600: '#44403c',
+      700: '#3a352e',
+      800: '#292524',
+      900: '#1c1917',
+    },
   },
+  // Contrast-guaranteed text tiers + brand color per mode (enforced by themeStore.contrast.test.ts).
+  fg: {
+    light: {
+      primary: '#1c1917',
+      secondary: '#57534e',
+      muted: '#69655f',
+      faint: '#878079',
+      control: '#8f8982',
+    },
+    dark: {
+      primary: '#fcfbfb',
+      secondary: '#d1d0cf',
+      muted: '#a7a4a2',
+      faint: '#7f7b78',
+      control: '#706c69',
+    },
+  },
+  brand: { light: '#157356', dark: '#23c190' },
   semantic: {
     success: {
       100: '#dcfce7',
@@ -203,8 +268,8 @@ const defaultColorScheme: ColorScheme = {
       900: '#14532d',
     },
     error: {
-      500: '#ef4444',
-      600: '#dc2626',
+      500: '#f87171', // dark-mode error: text on its own tint was 4.4:1 at #ef4444
+      600: '#a91b1b', // AA as text on its own 10% tint on every preset (#dc2626 measured 4.1:1) and >6:1 with white text as a fill
     },
     warning: {
       100: '#fef3c7',
@@ -227,8 +292,20 @@ const defaultColorScheme: ColorScheme = {
     dark: {
       50: '#1c1917',
       100: '#292524',
-      200: '#3a352e',
-      300: '#44403c',
+      // 200/300 lightened 2026-10-20 — same WCAG AA failure as 400/500 below,
+      // found via the same codebase sweep: this ramp was authored purely as
+      // background-depth steps (50 darkest -> 900 lightest), but 47 call
+      // sites across 17 files pair it with light-mode text classes as a
+      // dark-mode TEXT color (e.g. `text-surface-700 dark:text-surface-200`,
+      // `text-surface-600 dark:text-surface-300` -- the landing page's
+      // "Sign in" button used the latter, confirmed unreadable ~1.9:1).
+      // Confirmed unused as a dark-mode background/border/ring anywhere in
+      // the app (grepped), so raising these is safe. New values preserve the
+      // intended hierarchy relative to the already-fixed 400/500/600 (200 >
+      // 300 > 600 > 500 > 400 in brightness): 200 ~13:1 (pairs with
+      // high-emphasis light-700), 300 ~7:1 (pairs with medium light-600).
+      200: '#d8d4cf',
+      300: '#a39b92',
       // 400/500 lightened 2026-10-19 — see matching comment in index.css.
       // Original values (#57534e, #78716c) measured 2.15-3.74:1 contrast as
       // text against this app's actual dark surfaces, failing WCAG AA.
@@ -272,17 +349,24 @@ const defaultColorScheme: ColorScheme = {
 const alternativeSchemes: Record<string, ColorScheme> = {
   'Forest': {
     name: 'Forest',
+    // Primary ramp replaced 2026-10-20 ("Warm pantry" design) — a sage
+    // green brand accent (exact value at 500) in place of the original
+    // saturated Tailwind green, applied in both light and dark mode per
+    // user decision (primary has no light/dark split in this schema; dark
+    // mode derives from this ramp algorithmically via adjustHSLLightness).
+    // 2026-10-20 contrast contract: 500 is the AA-safe solid fill (white text) and
+    // light-mode brand text; 400 is the dark-mode brand text/fill. See fg/brand below.
     primary: {
-      50: '#f0fdf4',
-      100: '#dcfce7',
-      200: '#bbf7d0',
-      300: '#86efac',
-      400: '#4ade80',
-      500: '#22c55e',
-      600: '#16a34a',
-      700: '#15803d',
-      800: '#166534',
-      900: '#14532d',
+      50: '#f6f8f7',
+      100: '#ebf0ed',
+      200: '#d0e2d8',
+      300: '#a7c8b6',
+      400: '#65bb8b',
+      500: '#2F6B4A',
+      600: '#26563b',
+      700: '#1d422e',
+      800: '#163122',
+      900: '#0e2016',
     },
     secondary: {
       50: '#fefce8',
@@ -307,7 +391,36 @@ const alternativeSchemes: Record<string, ColorScheme> = {
       700: '#374151',
       800: '#1f2937',
       900: '#111827',
+      dark: {
+        100: '#d1d5dc',
+        200: '#b5bcc7',
+        300: '#99a3b1',
+        400: '#7a889a',
+        500: '#8995a6',
+        600: '#363b27',
+        700: '#282c1d',
+        800: '#1e2116',
+        900: '#14150f',
+      },
     },
+    // Contrast-guaranteed text tiers + brand color per mode (enforced by themeStore.contrast.test.ts).
+    fg: {
+      light: {
+        primary: '#2A251F',
+        secondary: '#595146',
+        muted: '#685d51',
+        faint: '#857868',
+        control: '#897c6c',
+      },
+      dark: {
+        primary: '#fbfcfb',
+        secondary: '#ced1c6',
+        muted: '#a2a791',
+        faint: '#787e65',
+        control: '#6a6f59',
+      },
+    },
+    brand: { light: '#2F6B4A', dark: '#65bb8b' },
     semantic: {
       success: {
         100: '#dcfce7',
@@ -315,32 +428,47 @@ const alternativeSchemes: Record<string, ColorScheme> = {
         900: '#14532d',
       },
       error: {
-        500: '#ef4444',
-        600: '#dc2626',
+        500: '#f87171', // dark-mode error: text on its own tint was 4.4:1 at #ef4444
+        600: '#a91b1b', // AA as text on its own 10% tint on every preset (#dc2626 measured 4.1:1) and >6:1 with white text as a fill
       },
       warning: {
         100: '#fef3c7',
         800: '#92400e',
       },
     },
+    // Light surface ramp replaced 2026-10-20 ("Warm pantry" design) — the
+    // user's own designed replacement for the original Forest light ramp,
+    // which caused eye strain/glare. Anchors (Page/Border/Secondary-text/
+    // Text) are the designer-specified hex values; 100/200/400/700/800 are
+    // interpolated between those anchors and 500 is solved to hit ~4.8:1
+    // contrast against white (the "muted text" tier, same AA bar as the
+    // rest of this session's contrast sweep) rather than linearly
+    // interpolated, which measured only 3.3:1. dark sub-ramp untouched.
     surface: {
-      50: '#f7f9f4',
-      100: '#eef2e7',
-      200: '#dfe6d2',
-      300: '#c7d1b3',
-      400: '#9fab84',
-      500: '#767f5c',
-      600: '#5a6146',
-      700: '#434833',
-      800: '#2b2e20',
-      900: '#1a1c14',
+      50: '#EFE9DF',
+      100: '#e9e2d6',
+      200: '#e3dacd',
+      300: '#DDD3C4',
+      400: '#ada293',
+      500: '#7d7162',
+      600: '#5C5348',
+      700: '#4b443a',
+      800: '#3b342d',
+      900: '#2A251F',
       dark: {
         50: '#14150f',
         100: '#1e2116',
-        200: '#282c1d',
-        300: '#363b27',
-        400: '#4a5136',
-        500: '#6b734f',
+        // 200/300/400/500 lightened 2026-10-20 — same WCAG AA sweep as
+        // Evergreen (see themeStore.ts's Evergreen surface.dark comment and
+        // index.css): these were background-depth steps repurposed as
+        // dark-mode text, measuring 1.1-3.8:1 contrast. New values keep
+        // Forest's hue (~73°) and target the same contrast tiers used for
+        // Evergreen (200 ~13:1, 300 ~7:1, 400 ~5.3:1, 500 ~5.8:1, all
+        // against this app's actual dark page/card backgrounds).
+        200: '#d2d7c4',
+        300: '#97a176',
+        400: '#828b60',
+        500: '#889365',
         600: '#8f9871',
         700: '#b6bd9d',
         800: '#d5dac0',
@@ -373,17 +501,26 @@ const alternativeSchemes: Record<string, ColorScheme> = {
   },
   'Ocean': {
     name: 'Ocean',
+    // Primary ramp replaced 2026-10-20 ("Slate and saffron" design) — a
+    // warm saffron/amber brand accent (exact value at 500) in place of
+    // the original blue, applied in both light and dark mode per user
+    // decision. Note: 500 measures 4.23:1 against white — passes AA for
+    // large/bold text and icons (3:1) but is slightly under the 4.5:1 bar
+    // for small plain text; flagged, not altered, since it's the exact
+    // user-specified value.
+    // 2026-10-20 contrast contract: 500 is the AA-safe solid fill (white text) and
+    // light-mode brand text; 400 is the dark-mode brand text/fill. See fg/brand below.
     primary: {
-      50: '#eff6ff',
-      100: '#dbeafe',
-      200: '#bfdbfe',
-      300: '#93c5fd',
-      400: '#60a5fa',
-      500: '#3b82f6',
-      600: '#2563eb',
-      700: '#1d4ed8',
-      800: '#1e40af',
-      900: '#1e3a8a',
+      50: '#faf8f5',
+      100: '#f2eee8',
+      200: '#ebdac6',
+      300: '#dabb95',
+      400: '#ea9835',
+      500: '#87500e',
+      600: '#6c400b',
+      700: '#543209',
+      800: '#3e2506',
+      900: '#291804',
     },
     secondary: {
       50: '#f0fdfa',
@@ -408,7 +545,36 @@ const alternativeSchemes: Record<string, ColorScheme> = {
       700: '#334155',
       800: '#1e293b',
       900: '#0f172a',
+      dark: {
+        100: '#cfd6df',
+        200: '#b2bdcb',
+        300: '#95a4b8',
+        400: '#7688a2',
+        500: '#8596ad',
+        600: '#2a3142',
+        700: '#1e2330',
+        800: '#161a24',
+        900: '#0e1016',
+      },
     },
+    // Contrast-guaranteed text tiers + brand color per mode (enforced by themeStore.contrast.test.ts).
+    fg: {
+      light: {
+        primary: '#1C2630',
+        secondary: '#455260',
+        muted: '#505f6f',
+        faint: '#677a8e',
+        control: '#6a7e93',
+      },
+      dark: {
+        primary: '#fbfcfc',
+        secondary: '#ccd0d6',
+        muted: '#9da5b1',
+        faint: '#707d8e',
+        control: '#636e7d',
+      },
+    },
+    brand: { light: '#87500e', dark: '#ea9835' },
     semantic: {
       success: {
         100: '#dcfce7',
@@ -416,32 +582,38 @@ const alternativeSchemes: Record<string, ColorScheme> = {
         900: '#14532d',
       },
       error: {
-        500: '#ef4444',
-        600: '#dc2626',
+        500: '#f87171', // dark-mode error: text on its own tint was 4.4:1 at #ef4444
+        600: '#a91b1b', // AA as text on its own 10% tint on every preset (#dc2626 measured 4.1:1) and >6:1 with white text as a fill
       },
       warning: {
         100: '#fef3c7',
         800: '#92400e',
       },
     },
+    // Light surface ramp replaced 2026-10-20 ("Slate and saffron" design) —
+    // same methodology as Forest's: designer-specified anchors (Page/
+    // Border/Secondary-text/Text), 500 solved for ~4.8:1 contrast against
+    // white rather than linearly interpolated (which only hit 3.2:1).
     surface: {
-      50: '#f6f8fb',
-      100: '#eaeef5',
-      200: '#d7deea',
-      300: '#b9c5da',
-      400: '#8b9bbb',
-      500: '#647391',
-      600: '#4c5975',
-      700: '#38435a',
-      800: '#242b3b',
-      900: '#161a24',
+      50: '#E4E8EC',
+      100: '#dce1e6',
+      200: '#d3d9e0',
+      300: '#CBD2DA',
+      400: '#97a4b1',
+      500: '#627587',
+      600: '#4A5866',
+      700: '#3b4754',
+      800: '#2b3742',
+      900: '#1C2630',
       dark: {
         50: '#0e1016',
         100: '#161a24',
-        200: '#1e2330',
-        300: '#2a3142',
-        400: '#3c465c',
-        500: '#576382',
+        // 200/300/400/500 lightened 2026-10-20 — same WCAG AA sweep as
+        // Evergreen/Forest. Keeps Ocean's hue (~223°).
+        200: '#d0d5e0',
+        300: '#929db6',
+        400: '#7a87a6',
+        500: '#7b88a7',
         600: '#7d89a8',
         700: '#a9b2c9',
         800: '#ced4e2',
@@ -474,17 +646,19 @@ const alternativeSchemes: Record<string, ColorScheme> = {
   },
   'Sunset': {
     name: 'Sunset',
+    // 2026-10-20 contrast contract: 500 is the AA-safe solid fill (white text) and
+    // light-mode brand text; 400 is the dark-mode brand text/fill. See fg/brand below.
     primary: {
-      50: '#fff7ed',
-      100: '#ffedd5',
-      200: '#fed7aa',
-      300: '#fdba74',
-      400: '#fb923c',
-      500: '#f97316',
-      600: '#ea580c',
-      700: '#c2410c',
-      800: '#9a3412',
-      900: '#7c2d12',
+      50: '#faf7f5',
+      100: '#f3ece7',
+      200: '#efd5c3',
+      300: '#e0b18f',
+      400: '#fa8f42',
+      500: '#a14504',
+      600: '#813703',
+      700: '#642b02',
+      800: '#4a2002',
+      900: '#301501',
     },
     secondary: {
       50: '#fdf2f8',
@@ -509,7 +683,36 @@ const alternativeSchemes: Record<string, ColorScheme> = {
       700: '#374151',
       800: '#1f2937',
       900: '#111827',
+      dark: {
+        100: '#d1d5dc',
+        200: '#b5bcc7',
+        300: '#99a3b1',
+        400: '#7a889a',
+        500: '#8995a6',
+        600: '#4f3722',
+        700: '#382719',
+        800: '#291d13',
+        900: '#1a120c',
+      },
     },
+    // Contrast-guaranteed text tiers + brand color per mode (enforced by themeStore.contrast.test.ts).
+    fg: {
+      light: {
+        primary: '#2c1c12',
+        secondary: '#7c4f31',
+        muted: '#855635',
+        faint: '#aa6d44',
+        control: '#b8784d',
+      },
+      dark: {
+        primary: '#fcfbfb',
+        secondary: '#dacec1',
+        muted: '#b9a088',
+        faint: '#937658',
+        control: '#82684d',
+      },
+    },
+    brand: { light: '#a14504', dark: '#fa8f42' },
     semantic: {
       success: {
         100: '#dcfce7',
@@ -517,8 +720,8 @@ const alternativeSchemes: Record<string, ColorScheme> = {
         900: '#14532d',
       },
       error: {
-        500: '#ef4444',
-        600: '#dc2626',
+        500: '#f87171', // dark-mode error: text on its own tint was 4.4:1 at #ef4444
+        600: '#a91b1b', // AA as text on its own 10% tint on every preset (#dc2626 measured 4.1:1) and >6:1 with white text as a fill
       },
       warning: {
         100: '#fef3c7',
@@ -531,7 +734,9 @@ const alternativeSchemes: Record<string, ColorScheme> = {
       200: '#f3d9c8',
       300: '#e7bc9e',
       400: '#d29a6f',
-      500: '#b3774c',
+      // 500 darkened 2026-10-20 — same light-mode AA sweep as Forest/
+      // Botanical. Original value measured 3.71:1 against white.
+      500: '#9a6741',
       600: '#8f5c39',
       700: '#6d452c',
       800: '#492e1d',
@@ -539,10 +744,12 @@ const alternativeSchemes: Record<string, ColorScheme> = {
       dark: {
         50: '#1a120c',
         100: '#291d13',
-        200: '#382719',
-        300: '#4f3722',
-        400: '#6f4c2d',
-        500: '#96683c',
+        // 200/300/400/500 lightened 2026-10-20 — same WCAG AA sweep as
+        // Evergreen/Forest/Ocean. Keeps Sunset's hue (~29°).
+        200: '#e5d2bf',
+        300: '#c29467',
+        400: '#b27b47',
+        500: '#b9834f',
         600: '#c08a55',
         700: '#d9ab7c',
         800: '#eaccae',
@@ -575,32 +782,36 @@ const alternativeSchemes: Record<string, ColorScheme> = {
   },
   'Botanical': {
     name: 'Botanical',
-    // Only preset that introduces new primary/secondary brand ramps
-    // (terracotta / olive) — MOP-0029 Phase 4. Dark mode is "same" per the
-    // approved spec; no separate dark ramp for primary/secondary/accentCategory/gradient.
+    // Primary/secondary replaced 2026-10-20 ("Herb garden" design) — olive
+    // green (exact value at 500) as the primary brand accent, tomato-red
+    // (exact value at 500) as the secondary "highlight" accent, applied
+    // in both light and dark mode per user decision (no dark/light split
+    // for these ramps; dark mode derives algorithmically).
+    // 2026-10-20 contrast contract: 500 is the AA-safe solid fill (white text) and
+    // light-mode brand text; 400 is the dark-mode brand text/fill. See fg/brand below.
     primary: {
-      50: '#fdf1ec',
-      100: '#fbe0d3',
-      200: '#f4bda2',
-      300: '#e89a6e',
-      400: '#d67744',
-      500: '#b5542f',
-      600: '#963f22',
-      700: '#77301a',
-      800: '#582212',
-      900: '#3a160b',
+      50: '#f8f8f6',
+      100: '#eef0eb',
+      200: '#dae2cf',
+      300: '#bbc9a6',
+      400: '#8eb753',
+      500: '#4e662b',
+      600: '#3e5222',
+      700: '#303f1b',
+      800: '#242f14',
+      900: '#171f0d',
     },
     secondary: {
-      50: '#f3f5ee',
-      100: '#e4e9d8',
-      200: '#c9d3ae',
-      300: '#aabb85',
-      400: '#8a9c66',
-      500: '#5b6b3f',
-      600: '#485631',
-      700: '#374225',
-      800: '#262f19',
-      900: '#161c0e',
+      50: '#f9f6f6',
+      100: '#f1ebe9',
+      200: '#e6d0cb',
+      300: '#d1a89e',
+      400: '#d36c55',
+      500: '#B5482F',
+      600: '#913a26',
+      700: '#702d1d',
+      800: '#532116',
+      900: '#36160e',
     },
     // Not specified by the MOP for Botanical — derived as a warm-neutral gray
     // consistent with the terracotta/olive palette rather than reusing
@@ -616,7 +827,36 @@ const alternativeSchemes: Record<string, ColorScheme> = {
       700: '#463c33',
       800: '#2e2822',
       900: '#1c1815',
+      dark: {
+        100: '#dbd4cd',
+        200: '#c5baaf',
+        300: '#afa091',
+        400: '#988371',
+        500: '#a39180',
+        600: '#332a1e',
+        700: '#241d15',
+        800: '#1d1811',
+        900: '#161310',
+      },
     },
+    // Contrast-guaranteed text tiers + brand color per mode (enforced by themeStore.contrast.test.ts).
+    fg: {
+      light: {
+        primary: '#1F241B',
+        secondary: '#4b5544',
+        muted: '#57624f',
+        faint: '#707e66',
+        control: '#748269',
+      },
+      dark: {
+        primary: '#fcfbfb',
+        secondary: '#d5cfc7',
+        muted: '#ada393',
+        faint: '#867a66',
+        control: '#776b5a',
+      },
+    },
+    brand: { light: '#4e662b', dark: '#8eb753' },
     semantic: {
       success: {
         100: '#dcfce7',
@@ -624,32 +864,38 @@ const alternativeSchemes: Record<string, ColorScheme> = {
         900: '#14532d',
       },
       error: {
-        500: '#ef4444',
-        600: '#dc2626',
+        500: '#f87171', // dark-mode error: text on its own tint was 4.4:1 at #ef4444
+        600: '#a91b1b', // AA as text on its own 10% tint on every preset (#dc2626 measured 4.1:1) and >6:1 with white text as a fill
       },
       warning: {
         100: '#fef3c7',
         800: '#92400e',
       },
     },
+    // Light surface ramp replaced 2026-10-20 ("Herb garden" design) — same
+    // methodology as Forest/Ocean: designer-specified anchors (Page/
+    // Border/Secondary-text/Text), 500 solved for ~4.8:1 contrast against
+    // white rather than linearly interpolated (which only hit 3.2:1).
     surface: {
-      50: '#faf6ee',
-      100: '#f4ecdd',
-      200: '#e8dcc5',
-      300: '#d9cbb0',
-      400: '#c2b092',
-      500: '#a3936f',
-      600: '#7d7053',
-      700: '#5c5340',
-      800: '#3a352a',
-      900: '#241f18',
+      50: '#E7EBE2',
+      100: '#dfe4d8',
+      200: '#d6ddcf',
+      300: '#CED6C5',
+      400: '#9ca793',
+      500: '#697760',
+      600: '#4E5847',
+      700: '#3e4738',
+      800: '#2f352a',
+      900: '#1F241B',
       dark: {
         50: '#161310',
         100: '#1d1811',
-        200: '#241d15',
-        300: '#332a1e',
-        400: '#453a29',
-        500: '#6c5c45',
+        // 200/300/400/500 lightened 2026-10-20 — same WCAG AA sweep as
+        // Evergreen/Forest/Ocean/Sunset. Keeps Botanical's hue (~35°).
+        200: '#dcd4c8',
+        300: '#ad9a7e',
+        400: '#9a8463',
+        500: '#a38e6f',
         600: '#a8987e',
         700: '#c9bda6',
         800: '#e1d7c5',
@@ -682,60 +928,30 @@ const alternativeSchemes: Record<string, ColorScheme> = {
   },
 }
 
-// MOP-0029 Phase 4 — persisted-state migration for the v0 -> v1 schema
-// change (ColorScheme gained required surface/accentCategory/gradient/viz
-// fields). Extracted as a standalone, exported, pure function (rather than
-// staying inline in the `persist` config) so it's directly unit-testable
-// without driving it through zustand's actual localStorage rehydration
-// machinery. Backfills every persisted scheme using its own built-in
-// preset's new ramps where the name matches (Evergreen/Forest/Ocean/Sunset),
-// or falls back to Evergreen's ramps for an unrecognized custom name.
+// Persisted shape (v3+): only the user's CHOICES are stored — the light/dark
+// mode and the preset NAME. The palette itself is always resolved from the
+// code-defined presets on load. Earlier versions (v0-v2) persisted the entire
+// ColorScheme object, so a browser that had ever saved settings kept serving
+// that stale snapshot and silently ignored every later palette/contrast fix
+// shipped in code. Presets are application data, not user data.
+export interface PersistedThemeState {
+  theme?: Theme
+  colorSchemeName?: string
+}
+
 export function migrateThemeStoreState(
   persistedState: unknown,
-  version: number
-): ThemeState {
-  const state = persistedState as {
+  _version: number
+): PersistedThemeState {
+  const state = (persistedState ?? {}) as {
     theme?: Theme
-    colorScheme?: ColorScheme
-    availableColorSchemes?: Record<string, ColorScheme>
+    colorSchemeName?: string
+    colorScheme?: { name?: string }
   }
-
-  if (version >= 1) {
-    return state as ThemeState
-  }
-
-  const backfillScheme = (scheme: ColorScheme | undefined): ColorScheme | undefined => {
-    if (!scheme) return scheme
-    const currentByName =
-      scheme.name === defaultColorScheme.name
-        ? defaultColorScheme
-        : alternativeSchemes[scheme.name]
-    const source = currentByName ?? defaultColorScheme
-    return {
-      ...scheme,
-      surface: scheme.surface ?? source.surface,
-      accentCategory: scheme.accentCategory ?? source.accentCategory,
-      gradient: scheme.gradient ?? source.gradient,
-      viz: scheme.viz ?? source.viz,
-    }
-  }
-
-  const migratedAvailable: Record<string, ColorScheme> = {}
-  if (state.availableColorSchemes) {
-    for (const [key, scheme] of Object.entries(state.availableColorSchemes)) {
-      const backfilled = backfillScheme(scheme)
-      if (backfilled) migratedAvailable[key] = backfilled
-    }
-  }
-
   return {
-    ...state,
-    colorScheme: backfillScheme(state.colorScheme) ?? defaultColorScheme,
-    availableColorSchemes:
-      Object.keys(migratedAvailable).length > 0
-        ? migratedAvailable
-        : { Evergreen: defaultColorScheme, ...alternativeSchemes },
-  } as ThemeState
+    theme: state.theme,
+    colorSchemeName: state.colorSchemeName ?? state.colorScheme?.name,
+  }
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -818,17 +1034,18 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: "theme-store",
-      // MOP-0029 Phase 4 — bumped from the implicit v0 because ColorScheme
-      // gained required `surface` / `accentCategory` / `gradient` / `viz`
-      // fields. Without a migration, persisted state from before this change
-      // would hydrate with those ramps `undefined`.
-      version: 1,
+      // v3: persist only { theme, colorSchemeName } (see PersistedThemeState).
+      version: 3,
       migrate: migrateThemeStoreState,
-      partialize: (state) => ({
+      partialize: (state): PersistedThemeState => ({
         theme: state.theme,
-        colorScheme: state.colorScheme,
-        availableColorSchemes: state.availableColorSchemes,
+        colorSchemeName: state.colorScheme.name,
       }),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as PersistedThemeState
+        const scheme = p.colorSchemeName ? current.availableColorSchemes[p.colorSchemeName] : undefined
+        return { ...current, theme: p.theme ?? current.theme, colorScheme: scheme ?? current.colorScheme }
+      },
     }
   )
 );
@@ -873,16 +1090,77 @@ function hexToRGBTriplet(hex: string): string {
   return `${r} ${g} ${b}`
 }
 
-// Light/dark-aware lightness adjustment for an HSL triplet string, used so
-// applying a preset doesn't flatten the .dark block's intentionally
-// lightened --primary (previously index.css had a hardcoded lighter value
-// for dark mode that a preset switch would overwrite identically to light).
-function adjustHSLLightness(hsl: string, deltaPercent: number): string {
-  const match = hsl.match(/^(\d+)\s+(\d+)%\s+(\d+)%$/);
-  if (!match) return hsl;
-  const [, h, s, l] = match;
-  const newL = Math.max(0, Math.min(100, parseInt(l, 10) + deltaPercent));
-  return `${h} ${s}% ${newL}%`;
+// ── Contrast helpers (WCAG 2.x relative luminance) ──
+// Exported so the contrast-contract unit test and any future tooling use the
+// exact same math as the runtime foreground-selection below.
+function channelToLinear(v: number): number {
+  const c = v / 255
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+}
+export function relativeLuminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return 0.2126 * channelToLinear(r) + 0.7152 * channelToLinear(g) + 0.0722 * channelToLinear(b)
+}
+export function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a)
+  const lb = relativeLuminance(b)
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+// Near-black used for text on bright fills. Not pure #000 — keeps the UI soft.
+const ON_COLOR_DARK = '#0b0d10'
+const ON_COLOR_LIGHT = '#ffffff'
+/** The text color (white or near-black) that reads better on a given fill. */
+export function onColor(fillHex: string): string {
+  return contrastRatio(ON_COLOR_LIGHT, fillHex) >= contrastRatio(ON_COLOR_DARK, fillHex)
+    ? ON_COLOR_LIGHT
+    : ON_COLOR_DARK
+}
+function hexToHslTuple(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  let h = 0, s = 0
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break
+      case g: h = ((b - r) / d + 2) / 6; break
+      default: h = ((r - g) / d + 4) / 6
+    }
+  }
+  return [h, s, l]
+}
+function hslTupleToHex(h: number, s: number, l: number): string {
+  const f = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1
+    if (t > 1) t -= 1
+    if (t < 1 / 6) return p + (q - p) * 6 * t
+    if (t < 1 / 2) return q
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+    return p
+  }
+  let r: number, g: number, b: number
+  if (s === 0) { r = g = b = l } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+    const p = 2 * l - q
+    r = f(p, q, h + 1 / 3); g = f(p, q, h); b = f(p, q, h - 1 / 3)
+  }
+  return '#' + [r, g, b].map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('')
+}
+/** White or near-black, whichever reads better across ALL of the given fills (used for gradients). */
+export function onColorForFills(fills: string[]): string {
+  const minWith = (fg: string) => Math.min(...fills.map((f) => contrastRatio(fg, f)))
+  return minWith(ON_COLOR_LIGHT) >= minWith(ON_COLOR_DARK) ? ON_COLOR_LIGHT : ON_COLOR_DARK
+}
+/** Hex with its HSL lightness shifted by deltaPercent (clamped 0-100). */
+export function shiftLightness(hex: string, deltaPercent: number): string {
+  const [h, s, l] = hexToHslTuple(hex)
+  return hslTupleToHex(h, s, Math.max(0, Math.min(1, l + deltaPercent / 100)))
 }
 
 // Helper function to apply color scheme to CSS custom properties.
@@ -893,29 +1171,66 @@ export function applyColorSchemeToCSS(scheme: ColorScheme) {
   const isDark = root.classList.contains('dark')
 
   // Apply primary colors (numeric ramp)
+  // Every ramp also gets a "-rgb" channel-triplet twin so Tailwind opacity modifiers
+  // (bg-primary-500/10, ring-primary-500/30, dark:bg-primary-900/30 ...) work. With plain
+  // hex vars Tailwind silently DROPS those utilities — 80+ tints/rings/shadows never rendered.
   Object.entries(scheme.primary).forEach(([shade, color]) => {
     root.style.setProperty(`--primary-${shade}`, color)
+    root.style.setProperty(`--primary-${shade}-rgb`, hexToRGBTriplet(color))
   })
 
   // Apply secondary colors (numeric ramp)
   Object.entries(scheme.secondary).forEach(([shade, color]) => {
     root.style.setProperty(`--secondary-${shade}`, color)
+    root.style.setProperty(`--secondary-${shade}-rgb`, hexToRGBTriplet(color))
   })
 
-  // Apply neutral colors
-  Object.entries(scheme.neutral).forEach(([shade, color]) => {
+  // Apply neutral colors. 100-500 are the dark TEXT-capable tiers and 600-900 the preset-tinted dark backgrounds (see the
+  // ColorScheme.neutral type comment) — 600-900 stay identical to light
+  // mode in both branches since those are also consumed as dark-mode
+  // backgrounds/borders where the darker light-mode value is correct.
+  ;([50, 100, 200, 300, 400, 500, 600, 700, 800, 900] as const).forEach((shade) => {
+    const color = isDark && shade in scheme.neutral.dark
+      ? scheme.neutral.dark[shade as 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900]
+      : scheme.neutral[shade]
     root.style.setProperty(`--gray-${shade}`, color)
+    root.style.setProperty(`--gray-${shade}-rgb`, hexToRGBTriplet(color))
   })
 
-  // HSL-derived tokens consumed by shadcn primitives (bg-primary, ring, etc).
-  // Dark mode gets a lightened variant so presets don't flatten the .dark
-  // block's intentionally brighter --primary (index.css previously hardcoded
-  // "160 67% 52%" vs light's "158 70% 37%" — roughly +15% lightness).
-  const primaryHSL = hexToHSL(scheme.primary[500])
-  const secondaryHSL = hexToHSL(scheme.secondary[500])
-  root.style.setProperty('--primary', isDark ? adjustHSLLightness(primaryHSL, 15) : primaryHSL)
-  root.style.setProperty('--ring', isDark ? adjustHSLLightness(primaryHSL, 15) : primaryHSL)
-  root.style.setProperty('--secondary', isDark ? adjustHSLLightness(secondaryHSL, 15) : secondaryHSL)
+  // Solid "action" fills (shadcn bg-primary / bg-secondary / bg-destructive).
+  // The fill comes from the scheme (light: brand.light, dark: brand.dark — both
+  // contrast-contract values) and the TEXT on it is computed from the actual
+  // fill, never a fixed light/dark constant: the old static foreground tokens
+  // were the root cause of white-on-mint buttons and light-on-yellow badges.
+  const primaryFill = isDark ? scheme.brand.dark : scheme.brand.light
+  const secondaryFill = isDark ? shiftLightness(scheme.secondary[500], 15) : scheme.secondary[500]
+  const destructiveFill = isDark ? scheme.semantic.error[500] : scheme.semantic.error[600]
+  root.style.setProperty('--primary', hexToHSL(primaryFill))
+  root.style.setProperty('--primary-foreground', hexToHSL(onColor(primaryFill)))
+  root.style.setProperty('--ring', hexToHSL(primaryFill))
+  root.style.setProperty('--secondary', hexToHSL(secondaryFill))
+  root.style.setProperty('--secondary-foreground', hexToHSL(onColor(secondaryFill)))
+  root.style.setProperty('--destructive-foreground', hexToHSL(onColor(destructiveFill)))
+
+  // Contrast-contract text tiers + brand text color (Tailwind: text-fg,
+  // text-fg-secondary, text-fg-muted, text-fg-faint, text-brand).
+  const tiers = scheme.fg[isDark ? 'dark' : 'light']
+  root.style.setProperty('--fg-rgb', hexToRGBTriplet(tiers.primary))
+  root.style.setProperty('--fg-secondary-rgb', hexToRGBTriplet(tiers.secondary))
+  root.style.setProperty('--fg-muted-rgb', hexToRGBTriplet(tiers.muted))
+  root.style.setProperty('--fg-faint-rgb', hexToRGBTriplet(tiers.faint))
+  root.style.setProperty('--brand-rgb', hexToRGBTriplet(primaryFill))
+  // shadcn's border-input (every Input/Textarea/Select). Was ~1.2:1 against its surroundings; now >= 3:1.
+  root.style.setProperty('--input', hexToHSL(tiers.control))
+
+  // Foreground for glyphs sitting on the decorative warm gradient (header badges etc.).
+  root.style.setProperty('--on-warm-rgb', hexToRGBTriplet(onColorForFills([scheme.gradient.warm.from, scheme.gradient.warm.to])))
+
+  // Legacy --rs-accent family now follows the preset (it was a static
+  // Evergreen green for every preset) and the same AA-safe fill.
+  root.style.setProperty('--rs-accent', primaryFill)
+  root.style.setProperty('--rs-accent-hover', isDark ? shiftLightness(primaryFill, 6) : scheme.primary[600])
+  root.style.setProperty('--rs-accent-light', isDark ? `rgba(${hexToRGBTriplet(primaryFill).replace(/ /g, ', ')}, 0.14)` : scheme.primary[100])
 
   // Apply semantic colors (numeric ramp)
   root.style.setProperty('--success-100', scheme.semantic.success[100])
@@ -932,12 +1247,20 @@ export function applyColorSchemeToCSS(scheme: ColorScheme) {
   // Dark mode uses the lighter error[500] shade against the dark surface
   // (matches the existing hardcoded dark --destructive being a distinct,
   // muted treatment from light rather than a uniform lightness bump).
-  root.style.setProperty('--destructive', hexToHSL(isDark ? scheme.semantic.error[500] : scheme.semantic.error[600]))
+  root.style.setProperty('--destructive', hexToHSL(destructiveFill))
 
   // Status tokens (success/warning) as HSL, for the alert.tsx status-*
   // Tailwind utilities wired in tailwind.config.js.
-  root.style.setProperty('--status-success', hexToHSL(scheme.semantic.success[800]))
-  root.style.setProperty('--status-warning', hexToHSL(scheme.semantic.warning[800]))
+  // The 800 shades are LIGHT-mode text colors (dark green/amber on a light page). In dark mode they
+  // measured ~1:1 on the page (dark green on near-black), so dark mode must NOT inherit this inline
+  // override — removing it lets the .dark rule in index.css (bright status tones) apply.
+  if (isDark) {
+    root.style.removeProperty('--status-success')
+    root.style.removeProperty('--status-warning')
+  } else {
+    root.style.setProperty('--status-success', hexToHSL(scheme.semantic.success[800]))
+    root.style.setProperty('--status-warning', hexToHSL(scheme.semantic.warning[800]))
+  }
 
   // MOP-0029 Phase 4 — surface ramp. Genuinely distinct light/dark ramps
   // (not a formulaic derivation), so pick the ramp matching the current

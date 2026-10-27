@@ -9,55 +9,72 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
-          50: 'var(--primary-50)',
-          100: 'var(--primary-100)',
-          200: 'var(--primary-200)',
-          300: 'var(--primary-300)',
-          400: 'var(--primary-400)',
-          500: 'var(--primary-500)',
-          600: 'var(--primary-600)',
-          700: 'var(--primary-700)',
-          800: 'var(--primary-800)',
-          900: 'var(--primary-900)',
+          DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
+          foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
+          50: 'rgb(var(--primary-50-rgb) / <alpha-value>)',
+          100: 'rgb(var(--primary-100-rgb) / <alpha-value>)',
+          200: 'rgb(var(--primary-200-rgb) / <alpha-value>)',
+          300: 'rgb(var(--primary-300-rgb) / <alpha-value>)',
+          400: 'rgb(var(--primary-400-rgb) / <alpha-value>)',
+          500: 'rgb(var(--primary-500-rgb) / <alpha-value>)',
+          600: 'rgb(var(--primary-600-rgb) / <alpha-value>)',
+          700: 'rgb(var(--primary-700-rgb) / <alpha-value>)',
+          800: 'rgb(var(--primary-800-rgb) / <alpha-value>)',
+          900: 'rgb(var(--primary-900-rgb) / <alpha-value>)',
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
-          50: 'var(--secondary-50)',
-          100: 'var(--secondary-100)',
-          200: 'var(--secondary-200)',
-          300: 'var(--secondary-300)',
-          400: 'var(--secondary-400)',
-          500: 'var(--secondary-500)',
-          600: 'var(--secondary-600)',
-          700: 'var(--secondary-700)',
-          800: 'var(--secondary-800)',
-          900: 'var(--secondary-900)',
+          DEFAULT: 'hsl(var(--secondary) / <alpha-value>)',
+          foreground: 'hsl(var(--secondary-foreground) / <alpha-value>)',
+          50: 'rgb(var(--secondary-50-rgb) / <alpha-value>)',
+          100: 'rgb(var(--secondary-100-rgb) / <alpha-value>)',
+          200: 'rgb(var(--secondary-200-rgb) / <alpha-value>)',
+          300: 'rgb(var(--secondary-300-rgb) / <alpha-value>)',
+          400: 'rgb(var(--secondary-400-rgb) / <alpha-value>)',
+          500: 'rgb(var(--secondary-500-rgb) / <alpha-value>)',
+          600: 'rgb(var(--secondary-600-rgb) / <alpha-value>)',
+          700: 'rgb(var(--secondary-700-rgb) / <alpha-value>)',
+          800: 'rgb(var(--secondary-800-rgb) / <alpha-value>)',
+          900: 'rgb(var(--secondary-900-rgb) / <alpha-value>)',
         },
+        // Contrast-contract text tiers (2026-10-20). The ONLY sanctioned text colors:
+        // text-fg (primary), text-fg-secondary, text-fg-muted, text-fg-faint (icons /
+        // decoration, >=3:1) and text-brand (links, active states). Values are set per
+        // preset AND per light/dark mode by applyColorSchemeToCSS() from ColorScheme.fg /
+        // .brand and verified >= WCAG AA by themeStore.contrast.test.ts. surface-* and
+        // gray-* are background/border ramps -- never use them for text.
+        fg: {
+          DEFAULT: 'rgb(var(--fg-rgb) / <alpha-value>)',
+          secondary: 'rgb(var(--fg-secondary-rgb) / <alpha-value>)',
+          muted: 'rgb(var(--fg-muted-rgb) / <alpha-value>)',
+          faint: 'rgb(var(--fg-faint-rgb) / <alpha-value>)',
+        },
+        brand: {
+          DEFAULT: 'rgb(var(--brand-rgb) / <alpha-value>)',
+        },
+        // Glyph colour on the decorative warm gradient (computed per preset from its stops).
+        'on-warm': 'rgb(var(--on-warm-rgb) / <alpha-value>)',
         // Semantic colors for consistent theming
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        background: 'hsl(var(--background) / <alpha-value>)',
+        foreground: 'hsl(var(--foreground) / <alpha-value>)',
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
+          DEFAULT: 'hsl(var(--card) / <alpha-value>)',
+          foreground: 'hsl(var(--card-foreground) / <alpha-value>)',
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
+          DEFAULT: 'hsl(var(--popover) / <alpha-value>)',
+          foreground: 'hsl(var(--popover-foreground) / <alpha-value>)',
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: 'hsl(var(--muted) / <alpha-value>)',
+          foreground: 'hsl(var(--muted-foreground) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+          DEFAULT: 'hsl(var(--accent) / <alpha-value>)',
+          foreground: 'hsl(var(--accent-foreground) / <alpha-value>)',
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
+          DEFAULT: 'hsl(var(--destructive) / <alpha-value>)',
+          foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)',
         },
         // Status roles (MOP-0029 Phase 3; error + info added 2026-10-18) —
         // wires the four COLOR_SCHEMA.md §5 status roles to Tailwind
@@ -67,26 +84,26 @@ export default {
         // var so it can be referenced without borrowing the shadcn-specific
         // destructive name in non-shadcn status UI (alerts, toasts, badges).
         status: {
-          success: 'hsl(var(--status-success))',
-          warning: 'hsl(var(--status-warning))',
-          error: 'hsl(var(--status-error))',
-          info: 'hsl(var(--status-info))',
+          success: 'hsl(var(--status-success) / <alpha-value>)',
+          warning: 'hsl(var(--status-warning) / <alpha-value>)',
+          error: 'hsl(var(--status-error) / <alpha-value>)',
+          info: 'hsl(var(--status-info) / <alpha-value>)',
         },
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
+        border: 'hsl(var(--border) / <alpha-value>)',
+        input: 'hsl(var(--input) / <alpha-value>)',
+        ring: 'hsl(var(--ring) / <alpha-value>)',
         // Dynamic gray scale
         gray: {
-          50: 'var(--gray-50)',
-          100: 'var(--gray-100)',
-          200: 'var(--gray-200)',
-          300: 'var(--gray-300)',
-          400: 'var(--gray-400)',
-          500: 'var(--gray-500)',
-          600: 'var(--gray-600)',
-          700: 'var(--gray-700)',
-          800: 'var(--gray-800)',
-          900: 'var(--gray-900)',
+          50: 'rgb(var(--gray-50-rgb) / <alpha-value>)',
+          100: 'rgb(var(--gray-100-rgb) / <alpha-value>)',
+          200: 'rgb(var(--gray-200-rgb) / <alpha-value>)',
+          300: 'rgb(var(--gray-300-rgb) / <alpha-value>)',
+          400: 'rgb(var(--gray-400-rgb) / <alpha-value>)',
+          500: 'rgb(var(--gray-500-rgb) / <alpha-value>)',
+          600: 'rgb(var(--gray-600-rgb) / <alpha-value>)',
+          700: 'rgb(var(--gray-700-rgb) / <alpha-value>)',
+          800: 'rgb(var(--gray-800-rgb) / <alpha-value>)',
+          900: 'rgb(var(--gray-900-rgb) / <alpha-value>)',
         },
         // MOP-0029 Phase 4 — surface ramp (page background / card surface /
         // borders). Maps to --surface-* CSS vars, which applyColorSchemeToCSS()

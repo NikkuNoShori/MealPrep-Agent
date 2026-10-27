@@ -53,9 +53,9 @@ export const MEAL_SLOT_ACCENTS: Record<MealSlot, MealSlotAccent> = {
     key: 'breakfast',
     label: 'Breakfast',
     icon: Coffee,
-    color: 'text-amber-500',
+    color: 'text-amber-800 dark:text-amber-400',
     bg: 'bg-amber-500/10',
-    activeBg: 'bg-amber-500',
+    activeBg: 'bg-amber-700',
     gradientFrom: 'from-amber-500/10',
     gradientTo: 'to-amber-500/5',
   },
@@ -63,9 +63,9 @@ export const MEAL_SLOT_ACCENTS: Record<MealSlot, MealSlotAccent> = {
     key: 'lunch',
     label: 'Lunch',
     icon: Sun,
-    color: 'text-orange-500',
+    color: 'text-orange-800 dark:text-orange-400',
     bg: 'bg-orange-500/10',
-    activeBg: 'bg-orange-500',
+    activeBg: 'bg-orange-700',
     gradientFrom: 'from-orange-500/10',
     gradientTo: 'to-orange-500/5',
   },
@@ -73,9 +73,9 @@ export const MEAL_SLOT_ACCENTS: Record<MealSlot, MealSlotAccent> = {
     key: 'dinner',
     label: 'Dinner',
     icon: Moon,
-    color: 'text-indigo-500',
+    color: 'text-indigo-700 dark:text-indigo-400',
     bg: 'bg-indigo-500/10',
-    activeBg: 'bg-indigo-500',
+    activeBg: 'bg-indigo-600',
     gradientFrom: 'from-indigo-500/10',
     gradientTo: 'to-indigo-500/5',
   },
@@ -83,9 +83,9 @@ export const MEAL_SLOT_ACCENTS: Record<MealSlot, MealSlotAccent> = {
     key: 'snacks',
     label: 'Snacks',
     icon: Cookie,
-    color: 'text-pink-500',
+    color: 'text-pink-800 dark:text-pink-400',
     bg: 'bg-pink-500/10',
-    activeBg: 'bg-pink-500',
+    activeBg: 'bg-pink-700',
     gradientFrom: 'from-pink-500/10',
     gradientTo: 'to-pink-500/5',
   },
@@ -123,7 +123,7 @@ export const PLAN_LEVEL_LIST_ACCENTS = [
     key: '_non_recipe',
     label: 'Non-Recipe Items',
     icon: ShoppingCart,
-    color: 'text-teal-500',
+    color: 'text-teal-800 dark:text-teal-400',
     description: 'Extras like paper towels, foil, etc.',
   },
 ] as const
@@ -144,7 +144,7 @@ export interface MealPlanStatusAccent {
 export const MEAL_PLAN_STATUS_ACCENTS: Record<MealPlanStatusKey, MealPlanStatusAccent> = {
   draft: {
     label: 'Draft',
-    color: 'text-surface-500 dark:text-surface-400',
+    color: 'text-fg-muted',
     bg: 'bg-surface-100 dark:bg-white/[0.04]',
   },
   active: {
@@ -154,12 +154,12 @@ export const MEAL_PLAN_STATUS_ACCENTS: Record<MealPlanStatusKey, MealPlanStatusA
   },
   completed: {
     label: 'Done',
-    color: 'text-emerald-600 dark:text-emerald-400',
+    color: 'text-emerald-800 dark:text-emerald-400',
     bg: 'bg-emerald-50 dark:bg-emerald-500/10',
   },
   archived: {
     label: 'Archived',
-    color: 'text-surface-400 dark:text-surface-500',
+    color: 'text-fg-muted',
     bg: 'bg-surface-100 dark:bg-surface-800/60',
   },
 }
@@ -178,20 +178,20 @@ export interface InviteStatusAccent {
 
 export const INVITE_STATUS_ACCENTS: Record<InviteStatusKey, InviteStatusAccent> = {
   pending: {
-    color: 'text-amber-500',
-    badgeBg: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    color: 'text-amber-800 dark:text-amber-400',
+    badgeBg: 'bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400',
   },
   accepted: {
-    color: 'text-primary-500',
+    color: 'text-brand',
     badgeBg: 'bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400',
   },
   declined: {
-    color: 'text-red-500',
-    badgeBg: 'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400',
+    color: 'text-red-700 dark:text-red-400',
+    badgeBg: 'bg-gray-50 dark:bg-white/5 text-fg-muted',
   },
   expired: {
-    color: 'text-gray-400',
-    badgeBg: 'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400',
+    color: 'text-fg-muted',
+    badgeBg: 'bg-gray-50 dark:bg-white/5 text-fg-muted',
   },
 }
 
@@ -202,7 +202,7 @@ export const INVITE_STATUS_ACCENTS: Record<InviteStatusKey, InviteStatusAccent> 
 
 export const DASHBOARD_STAT_ACCENTS = {
   recipes: 'text-primary-600 dark:text-primary-400',
-  thisWeek: 'text-amber-600 dark:text-amber-400',
-  family: 'text-rose-500 dark:text-rose-400',
-  grocery: 'text-teal-600 dark:text-teal-400',
+  thisWeek: 'text-amber-800 dark:text-amber-400',
+  family: 'text-rose-800 dark:text-rose-400',
+  grocery: 'text-teal-800 dark:text-teal-400',
 } as const
