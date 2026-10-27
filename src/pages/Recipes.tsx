@@ -132,12 +132,12 @@ const Recipes = () => {
                 />
                 <div className="absolute inset-y-0 left-0 w-80 max-w-[85vw] bg-white dark:bg-[var(--rs-bg)] shadow-2xl animate-slide-up p-5 overflow-y-auto">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-surface-900 dark:text-white">Collections</h3>
+                    <h3 className="text-lg font-semibold text-fg">Collections</h3>
                     <button
                       onClick={() => setMobileCollectionsOpen(false)}
-                      className="p-2 rounded-xl text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
+                      className="p-2 rounded-xl text-fg-muted hover:text-fg-secondary transition-colors"
                     >
-                      <X className="h-5 w-5 text-surface-500" />
+                      <X className="h-5 w-5 text-fg-muted" />
                     </button>
                   </div>
                   <CollectionsSidebar
@@ -172,7 +172,7 @@ const Recipes = () => {
 
             {/* Recipe List */}
             <div className="flex-1 min-w-0 space-y-4">
-              <h1 className="text-2xl font-bold tracking-tight text-surface-900 dark:text-white">
+              <h1 className="text-2xl font-bold tracking-tight text-fg">
                 {viewMode === 'collection' && selectedCollectionName
                   ? selectedCollectionName
                   : viewMode === 'household'
@@ -187,7 +187,7 @@ const Recipes = () => {
               <div className="lg:hidden">
                 <button
                   onClick={() => setMobileCollectionsOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm text-sm font-medium text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-200/60 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl shadow-sm text-sm font-medium text-fg-muted hover:text-fg transition-colors"
                 >
                   <Filter className="h-4 w-4" />
                   Collections & Filters

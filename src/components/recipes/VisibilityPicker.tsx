@@ -45,14 +45,12 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
           inline-flex items-center gap-1.5 rounded-lg border border-border/60
           bg-background/80 backdrop-blur-sm shadow-sm
           ${isSmall ? 'h-8 px-2.5 text-xs' : 'h-9 px-3 text-sm'}
-          transition-all duration-200 ease-out
-          hover:border-primary-500/40 hover:text-primary-500 dark:hover:text-primary-400
-          active:scale-[0.97]
+          transition-all duration-200 ease-out hover:border-primary-500/40 hover:text-brand active:scale-[0.97]
           ${isOpen ? 'border-primary-500/50 shadow-md ring-1 ring-primary-500/20' : ''}
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
       >
-        <SelectedIcon className={`${isSmall ? 'h-3 w-3' : 'h-3.5 w-3.5'} text-muted-foreground transition-colors duration-200`} />
+        <SelectedIcon className={`${isSmall ? 'h-3 w-3' : 'h-3.5 w-3.5'} text-fg-muted transition-colors duration-200`} />
         <span className="font-medium">{selected.label}</span>
       </button>
 
@@ -84,8 +82,8 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
                     w-full flex items-start gap-2.5 rounded-lg px-2.5 py-2
                     transition-all duration-150 ease-out
                     ${isActive
-                      ? 'text-primary-500 dark:text-primary-400'
-                      : 'text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white'
+                      ? 'text-brand'
+                      : 'text-fg-muted hover:text-fg'
                     }
                   `}
                 >
@@ -97,10 +95,10 @@ export function VisibilityPicker({ value, onChange, disabled = false, size = "de
                     <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="text-left">
-                    <div className={`text-sm font-medium leading-tight ${isActive ? 'text-primary-500 dark:text-primary-400' : ''}`}>
+                    <div className={`text-sm font-medium leading-tight ${isActive ? 'text-brand' : ''}`}>
                       {option.label}
                     </div>
-                    <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    <div className="text-[11px] text-fg-muted leading-tight mt-0.5">
                       {option.description}
                     </div>
                   </div>

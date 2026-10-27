@@ -92,12 +92,12 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
       {/* Compact Search Bar */}
       <div className="flex gap-2">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-surface-400 z-10" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-fg-faint z-10" />
           <Input
             placeholder="Search recipes by name, ingredients, or tags..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 h-9 text-sm border border-surface-200 dark:border-white/[0.08] rounded-lg focus:border-primary-500 dark:focus:border-primary-400 bg-white dark:bg-white/[0.06] shadow-sm hover:shadow transition-all duration-200"
+            className="pl-9 h-9 text-sm border border-input rounded-lg focus:border-primary-500 dark:focus:border-primary-400 bg-white dark:bg-white/[0.06] shadow-sm hover:shadow transition-all duration-200"
           />
         </div>
         <Button
@@ -134,7 +134,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <div className="w-1 h-3 bg-primary-500 rounded-full"></div>
-            <span className="text-xs font-medium text-surface-600 dark:text-surface-400">Active Filters:</span>
+            <span className="text-xs font-medium text-fg-secondary">Active Filters:</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {filters.dietaryRestrictions.map(restriction => (
@@ -194,9 +194,9 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-primary-100 dark:bg-primary-900/30 rounded-md flex items-center justify-center">
-                    <span className="text-primary-500 dark:text-primary-400 text-xs">🥗</span>
+                    <span className="text-brand text-xs">🥗</span>
                   </div>
-                  <h4 className="text-sm font-semibold text-surface-900 dark:text-white">Dietary Restrictions</h4>
+                  <h4 className="text-sm font-semibold text-fg">Dietary Restrictions</h4>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {DIETARY_RESTRICTIONS.map(restriction => (
@@ -222,7 +222,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                   <div className="w-6 h-6 bg-primary-100 dark:bg-primary-900/30 rounded-md flex items-center justify-center">
                     <Clock className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
                   </div>
-                  <h4 className="text-sm font-semibold text-surface-900 dark:text-white">Prep Time</h4>
+                  <h4 className="text-sm font-semibold text-fg">Prep Time</h4>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {PREP_TIME_RANGES.map(range => (
@@ -246,9 +246,9 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-primary-100 dark:bg-primary-900/30 rounded-md flex items-center justify-center">
-                    <span className="text-primary-500 dark:text-primary-400 text-xs">⚡</span>
+                    <span className="text-brand text-xs">⚡</span>
                   </div>
-                  <h4 className="text-sm font-semibold text-surface-900 dark:text-white">Difficulty Level</h4>
+                  <h4 className="text-sm font-semibold text-fg">Difficulty Level</h4>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {DIFFICULTY_LEVELS.map(difficulty => (
@@ -272,9 +272,9 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-orange-100 dark:bg-orange-900/30 rounded-md flex items-center justify-center">
-                    <span className="text-orange-600 dark:text-orange-400 text-xs">🏷️</span>
+                    <span className="text-orange-800 dark:text-orange-400 text-xs">🏷️</span>
                   </div>
-                  <h4 className="text-sm font-semibold text-surface-900 dark:text-white">Popular Tags</h4>
+                  <h4 className="text-sm font-semibold text-fg">Popular Tags</h4>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {['Quick', 'Healthy', 'Budget-Friendly', 'Family-Friendly', 'Spicy', 'Sweet', 'Savory'].map(tag => (
@@ -283,7 +283,7 @@ export const RecipeSearch: React.FC<RecipeSearchProps> = ({
                       variant={filters.tags.includes(tag) ? 'default' : 'outline'}
                       className={`cursor-pointer min-w-0 justify-center text-center leading-tight px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         filters.tags.includes(tag)
-                          ? 'bg-orange-600 hover:bg-orange-700 text-white shadow'
+                          ? 'bg-orange-700 hover:bg-orange-800 text-white shadow'
                           : 'border border-surface-300 dark:border-white/[0.18] hover:border-orange-500 dark:hover:border-orange-400 bg-white dark:bg-white/[0.07]'
                       }`}
                       onClick={() => toggleTag(tag)}

@@ -29,9 +29,9 @@ const difficultyLabel: Record<string, string> = {
 }
 
 const difficultyColor: Record<string, string> = {
-  easy: 'text-emerald-600 dark:text-emerald-400',
-  medium: 'text-amber-600 dark:text-amber-400',
-  hard: 'text-rose-600 dark:text-rose-400',
+  easy: 'text-emerald-800 dark:text-emerald-400',
+  medium: 'text-amber-800 dark:text-amber-400',
+  hard: 'text-rose-800 dark:text-rose-400',
 }
 
 export const SimilarRecipesRail: React.FC<SimilarRecipesRailProps> = ({
@@ -45,7 +45,7 @@ export const SimilarRecipesRail: React.FC<SimilarRecipesRailProps> = ({
 
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-3 px-0.5">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-fg-muted mb-3 px-0.5">
         Similar Recipes
       </h2>
 
@@ -80,7 +80,7 @@ export const SimilarRecipesRail: React.FC<SimilarRecipesRailProps> = ({
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <ChefHat className="h-7 w-7 text-surface-300 dark:text-surface-600" />
+                    <ChefHat className="h-7 w-7 text-fg-faint" />
                   </div>
                 )}
 
@@ -101,19 +101,19 @@ export const SimilarRecipesRail: React.FC<SimilarRecipesRailProps> = ({
 
               {/* Card body */}
               <div className="p-2.5">
-                <p className="text-xs font-semibold text-surface-800 dark:text-surface-100 line-clamp-2 leading-tight mb-1.5">
+                <p className="text-xs font-semibold text-fg line-clamp-2 leading-tight mb-1.5">
                   {recipe.title}
                 </p>
 
                 <div className="flex items-center gap-2 flex-wrap">
                   {totalTime > 0 && (
-                    <span className="flex items-center gap-0.5 text-[10px] text-surface-500 dark:text-surface-400">
+                    <span className="flex items-center gap-0.5 text-[10px] text-fg-muted">
                       <Clock className="h-2.5 w-2.5" />
                       {totalTime}m
                     </span>
                   )}
                   {recipe.difficulty && difficultyLabel[recipe.difficulty] && (
-                    <span className={`text-[10px] font-medium ${difficultyColor[recipe.difficulty] || 'text-surface-500'}`}>
+                    <span className={`text-[10px] font-medium ${difficultyColor[recipe.difficulty] || 'text-fg-muted'}`}>
                       {difficultyLabel[recipe.difficulty]}
                     </span>
                   )}

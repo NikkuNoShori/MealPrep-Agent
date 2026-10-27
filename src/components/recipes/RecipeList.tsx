@@ -341,7 +341,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
           /* ── Select mode toolbar ── */
           <div className="flex-1 flex flex-wrap items-center gap-2">
             {/* Unified count — text-swaps to "N of M selected" */}
-            <span className="text-sm font-semibold text-surface-700 dark:text-surface-200 shrink-0">
+            <span className="text-sm font-semibold text-fg-secondary shrink-0">
               {selectedIds.size} of {totalCount} selected
             </span>
 
@@ -371,7 +371,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                     <button
                       key={v}
                       onClick={() => handleBulkVisibility(v)}
-                      className="w-full text-left px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] capitalize transition-colors"
+                      className="w-full text-left px-3 py-1.5 text-[13px] text-fg-secondary hover:bg-surface-50 dark:hover:bg-white/[0.05] capitalize transition-colors"
                     >
                       {v}
                     </button>
@@ -399,7 +399,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                       <button
                         key={c.id}
                         onClick={() => handleBulkAddToCollection(c.id, c.name)}
-                        className="w-full text-left px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors truncate"
+                        className="w-full text-left px-3 py-1.5 text-[13px] text-fg-secondary hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors truncate"
                       >
                         {c.icon && <span className="mr-1.5">{c.icon}</span>}{c.name}
                       </button>
@@ -414,7 +414,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
               variant="outline"
               size="sm"
               onClick={handleBulkDelete}
-              className="rounded-lg flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-700 border-rose-200 hover:border-rose-300 dark:text-rose-400 dark:border-rose-500/30 dark:hover:border-rose-400/50"
+              className="rounded-lg flex items-center gap-1.5 text-xs text-rose-800 hover:text-rose-800 dark:hover:text-rose-400 border-rose-200 hover:border-rose-300 dark:text-rose-400 dark:border-rose-500/30 dark:hover:border-rose-400/50"
             >
               <Trash2 className="h-3.5 w-3.5" />
               Delete
@@ -423,7 +423,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             {/* Exit select mode */}
             <button
               onClick={exitSelectMode}
-              className="ml-auto p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-white/[0.06] text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
+              className="ml-auto p-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-white/[0.06] text-fg-muted hover:text-fg-secondary transition-colors"
               title="Exit selection"
             >
               <X className="h-4 w-4" />
@@ -444,7 +444,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             <div className="flex items-center gap-3">
               {/* Unified count — "N recipes" in normal mode */}
               {totalCount > 0 && (
-                <span className="text-sm text-surface-400 dark:text-surface-500 shrink-0 tabular-nums">
+                <span className="text-sm text-fg-muted shrink-0 tabular-nums">
                   {totalCount} {totalCount === 1 ? 'recipe' : 'recipes'}
                 </span>
               )}
@@ -457,7 +457,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                   onClick={() => setViewMode("grid")}
                   className={`rounded-lg transition-all duration-200 ${
                     viewMode === "grid"
-                      ? "bg-white dark:bg-white/[0.08] shadow-sm"
+                      ? "bg-white dark:bg-white/[0.08] hover:bg-white dark:hover:bg-white/[0.08] shadow-sm text-fg hover:text-fg hover:translate-y-0"
                       : ""
                   }`}
                 >
@@ -469,7 +469,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                   onClick={() => setViewMode("list")}
                   className={`rounded-lg transition-all duration-200 ${
                     viewMode === "list"
-                      ? "bg-white dark:bg-white/[0.08] shadow-sm"
+                      ? "bg-white dark:bg-white/[0.08] hover:bg-white dark:hover:bg-white/[0.08] shadow-sm text-fg hover:text-fg hover:translate-y-0"
                       : ""
                   }`}
                 >
@@ -492,21 +492,21 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                   <div className="absolute top-full right-0 mt-1.5 z-[200] bg-white dark:bg-[var(--rs-bg-elevated)] border border-surface-200/60 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 py-1.5 min-w-[220px] animate-scale-in origin-top-right">
                     <button
                       onClick={toggleShowPhotos}
-                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-fg-secondary hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                     >
                       <span>Show photos</span>
                       <Switch checked={showPhotos} />
                     </button>
                     <button
                       onClick={toggleShowDescriptions}
-                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-fg-secondary hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                     >
                       <span>Show descriptions</span>
                       <Switch checked={showDescriptions} />
                     </button>
                     <button
                       onClick={toggleShowTags}
-                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] text-fg-secondary hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                     >
                       <span>Show tags</span>
                       <Switch checked={showTags} />
@@ -544,7 +544,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
               </div>
             </div>
 
-            <h3 className="text-2xl font-bold text-surface-900 dark:text-white mb-3">
+            <h3 className="text-2xl font-bold text-fg mb-3">
               {searchError
                 ? "Search failed"
                 : searchQuery || Object.values(filters).some((f) => f && f.length > 0)
@@ -553,7 +553,7 @@ export const RecipeList: React.FC<RecipeListProps> = ({
                 ? "Nothing shared with you yet"
                 : "Start building your recipe collection"}
             </h3>
-            <p className={`mb-8 text-lg leading-relaxed ${searchError ? 'text-status-error' : 'text-surface-600 dark:text-surface-400'}`}>
+            <p className={`mb-8 text-lg leading-relaxed ${searchError ? 'text-status-error' : 'text-fg-secondary'}`}>
               {searchError
                 ? "Something went wrong while searching. Please try again, or contact support if this keeps happening."
                 : searchQuery || Object.values(filters).some((f) => f && f.length > 0)
@@ -596,8 +596,8 @@ export const RecipeList: React.FC<RecipeListProps> = ({
             >
               {feedMode === 'shared' && recipe._sharerDisplayName && (
                 <div className="flex items-center gap-1.5 mb-1.5 px-0.5">
-                  <Share2 className="h-3 w-3 text-surface-400 dark:text-surface-500 shrink-0" />
-                  <span className="text-[11px] text-surface-400 dark:text-surface-500 truncate">
+                  <Share2 className="h-3 w-3 text-fg-muted shrink-0" />
+                  <span className="text-[11px] text-fg-muted truncate">
                     {recipe._sharerDisplayName}
                     {recipe._sharerUsername && ` · @${recipe._sharerUsername}`}
                   </span>

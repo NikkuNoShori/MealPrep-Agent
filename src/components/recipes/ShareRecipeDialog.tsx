@@ -45,39 +45,39 @@ export const ShareRecipeDialog: React.FC<ShareRecipeDialogProps> = ({
       <div className="relative w-full max-w-sm rounded-2xl bg-white dark:bg-[#1a1b21] border border-surface-200/60 dark:border-white/[0.08] shadow-2xl p-6 animate-scale-in">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-fg-muted hover:text-fg-secondary transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
 
         <div className="flex items-center gap-2.5 mb-4">
           <div className="w-8 h-8 rounded-xl bg-primary-100 dark:bg-primary-500/10 flex items-center justify-center shrink-0">
-            <Share2 className="h-4 w-4 text-primary-500" />
+            <Share2 className="h-4 w-4 text-brand" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-surface-900 dark:text-white">Share recipe</h2>
-            <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{recipeTitle}</p>
+            <h2 className="text-sm font-semibold text-fg">Share recipe</h2>
+            <p className="text-xs text-fg-muted truncate">{recipeTitle}</p>
           </div>
         </div>
 
         {shared ? (
           <div className="flex flex-col items-center gap-3 py-4">
             <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center">
-              <Check className="h-5 w-5 text-emerald-500" />
+              <Check className="h-5 w-5 text-emerald-800 dark:text-emerald-400" />
             </div>
-            <p className="text-sm text-surface-700 dark:text-surface-300 text-center">
+            <p className="text-sm text-fg-secondary text-center">
               Shared with <span className="font-medium">{identifier.trim()}</span>
             </p>
             <button
               onClick={() => { setShared(false); setIdentifier('') }}
-              className="text-xs text-primary-500 hover:text-primary-600 transition-colors"
+              className="text-xs text-brand hover:text-primary-600 transition-colors"
             >
               Share with someone else
             </button>
           </div>
         ) : (
           <>
-            <p className="text-xs text-surface-500 dark:text-surface-400 mb-3">
+            <p className="text-xs text-fg-muted mb-3">
               Enter the username or email address of the person you want to share with.
             </p>
             <input
@@ -86,11 +86,11 @@ export const ShareRecipeDialog: React.FC<ShareRecipeDialogProps> = ({
               onChange={(e) => setIdentifier(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="username or email"
-              className="w-full rounded-xl border border-surface-200/80 dark:border-white/[0.08] bg-surface-50 dark:bg-white/[0.03] px-3 py-2 text-sm text-surface-900 dark:text-white placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40 transition-shadow"
+              className="w-full rounded-xl border border-input bg-surface-50 dark:bg-white/[0.03] px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-primary-500/40 transition-shadow"
               autoFocus
             />
             <div className="flex items-center gap-2 mt-3">
-              <div className="flex items-center gap-1 text-[11px] text-surface-400 dark:text-surface-500">
+              <div className="flex items-center gap-1 text-[11px] text-fg-muted">
                 <AlertCircle className="h-3 w-3 shrink-0" />
                 They'll see it in "Shared with me"
               </div>

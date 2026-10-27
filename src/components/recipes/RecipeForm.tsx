@@ -114,7 +114,7 @@ const UnitPicker: React.FC<UnitPickerProps> = ({
             : "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         }
       >
-        <span className={displayValue ? "" : "text-muted-foreground"}>
+        <span className={displayValue ? "" : "text-fg-muted"}>
           {displayValue || "Unit"}
         </span>
         <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 shrink-0 ml-1" />
@@ -123,7 +123,7 @@ const UnitPicker: React.FC<UnitPickerProps> = ({
       {open && (
         <div className="absolute z-50 top-[calc(100%+4px)] left-0 w-48 rounded-md border bg-popover text-popover-foreground shadow-md p-1 animate-in fade-in-0 zoom-in-95">
           {/* Measurement units */}
-          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Measurement</div>
+          <div className="px-2 py-1 text-xs font-semibold text-fg-muted">Measurement</div>
           {[...measurementUnits.weight, ...measurementUnits.volume].map((unit) => (
             <div key={unit} className={itemClass} onClick={() => select(unit)}>
               {unit}
@@ -249,7 +249,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
         type="button"
         {...attributes}
         {...listeners}
-        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors"
+        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-fg-muted hover:text-foreground transition-colors"
         aria-label="Drag to reorder"
         disabled={isEditing}
       >
@@ -276,7 +276,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
               onClick={handleSave}
               className="h-8 w-8"
             >
-              <Check className="h-4 w-4 text-primary-500" />
+              <Check className="h-4 w-4 text-brand" />
             </Button>
             <Button
               type="button"
@@ -292,7 +292,7 @@ const SortableInstructionItem: React.FC<SortableInstructionItemProps> = ({
       ) : (
         <>
           <p
-            className="flex-1 cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-colors hover:text-primary-500 dark:hover:text-primary-400"
+            className="flex-1 cursor-pointer rounded px-2 py-1 -mx-2 -my-1 transition-colors hover:text-brand"
             onClick={() => setIsEditing(true)}
             title="Click to edit"
           >
@@ -422,7 +422,7 @@ const EditableIngredientItem: React.FC<EditableIngredientItemProps> = ({
     <div className="flex items-center justify-between rounded bg-muted p-2">
       <span className="font-medium">{ingredient.name}</span>
       <div className="flex items-center gap-2">
-        <span className="text-muted-foreground">
+        <span className="text-fg-muted">
           {ingredient.amount != null && Number(ingredient.amount) !== 0
             ? `${ingredient.amount} ${ingredient.unit}`
             : ingredient.unit}
@@ -792,7 +792,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
             <h1 className="text-3xl font-bold">
               {isEditing ? "Edit Recipe" : "Add New Recipe"}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-fg-muted">
               {isEditing
                 ? "Update your recipe details"
                 : "Create a new recipe for your collection"}
@@ -997,7 +997,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                     {/* URL Input */}
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        <ImageIcon className="h-4 w-4 text-fg-muted" />
                       </div>
                       <Input
                         id="imageUrl"
@@ -1009,7 +1009,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-fg-muted">
                     Upload an image file or enter an image URL
                   </p>
                 </div>
@@ -1237,7 +1237,7 @@ export const RecipeForm: React.FC<RecipeFormProps> = ({
                       <button
                         type="button"
                         onClick={() => removeTag(tag)}
-                        className="text-muted-foreground hover:text-foreground p-1 rounded -ml-1 flex-shrink-0"
+                        className="text-fg-muted hover:text-foreground p-1 rounded -ml-1 flex-shrink-0"
                         aria-label={`Remove ${tag} tag`}
                       >
                         <X className="h-3 w-3" />

@@ -225,10 +225,10 @@ export const RecipeCard: React.FC<Props> = (props) => {
             onMouseEnter={() => handleReactionMouseEnter("up")}
             onMouseLeave={handleReactionMouseLeave}
           >
-            <ThumbsUp className={`${iconSize} text-primary-500 dark:text-primary-400`} />
+            <ThumbsUp className={`${iconSize} text-brand`} />
             <span className={`${textSize} font-semibold text-primary-600 dark:text-primary-300`}>{thumbsUp.length}</span>
             {showReactionTooltip === "up" && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-surface-900 dark:bg-surface-100 text-white dark:text-surface-900 text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-surface-900 dark:bg-surface-100 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
                 {thumbsUp.map((r) => r.name ?? "Someone").join(", ")}
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-surface-900 dark:bg-surface-100 rotate-45" />
               </div>
@@ -241,10 +241,10 @@ export const RecipeCard: React.FC<Props> = (props) => {
             onMouseEnter={() => handleReactionMouseEnter("down")}
             onMouseLeave={handleReactionMouseLeave}
           >
-            <ThumbsDown className={`${iconSize} text-rose-500 dark:text-rose-400`} />
-            <span className={`${textSize} font-semibold text-rose-600 dark:text-rose-300`}>{thumbsDown.length}</span>
+            <ThumbsDown className={`${iconSize} text-rose-800 dark:text-rose-400`} />
+            <span className={`${textSize} font-semibold text-rose-800 dark:text-rose-300`}>{thumbsDown.length}</span>
             {showReactionTooltip === "down" && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-surface-900 dark:bg-surface-100 text-white dark:text-surface-900 text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[100] bg-surface-900 dark:bg-surface-100 text-white text-xs font-medium rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
                 {thumbsDown.map((r) => r.name ?? "Someone").join(", ")}
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-surface-900 dark:bg-surface-100 rotate-45" />
               </div>
@@ -258,7 +258,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
   const AllergyBadge = () => {
     if (!hasAllergyWarning) return null;
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold flex-shrink-0">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 text-[11px] font-semibold flex-shrink-0">
         <ShieldAlert className="h-3 w-3" />
         Allergen
       </span>
@@ -284,7 +284,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
           className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:scale-110 active:scale-95 transition-all duration-150`}
           title="Thumbs down"
         >
-          <ThumbsDown className={`${iconSize} text-rose-500 dark:text-rose-400`} />
+          <ThumbsDown className={`${iconSize} text-rose-800 dark:text-rose-400`} />
         </button>
         {dependents.length > 0 && (
           <div className="relative">
@@ -293,17 +293,17 @@ export const RecipeCard: React.FC<Props> = (props) => {
               className={`${btnSize} rounded-full bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-primary-500/10 dark:hover:bg-primary-500/20 hover:scale-110 active:scale-95 transition-all duration-150`}
               title="React for family member"
             >
-              <Users className={`${iconSize} text-surface-500 dark:text-surface-400`} />
+              <Users className={`${iconSize} text-fg-muted`} />
             </button>
             {showReactionPopover && (
               <div
                 className="absolute bottom-full left-0 mb-2 bg-white dark:bg-[#16171c] rounded-xl shadow-2xl shadow-black/20 border border-surface-200/80 dark:border-white/10 py-1.5 min-w-[200px] z-[100] animate-scale-in origin-bottom-left"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="px-3 py-1.5 text-[11px] font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-widest">React for</div>
+                <div className="px-3 py-1.5 text-[11px] font-semibold text-fg-muted uppercase tracking-widest">React for</div>
                 {dependents.map((dep) => (
                   <div key={dep.id} className="flex items-center justify-between px-3 py-2 hover:bg-surface-50 dark:hover:bg-white/5 transition-colors">
-                    <span className="text-sm font-medium text-surface-700 dark:text-surface-200">{dep.name}</span>
+                    <span className="text-sm font-medium text-fg-secondary">{dep.name}</span>
                     <div className="flex items-center gap-0.5">
                       <button
                         onClick={(e) => { handleReactionClick(e, "thumbs_up", dep.id); setShowReactionPopover(false); }}
@@ -315,7 +315,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
                         onClick={(e) => { handleReactionClick(e, "thumbs_down", dep.id); setShowReactionPopover(false); }}
                         className="w-7 h-7 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center transition-colors"
                       >
-                        <ThumbsDown className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
+                        <ThumbsDown className="h-3.5 w-3.5 text-rose-800 dark:text-rose-400" />
                       </button>
                     </div>
                   </div>
@@ -338,7 +338,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
           className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-white dark:hover:bg-white/20 hover:scale-110 active:scale-95 transition-all duration-150"
           title={copiedLink ? "Copied!" : "Share"}
         >
-          {copiedLink ? <Check className="h-3.5 w-3.5 text-primary-500" /> : <Share2 className="h-3.5 w-3.5 text-surface-600 dark:text-surface-300" />}
+          {copiedLink ? <Check className="h-3.5 w-3.5 text-brand" /> : <Share2 className="h-3.5 w-3.5 text-fg-secondary" />}
         </button>
       );
     }
@@ -350,7 +350,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
           className="w-7 h-7 rounded-lg bg-white/90 dark:bg-white/10 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-white dark:hover:bg-white/20 hover:scale-110 active:scale-95 transition-all duration-150"
           title="More options"
         >
-          <MoreVertical className="h-4 w-4 text-surface-600 dark:text-surface-300" />
+          <MoreVertical className="h-4 w-4 text-fg-secondary" />
         </button>
         {showOverflowMenu && (
           <div
@@ -359,15 +359,15 @@ export const RecipeCard: React.FC<Props> = (props) => {
           >
             <button
               onClick={handleShare}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-fg-muted hover:text-fg transition-colors"
             >
-              {copiedLink ? <Check className="h-3.5 w-3.5 text-primary-500" /> : <Share2 className="h-3.5 w-3.5" />}
+              {copiedLink ? <Check className="h-3.5 w-3.5 text-brand" /> : <Share2 className="h-3.5 w-3.5" />}
               {copiedLink ? "Copied!" : "Copy link"}
             </button>
             {onEdit && (
               <button
                 onClick={(e) => { e.stopPropagation(); setShowOverflowMenu(false); onEdit(recipe); }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-fg-muted hover:text-fg transition-colors"
               >
                 <Edit className="h-3.5 w-3.5" />
                 Edit
@@ -376,7 +376,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
             {onDelete && recipeId && (
               <button
                 onClick={(e) => { e.stopPropagation(); setShowOverflowMenu(false); onDelete(recipeId); }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-surface-400 dark:text-surface-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-fg-muted hover:text-rose-800 dark:hover:text-rose-400 transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete
@@ -396,7 +396,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
         {previewActions.hasDetails && (
           <button
             onClick={previewActions.onExpand}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-surface-400 dark:text-surface-500 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-fg-muted hover:text-fg-secondary transition-colors"
             aria-label={previewActions.expanded ? "Collapse recipe details" : "Expand recipe details"}
           >
             {previewActions.expanded
@@ -417,7 +417,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
           </Button>
         )}
         {previewActions.saved && (
-          <span className="flex items-center gap-1 text-[12px] font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="flex items-center gap-1 text-[12px] font-medium text-emerald-800 dark:text-emerald-400">
             <CheckCircle2 className="h-3.5 w-3.5" /> Saved ✓
           </span>
         )}
@@ -459,8 +459,8 @@ export const RecipeCard: React.FC<Props> = (props) => {
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 {isPreview && previewActions?.saved
-                  ? <CheckCircle2 className="h-10 w-10 text-emerald-400/60" />
-                  : <ChefHat className="h-10 w-10 text-surface-400 dark:text-surface-500" />
+                  ? <CheckCircle2 className="h-10 w-10 text-emerald-800 dark:text-emerald-400" />
+                  : <ChefHat className="h-10 w-10 text-fg-muted" />
                 }
               </div>
             )}
@@ -498,11 +498,11 @@ export const RecipeCard: React.FC<Props> = (props) => {
             <div>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-[15px] text-surface-900 dark:text-white leading-snug truncate" title={recipe.title}>
+                  <h3 className="font-semibold text-[15px] text-fg leading-snug truncate" title={recipe.title}>
                     {recipe.title}
                   </h3>
                   {(recipe.author || recipe.cuisine) && (
-                    <p className="text-[12px] text-surface-400 dark:text-surface-500 mt-0.5">
+                    <p className="text-[12px] text-fg-muted mt-0.5">
                       {recipe.author
                         ? `@${recipe.author.username || recipe.author.displayName}`
                         : recipe.cuisine}
@@ -530,7 +530,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
                 )}
               </div>
               {showDescriptions && recipe.description && (
-                <p className="text-[13px] text-surface-500 dark:text-surface-400 line-clamp-2 mt-1 leading-relaxed">
+                <p className="text-[13px] text-fg-muted line-clamp-2 mt-1 leading-relaxed">
                   {recipe.description}
                 </p>
               )}
@@ -538,7 +538,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
 
             {/* Bottom: meta + reactions */}
             <div className="flex items-center justify-between gap-3 mt-auto">
-              <div className="flex items-center gap-2 flex-wrap text-[12px] text-surface-400 dark:text-surface-500">
+              <div className="flex items-center gap-2 flex-wrap text-[12px] text-fg-muted">
                 <AllergyBadge />
                 {recipe.servings && (
                   <span className="flex items-center gap-1">
@@ -546,10 +546,10 @@ export const RecipeCard: React.FC<Props> = (props) => {
                   </span>
                 )}
                 {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
-                  <span key={i} className="text-surface-400 dark:text-surface-500">{tag}</span>
+                  <span key={i} className="text-fg-muted">{tag}</span>
                 ))}
                 {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
-                  <span className="text-surface-300 dark:text-surface-600">+{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}</span>
+                  <span className="text-fg-muted">+{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}</span>
                 )}
               </div>
               {!isPreview && <ReactionBadges size="sm" />}
@@ -588,7 +588,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-2">
               <div className="w-16 h-16 rounded-2xl bg-white/40 dark:bg-white/[0.06] flex items-center justify-center">
-                <ChefHat className="h-8 w-8 text-surface-400 dark:text-surface-500" />
+                <ChefHat className="h-8 w-8 text-fg-muted" />
               </div>
             </div>
           )}
@@ -606,13 +606,13 @@ export const RecipeCard: React.FC<Props> = (props) => {
           {/* Bottom-left: time + servings overlaid on image */}
           <div className="absolute bottom-2.5 left-2.5 flex items-center gap-2">
             {totalTime > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md">
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/65 backdrop-blur-md">
                 <Clock className="h-3 w-3 text-white/80" />
                 <span className="text-[11px] font-medium text-white/90">{totalTime}m</span>
               </div>
             )}
             {recipe.servings && (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md">
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/65 backdrop-blur-md">
                 <Users className="h-3 w-3 text-white/80" />
                 <span className="text-[11px] font-medium text-white/90">{recipe.servings}</span>
               </div>
@@ -665,13 +665,13 @@ export const RecipeCard: React.FC<Props> = (props) => {
         {/* Content area */}
         <div className="flex flex-col flex-1 px-3.5 pt-3 pb-3">
           {/* Title */}
-          <h3 className="font-semibold text-[15px] text-surface-900 dark:text-white leading-snug line-clamp-2" title={recipe.title}>
+          <h3 className="font-semibold text-[15px] text-fg leading-snug line-clamp-2" title={recipe.title}>
             {recipe.title}
           </h3>
 
           {/* Author or cuisine */}
           {(recipe.author || recipe.cuisine) && (
-            <p className="text-[12px] text-surface-400 dark:text-surface-500 mt-0.5">
+            <p className="text-[12px] text-fg-muted mt-0.5">
               {recipe.author
                 ? `@${recipe.author.username || recipe.author.displayName}`
                 : recipe.cuisine}
@@ -680,7 +680,7 @@ export const RecipeCard: React.FC<Props> = (props) => {
 
           {/* Description */}
           {showDescriptions && recipe.description && (
-            <p className="text-[12px] text-surface-500 dark:text-surface-400 line-clamp-2 mt-1.5 leading-relaxed">
+            <p className="text-[12px] text-fg-muted line-clamp-2 mt-1.5 leading-relaxed">
               {recipe.description}
             </p>
           )}
@@ -694,12 +694,12 @@ export const RecipeCard: React.FC<Props> = (props) => {
             <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden flex-wrap">
               <AllergyBadge />
               {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").slice(0, 2).map((tag, i) => (
-                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-100 dark:bg-white/[0.06] text-[11px] font-medium text-surface-500 dark:text-surface-400 truncate max-w-[80px]">
+                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-100 dark:bg-white/[0.06] text-[11px] font-medium text-fg-muted truncate max-w-[80px]">
                   {tag}
                 </span>
               ))}
               {showTags && recipe.tags && recipe.tags.filter(t => t !== "ALLERGY WARNING").length > 2 && (
-                <span className="text-[11px] text-surface-300 dark:text-surface-600 font-medium flex-shrink-0">
+                <span className="text-[11px] text-fg-muted font-medium flex-shrink-0">
                   +{recipe.tags.filter(t => t !== "ALLERGY WARNING").length - 2}
                 </span>
               )}
