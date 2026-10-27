@@ -122,7 +122,7 @@ const MealPlanHistory = ({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-500/50" />
+        <Loader2 className="h-8 w-8 animate-spin text-brand/50" />
       </div>
     );
   }
@@ -130,9 +130,9 @@ const MealPlanHistory = ({
   if (plans.length === 0) {
     return (
       <div className="text-center py-12">
-        <Clock className="h-10 w-10 text-surface-300 dark:text-gray-600 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-surface-800 dark:text-gray-200 mb-1">No history yet</h3>
-        <p className="text-sm text-surface-500 dark:text-gray-400">
+        <Clock className="h-10 w-10 text-fg-faint mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-fg mb-1">No history yet</h3>
+        <p className="text-sm text-fg-muted">
           Completed and archived plans will appear here.
         </p>
       </div>
@@ -160,7 +160,7 @@ const MealPlanHistory = ({
               {showDivider && (
                 <div className="flex items-center gap-3 py-3">
                   <div className="flex-1 border-t border-surface-100 dark:border-white/[0.05]" />
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400 dark:text-surface-600">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-fg-muted">
                     {group === 'completed' ? 'Completed' : 'Archived'}
                   </span>
                   <div className="flex-1 border-t border-surface-100 dark:border-white/[0.05]" />
@@ -178,20 +178,20 @@ const MealPlanHistory = ({
                     <Icon className={`h-4.5 w-4.5 ${cfg.color}`} style={{ width: '1.125rem', height: '1.125rem' }} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-surface-800 dark:text-gray-200 leading-snug">
+                    <p className="text-sm font-semibold text-fg leading-snug">
                       {plan.title || 'Untitled Plan'}
                     </p>
-                    <p className="text-xs text-surface-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-fg-muted mt-0.5">
                       {formatDateRange(plan.startDate, plan.endDate)}
                       {mealCount > 0 && (
                         <>
-                          <span className="mx-1.5 text-surface-300 dark:text-gray-600">·</span>
+                          <span className="mx-1.5 text-fg-muted">·</span>
                           {mealCount} meals
                         </>
                       )}
                       {groceryCount > 0 && (
                         <>
-                          <span className="mx-1.5 text-surface-300 dark:text-gray-600">·</span>
+                          <span className="mx-1.5 text-fg-muted">·</span>
                           {groceryCount} grocery items
                         </>
                       )}
@@ -205,7 +205,7 @@ const MealPlanHistory = ({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
-                    className="h-8 w-8 flex items-center justify-center rounded-xl text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
+                    className="h-8 w-8 flex items-center justify-center rounded-xl text-fg-faint hover:text-fg-secondary hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                     onClick={() => onPlanMenuToggle(planMenuOpen === plan.id ? null : plan.id)}
                   >
                     <MoreHorizontal className="h-4 w-4" />
@@ -216,7 +216,7 @@ const MealPlanHistory = ({
 
                       {/* Copy to new plan */}
                       <button
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-fg-secondary hover:text-fg hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                         onClick={() => { onCopy(plan.id); onPlanMenuToggle(null); }}
                         disabled={copyPending}
                       >
@@ -227,7 +227,7 @@ const MealPlanHistory = ({
                       {/* Restore to active */}
                       {(plan.status === 'completed' || plan.status === 'archived') && (
                         <button
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-fg-secondary hover:text-fg hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                           onClick={() => { onStatusChange(plan.id, 'active'); onPlanMenuToggle(null); }}
                         >
                           <RotateCcw className="h-3.5 w-3.5 flex-shrink-0" />
@@ -238,7 +238,7 @@ const MealPlanHistory = ({
                       {/* Archive (completed plans only) */}
                       {plan.status === 'completed' && (
                         <button
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-fg-secondary hover:text-fg hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                           onClick={() => { onStatusChange(plan.id, 'archived'); onPlanMenuToggle(null); }}
                         >
                           <Archive className="h-3.5 w-3.5 flex-shrink-0" />
@@ -249,10 +249,10 @@ const MealPlanHistory = ({
                       {/* Mark as complete (stale active/draft) */}
                       {(plan.status === 'draft' || plan.status === 'active') && (
                         <button
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-fg-secondary hover:text-fg hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                           onClick={() => { setCompleteTarget(plan); onPlanMenuToggle(null); }}
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
+                          <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-emerald-800 dark:text-emerald-400" />
                           Mark as complete
                         </button>
                       )}
@@ -261,7 +261,7 @@ const MealPlanHistory = ({
 
                       {/* Delete */}
                       <button
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-surface-400 dark:text-surface-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/5 transition-colors"
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-fg-muted hover:text-rose-800 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/5 transition-colors"
                         onClick={() => { onPlanMenuToggle(null); setDeleteTarget(plan); }}
                       >
                         <Trash2 className="h-3.5 w-3.5 flex-shrink-0" />
@@ -321,10 +321,10 @@ const MealPlanHistory = ({
                     <Icon className={`h-5 w-5 ${cfg.color}`} />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-surface-900 dark:text-white truncate">
+                    <h2 className="text-base font-semibold text-fg truncate">
                       {detailPlan.title || 'Untitled Plan'}
                     </h2>
-                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
+                    <p className="text-xs text-fg-muted mt-0.5">
                       {formatDateRange(detailPlan.startDate, detailPlan.endDate)}
                     </p>
                   </div>
@@ -332,7 +332,7 @@ const MealPlanHistory = ({
 
                 {/* Stats + close */}
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <div className="hidden sm:flex items-center gap-3 text-xs text-surface-500 dark:text-surface-400">
+                  <div className="hidden sm:flex items-center gap-3 text-xs text-fg-muted">
                     <span className="flex items-center gap-1">
                       <ChefHat className="h-3.5 w-3.5" />
                       {mealCount} meal{mealCount !== 1 ? 's' : ''}
@@ -348,7 +348,7 @@ const MealPlanHistory = ({
                     </span>
                   </div>
                   <button
-                    className="p-1.5 rounded-lg text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
+                    className="p-1.5 rounded-lg text-fg-muted hover:text-fg-secondary hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                     onClick={() => setDetailPlan(null)}
                     aria-label="Close"
                   >
@@ -363,17 +363,17 @@ const MealPlanHistory = ({
 
                   {/* Meals column */}
                   <div className="p-6">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3 flex items-center gap-1.5">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted mb-3 flex items-center gap-1.5">
                       <ChefHat className="h-3.5 w-3.5" />
                       Meals
                     </h3>
                     {mealRows.length === 0 ? (
-                      <p className="text-sm text-surface-400 dark:text-surface-500 italic">No meals recorded.</p>
+                      <p className="text-sm text-fg-muted italic">No meals recorded.</p>
                     ) : (
                       <div className="space-y-1.5">
                         {mealRows.map((row) => (
                           <div key={row.key} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 dark:bg-white/[0.03] border border-surface-100 dark:border-white/[0.04]">
-                            <span className="text-sm text-surface-700 dark:text-surface-200 leading-snug">{row.name}</span>
+                            <span className="text-sm text-fg-secondary leading-snug">{row.name}</span>
                           </div>
                         ))}
                       </div>
@@ -382,12 +382,12 @@ const MealPlanHistory = ({
 
                   {/* Grocery column */}
                   <div className="p-6">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3 flex items-center gap-1.5">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted mb-3 flex items-center gap-1.5">
                       <ShoppingCart className="h-3.5 w-3.5" />
                       Grocery list
                     </h3>
                     {groceryItems.length === 0 ? (
-                      <p className="text-sm text-surface-400 dark:text-surface-500 italic">No grocery list.</p>
+                      <p className="text-sm text-fg-muted italic">No grocery list.</p>
                     ) : (
                       <div className="space-y-1.5">
                         {groceryItems.map((item) => (
@@ -400,9 +400,9 @@ const MealPlanHistory = ({
                             }`}
                           >
                             {item.isChecked && (
-                              <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
+                              <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-emerald-800 dark:text-emerald-400" />
                             )}
-                            <span className={`text-sm leading-snug ${item.isChecked ? 'line-through text-surface-400 dark:text-surface-500' : 'text-surface-700 dark:text-surface-200'}`}>
+                            <span className={`text-sm leading-snug ${item.isChecked ? 'line-through text-fg-muted' : 'text-fg-secondary'}`}>
                               {item.amount != null ? `${item.amount} ` : ''}
                               {item.unit ? `${item.unit} ` : ''}
                               {item.name}
@@ -420,7 +420,7 @@ const MealPlanHistory = ({
                 <div className="flex items-center gap-2">
                   {(detailPlan.status === 'completed' || detailPlan.status === 'archived') && (
                     <button
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-surface-600 dark:text-surface-300 border border-surface-200 dark:border-white/[0.08] hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-fg-secondary border border-surface-200 dark:border-white/[0.08] hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                       onClick={() => { onStatusChange(detailPlan.id, 'active'); setDetailPlan(null); }}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -429,10 +429,10 @@ const MealPlanHistory = ({
                   )}
                   {(detailPlan.status === 'draft' || detailPlan.status === 'active') && (
                     <button
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-surface-600 dark:text-surface-300 border border-surface-200 dark:border-white/[0.08] hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-fg-secondary border border-surface-200 dark:border-white/[0.08] hover:bg-surface-50 dark:hover:bg-white/[0.05] transition-colors"
                       onClick={() => { setCompleteTarget(detailPlan); setDetailPlan(null); }}
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-800 dark:text-emerald-400" />
                       Mark complete
                     </button>
                   )}

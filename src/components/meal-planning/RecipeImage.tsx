@@ -13,7 +13,7 @@ const RecipeImage = ({ src, alt, size }: { src?: string; alt: string; size: 'sm'
   if (!src || failed) {
     return (
       <div className={`${sizeClasses} bg-gradient-to-br from-surface-100 to-surface-50 dark:from-white/[0.06] dark:to-white/[0.02] flex items-center justify-center flex-shrink-0`}>
-        <UtensilsCrossed className={`${iconSize} text-surface-300 dark:text-gray-600`} />
+        <UtensilsCrossed className={`${iconSize} text-fg-muted`} />
       </div>
     );
   }

@@ -396,7 +396,7 @@ const RecipeSelectorModal = ({
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'var(--rs-search-bg)', borderRadius: 12,
-            border: `1px solid var(--rs-border-subtle)`,
+            border: '1px solid hsl(var(--input))', // form-field boundary must be >= 3:1 (WCAG 1.4.11)
             padding: '8px 12px', marginTop: 14,
             transition: 'border-color 0.15s',
           }}>

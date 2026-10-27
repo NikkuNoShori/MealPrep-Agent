@@ -62,10 +62,10 @@ const DAILY_SLOTS = DAILY_MEAL_SLOTS;
 const PLAN_LISTS = PLAN_LEVEL_LIST_ACCENTS;
 
 const STATUS_CONFIG: Record<MealPlanStatus, { label: string; color: string; bg: string }> = {
-  draft: { label: 'Draft', color: 'text-surface-600 dark:text-surface-400', bg: 'bg-surface-100 dark:bg-white/[0.04]' },
+  draft: { label: 'Draft', color: 'text-fg-secondary', bg: 'bg-surface-100 dark:bg-white/[0.04]' },
   active: { label: 'Active', color: 'text-primary-600 dark:text-primary-400', bg: 'bg-primary-50 dark:bg-primary-500/10' },
   completed: { label: 'Done', color: 'text-primary-600 dark:text-primary-400', bg: 'bg-primary-50 dark:bg-primary-500/10' },
-  archived: { label: 'Archived', color: 'text-surface-500 dark:text-surface-500', bg: 'bg-surface-100 dark:bg-surface-800' },
+  archived: { label: 'Archived', color: 'text-fg-muted', bg: 'bg-surface-100 dark:bg-surface-800' },
 };
 
 function getWeekDates(weekStart: Date): Date[] {
@@ -235,24 +235,24 @@ function WeekLabelDropdown({
             : 'cursor-default',
         ].join(' ')}
       >
-        <h2 className="text-sm font-semibold text-surface-900 dark:text-white whitespace-nowrap">
+        <h2 className="text-sm font-semibold text-fg whitespace-nowrap">
           {weekLabel}
         </h2>
         {canOpen && (
-          <ChevronDown className={`h-3.5 w-3.5 text-surface-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`h-3.5 w-3.5 text-fg-faint transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
         )}
       </button>
       {weekSubLabel && (
-        <span className="text-[10px] text-surface-400 dark:text-surface-500 -mt-0.5 pointer-events-none">
+        <span className="text-[10px] text-fg-muted -mt-0.5 pointer-events-none">
           {weekSubLabel}
         </span>
       )}
 
       {open && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-10 z-50 min-w-[240px] rounded-xl border border-surface-200/80 dark:border-white/[0.08] shadow-xl p-1.5 animate-scale-in" style={{ background: 'hsl(var(--popover))' }}>
+        <div className="absolute left-0 top-10 z-50 min-w-[240px] max-w-[calc(100vw-2rem)] rounded-xl border border-surface-200/80 dark:border-white/[0.08] shadow-xl p-1.5 animate-scale-in" style={{ background: 'hsl(var(--popover))' }}>
 
           {plans.length > 1 && (
-            <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">
+            <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
               Switch plan
             </p>
           )}
@@ -269,8 +269,8 @@ function WeekLabelDropdown({
                   className={[
                     'flex items-center w-full rounded-lg transition-colors group',
                     isActive
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/[0.06]',
+                      ? 'bg-surface-100 dark:bg-white/10'
+                      : 'hover:bg-surface-100 dark:hover:bg-white/[0.06]',
                   ].join(' ')}
                 >
                   {/* Plan select area */}
@@ -278,10 +278,10 @@ function WeekLabelDropdown({
                     onClick={() => { onSelect(p.id); setPlanMenuOpen(null); setOpen(false); }}
                     className="flex flex-col flex-1 min-w-0 text-left px-3 py-2"
                   >
-                    <span className={`text-xs font-medium truncate ${isActive ? 'text-white' : 'text-surface-700 dark:text-surface-300'}`}>
+                    <span className={`text-xs font-medium truncate ${isActive ? 'text-fg' : 'text-fg-secondary'}`}>
                       {p.title || 'Untitled'}
                     </span>
-                    <span className={`text-[10px] mt-0.5 ${isActive ? 'text-white/60' : 'text-surface-400 dark:text-surface-500'}`}>
+                    <span className={`text-[10px] mt-0.5 text-fg-muted`}>
                       {formatPlanRange(p)}
                     </span>
                   </button>
@@ -296,8 +296,8 @@ function WeekLabelDropdown({
                       className={[
                         'flex-shrink-0 h-7 w-7 flex items-center justify-center rounded-lg mr-1 transition-colors',
                         isThisPlanMenuOpen
-                          ? 'bg-white/20 text-white'
-                          : 'text-white/50 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100',
+                          ? 'bg-surface-200 dark:bg-white/20 text-fg'
+                          : 'text-fg-muted hover:text-fg hover:bg-surface-100 dark:hover:bg-white/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                       ].join(' ')}
                       title="Plan actions"
                     >
@@ -314,7 +314,7 @@ function WeekLabelDropdown({
                   >
                     {onRename && (
                       <button
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-white/[0.06] transition-colors"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-fg-secondary hover:text-fg hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                         onClick={() => { onRename(); setPlanMenuOpen(null); setOpen(false); }}
                       >
                         <Pencil className="h-3 w-3" />
@@ -323,19 +323,19 @@ function WeekLabelDropdown({
                     )}
                     {onComplete && (
                       <button
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-white/[0.06] transition-colors"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-fg-secondary hover:text-fg hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                         onClick={() => { onComplete(); setPlanMenuOpen(null); setOpen(false); }}
                       >
-                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                        <CheckCircle2 className="h-3 w-3 text-emerald-800 dark:text-emerald-400" />
                         Mark complete
                       </button>
                     )}
                     {onRestore && (
                       <button
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white hover:bg-white/[0.06] transition-colors"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-fg-secondary hover:text-fg hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                         onClick={() => { onRestore(); setPlanMenuOpen(null); setOpen(false); }}
                       >
-                        <CheckCircle2 className="h-3 w-3 text-surface-400" />
+                        <CheckCircle2 className="h-3 w-3 text-fg-faint" />
                         Restore to active
                       </button>
                     )}
@@ -343,7 +343,7 @@ function WeekLabelDropdown({
                       <>
                         <div className="my-1 border-t border-surface-100 dark:border-white/[0.06]" />
                         <button
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-500/[0.06] transition-colors"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-rose-800 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-400 hover:bg-rose-500/[0.06] transition-colors"
                           onClick={() => { onDelete(); setPlanMenuOpen(null); setOpen(false); }}
                         >
                           <Trash2 className="h-3 w-3" />
@@ -366,26 +366,26 @@ function WeekLabelDropdown({
               {!historyExpanded ? (
                 <button
                   onClick={() => setShowHistory(true)}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 hover:bg-white/[0.06] transition-colors"
+                  className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-fg-muted hover:text-fg-secondary hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                 >
                   <ChevronDown className="h-3 w-3" />
                   Completed & archived ({history.length})
                 </button>
               ) : (
                 <>
-                  <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">
+                  <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
                     Completed & archived
                   </p>
                   {history.map((p: any) => (
                     <button
                       key={p.id}
                       onClick={() => { onSelect(p.id); setPlanMenuOpen(null); setOpen(false); }}
-                      className="flex flex-col w-full text-left rounded-lg px-3 py-2 hover:bg-white/[0.06] transition-colors"
+                      className="flex flex-col w-full text-left rounded-lg px-3 py-2 hover:bg-surface-100 dark:hover:bg-white/[0.06] transition-colors"
                     >
-                      <span className="text-xs font-medium truncate text-surface-700 dark:text-surface-300">
+                      <span className="text-xs font-medium truncate text-fg-secondary">
                         {p.title || 'Untitled'}
                       </span>
-                      <span className="text-[10px] mt-0.5 text-surface-400 dark:text-surface-500">
+                      <span className="text-[10px] mt-0.5 text-fg-muted">
                         {formatPlanRange(p)} · {p.status}
                       </span>
                     </button>
@@ -869,7 +869,7 @@ const MealPlanner = () => {
         {/* ── Header: Title + New Plan + Tabs ── */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-surface-900 dark:text-white">
+          <h1 className="text-2xl font-bold tracking-tight text-fg">
             Meal Planner
           </h1>
           <div className="flex items-center gap-3">
@@ -930,7 +930,7 @@ const MealPlanner = () => {
               </div>
               {/* Duration picker + create */}
               <div className="flex items-center gap-2">
-                <span className="text-xs text-surface-500 dark:text-surface-400 shrink-0">Duration:</span>
+                <span className="text-xs text-fg-muted shrink-0">Duration:</span>
                 <div className="flex gap-1">
                   {DURATION_OPTIONS.map(opt => {
                     const isDefault = opt.days === configToDays(planPeriodConfig);
@@ -942,7 +942,7 @@ const MealPlanner = () => {
                           'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
                           newPlanDays === opt.days
                             ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400'
-                            : 'border-surface-200 dark:border-white/[0.08] text-surface-500 dark:text-surface-400 hover:border-surface-300',
+                            : 'border-surface-200 dark:border-white/[0.08] text-fg-muted hover:border-surface-300',
                         ].join(' ')}
                       >
                         {opt.label}{isDefault ? ' · Default' : ''}
@@ -1046,21 +1046,21 @@ const MealPlanner = () => {
                 {/* View toggle */}
                 <div className="flex items-center rounded-lg border border-surface-200/80 dark:border-white/[0.08] bg-surface-100/60 dark:bg-white/[0.03] p-0.5">
                   <button
-                    className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'days' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary-500' : 'text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300'}`}
+                    className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'days' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-brand' : 'text-fg-muted hover:text-fg-secondary'}`}
                     onClick={() => setCalendarView('days')}
                     title="Days view"
                   >
                     <LayoutGrid className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'meals' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary-500' : 'text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300'}`}
+                    className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'meals' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-brand' : 'text-fg-muted hover:text-fg-secondary'}`}
                     onClick={() => setCalendarView('meals')}
                     title="Meals view"
                   >
                     <Rows className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'titles' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary-500' : 'text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300'}`}
+                    className={`p-1.5 rounded-md transition-all duration-200 ${calendarView === 'titles' ? 'bg-white dark:bg-white/[0.1] shadow-sm text-brand' : 'text-fg-muted hover:text-fg-secondary'}`}
                     onClick={() => setCalendarView('titles')}
                     title="Titles view"
                   >
@@ -1076,7 +1076,7 @@ const MealPlanner = () => {
             {/* Calendar Grid — Days View or Meals View */}
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500/50" />
+                <Loader2 className="h-8 w-8 animate-spin text-brand/50" />
               </div>
             ) : calendarView === 'days' ? (
               /* Days view: all weeks stacked, each week is a 7-column row.
@@ -1085,7 +1085,7 @@ const MealPlanner = () => {
                 {planWeeks.map((weekRow, weekIdx) => (
                   <div key={weekIdx}>
                     {planWeeks.length > 1 && (
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted mb-2">
                         Week {weekIdx + 1}
                       </p>
                     )}
@@ -1103,18 +1103,18 @@ const MealPlanner = () => {
                             >
                               {/* Day header */}
                               <div className="relative text-center pb-1">
-                                <p className="text-xs font-medium text-surface-400 dark:text-gray-500 uppercase tracking-widest">
+                                <p className="text-xs font-medium text-fg-muted uppercase tracking-widest">
                                   {DAYS_SHORT[i]}
                                 </p>
                                 <p className={`text-lg font-bold mt-0.5 transition-colors ${
                                   isToday
-                                    ? 'text-primary-500'
-                                    : 'text-surface-700 dark:text-gray-300'
+                                    ? 'text-brand'
+                                    : 'text-fg-secondary'
                                 }`}>
                                   {date.getDate()}
                                 </p>
                                 <button
-                                  className="absolute top-0 right-0 p-1 rounded-lg text-surface-300 dark:text-gray-600 hover:text-primary-500 hover:bg-primary-500/[0.08] transition-colors"
+                                  className="absolute top-0 right-0 p-1 rounded-lg text-fg-muted hover:text-brand hover:bg-primary-500/[0.08] transition-colors"
                                   onClick={() => handleRandomizeDay(dateStr)}
                                   title="Randomize all 3 meals for this day"
                                 >
@@ -1140,8 +1140,8 @@ const MealPlanner = () => {
                                     return (
                                       <div key={slot.key} className="group/slot">
                                         <div className="flex items-center gap-1 mb-0.5">
-                                          <slot.icon className={`h-3 w-3 ${slot.color} opacity-60`} />
-                                          <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-gray-500">
+                                          <slot.icon className={`h-3 w-3 ${slot.color}`} />
+                                          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
                                             {slot.label}
                                           </span>
                                         </div>
@@ -1150,12 +1150,12 @@ const MealPlanner = () => {
                                             {slotMeals.map((meal: any) => (
                                               <div
                                                 key={meal.id}
-                                                className="group/meal flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-surface-700 dark:text-gray-300 transition-all duration-200 hover:bg-surface-100 dark:hover:bg-white/[0.08] hover:shadow-sm"
+                                                className="group/meal flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-fg-secondary transition-all duration-200 hover:bg-surface-100 dark:hover:bg-white/[0.08] hover:shadow-sm"
                                                 title={meal.recipeName}
                                               >
                                                 <span className="truncate flex-1">{meal.recipeName}</span>
                                                 <button
-                                                  className="flex-shrink-0 opacity-70 md:opacity-0 md:group-hover/meal:opacity-100 text-surface-400 hover:text-destructive transition-all"
+                                                  className="flex-shrink-0 md:opacity-0 md:focus-within:opacity-100 md:group-hover/meal:opacity-100 text-fg-muted hover:text-destructive transition-all"
                                                   onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
                                                   title="Remove"
                                                 >
@@ -1163,15 +1163,15 @@ const MealPlanner = () => {
                                                 </button>
                                               </div>
                                             ))}
-                                            <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 transition-all duration-200">
+                                            <div className="flex gap-0.5 md:opacity-0 md:focus-within:opacity-100 md:group-hover/slot:opacity-100 transition-all duration-200">
                                               <button
-                                                className="flex-1 px-2 py-0.5 rounded-lg text-[10px] text-surface-300 dark:text-gray-600 hover:text-primary-500/60 transition-colors"
+                                                className="flex-1 px-2 py-0.5 rounded-lg text-[10px] text-fg-muted hover:text-brand/60 transition-colors"
                                                 onClick={() => openRecipeSelector(dateStr, slot.key)}
                                               >
                                                 + Add more
                                               </button>
                                               <button
-                                                className="px-1.5 py-0.5 rounded-lg text-[10px] text-surface-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
+                                                className="px-1.5 py-0.5 rounded-lg text-[10px] text-fg-muted hover:text-amber-800 dark:hover:text-amber-400 hover:bg-amber-500/[0.05] transition-colors"
                                                 onClick={() => handleRandomizeSlot(dateStr, slot.key)}
                                                 title="I Don't Know"
                                               >
@@ -1180,15 +1180,15 @@ const MealPlanner = () => {
                                             </div>
                                           </>
                                         ) : (
-                                          <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover/slot:opacity-100 md:group-hover:opacity-60 transition-all duration-200">
+                                          <div className="flex gap-0.5 md:opacity-0 md:focus-within:opacity-100 md:group-hover/slot:opacity-100 transition-all duration-200">
                                             <button
-                                              className="flex-1 px-2 py-1 rounded-lg border border-dashed border-surface-200/60 dark:border-white/[0.06] text-[10px] text-surface-300 dark:text-gray-600 hover:border-primary-500/40 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-colors"
+                                              className="flex-1 px-2 py-1 rounded-lg border border-dashed border-surface-200/60 dark:border-white/[0.06] text-[10px] text-fg-muted hover:border-primary-500/40 hover:text-brand/60 hover:bg-primary-500/[0.02] transition-colors"
                                               onClick={() => openRecipeSelector(dateStr, slot.key)}
                                             >
                                               + Add
                                             </button>
                                             <button
-                                              className="px-1.5 py-1 rounded-lg border border-dashed border-surface-200/60 dark:border-white/[0.06] text-[10px] text-surface-300 dark:text-gray-600 hover:border-amber-400/40 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
+                                              className="px-1.5 py-1 rounded-lg border border-dashed border-surface-200/60 dark:border-white/[0.06] text-[10px] text-fg-muted hover:border-amber-400/40 hover:text-amber-800 dark:hover:text-amber-400 hover:bg-amber-500/[0.05] transition-colors"
                                               onClick={() => handleRandomizeSlot(dateStr, slot.key)}
                                               title="I Don't Know"
                                             >
@@ -1231,19 +1231,19 @@ const MealPlanner = () => {
                                 isToday ? 'bg-primary-50/40 dark:bg-primary-500/[0.05]' : ''
                               }`}
                             >
-                              <p className={`text-[9px] font-medium mb-1 ${isToday ? 'text-primary-500' : 'text-surface-400 dark:text-surface-500'}`}>
+                              <p className={`text-[9px] font-medium mb-1 ${isToday ? 'text-brand' : 'text-fg-muted'}`}>
                                 {date.toLocaleDateString('en-US', { weekday: 'narrow', month: 'numeric', day: 'numeric' })}
                               </p>
                               {meals.length > 0 ? (
                                 <div className="space-y-0.5">
                                   {meals.map((meal: PlannedMealEntry) => (
-                                    <p key={meal.id} className="text-[10px] text-surface-700 dark:text-gray-300 leading-tight truncate" title={meal.recipeName}>
+                                    <p key={meal.id} className="text-[10px] text-fg-secondary leading-tight truncate" title={meal.recipeName}>
                                       {meal.recipeName}
                                     </p>
                                   ))}
                                 </div>
                               ) : (
-                                <p className="text-[10px] text-surface-300 dark:text-surface-600 italic">—</p>
+                                <p className="text-[10px] text-fg-muted italic">—</p>
                               )}
                             </div>
                           );
@@ -1281,10 +1281,10 @@ const MealPlanner = () => {
                           <slot.icon className={`h-4 w-4 ${slot.color}`} />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-sm font-semibold text-surface-800 dark:text-gray-200">
+                          <h3 className="text-sm font-semibold text-fg">
                             {slot.label}
                           </h3>
-                          <p className="text-[10px] text-surface-400 dark:text-gray-500">
+                          <p className="text-[10px] text-fg-muted">
                             {totalForSlot} {totalForSlot === 1 ? 'recipe' : 'recipes'} planned
                             {!isSnacks && planWeeks.length > 1 && (
                               <span className="ml-1">· {planWeeks.length} weeks</span>
@@ -1295,7 +1295,7 @@ const MealPlanner = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 gap-1 rounded-lg text-xs text-surface-400 hover:text-primary-500"
+                            className="h-7 gap-1 rounded-lg text-xs text-fg-muted hover:text-brand"
                             onClick={() => openRecipeSelector(formatDateKey(planDates[0]), slot.key)}
                             title={`Add ${slot.label}`}
                           >
@@ -1314,12 +1314,12 @@ const MealPlanner = () => {
                               {snackItems.map((item: PlannedMealEntry) => (
                                 <div
                                   key={item.id}
-                                  className="group/item flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-surface-700 dark:text-gray-300 transition-all hover:bg-surface-100 dark:hover:bg-white/[0.08]"
+                                  className="group/item flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-fg-secondary transition-all hover:bg-surface-100 dark:hover:bg-white/[0.08]"
                                 >
-                                  <Cookie className="h-3 w-3 text-pink-400 flex-shrink-0" />
+                                  <Cookie className="h-3 w-3 text-pink-800 dark:text-pink-400 flex-shrink-0" />
                                   <span className="truncate">{item.recipeName}</span>
                                   <button
-                                    className="flex-shrink-0 opacity-0 group-hover/item:opacity-100 text-surface-400 hover:text-destructive transition-all"
+                                    className="flex-shrink-0 opacity-0 group-hover/item:opacity-100 text-fg-muted hover:text-destructive transition-all"
                                     onClick={() => handleRemovePlanListItem('_snacks', item.id)}
                                     title="Remove"
                                   >
@@ -1329,7 +1329,7 @@ const MealPlanner = () => {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-xs text-surface-400 dark:text-gray-500 text-center py-3">
+                            <p className="text-xs text-fg-muted text-center py-3">
                               No snacks added yet
                             </p>
                           )}
@@ -1338,7 +1338,7 @@ const MealPlanner = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 gap-1 rounded-lg text-xs text-surface-400 hover:text-primary-500"
+                                className="h-7 gap-1 rounded-lg text-xs text-fg-muted hover:text-brand"
                                 onClick={() => openRecipeSelector('_snacks', 'snacks')}
                               >
                                 <Plus className="h-3 w-3" />
@@ -1355,7 +1355,7 @@ const MealPlanner = () => {
                               {/* Week label for multi-week plans */}
                               {planWeeks.length > 1 && (
                                 <div className="px-3 pt-1.5 pb-0.5">
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-surface-300 dark:text-surface-600">
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
                                     Week {weekIdx + 1}
                                     {weekRow[0] && (
                                       <span className="ml-1 font-normal normal-case tracking-normal">
@@ -1383,7 +1383,7 @@ const MealPlanner = () => {
                                       >
                                         {/* Day label */}
                                         <p className={`text-[10px] font-semibold text-center mb-1.5 ${
-                                          isToday ? 'text-primary-500' : 'text-surface-400 dark:text-gray-500'
+                                          isToday ? 'text-brand' : 'text-fg-muted'
                                         }`}>
                                           {DAYS_SHORT[date.getDay()]} {date.getDate()}
                                         </p>
@@ -1393,12 +1393,12 @@ const MealPlanner = () => {
                                           {slotMeals.map((meal: any) => (
                                             <div
                                               key={meal.id}
-                                              className="group/meal flex items-center gap-0.5 px-1.5 py-1 rounded-md bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-[10px] text-surface-700 dark:text-gray-300 transition-all hover:bg-surface-100 dark:hover:bg-white/[0.08]"
+                                              className="group/meal flex items-center gap-0.5 px-1.5 py-1 rounded-md bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-[10px] text-fg-secondary transition-all hover:bg-surface-100 dark:hover:bg-white/[0.08]"
                                               title={meal.recipeName}
                                             >
                                               <span className="truncate flex-1">{meal.recipeName}</span>
                                               <button
-                                                className="flex-shrink-0 opacity-70 md:opacity-0 md:group-hover/meal:opacity-100 text-surface-400 hover:text-destructive transition-all"
+                                                className="flex-shrink-0 md:opacity-0 md:focus-within:opacity-100 md:group-hover/meal:opacity-100 text-fg-muted hover:text-destructive transition-all"
                                                 onClick={() => handleRemoveMeal(dateStr, slot.key, meal.id)}
                                               >
                                                 <X className="h-2.5 w-2.5" />
@@ -1408,15 +1408,15 @@ const MealPlanner = () => {
 
                                           {/* Add + Randomize buttons */}
                                           {weekPlan && (
-                                            <div className="flex gap-0.5 opacity-70 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
+                                            <div className="flex gap-0.5 md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100 transition-all duration-200">
                                               <button
-                                                className="flex-1 px-1 py-0.5 rounded-md text-[10px] text-surface-300 dark:text-gray-600 hover:text-primary-500/60 hover:bg-primary-500/[0.02] transition-colors"
+                                                className="flex-1 px-1 py-0.5 rounded-md text-[10px] text-fg-muted hover:text-brand/60 hover:bg-primary-500/[0.02] transition-colors"
                                                 onClick={() => openRecipeSelector(dateStr, slot.key)}
                                               >
                                                 + Add
                                               </button>
                                               <button
-                                                className="px-1 py-0.5 rounded-md text-[10px] text-surface-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-500/[0.05] transition-colors"
+                                                className="px-1 py-0.5 rounded-md text-[10px] text-fg-muted hover:text-amber-800 dark:hover:text-amber-400 hover:bg-amber-500/[0.05] transition-colors"
                                                 onClick={() => handleRandomizeSlot(dateStr, slot.key as MealSlot)}
                                                 title="I Don't Know — pick a random recipe"
                                               >
@@ -1437,7 +1437,7 @@ const MealPlanner = () => {
                           {planWeeks.length > 1 && (
                             <button
                               onClick={() => toggleExpandedWeek(slot.key)}
-                              className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] text-surface-400 dark:text-surface-500 hover:text-primary-500 hover:bg-surface-50 dark:hover:bg-white/[0.03] border-t border-surface-100 dark:border-white/[0.04] transition-colors"
+                              className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] text-fg-muted hover:text-brand hover:bg-surface-50 dark:hover:bg-white/[0.03] border-t border-surface-100 dark:border-white/[0.04] transition-colors"
                             >
                               <ChevronRight className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                               {isExpanded
@@ -1472,10 +1472,10 @@ const MealPlanner = () => {
                       <div className="flex items-center gap-2 mb-3">
                         <list.icon className={`h-4 w-4 ${list.color}`} />
                         <div className="flex-1">
-                          <h4 className="text-sm font-semibold text-surface-800 dark:text-gray-200">
+                          <h4 className="text-sm font-semibold text-fg">
                             {list.label}
                           </h4>
-                          <p className="text-[10px] text-surface-400 dark:text-gray-500">{list.description}</p>
+                          <p className="text-[10px] text-fg-muted">{list.description}</p>
                         </div>
                         {items.length > 0 && (
                           <Badge variant="secondary" className="text-[10px] h-5">
@@ -1489,11 +1489,11 @@ const MealPlanner = () => {
                         {items.map((item: any) => (
                           <div
                             key={item.id}
-                            className="group/item flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-surface-700 dark:text-gray-300 transition-all duration-200 hover:bg-surface-100 dark:hover:bg-white/[0.08]"
+                            className="group/item flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-fg-secondary transition-all duration-200 hover:bg-surface-100 dark:hover:bg-white/[0.08]"
                           >
                             <span className="truncate flex-1">{item.recipeName}</span>
                             <button
-                              className="flex-shrink-0 opacity-0 group-hover/item:opacity-100 text-surface-400 hover:text-destructive transition-all"
+                              className="flex-shrink-0 opacity-0 group-hover/item:opacity-100 text-fg-muted hover:text-destructive transition-all"
                               onClick={() => handleRemovePlanListItem(list.key, item.id)}
                               title="Remove"
                             >
@@ -1536,7 +1536,7 @@ const MealPlanner = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 rounded-lg text-surface-400 hover:text-primary-500"
+                            className="h-8 w-8 p-0 rounded-lg text-fg-faint hover:text-brand"
                             onClick={() => openRecipeSelector('_snacks', 'snacks')}
                             title="Pick from recipes"
                           >
@@ -1556,16 +1556,16 @@ const MealPlanner = () => {
               <div className="text-center py-12">
                 <div className="relative inline-flex mb-5">
                   <div className="w-16 h-16 rounded-2xl bg-primary-500/8 dark:bg-primary-400/15 flex items-center justify-center">
-                    <ChefHat className="w-8 h-8 text-primary-500/60" />
+                    <ChefHat className="w-8 h-8 text-brand/60" />
                   </div>
                   <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
                     <Plus className="w-3 h-3 text-white" />
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-surface-800 dark:text-gray-200 mb-1.5">
+                <h3 className="text-lg font-semibold text-fg mb-1.5">
                   {historyPlans.length > 0 ? 'No active plan' : 'No meal plans yet'}
                 </h3>
-                <p className="text-sm text-surface-500 dark:text-gray-400 max-w-sm mx-auto mb-5">
+                <p className="text-sm text-fg-muted max-w-sm mx-auto mb-5">
                   {historyPlans.length > 0
                     ? 'Create a new plan to start scheduling meals for the week.'
                     : 'Create a meal plan to start assigning recipes and building your grocery list.'}

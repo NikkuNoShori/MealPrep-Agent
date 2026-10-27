@@ -83,12 +83,12 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
         <div className="w-full max-w-md mx-4 bg-white dark:bg-[var(--rs-bg)] rounded-2xl shadow-2xl border border-surface-200/60 dark:border-white/[0.08] overflow-hidden animate-scale-in">
           <div className="p-6 text-center">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-500/8 dark:bg-primary-400/15 mb-4">
-              <Users className="h-7 w-7 text-primary-500/70" />
+              <Users className="h-7 w-7 text-brand/70" />
             </div>
-            <h3 className="text-lg font-semibold text-surface-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-fg">
               Modify serving sizes?
             </h3>
-            <p className="text-sm text-surface-500 dark:text-gray-400 mt-2 max-w-xs mx-auto">
+            <p className="text-sm text-fg-muted mt-2 max-w-xs mx-auto">
               You selected {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'}. Would you like to adjust serving sizes before adding?
             </p>
 
@@ -97,14 +97,14 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
               {recipes.slice(0, 5).map((r) => (
                 <div
                   key={r.recipeId}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-surface-600 dark:text-gray-300"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-fg-secondary"
                 >
-                  <ChefHat className="h-3 w-3 text-surface-400" />
+                  <ChefHat className="h-3 w-3 text-fg-faint" />
                   <span className="truncate max-w-[120px]">{r.recipeName}</span>
                 </div>
               ))}
               {recipes.length > 5 && (
-                <div className="flex items-center px-2.5 py-1 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-surface-400">
+                <div className="flex items-center px-2.5 py-1 rounded-lg bg-surface-50 dark:bg-white/[0.04] border border-surface-100 dark:border-white/[0.06] text-xs text-fg-muted">
                   +{recipes.length - 5} more
                 </div>
               )}
@@ -133,10 +133,10 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200/60 dark:border-white/[0.06]">
             <div>
-              <h3 className="text-lg font-semibold text-surface-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-fg">
                 Adjust Servings
               </h3>
-              <p className="text-xs text-surface-500 dark:text-gray-400 mt-0.5">
+              <p className="text-xs text-fg-muted mt-0.5">
                 Set serving sizes for each recipe
               </p>
             </div>
@@ -161,26 +161,26 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
                 >
                   <RecipeImage src={recipe.recipeImage} alt={recipe.recipeName} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-surface-800 dark:text-gray-200 truncate">
+                    <p className="text-sm font-medium text-fg truncate">
                       {recipe.recipeName}
                     </p>
-                    <p className="text-[10px] text-surface-400 dark:text-gray-500 mt-0.5">
+                    <p className="text-[10px] text-fg-muted mt-0.5">
                       Default: {recipe.servings} servings
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
-                      className="w-7 h-7 rounded-lg border border-surface-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] flex items-center justify-center text-surface-500 hover:text-primary-500 hover:border-primary-500/30 hover:shadow-sm active:scale-95 transition-all duration-150 disabled:opacity-30 disabled:hover:text-surface-500"
+                      className="w-7 h-7 rounded-lg border border-surface-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] flex items-center justify-center text-fg-muted hover:text-brand hover:border-primary-500/30 hover:shadow-sm active:scale-95 transition-all duration-150 disabled:opacity-30 disabled:hover:text-fg-muted"
                       onClick={() => updateServings(recipe.recipeId, -1)}
                       disabled={currentServings <= 1}
                     >
                       <Minus className="h-3 w-3" />
                     </button>
-                    <span className="text-sm font-bold text-surface-900 dark:text-white w-7 text-center tabular-nums">
+                    <span className="text-sm font-bold text-fg w-7 text-center tabular-nums">
                       {currentServings}
                     </span>
                     <button
-                      className="w-7 h-7 rounded-lg border border-surface-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] flex items-center justify-center text-surface-500 hover:text-primary-500 hover:border-primary-500/30 hover:shadow-sm active:scale-95 transition-all duration-150"
+                      className="w-7 h-7 rounded-lg border border-surface-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] flex items-center justify-center text-fg-muted hover:text-brand hover:border-primary-500/30 hover:shadow-sm active:scale-95 transition-all duration-150"
                       onClick={() => updateServings(recipe.recipeId, 1)}
                     >
                       <Plus className="h-3 w-3" />
@@ -194,7 +194,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
           {/* Footer */}
           <div className="px-5 py-4 border-t border-surface-200/60 dark:border-white/[0.06] flex items-center justify-between bg-surface-50/50 dark:bg-white/[0.02]">
             <button
-              className="text-xs text-surface-400 hover:text-surface-600 dark:hover:text-gray-300 transition-colors"
+              className="text-xs text-fg-muted hover:text-fg-secondary transition-colors"
               onClick={() => setPhase('ask')}
             >
               ← Back

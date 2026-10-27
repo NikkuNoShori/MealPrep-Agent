@@ -36,9 +36,9 @@ interface SuggestWeekModalProps {
 
 const difficultyLabel: Record<string, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
 const difficultyColor: Record<string, string> = {
-  easy: 'text-emerald-600 dark:text-emerald-400',
-  medium: 'text-amber-600 dark:text-amber-400',
-  hard: 'text-rose-600 dark:text-rose-400',
+  easy: 'text-emerald-800 dark:text-emerald-400',
+  medium: 'text-amber-800 dark:text-amber-400',
+  hard: 'text-rose-800 dark:text-rose-400',
 }
 
 // Extract all recipe IDs used in a meal plan's meals object
@@ -114,16 +114,16 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-surface-100 dark:border-white/[0.06] flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 rounded-lg bg-primary-50 dark:bg-primary-500/10">
-              <Sparkles className="h-4 w-4 text-primary-500" />
+              <Sparkles className="h-4 w-4 text-brand" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-surface-900 dark:text-white">Suggest meals</h2>
-              <p className="text-xs text-surface-500 dark:text-surface-400">Scored by your taste history</p>
+              <h2 className="text-sm font-semibold text-fg">Suggest meals</h2>
+              <p className="text-xs text-fg-muted">Scored by your taste history</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
+            className="p-1.5 rounded-lg text-fg-muted hover:text-fg-secondary transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -131,7 +131,7 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
 
         {excludedCount > 0 && (
           <div className="px-5 py-2 border-b border-surface-100 dark:border-white/[0.06] flex-shrink-0">
-            <p className="text-[10px] text-surface-400 dark:text-surface-500">
+            <p className="text-[10px] text-fg-muted">
               {excludedCount} recipe{excludedCount !== 1 ? 's' : ''} from your last plan hidden to keep things fresh
             </p>
           </div>
@@ -140,14 +140,14 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
         {/* Results */}
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
           {isLoading ? (
-            <div className="flex items-center justify-center py-10 gap-2 text-surface-400">
+            <div className="flex items-center justify-center py-10 gap-2 text-fg-muted">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="text-sm">Finding your best matches…</span>
             </div>
           ) : suggestions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
-              <ChefHat className="h-8 w-8 text-surface-300 dark:text-surface-600" />
-              <p className="text-sm text-surface-500 dark:text-surface-400">
+              <ChefHat className="h-8 w-8 text-fg-faint" />
+              <p className="text-sm text-fg-muted">
                 No recipes to suggest right now.<br />Add some recipes to your library first.
               </p>
             </div>
@@ -175,22 +175,22 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
                       <img src={recipe.imageUrl} alt={recipe.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ChefHat className="h-5 w-5 text-surface-300 dark:text-surface-600" />
+                        <ChefHat className="h-5 w-5 text-fg-faint" />
                       </div>
                     )}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-surface-800 dark:text-surface-100 truncate">{recipe.title}</p>
+                    <p className="text-xs font-semibold text-fg truncate">{recipe.title}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {totalTime > 0 && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-surface-500 dark:text-surface-400">
+                        <span className="flex items-center gap-0.5 text-[10px] text-fg-muted">
                           <Clock className="h-2.5 w-2.5" />{totalTime}m
                         </span>
                       )}
                       {recipe.difficulty && (
-                        <span className={`text-[10px] font-medium ${difficultyColor[recipe.difficulty] ?? 'text-surface-500'}`}>
+                        <span className={`text-[10px] font-medium ${difficultyColor[recipe.difficulty] ?? 'text-fg-muted'}`}>
                           {difficultyLabel[recipe.difficulty]}
                         </span>
                       )}
@@ -200,9 +200,9 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
                   {/* Score / assigned */}
                   <div className="flex-shrink-0 flex items-center gap-2">
                     {isAssigned ? (
-                      <Check className="h-4 w-4 text-emerald-500" />
+                      <Check className="h-4 w-4 text-emerald-800 dark:text-emerald-400" />
                     ) : (
-                      <span className="text-[10px] font-medium text-surface-400 dark:text-surface-500 tabular-nums">
+                      <span className="text-[10px] font-medium text-fg-muted tabular-nums">
                         {score}%
                       </span>
                     )}
@@ -216,7 +216,7 @@ export const SuggestWeekModal: React.FC<SuggestWeekModalProps> = ({
         {/* Footer */}
         {suggestions.length > 0 && emptySlotCount > 0 && (
           <div className="px-5 py-4 border-t border-surface-100 dark:border-white/[0.06] flex-shrink-0 flex items-center justify-between gap-3">
-            <p className="text-xs text-surface-500 dark:text-surface-400">
+            <p className="text-xs text-fg-muted">
               {emptySlotCount} empty dinner slot{emptySlotCount !== 1 ? 's' : ''} this week
             </p>
             <Button

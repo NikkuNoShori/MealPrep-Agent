@@ -70,8 +70,8 @@ export function PlannerSettingsMenu({
         className={[
           'p-1.5 rounded-md transition-all duration-200',
           active || open
-            ? 'bg-white dark:bg-white/[0.1] shadow-sm text-primary-500'
-            : 'text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300',
+            ? 'bg-white dark:bg-white/[0.1] shadow-sm text-brand'
+            : 'text-fg-muted hover:text-fg-secondary',
         ].join(' ')}
       >
         <MoreHorizontal className="h-3.5 w-3.5" />
@@ -106,13 +106,13 @@ export function PlannerSettingsMenu({
                     : 'hover:bg-surface-50 dark:hover:bg-white/[0.05] cursor-pointer',
                 ].join(' ')}
               >
-                <opt.icon className="h-4 w-4 mt-0.5 flex-shrink-0 text-surface-500 dark:text-surface-400" />
+                <opt.icon className="h-4 w-4 mt-0.5 flex-shrink-0 text-fg-muted" />
                 <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-surface-700 dark:text-surface-200 leading-snug">
+                  <p className="text-[13px] font-medium text-fg-secondary leading-snug">
                     {opt.label}
                   </p>
                   {opt.description && (
-                    <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5 leading-snug">
+                    <p className="text-[11px] text-fg-muted mt-0.5 leading-snug">
                       {opt.description}
                     </p>
                   )}

@@ -15,7 +15,7 @@ interface ShoppingModeProps {
 const ShoppingMode = ({ grouped, onToggleCheck }: ShoppingModeProps) => {
   if (grouped.size === 0) {
     return (
-      <p className="text-center text-sm text-surface-500 dark:text-gray-400 py-8">
+      <p className="text-center text-sm text-fg-muted py-8">
         No items on your list. Generate a grocery list from your meal plan first.
       </p>
     );
@@ -34,7 +34,7 @@ const ShoppingMode = ({ grouped, onToggleCheck }: ShoppingModeProps) => {
             className="rounded-2xl border border-surface-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] overflow-hidden"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-surface-100 dark:border-white/[0.04]">
-              <h4 className="text-base font-semibold text-surface-800 dark:text-gray-200">
+              <h4 className="text-base font-semibold text-fg">
                 {CATEGORY_LABELS[category] || category}
               </h4>
               <Badge variant="secondary" className="text-xs">
@@ -49,7 +49,7 @@ const ShoppingMode = ({ grouped, onToggleCheck }: ShoppingModeProps) => {
                   type="button"
                   className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${
                     item.isChecked
-                      ? 'bg-surface-50/80 dark:bg-white/[0.02] opacity-70'
+                      ? 'bg-surface-50/80 dark:bg-white/[0.02]'
                       : 'hover:bg-surface-50 dark:hover:bg-white/[0.04]'
                   }`}
                   onClick={() => onToggleCheck(item.id)}
@@ -67,8 +67,8 @@ const ShoppingMode = ({ grouped, onToggleCheck }: ShoppingModeProps) => {
                   <span
                     className={`flex-1 flex items-baseline justify-between gap-3 text-base ${
                       item.isChecked
-                        ? 'line-through text-surface-400 dark:text-gray-500'
-                        : 'text-surface-800 dark:text-gray-200'
+                        ? 'line-through text-fg-muted'
+                        : 'text-fg'
                     }`}
                   >
                     <span className="min-w-0 truncate">{item.name}</span>
@@ -77,7 +77,7 @@ const ShoppingMode = ({ grouped, onToggleCheck }: ShoppingModeProps) => {
                         {item.amount !== null && item.amount}
                         {item.unit && (item.amount !== null ? ` ${item.unit}` : item.unit)}
                         {item.rawAmount !== undefined && (
-                          <span className="ml-1 font-normal text-xs text-surface-400 dark:text-gray-500">
+                          <span className="ml-1 font-normal text-xs text-fg-muted">
                             (need {item.rawAmount})
                           </span>
                         )}

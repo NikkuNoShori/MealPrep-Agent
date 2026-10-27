@@ -156,10 +156,10 @@ const DayAssignmentModal = ({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200/60 dark:border-white/[0.06]">
           <div>
-            <h3 className="text-lg font-semibold text-surface-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-fg">
               Assign to Plan
             </h3>
-            <p className="text-xs text-surface-500 dark:text-gray-400 mt-0.5">
+            <p className="text-xs text-fg-muted mt-0.5">
               Choose a meal type for each recipe
             </p>
           </div>
@@ -184,10 +184,10 @@ const DayAssignmentModal = ({
                 <div className="flex items-center gap-3 p-3">
                   <RecipeImage src={recipe.recipeImage} alt={recipe.recipeName} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-surface-800 dark:text-gray-200 truncate">
+                    <p className="text-sm font-medium text-fg truncate">
                       {recipe.recipeName}
                     </p>
-                    <p className="text-[10px] text-surface-400 dark:text-gray-500 mt-0.5">
+                    <p className="text-[10px] text-fg-muted mt-0.5">
                       {recipe.servings} servings
                     </p>
                   </div>
@@ -248,7 +248,7 @@ const DayAssignmentModal = ({
                               ? 'bg-primary-500 text-white shadow-sm'
                               : isToday
                                 ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 hover:bg-primary-500/20'
-                                : 'text-surface-400 dark:text-gray-500 hover:bg-surface-100 dark:hover:bg-white/[0.06]'
+                                : 'text-fg-muted hover:bg-surface-100 dark:hover:bg-white/[0.06]'
                           }`}
                           title={date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                         >
@@ -272,7 +272,7 @@ const DayAssignmentModal = ({
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
               showDays
                 ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400'
-                : 'text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300 hover:bg-surface-100 dark:hover:bg-white/[0.06]'
+                : 'text-fg-muted hover:text-fg-secondary hover:bg-surface-100 dark:hover:bg-white/[0.06]'
             }`}
           >
             <Calendar className="h-3.5 w-3.5" />
