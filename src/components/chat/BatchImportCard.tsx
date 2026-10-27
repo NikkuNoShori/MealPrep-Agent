@@ -70,7 +70,7 @@ function getDifficultyColor(difficulty?: string) {
     case "easy":   return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
     case "medium": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
     case "hard":   return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-    default:       return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+    default:       return "bg-gray-100 text-fg dark:bg-gray-900";
   }
 }
 
@@ -180,7 +180,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
               <h3 className="font-semibold text-[15px] text-destructive leading-snug truncate">
                 {displayUrl}
               </h3>
-              <p className="text-[13px] text-surface-500 dark:text-surface-400 line-clamp-2 mt-1 leading-relaxed">
+              <p className="text-[13px] text-fg-muted line-clamp-2 mt-1 leading-relaxed">
                 {cleanError(error)}
               </p>
             </div>
@@ -214,7 +214,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
           <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
             <div>
               <h3 className="font-semibold text-[15px] leading-snug truncate">{editedTitle}</h3>
-              <p className="text-[13px] text-surface-500 dark:text-surface-400 mt-0.5">{displayUrl}</p>
+              <p className="text-[13px] text-fg-muted mt-0.5">{displayUrl}</p>
             </div>
             <p className="text-[12px] text-status-success font-medium mt-auto">Saved to library</p>
           </div>
@@ -257,7 +257,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
           </button>
         )}
 
-        <p className="text-[12px] text-surface-400 dark:text-surface-500 -mt-1">{displayUrl}</p>
+        <p className="text-[12px] text-fg-muted -mt-1">{displayUrl}</p>
 
         {/* Metadata badges — editable */}
         <div className="flex flex-wrap gap-1.5 items-center">
@@ -290,7 +290,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
           ) : (
             <Badge
               variant="outline"
-              className="gap-1 cursor-pointer hover:bg-muted transition-colors text-xs text-muted-foreground"
+              className="gap-1 cursor-pointer hover:bg-muted transition-colors text-xs text-fg-muted"
               title="Click to set prep time"
               onClick={() => setEditingField("prepTime")}
             >
@@ -327,7 +327,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
           ) : (
             <Badge
               variant="outline"
-              className="gap-1 cursor-pointer hover:bg-muted transition-colors text-xs text-muted-foreground"
+              className="gap-1 cursor-pointer hover:bg-muted transition-colors text-xs text-fg-muted"
               title="Click to set cook time"
               onClick={() => setEditingField("cookTime")}
             >
@@ -410,7 +410,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
         {/* Expandable ingredients + instructions */}
         {hasDetails && (
           <button
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs text-fg-muted hover:text-foreground transition-colors"
             onClick={() => setExpanded((v) => !v)}
           >
             {expanded ? "Hide details" : "Show ingredients & steps"}
@@ -425,7 +425,7 @@ export function BatchImportCard({ entry, onSave, onRetry, isSaving }: BatchImpor
         {/* Visibility + Save */}
         <div className="flex items-center justify-between pt-1 border-t border-surface-100 dark:border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Visibility:</span>
+            <span className="text-xs text-fg-muted">Visibility:</span>
             <VisibilityPicker value={visibility} onChange={setVisibility} size="sm" />
           </div>
           <Button
@@ -458,7 +458,7 @@ function RecipeDetails({
     <div className="px-3 pb-3 pt-2.5 space-y-3 bg-surface-50 dark:bg-white/[0.02]">
       {ingredients.length > 0 && (
         <div>
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500 mb-1.5">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-muted mb-1.5">
             <BookOpen className="h-3 w-3" />
             Ingredients
           </p>
@@ -469,9 +469,9 @@ function RecipeDetails({
               const unit = ing.unit ?? "";
               const label = [amount, unit].filter(Boolean).join(" ");
               return (
-                <li key={i} className="text-[13px] flex gap-2 text-surface-700 dark:text-surface-300">
+                <li key={i} className="text-[13px] flex gap-2 text-fg-secondary">
                   {label && (
-                    <span className="shrink-0 text-surface-400 dark:text-surface-500 tabular-nums w-16 text-right">{label}</span>
+                    <span className="shrink-0 text-fg-muted tabular-nums w-16 text-right">{label}</span>
                   )}
                   <span className="min-w-0">{name}</span>
                 </li>
@@ -483,14 +483,14 @@ function RecipeDetails({
 
       {instructions.length > 0 && (
         <div>
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500 mb-1.5">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-muted mb-1.5">
             <ListOrdered className="h-3 w-3" />
             Instructions
           </p>
           <ol className="space-y-1.5">
             {instructions.map((step, i) => (
-              <li key={i} className="text-[13px] flex gap-2 text-surface-700 dark:text-surface-300">
-                <span className="shrink-0 text-surface-400 dark:text-surface-500 tabular-nums font-medium w-4 text-right">{i + 1}.</span>
+              <li key={i} className="text-[13px] flex gap-2 text-fg-secondary">
+                <span className="shrink-0 text-fg-muted tabular-nums font-medium w-4 text-right">{i + 1}.</span>
                 <span className="min-w-0 leading-relaxed">{step}</span>
               </li>
             ))}

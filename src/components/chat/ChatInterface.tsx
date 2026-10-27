@@ -1690,7 +1690,7 @@ export const ChatInterface: React.FC = () => {
               variant="outline"
               size="icon"
               title="New Chat"
-              className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-surface-900 dark:hover:text-white"
+              className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-fg"
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -1702,7 +1702,7 @@ export const ChatInterface: React.FC = () => {
                     onClick={() => setIsMultiSelectMode(true)}
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-surface-900 dark:hover:text-white"
+                    className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-fg"
                     title="Select"
                   >
                     <CheckSquare className="h-3.5 w-3.5" />
@@ -1713,7 +1713,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={selectAllConversations}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-surface-900 dark:hover:text-white"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-fg"
                       title="Select All"
                     >
                       <CheckSquare className="h-3.5 w-3.5" />
@@ -1722,7 +1722,7 @@ export const ChatInterface: React.FC = () => {
                       onClick={clearSelection}
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-surface-900 dark:hover:text-white"
+                      className="h-8 w-8 flex-1 bg-transparent dark:bg-white/[0.04] border-surface-200 dark:border-white/[0.08] hover:text-fg"
                       title="Cancel"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -1796,11 +1796,11 @@ export const ChatInterface: React.FC = () => {
                         {selectedConversations.has(conversation.id) ? (
                           <CheckSquare className="h-4 w-4 text-primary" />
                         ) : (
-                          <Square className="h-4 w-4 text-gray-400" />
+                          <Square className="h-4 w-4 text-fg-faint" />
                         )}
                       </button>
                     ) : (
-                      <MessageSquare className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                      <MessageSquare className="h-4 w-4 text-fg-muted flex-shrink-0" />
                     )}
 
                     <div className="flex-1 min-w-0">
@@ -1810,11 +1810,11 @@ export const ChatInterface: React.FC = () => {
                         </span>
                       </div>
                       {conversation.lastMessage && (
-                        <p className="text-xs text-gray-500 truncate mt-1">
+                        <p className="text-xs text-fg-muted truncate mt-1">
                           {conversation.lastMessage}
                         </p>
                       )}
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-fg-muted mt-1">
                         {conversation.timestamp.toLocaleDateString()}
                       </p>
                     </div>
@@ -1839,7 +1839,7 @@ export const ChatInterface: React.FC = () => {
           {conversations.filter(
             (conv) => conv.messages.length > 0 || conv.isTemporary
           ).length === 0 && (
-            <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="p-4 text-center text-sm text-fg-muted">
               No conversations yet. Start a new chat to begin!
             </div>
           )}
@@ -1875,10 +1875,10 @@ export const ChatInterface: React.FC = () => {
         >
           {!currentConversation || currentConversation.messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-8 px-4 text-center">
-              <h2 className="text-xl font-medium text-gray-900 dark:text-gray-100 mb-2">
+              <h2 className="text-xl font-medium text-fg mb-2">
                 Hey {getFirstName()}, what can I help you with?
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              <p className="text-sm text-fg-muted mb-6">
                 You can start typing, or use the buttons below for quick actions
               </p>
               <div className="flex flex-wrap justify-center gap-3">
@@ -1928,7 +1928,7 @@ export const ChatInterface: React.FC = () => {
                     {/* Streaming text content (deltas arrive before done) */}
                     {message.content ? (
                       <div className="rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
-                        <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                        <p className="text-sm whitespace-pre-wrap text-fg">
                           {message.content}
                         </p>
                       </div>
@@ -1968,18 +1968,18 @@ export const ChatInterface: React.FC = () => {
                     )}
                     {message.content && (
                       <div className="relative mb-3 max-w-[90%] sm:max-w-[70%] rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
-                        <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                        <p className="text-sm whitespace-pre-wrap text-fg">
                           {message.content}
                         </p>
                         <button
                           onClick={() => copyMessage(message.id, message.content)}
-                          className="absolute -top-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-surface-400 hover:text-surface-700 dark:hover:text-surface-200"
+                          className="absolute -top-3 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white dark:bg-[rgb(var(--rs-bg-elevated-rgb))] border border-surface-200 dark:border-white/10 shadow-sm text-fg-muted hover:text-fg-secondary"
                           title="Copy message"
                         >
                           {copiedMessageId === message.id ? (
                             <Check className="h-3 w-3 text-status-success" />
                           ) : (
-                            <Copy className="h-3 w-3 text-gray-500 dark:text-gray-400" />
+                            <Copy className="h-3 w-3 text-fg-muted" />
                           )}
                         </button>
                       </div>
@@ -2097,7 +2097,7 @@ export const ChatInterface: React.FC = () => {
                     <div
                       className={`rounded-lg px-4 py-2 ${
                         message.sender === "user"
-                          ? "bg-primary text-white"
+                          ? "bg-primary text-primary-foreground"
                           : "bg-gray-100 dark:bg-gray-800"
                       }`}
                     >
@@ -2114,7 +2114,7 @@ export const ChatInterface: React.FC = () => {
                             <button
                               key={idx}
                               onClick={() => setLightboxImage(imgUrl)}
-                              className="relative rounded-md overflow-hidden hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-white/50"
+                              className="relative rounded-md overflow-hidden hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                               title="Click to view full size"
                             >
                               <img
@@ -2130,18 +2130,18 @@ export const ChatInterface: React.FC = () => {
                         <p
                           className={`text-sm whitespace-pre-wrap break-words ${
                             message.sender === "user"
-                              ? "text-white"
-                              : "text-gray-900 dark:text-gray-100"
+                              ? "text-primary-foreground"
+                              : "text-fg"
                           }`}
                         >
                           {message.content}
                         </p>
                       )}
                       <p
-                        className={`text-xs opacity-70 mt-1 ${
+                        className={`text-xs mt-1 ${
                           message.sender === "user"
-                            ? "text-white"
-                            : "text-gray-600 dark:text-gray-400"
+                            ? "text-primary-foreground"
+                            : "text-fg-muted"
                         }`}
                       >
                         {message.timestamp.toLocaleTimeString()}
@@ -2162,7 +2162,7 @@ export const ChatInterface: React.FC = () => {
                     )}
                     <button
                       onClick={() => copyMessage(message.id, message.content)}
-                      className={`absolute -top-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 ${
+                      className={`absolute -top-3 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded bg-white dark:bg-[rgb(var(--rs-bg-elevated-rgb))] border border-surface-200 dark:border-white/10 shadow-sm text-fg-muted hover:text-fg-secondary ${
                         message.sender === "user" ? "right-1" : "right-1"
                       }`}
                       title="Copy message"
@@ -2170,7 +2170,7 @@ export const ChatInterface: React.FC = () => {
                       {copiedMessageId === message.id ? (
                         <Check className="h-3 w-3 text-status-success" />
                       ) : (
-                        <Copy className="h-3 w-3 text-gray-500 dark:text-gray-400" />
+                        <Copy className="h-3 w-3 text-fg-muted" />
                       )}
                     </button>
                   </div>
@@ -2204,7 +2204,7 @@ export const ChatInterface: React.FC = () => {
               <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-gray-900 dark:text-gray-100">
+                  <span className="text-sm text-fg">
                     {loadingLabel}
                   </span>
                   <Button
@@ -2297,12 +2297,12 @@ export const ChatInterface: React.FC = () => {
 
               {pendingVideo && (
                 <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40 px-3 py-2 text-sm">
-                  <Film className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                  <Film className="h-4 w-4 shrink-0 text-amber-800 dark:text-amber-400" />
                   <span className="truncate flex-1">{pendingVideo.name}</span>
                   <button
                     type="button"
                     onClick={removeVideo}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-fg-muted hover:text-foreground"
                     aria-label="Remove video"
                   >
                     <X className="h-4 w-4" />
@@ -2312,7 +2312,7 @@ export const ChatInterface: React.FC = () => {
 
               {/* Input and Buttons */}
               {hasQueuedMessage && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-fg-muted">
                   1 message queued — will send when the current response finishes
                 </p>
               )}
@@ -2368,7 +2368,7 @@ export const ChatInterface: React.FC = () => {
                       : "Type your message... (Shift+Enter for new line)"
                   }
                   rows={2}
-                  className="flex-1 resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ minHeight: '60px', maxHeight: '300px' }}
                 />
                 {isLoading ? (

@@ -292,7 +292,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
 
         {/* Running stats — derived live from card states so retries stay in sync */}
         {phase !== "idle" && cards.length > 0 && (
-          <span className="text-xs text-muted-foreground mr-2">
+          <span className="text-xs text-fg-muted mr-2">
             {succeededCount} saved · {failedCount} failed
           </span>
         )}
@@ -360,7 +360,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
       {/* ── URL input (idle only) ── */}
       {phase === "idle" && (
         <div className="flex flex-col gap-3 p-4 shrink-0">
-          <label htmlFor={textareaId} className="text-xs text-muted-foreground">
+          <label htmlFor={textareaId} className="text-xs text-fg-muted">
             Paste recipe URLs — one per line, or comma-separated. Up to 50 at a time.
           </label>
           <Textarea
@@ -383,7 +383,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
             </div>
           )}
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-fg-muted">
               {urlCount > 0
                 ? `${urlCount} URL${urlCount !== 1 ? "s" : ""} detected${urlCount > 50 ? " — capped at 50" : ""}`
                 : "No valid URLs yet"}
@@ -408,7 +408,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
           {phase === "running" ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-fg-muted">
                 Extracting {cards.filter((c) => c.status === "extracting").length > 0
                   ? `${cards.filter((c) => c.status !== "extracting").length} / ${cards.length}`
                   : `${cards.length} / ${cards.length}`} recipes…
@@ -417,7 +417,7 @@ export function BatchImportPanel({ onDismiss, onSaveComplete }: BatchImportPanel
           ) : (
             <>
               <CheckCheck className="h-3.5 w-3.5 text-status-success" />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-fg-muted">
                 Extraction complete —{" "}
                 {cards.length > 0
                   ? `${succeededCount} succeeded, ${failedCount} failed`

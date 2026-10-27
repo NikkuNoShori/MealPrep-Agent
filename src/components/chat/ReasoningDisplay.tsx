@@ -62,14 +62,14 @@ export function ReasoningDisplay({ steps, isStreaming }: ReasoningDisplayProps) 
           <CheckCircle className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
         )}
 
-        <span className="flex-1 font-medium text-muted-foreground truncate">
+        <span className="flex-1 font-medium text-fg-muted truncate">
           {headerLabel}
         </span>
 
         {expanded ? (
-          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <ChevronUp className="h-3.5 w-3.5 text-fg-muted flex-shrink-0" />
         ) : (
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <ChevronDown className="h-3.5 w-3.5 text-fg-muted flex-shrink-0" />
         )}
       </button>
 
@@ -91,14 +91,14 @@ export function ReasoningDisplay({ steps, isStreaming }: ReasoningDisplayProps) 
               )}
 
               {/* Tool icon + label */}
-              <Wrench className="h-3 w-3 text-muted-foreground/60 flex-shrink-0" />
-              <span className="flex-1 text-muted-foreground truncate">
+              <Wrench className="h-3 w-3 text-fg-muted flex-shrink-0" />
+              <span className="flex-1 text-fg-muted truncate">
                 {step.label}
               </span>
 
               {/* Duration badge */}
               {step.done && step.durationMs !== undefined && (
-                <span className="ml-auto pl-2 text-muted-foreground/50 tabular-nums flex-shrink-0">
+                <span className="ml-auto pl-2 text-fg-muted tabular-nums flex-shrink-0">
                   {step.durationMs < 1000
                     ? `${step.durationMs}ms`
                     : `${(step.durationMs / 1000).toFixed(1)}s`}

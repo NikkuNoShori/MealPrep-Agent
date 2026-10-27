@@ -206,7 +206,7 @@ function CompactIngredientRow({
       <span className="font-medium flex-1 min-w-0 truncate">{ingredient.name}</span>
       <div className="flex items-center gap-1 shrink-0">
         {qtyLabel && (
-          <span className="text-muted-foreground text-xs whitespace-nowrap">{qtyLabel}</span>
+          <span className="text-fg-muted text-xs whitespace-nowrap">{qtyLabel}</span>
         )}
         <Button
           type="button"
@@ -446,7 +446,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
       case "hard":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+        return "bg-gray-100 text-fg dark:bg-gray-900";
     }
   };
 
@@ -649,7 +649,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           </div>
         )}
         {recipe.description && (
-          <p className="text-sm text-muted-foreground mb-3">
+          <p className="text-sm text-fg-muted mb-3">
             {recipe.description}
           </p>
         )}
@@ -785,7 +785,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           </div>
         )}
         {sourceUrl && (
-          <p className="text-xs text-muted-foreground mt-2">
+          <p className="text-xs text-fg-muted mt-2">
             Source:{" "}
             <a
               href={sourceUrl}
@@ -816,15 +816,15 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           <div className="border border-border/40 rounded-lg">
             <button
               onClick={() => setShowIngredients(!showIngredients)}
-              className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-surface-900 dark:hover:text-white"
+              className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-fg"
             >
               <h4 className="font-semibold text-sm">
                 Ingredients ({ingredients.length})
               </h4>
               {showIngredients ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 text-fg-muted" />
               ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-fg-muted" />
               )}
             </button>
             {showIngredients && (
@@ -850,15 +850,15 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
           <div className="border border-border/40 rounded-lg">
             <button
               onClick={() => setShowInstructions(!showInstructions)}
-              className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-surface-900 dark:hover:text-white"
+              className="w-full flex items-center justify-between px-4 py-2.5 transition-colors rounded-lg hover:text-fg"
             >
               <h4 className="font-semibold text-sm">
                 Instructions ({instructions.length} steps)
               </h4>
               {showInstructions ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 text-fg-muted" />
               ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-fg-muted" />
               )}
             </button>
             {showInstructions && (
@@ -976,7 +976,7 @@ export const StructuredRecipeDisplay = forwardRef<StructuredRecipeDisplayHandle,
         {/* Visibility picker + Save button at the bottom of the card */}
         {!isPrompting && !isSaved && !isBusy && (
           <div className="flex items-center justify-between mt-3 mb-1">
-            <span className="text-xs text-muted-foreground mr-2">Visibility:</span>
+            <span className="text-xs text-fg-muted mr-2">Visibility:</span>
             <VisibilityPicker value={visibility} onChange={setVisibility} size="sm" />
           </div>
         )}
