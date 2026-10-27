@@ -194,7 +194,7 @@ export const FamilyMembers: React.FC<FamilyMembersProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 className="text-2xl font-bold text-fg">
           Family Members
         </h2>
         <Button
@@ -351,7 +351,7 @@ export const FamilyMembers: React.FC<FamilyMembersProps> = ({
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <User className="h-4 w-4 text-gray-500" />
+                    <User className="h-4 w-4 text-fg-muted" />
                     <h3 className="font-semibold text-lg">{member.name}</h3>
                     <Badge variant="outline">{member.relationship}</Badge>
                     {member.age && <Badge variant="secondary">{member.age} years</Badge>}
@@ -359,7 +359,7 @@ export const FamilyMembers: React.FC<FamilyMembersProps> = ({
                   
                   {member.dietaryRestrictions.length > 0 && (
                     <div className="mb-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Dietary: </span>
+                      <span className="text-sm text-fg-secondary">Dietary: </span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {member.dietaryRestrictions.map(restriction => (
                           <Badge key={restriction} variant="outline" className="text-xs">
@@ -372,7 +372,7 @@ export const FamilyMembers: React.FC<FamilyMembersProps> = ({
                   
                   {member.allergies.length > 0 && (
                     <div>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Allergies: </span>
+                      <span className="text-sm text-fg-secondary">Allergies: </span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {member.allergies.map(allergy => (
                           <Badge key={allergy} variant="destructive" className="text-xs">
@@ -409,11 +409,11 @@ export const FamilyMembers: React.FC<FamilyMembersProps> = ({
       {members.length === 0 && !isAdding && (
         <Card>
           <CardContent className="p-8 text-center">
-            <User className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <User className="h-12 w-12 mx-auto mb-4 text-fg-faint" />
+            <h3 className="text-lg font-medium text-fg mb-2">
               No Family Members Added
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-fg-secondary mb-4">
               Add family members to personalize meal planning and recipe recommendations.
             </p>
             <Button onClick={() => setIsAdding(true)}>

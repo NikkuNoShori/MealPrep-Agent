@@ -8,7 +8,7 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           {/* Copyright */}
-          <p className="text-xs text-surface-400 dark:text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <p className="text-xs text-fg-muted" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             &copy; {year} Transcension Solutions LLC. All rights reserved.
           </p>
 
@@ -16,28 +16,28 @@ const Footer = () => {
           <nav className="flex items-center gap-4">
             <Link
               to="/dashboard"
-              className="text-xs text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300 transition-colors"
+              className="text-xs text-fg-muted hover:text-fg-secondary transition-colors"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
               Dashboard
             </Link>
             <Link
               to="/recipes"
-              className="text-xs text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300 transition-colors"
+              className="text-xs text-fg-muted hover:text-fg-secondary transition-colors"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
               Recipes
             </Link>
             <Link
               to="/meal-planner"
-              className="text-xs text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300 transition-colors"
+              className="text-xs text-fg-muted hover:text-fg-secondary transition-colors"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
               Meal Planner
             </Link>
             <Link
               to="/settings"
-              className="text-xs text-surface-400 dark:text-gray-500 hover:text-surface-600 dark:hover:text-gray-300 transition-colors"
+              className="text-xs text-fg-muted hover:text-fg-secondary transition-colors"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
               Settings

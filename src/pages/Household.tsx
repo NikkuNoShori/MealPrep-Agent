@@ -336,7 +336,7 @@ const Household = () => {
     return (
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-fg-muted" />
         </div>
       </div>
     );
@@ -351,7 +351,7 @@ const Household = () => {
             <div className="w-2 h-8 bg-primary-500 rounded-full" />
             <h1 className="text-3xl font-bold">Household</h1>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-fg-muted">
             Manage your household members, invites, and family profiles.
           </p>
         </div>
@@ -373,7 +373,7 @@ const Household = () => {
                       You've been invited to join{' '}
                       <span className="text-primary">{invite.households?.name || 'a household'}</span>
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-xs text-fg-muted mt-0.5">
                       Respond to this invite to join the household
                     </p>
                   </div>
@@ -407,8 +407,8 @@ const Household = () => {
         {!householdData ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <Home className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">
+              <Home className="h-12 w-12 mx-auto mb-4 text-fg-muted" />
+              <p className="text-fg-muted">
                 No household found. One should have been created when you signed up.
               </p>
             </CardContent>
@@ -471,12 +471,12 @@ const Household = () => {
                               setIsEditingName(true);
                             }}
                           >
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            <Pencil className="h-3.5 w-3.5 text-fg-muted" />
                           </Button>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-fg-muted">
                       Your role: <span className="font-medium capitalize">{myRole || 'member'}</span>
                     </p>
                   </div>
@@ -508,7 +508,7 @@ const Household = () => {
                           Invite
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-fg-muted">
                         Send an invite to add someone to your household.
                       </p>
                     </div>
@@ -544,8 +544,8 @@ const Household = () => {
                             <div
                               className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold ${
                                 isCurrentUser
-                                  ? 'bg-primary/20 text-primary'
-                                  : 'bg-muted text-muted-foreground'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted text-fg-muted'
                               }`}
                             >
                               {member.profiles?.displayName?.charAt(0)?.toUpperCase() ||
@@ -556,11 +556,11 @@ const Household = () => {
                               <p className="text-sm font-medium">
                                 {memberName}
                                 {isCurrentUser && (
-                                  <span className="text-xs text-muted-foreground ml-1.5">(you)</span>
+                                  <span className="text-xs text-fg-muted ml-1.5">(you)</span>
                                 )}
                               </p>
                               {member.profiles?.displayName && member.profiles?.email && (
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-fg-muted">
                                   {member.profiles.email}
                                 </p>
                               )}
@@ -585,7 +585,7 @@ const Household = () => {
                                   <div className="absolute right-0 top-8 z-50 min-w-[180px] rounded-lg border border-surface-200/50 dark:border-white/[0.08] bg-white/95 dark:bg-[rgb(var(--rs-bg-elevated-rgb)/0.95)] backdrop-blur-xl p-1 shadow-lg shadow-black/10 dark:shadow-black/30">
                                     {member.role === 'member' ? (
                                       <button
-                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-fg-muted hover:text-fg transition-colors"
                                         onClick={() => handleChangeRole(member.id, 'admin', memberName)}
                                       >
                                         <Shield className="h-3.5 w-3.5" />
@@ -593,7 +593,7 @@ const Household = () => {
                                       </button>
                                     ) : (
                                       <button
-                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-fg-muted hover:text-fg transition-colors"
                                         onClick={() => handleChangeRole(member.id, 'member', memberName)}
                                       >
                                         <User className="h-3.5 w-3.5" />
@@ -601,7 +601,7 @@ const Household = () => {
                                       </button>
                                     )}
                                     <button
-                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-fg-muted hover:text-fg transition-colors"
                                       onClick={() => {
                                         setConfirmAction({ type: 'transfer', memberId: member.id, memberName });
                                         setMemberMenuOpen(null);
@@ -612,7 +612,7 @@ const Household = () => {
                                     </button>
                                     <div className="my-1 border-t border-surface-100/60 dark:border-white/[0.06]" />
                                     <button
-                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-surface-400 dark:text-surface-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-fg-muted hover:text-rose-800 dark:hover:text-rose-400 transition-colors"
                                       onClick={() => {
                                         setConfirmAction({ type: 'remove', memberId: member.id, memberName });
                                         setMemberMenuOpen(null);
@@ -636,19 +636,19 @@ const Household = () => {
                         className="flex items-center justify-between p-3 rounded-xl border border-dashed border-amber-300/50 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-400">
                             <Mail className="h-4 w-4" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-muted-foreground">
+                            <p className="text-sm font-medium text-fg-muted">
                               {invite.invitedEmail}
                             </p>
-                            <p className="text-xs text-muted-foreground/70">
+                            <p className="text-xs text-fg-muted">
                               Invited {new Date(invite.createdAt).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
-                        <Badge variant="outline" className="gap-1 text-xs border-amber-300 dark:border-amber-500/30 text-amber-600 dark:text-amber-400">
+                        <Badge variant="outline" className="gap-1 text-xs border-amber-300 dark:border-amber-500/30 text-amber-800 dark:text-amber-400">
                           <Clock className="h-3 w-3" />
                           Pending
                         </Badge>
@@ -668,7 +668,7 @@ const Household = () => {
                       {confirmAction.type === 'remove' ? (
                         <LogOut className="h-4 w-4 text-destructive" />
                       ) : (
-                        <ArrowRightLeft className="h-4 w-4 text-amber-500" />
+                        <ArrowRightLeft className="h-4 w-4 text-amber-800 dark:text-amber-400" />
                       )}
                     </div>
                     <div className="flex-1">
@@ -677,7 +677,7 @@ const Household = () => {
                           ? `Remove ${confirmAction.memberName}?`
                           : `Transfer ownership to ${confirmAction.memberName}?`}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-fg-muted mt-1">
                         {confirmAction.type === 'remove'
                           ? 'They will lose access to household recipes and data. This can be undone by re-inviting them.'
                           : 'You will become an admin. Only the new owner can transfer ownership back.'}
@@ -727,7 +727,7 @@ const Household = () => {
                     </Button>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-fg-muted">
                   Restrictions, allergies, and preferences for each person in your household. Only add profiles that are relevant.
                 </p>
               </CardHeader>
@@ -788,7 +788,7 @@ const Household = () => {
                         </div>
                       ) : (
                         <p className="text-sm font-medium flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-primary-500" />
+                          <User className="h-3.5 w-3.5 text-brand" />
                           {user?.email}
                           <Badge variant="secondary" className="text-[10px]">You</Badge>
                         </p>
@@ -805,12 +805,12 @@ const Household = () => {
                             >
                               <span>{sec.label}</span>
                               <span className="flex items-center gap-2">
-                                <span className="text-[10px] text-muted-foreground font-normal">
+                                <span className="text-[10px] text-fg-muted font-normal">
                                   {sec.key === 'restrictions' && (profileFormData.dietaryRestrictions.length > 0 ? profileFormData.dietaryRestrictions.join(', ') : 'None set')}
                                   {sec.key === 'allergies' && (profileFormData.allergies.length > 0 ? profileFormData.allergies.join(', ') : 'None set')}
                                   {sec.key === 'preferences' && ([profileFormData.likedFoods, profileFormData.dislikedFoods].filter(Boolean).join(' · ') || 'None set')}
                                 </span>
-                                {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                                {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-fg-muted" /> : <ChevronRight className="h-3.5 w-3.5 text-fg-muted" />}
                               </span>
                             </button>
                             {isOpen && (
@@ -818,8 +818,8 @@ const Household = () => {
                                 {sec.key === 'restrictions' && (
                                   <>
                                     <div className="flex justify-end gap-1">
-                                      <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}>Select All</button>
-                                      <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, dietaryRestrictions: [] }))}>Clear</button>
+                                      <button type="button" className="text-[10px] text-fg-muted hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, dietaryRestrictions: [...DIETARY_RESTRICTIONS] }))}>Select All</button>
+                                      <button type="button" className="text-[10px] text-fg-muted hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, dietaryRestrictions: [] }))}>Clear</button>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                       {DIETARY_RESTRICTIONS.map(r => { const sel = profileFormData.dietaryRestrictions.includes(r); return <Badge key={r} variant={sel ? 'default' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm' : 'opacity-70 hover:opacity-100 hover:border-primary/40'}`} onClick={() => setProfileFormData(p => ({ ...p, dietaryRestrictions: sel ? p.dietaryRestrictions.filter(x => x !== r) : [...p.dietaryRestrictions, r] }))}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{r}</Badge>; })}
@@ -829,8 +829,8 @@ const Household = () => {
                                 {sec.key === 'allergies' && (
                                   <>
                                     <div className="flex justify-end gap-1">
-                                      <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}>Select All</button>
-                                      <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, allergies: [] }))}>Clear</button>
+                                      <button type="button" className="text-[10px] text-fg-muted hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, allergies: [...COMMON_ALLERGIES] }))}>Select All</button>
+                                      <button type="button" className="text-[10px] text-fg-muted hover:text-foreground transition-colors px-1.5 py-0.5 rounded" onClick={() => setProfileFormData(p => ({ ...p, allergies: [] }))}>Clear</button>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                       {COMMON_ALLERGIES.map(a => { const sel = profileFormData.allergies.includes(a); return <Badge key={a} variant={sel ? 'destructive' : 'outline'} className={`cursor-pointer transition-all duration-150 ${sel ? 'shadow-sm' : 'opacity-70 hover:opacity-100 hover:border-destructive/40'}`} onClick={() => setProfileFormData(p => ({ ...p, allergies: sel ? p.allergies.filter(x => x !== a) : [...p.allergies, a] }))}>{sel && <Check className="h-2.5 w-2.5 mr-0.5" />}{a}</Badge>; })}
@@ -840,11 +840,11 @@ const Household = () => {
                                 {sec.key === 'preferences' && (
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                      <Label className="flex items-center gap-1.5 text-xs"><ThumbsUp className="h-3 w-3 text-green-500" />Liked Foods</Label>
+                                      <Label className="flex items-center gap-1.5 text-xs"><ThumbsUp className="h-3 w-3 text-green-800 dark:text-green-400" />Liked Foods</Label>
                                       <Input value={profileFormData.likedFoods} onChange={e => setProfileFormData(p => ({ ...p, likedFoods: e.target.value }))} placeholder="pasta, chicken… (comma-separated)" />
                                     </div>
                                     <div className="space-y-1.5">
-                                      <Label className="flex items-center gap-1.5 text-xs"><ThumbsDown className="h-3 w-3 text-red-500" />Disliked Foods</Label>
+                                      <Label className="flex items-center gap-1.5 text-xs"><ThumbsDown className="h-3 w-3 text-red-700 dark:text-red-400" />Disliked Foods</Label>
                                       <Input value={profileFormData.dislikedFoods} onChange={e => setProfileFormData(p => ({ ...p, dislikedFoods: e.target.value }))} placeholder="mushrooms, olives… (comma-separated)" />
                                     </div>
                                   </div>
@@ -882,7 +882,7 @@ const Household = () => {
                         </div>
                       </div>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0 ml-2" onClick={() => openProfileForm('self')}>
-                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Pencil className="h-3.5 w-3.5 text-fg-muted" />
                       </Button>
                     </div>
                   )}
@@ -898,16 +898,16 @@ const Household = () => {
                         <div className="flex flex-wrap gap-1">
                           {(dep.dietaryRestrictions ?? []).map((r: string) => <Badge key={r} variant="outline" className="text-[10px] px-1.5 py-0">{r}</Badge>)}
                           {(dep.allergies ?? []).map((a: string) => <Badge key={a} variant="destructive" className="text-[10px] px-1.5 py-0">{a}</Badge>)}
-                          {!(dep.dietaryRestrictions?.length) && !(dep.allergies?.length) && <span className="text-[10px] text-muted-foreground">No restrictions set</span>}
+                          {!(dep.dietaryRestrictions?.length) && !(dep.allergies?.length) && <span className="text-[10px] text-fg-muted">No restrictions set</span>}
                         </div>
                       </div>
                       <div className="flex gap-1 shrink-0 ml-2">
                         {canEditChildProfiles ? (
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openProfileForm(dep.id)}>
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            <Pencil className="h-3.5 w-3.5 text-fg-muted" />
                           </Button>
                         ) : (
-                          <span title="Only owner/admin can edit" className="self-center mr-1"><Lock className="h-3.5 w-3.5 text-muted-foreground/40" /></span>
+                          <span title="Only owner/admin can edit" className="self-center mr-1"><Lock className="h-3.5 w-3.5 text-fg-muted" /></span>
                         )}
                         {isOwnerOrAdmin && (
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteDependent(dep.id, dep.name)}>
@@ -923,7 +923,7 @@ const Household = () => {
                     (myDietaryProfile?.dietaryRestrictions?.length ?? 0) === 0 &&
                     (myDietaryProfile?.allergies?.length ?? 0) === 0 &&
                     (householdData?.dependents ?? []).length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-6">
+                    <p className="text-sm text-fg-muted text-center py-6">
                       No dietary profiles yet. Add one for anyone in your household who has restrictions or allergies.
                     </p>
                   )}
@@ -932,13 +932,13 @@ const Household = () => {
                 {/* ── Owner: member permissions ── */}
                 {isOwner && householdData?.household?.id && (
                   <div className="mt-2 pt-4 border-t border-border/40 space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Member Permissions</p>
+                    <p className="text-xs font-medium text-fg-muted uppercase tracking-wide">Member Permissions</p>
                     {([
                       { key: 'allowMemberEdits', label: "Members can edit each other's dietary profiles", current: allowMemberEdits },
                       { key: 'allowMemberChildEdits', label: 'Members can create and edit child/dependent profiles', current: allowMemberChildEdits },
                     ] as const).map(flag => (
                       <div key={flag.key} className="flex items-center justify-between gap-3 py-1">
-                        <span className="text-sm text-muted-foreground">{flag.label}</span>
+                        <span className="text-sm text-fg-muted">{flag.label}</span>
                         <button
                           type="button"
                           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${flag.current ? 'bg-primary-500' : 'bg-muted'}`}

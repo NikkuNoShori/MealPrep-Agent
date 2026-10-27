@@ -23,29 +23,29 @@ const GroceryCartWidget = ({ stats, isLoading }: GroceryCartWidgetProps) => {
         action={{
           label: 'Open cart',
           to: '/meal-planner',
-          className: 'hover:text-teal-500 dark:hover:text-teal-400',
+          className: 'hover:text-teal-800 dark:hover:text-teal-400',
         }}
       />
 
       <div>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-4 w-4 animate-spin text-surface-400 dark:text-gray-500" />
+            <Loader2 className="h-4 w-4 animate-spin text-fg-faint" />
           </div>
         ) : !progress?.planId || total === 0 ? (
           <div className="text-center py-8">
-            <ShoppingCart className="h-5 w-5 text-surface-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-xs text-surface-400 dark:text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <ShoppingCart className="h-5 w-5 text-fg-faint mx-auto mb-2" />
+            <p className="text-xs text-fg-muted" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               No grocery list yet
             </p>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-surface-900 dark:text-white tabular-nums" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              <span className="text-sm font-semibold text-fg tabular-nums" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 {checked} / {total} checked
               </span>
-              <span className="text-xs text-teal-600 dark:text-teal-400 tabular-nums" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              <span className="text-xs text-teal-800 dark:text-teal-400 tabular-nums" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 {pct}%
               </span>
             </div>
@@ -60,7 +60,7 @@ const GroceryCartWidget = ({ stats, isLoading }: GroceryCartWidgetProps) => {
                 {progress.categories.map((cat) => (
                   <span
                     key={cat.category}
-                    className="px-2 py-0.5 rounded-full text-[10px] bg-surface-100 dark:bg-white/[0.06] text-surface-500 dark:text-gray-400 tabular-nums"
+                    className="px-2 py-0.5 rounded-full text-[10px] bg-surface-100 dark:bg-white/[0.06] text-fg-muted tabular-nums"
                     style={{ fontFamily: "'DM Sans', sans-serif" }}
                   >
                     {cat.category} {cat.checked}/{cat.total}

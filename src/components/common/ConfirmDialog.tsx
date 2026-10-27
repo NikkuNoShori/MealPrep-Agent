@@ -88,13 +88,13 @@ export function ConfirmDialog({
       >
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-9 h-9 rounded-full bg-rose-100 dark:bg-rose-500/10 flex items-center justify-center">
-            <AlertTriangle className="h-4.5 w-4.5 text-rose-500 dark:text-rose-400" />
+            <AlertTriangle className="h-4.5 w-4.5 text-rose-800 dark:text-rose-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 id="confirm-dialog-title" className="text-sm font-semibold text-surface-900 dark:text-white">
+            <h2 id="confirm-dialog-title" className="text-sm font-semibold text-fg">
               {title}
             </h2>
-            <p id="confirm-dialog-description" className="text-sm text-surface-500 dark:text-gray-400 mt-1">
+            <p id="confirm-dialog-description" className="text-sm text-fg-muted mt-1">
               {description}
             </p>
           </div>
@@ -105,7 +105,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={isConfirming}
-            className="flex-1 h-9 rounded-xl text-sm font-medium border border-surface-200 dark:border-white/[0.1] text-surface-700 dark:text-gray-300 hover:bg-surface-50 dark:hover:bg-white/[0.04] disabled:opacity-50 transition-colors"
+            className="flex-1 h-9 rounded-xl text-sm font-medium border border-surface-200 dark:border-white/[0.1] text-fg-secondary hover:bg-surface-50 dark:hover:bg-white/[0.04] disabled:opacity-50 transition-colors"
           >
             {cancelLabel}
           </button>
@@ -113,7 +113,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={isConfirming}
-            className="flex-1 h-9 rounded-xl text-sm font-medium bg-rose-500 hover:bg-rose-600 disabled:opacity-60 text-white transition-colors flex items-center justify-center gap-1.5"
+            className="flex-1 h-9 rounded-xl text-sm font-medium bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white transition-colors flex items-center justify-center gap-1.5"
           >
             {isConfirming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             {confirmLabel}

@@ -59,7 +59,7 @@ const PREFERENCE_ICONS = {
 const PREFERENCE_COLORS = {
   love: 'bg-red-100 text-red-800 border-red-200',
   like: 'bg-green-100 text-green-800 border-green-200',
-  neutral: 'bg-gray-100 text-gray-800 border-gray-200',
+  neutral: 'bg-gray-100 text-fg border-gray-200',
   dislike: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   hate: 'bg-red-100 text-red-800 border-red-200'
 };
@@ -112,7 +112,7 @@ export const PreferenceManager: React.FC<PreferenceManagerProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 className="text-2xl font-bold text-fg">
           Food Preferences
         </h2>
         <Button onClick={() => setIsAdding(true)}>
@@ -129,9 +129,9 @@ export const PreferenceManager: React.FC<PreferenceManagerProps> = ({
           return (
             <Card key={pref}>
               <CardContent className="p-4 text-center">
-                <Icon className="h-6 w-6 mx-auto mb-2 text-gray-600" />
+                <Icon className="h-6 w-6 mx-auto mb-2 text-fg-secondary" />
                 <div className="text-2xl font-bold">{count}</div>
-                <div className="text-sm text-gray-600 capitalize">{pref}</div>
+                <div className="text-sm text-fg-secondary capitalize">{pref}</div>
               </CardContent>
             </Card>
           );
@@ -221,7 +221,7 @@ export const PreferenceManager: React.FC<PreferenceManagerProps> = ({
         <div className="flex-1">
           <Label htmlFor="search">Search</Label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-fg-faint" />
             <Input
               id="search"
               value={searchTerm}
@@ -268,7 +268,7 @@ export const PreferenceManager: React.FC<PreferenceManagerProps> = ({
                     </Badge>
                   </div>
                   {preference.notes && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-fg-secondary">
                       {preference.notes}
                     </p>
                   )}
@@ -306,11 +306,11 @@ export const PreferenceManager: React.FC<PreferenceManagerProps> = ({
       {filteredPreferences.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
-            <Heart className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <Heart className="h-12 w-12 mx-auto mb-4 text-fg-faint" />
+            <h3 className="text-lg font-medium text-fg mb-2">
               No Preferences Found
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-fg-secondary mb-4">
               {searchTerm || selectedCategory !== 'All' 
                 ? 'Try adjusting your search or category filter.'
                 : 'Start adding your food preferences to get personalized recipe recommendations.'

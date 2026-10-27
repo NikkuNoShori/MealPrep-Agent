@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PlanPeriodConfig } from '@/components/settings/PlanPeriodConfig';
 import { usePlanPeriodConfig, useSetPlanPeriodConfig } from '../services/api';
 import { Label } from '../components/ui/label';
@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Button } from '../components/ui/button';
 import { useTheme } from '@/hooks/useTheme';
+import { useThemeStore, applyColorSchemeToCSS } from '@/stores/themeStore';
 import { useAuthStore } from '../stores/authStore';
 import { useMeasurementSystem } from "@/hooks/useMeasurementSystem";
 import {
@@ -67,6 +68,41 @@ const Settings = () => {
 
   // Get the staged color scheme for preview
   const previewColorScheme = availableColorSchemes[stagedColorScheme] || colorScheme;
+
+  const systemTheme = useThemeStore((s) => s.systemTheme);
+
+  // Live preview: push the staged theme/color scheme straight to the DOM
+  // (classList + CSS custom properties) so the whole app re-themes as soon
+  // as a selection is made, without calling setTheme/setColorScheme — those
+  // write to the persisted Zustand store, which is what Save is for. This
+  // mirrors applyColorSchemeToCSS's own role as a DOM-only side effect,
+  // just invoked here with a not-yet-committed scheme.
+  useEffect(() => {
+    const root = document.documentElement;
+    const resolvedMode = stagedTheme === 'system' ? systemTheme : stagedTheme;
+    root.classList.remove('light', 'dark');
+    root.classList.add(resolvedMode);
+    applyColorSchemeToCSS(previewColorScheme);
+  }, [stagedTheme, previewColorScheme, systemTheme]);
+
+  // Revert the live preview back to the actually-committed theme/scheme
+  // when this page unmounts without saving (e.g. navigating away after
+  // previewing but not clicking Save) — otherwise the rest of the app
+  // would keep showing the discarded preview. Reset uses a ref so the
+  // cleanup always sees the latest committed values, not whatever was
+  // committed when this effect first ran.
+  const committedRef = useRef({ theme, colorScheme });
+  committedRef.current = { theme, colorScheme };
+  useEffect(() => {
+    return () => {
+      const { theme: committedTheme, colorScheme: committedScheme } = committedRef.current;
+      const root = document.documentElement;
+      const resolvedMode = committedTheme === 'system' ? useThemeStore.getState().systemTheme : committedTheme;
+      root.classList.remove('light', 'dark');
+      root.classList.add(resolvedMode);
+      applyColorSchemeToCSS(committedScheme);
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -153,12 +189,12 @@ const Settings = () => {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-surface-900 dark:text-white">Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-fg">Settings</h1>
         {hasUnsavedChanges && (
           <div className="flex items-center gap-2">
             <button
               onClick={handleReset}
-              className="text-sm text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+              className="text-sm text-fg-muted hover:text-fg transition-colors"
             >
               Reset
             </button>
@@ -173,23 +209,23 @@ const Settings = () => {
       <div className="space-y-10">
         {/* ── Account ── */}
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-4">Account</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-fg-muted mb-4">Account</h2>
           <div className="space-y-5">
             {/* Email */}
             <div className="flex items-center justify-between">
-              <Label className="text-sm text-surface-600 dark:text-surface-300">Email</Label>
-              <span className="text-sm text-surface-500 dark:text-surface-400">{user?.email || "Not available"}</span>
+              <Label className="text-sm text-fg-secondary">Email</Label>
+              <span className="text-sm text-fg-muted">{user?.email || "Not available"}</span>
             </div>
 
             {/* Username */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <Label className="text-sm text-surface-600 dark:text-surface-300">Username</Label>
+                <Label className="text-sm text-fg-secondary">Username</Label>
                 {!isEditingUsername && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-surface-500 dark:text-surface-400">@{profile?.username || '...'}</span>
+                    <span className="text-sm text-fg-muted">@{profile?.username || '...'}</span>
                     <button
-                      className="text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
+                      className="text-fg-muted hover:text-fg-secondary transition-colors"
                       onClick={() => {
                         setEditedUsername(profile?.username || '');
                         setIsEditingUsername(true);
@@ -203,7 +239,7 @@ const Settings = () => {
               {isEditingUsername && (
                 <div className="flex gap-2 mt-2">
                   <div className="flex-1 relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-sm">@</span>
                     <Input
                       value={editedUsername}
                       onChange={(e) => setEditedUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
@@ -242,17 +278,17 @@ const Settings = () => {
 
             {/* Connected Accounts */}
             <div>
-              <Label className="text-sm text-surface-600 dark:text-surface-300 mb-3 block">Connected Accounts</Label>
+              <Label className="text-sm text-fg-secondary mb-3 block">Connected Accounts</Label>
               <div className="space-y-2">
                 {hasEmailPassword && (
                   <div className="flex items-center justify-between py-2">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-surface-100 dark:bg-white/[0.06] flex items-center justify-center">
-                        <span className="text-surface-500 dark:text-surface-400 text-sm font-medium">@</span>
+                        <span className="text-fg-muted text-sm font-medium">@</span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-surface-700 dark:text-surface-300">Email & Password</p>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">Always available</p>
+                        <p className="text-sm font-medium text-fg-secondary">Email & Password</p>
+                        <p className="text-xs text-fg-muted">Always available</p>
                       </div>
                     </div>
                   </div>
@@ -261,7 +297,7 @@ const Settings = () => {
                 <div className="flex items-center justify-between py-2">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-surface-100 dark:bg-white/[0.06] flex items-center justify-center">
-                      <svg className="w-4 h-4 text-surface-500 dark:text-surface-400" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-fg-muted" viewBox="0 0 24 24">
                         <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                         <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                         <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -269,8 +305,8 @@ const Settings = () => {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-surface-700 dark:text-surface-300">Google</p>
-                      <p className="text-xs text-surface-400 dark:text-surface-500">
+                      <p className="text-sm font-medium text-fg-secondary">Google</p>
+                      <p className="text-xs text-fg-muted">
                         {hasGoogleLinked ? "Connected" : "Not connected"}
                       </p>
                     </div>
@@ -278,7 +314,7 @@ const Settings = () => {
                   {hasGoogleLinked ? (
                     <button
                       onClick={handleUnlinkGoogle}
-                      className="text-xs text-surface-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                      className="text-xs text-fg-muted hover:text-rose-800 dark:hover:text-rose-400 transition-colors"
                       title={!hasEmailPassword ? "Sends a password setup email first" : "Unlink Google account"}
                     >
                       <Unlink className="w-3.5 h-3.5" />
@@ -286,7 +322,7 @@ const Settings = () => {
                   ) : (
                     <button
                       onClick={handleLinkGoogle}
-                      className="text-xs text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+                      className="text-xs text-fg-muted hover:text-fg transition-colors"
                       title="Link Google account"
                     >
                       <LinkIcon className="w-3.5 h-3.5" />
@@ -300,13 +336,13 @@ const Settings = () => {
 
         {/* ── Appearance ── */}
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-4">Appearance</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-fg-muted mb-4">Appearance</h2>
           <div className="space-y-5">
             {/* Theme */}
             <div className="flex items-center justify-between gap-4">
               <div>
-                <Label className="text-sm text-surface-600 dark:text-surface-300">Theme</Label>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">Light, dark, or match your system</p>
+                <Label className="text-sm text-fg-secondary">Theme</Label>
+                <p className="text-xs text-fg-muted mt-0.5">Light, dark, or match your system</p>
               </div>
               <Select
                 value={stagedTheme}
@@ -334,8 +370,8 @@ const Settings = () => {
             {/* Color Scheme */}
             <div className="flex items-center justify-between gap-4">
               <div>
-                <Label className="text-sm text-surface-600 dark:text-surface-300">Color Scheme</Label>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">App accent palette</p>
+                <Label className="text-sm text-fg-secondary">Color Scheme</Label>
+                <p className="text-xs text-fg-muted mt-0.5">App accent palette</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex gap-1">
@@ -378,7 +414,7 @@ const Settings = () => {
         {/* ── Preferences ── */}
         {/* ── Meal Planning ── */}
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-4">Meal Planning</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-fg-muted mb-4">Meal Planning</h2>
           <PlanPeriodConfig
             value={planPeriodConfig ?? null}
             onSave={(config) => setPlanPeriodConfig.mutateAsync(config)}
@@ -386,13 +422,13 @@ const Settings = () => {
         </section>
 
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-4">Preferences</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-fg-muted mb-4">Preferences</h2>
           <div className="space-y-5">
             {/* Measurement System */}
             <div className="flex items-center justify-between gap-4">
               <div>
-                <Label className="text-sm text-surface-600 dark:text-surface-300">Unit System</Label>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">Converts recipe measurements automatically</p>
+                <Label className="text-sm text-fg-secondary">Unit System</Label>
+                <p className="text-xs text-fg-muted mt-0.5">Converts recipe measurements automatically</p>
               </div>
               <Select
                 value={stagedMeasurementSystem}
@@ -415,12 +451,12 @@ const Settings = () => {
 
         {/* ── Recipe Defaults ── */}
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-4">Recipe Defaults</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-fg-muted mb-4">Recipe Defaults</h2>
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <Label className="text-sm text-surface-600 dark:text-surface-300">Default Visibility</Label>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">Visibility applied to newly saved recipes</p>
+                <Label className="text-sm text-fg-secondary">Default Visibility</Label>
+                <p className="text-xs text-fg-muted mt-0.5">Visibility applied to newly saved recipes</p>
               </div>
               <Select
                 value={(profile as any)?.defaultRecipeVisibility ?? 'private'}

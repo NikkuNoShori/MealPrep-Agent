@@ -17,7 +17,7 @@ const TopCuisinesWidget = ({ stats, isLoading }: TopCuisinesWidgetProps) => {
   return (
     <div className="rounded-2xl border border-surface-200/60 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4">
       <h2
-        className="text-sm font-semibold italic text-surface-800 dark:text-gray-200 mb-3"
+        className="text-sm font-semibold italic text-fg mb-3"
         style={{ fontFamily: "'Fraunces', serif" }}
       >
         Top cuisines
@@ -26,12 +26,12 @@ const TopCuisinesWidget = ({ stats, isLoading }: TopCuisinesWidgetProps) => {
       <div className="border-t border-dashed border-surface-200 dark:border-white/[0.08] pt-3">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-4 w-4 animate-spin text-surface-400 dark:text-gray-500" />
+            <Loader2 className="h-4 w-4 animate-spin text-fg-faint" />
           </div>
         ) : cuisines.length === 0 ? (
           <div className="text-center py-8">
-            <Globe2 className="h-5 w-5 text-surface-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-xs text-surface-400 dark:text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <Globe2 className="h-5 w-5 text-fg-faint mx-auto mb-2" />
+            <p className="text-xs text-fg-muted" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               No cuisines tagged yet
             </p>
           </div>
@@ -40,10 +40,10 @@ const TopCuisinesWidget = ({ stats, isLoading }: TopCuisinesWidgetProps) => {
             {cuisines.slice(0, 5).map((c) => (
               <li key={c.cuisine} className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-surface-700 dark:text-gray-300 capitalize truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                  <span className="text-sm text-fg-secondary capitalize truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {c.cuisine}
                   </span>
-                  <span className="text-xs text-surface-400 dark:text-gray-500 tabular-nums flex-shrink-0" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                  <span className="text-xs text-fg-muted tabular-nums flex-shrink-0" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {c.count}
                   </span>
                 </div>

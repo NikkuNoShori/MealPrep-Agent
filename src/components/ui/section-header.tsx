@@ -58,10 +58,10 @@ interface SectionHeaderProps {
 
 /** The italic Fraunces-serif label style shared by every section header. */
 const TITLE_CLASSES =
-  'text-sm font-semibold italic text-surface-800 dark:text-gray-200'
+  'text-sm font-semibold italic text-fg'
 
 const ACTION_CLASSES =
-  'text-xs text-surface-400 hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400 transition-colors'
+  'text-xs text-fg-muted hover:text-brand transition-colors'
 
 function SectionHeaderAction({ action }: { action: SectionHeaderAction }) {
   const style = { fontFamily: "'DM Sans', sans-serif" }
