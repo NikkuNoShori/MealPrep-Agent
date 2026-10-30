@@ -190,9 +190,16 @@ class ApiClient {
 
   // Recipe endpoints - using Supabase client directly
   // Note: user_id references profiles(id), which references auth.users(id)
-  async getRecipes(params?: { limit?: number; offset?: number }) {
-    const limit = params?.limit || 50;
-    const offset = params?.offset || 0;
+  async getRecipes(_params?: { limit?: number; offset?: number }) {
+    // No .range() cap -- this previously silently truncated at 50 rows
+    // while the "N recipes" header displayed that truncated length as if
+    // it were the real total (confirmed live 2026-10-30: sidebar's RPC-based
+    // count correctly showed 55, this page showed "50 recipes" with no
+    // pagination/"load more" to reach the other 5). The params are kept so
+    // existing call sites passing { limit: 50 } don't need changes, but
+    // they're no longer honored -- remove them if/when real pagination is
+    // added instead.
+    void _params;
 
     // Get current user
     const {
@@ -203,8 +210,7 @@ class ApiClient {
     const { data, error } = await supabase
       .from("recipes")
       .select("*")
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
 
@@ -2011,15 +2017,15 @@ class ApiClient {
 
   // ── Public Recipes ──
 
-  async getPublicRecipes(params?: { limit?: number; offset?: number }) {
-    const limit = params?.limit || 50;
-    const offset = params?.offset || 0;
+  async getPublicRecipes(_params?: { limit?: number; offset?: number }) {
+    // No .range() cap -- see the matching comment in getRecipes() above;
+    // same truncation bug, same fix.
+    void _params;
 
     const { data, error } = await supabase.from("recipes")
       .select("*, profiles!recipes_user_id_fkey(display_name, username, avatar_url)")
       .eq("visibility", "public")
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
 
