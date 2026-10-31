@@ -2,8 +2,22 @@
 
 > User-visible changes by date for MealPrep Agent. Newest entries first.
 
-**Last reviewed:** 2026-10-21
-**Last updated:** 2026-10-21 (end-to-end color contrast overhaul — see entry below)
+**Last reviewed:** 2026-10-30
+**Last updated:** 2026-10-30 (Meal Planner Titles-view layout, servings-prompt preference, grocery-cart scale correctness — see entry below)
+
+## 2026-10-30 (Meal Planner: one-week-per-row layout, servings-prompt preference, grocery scale correctness) `20261030-guided-onboarding-walkthrough`
+
+**UI: Meal Planner Titles view now shows one week per row.** Previously all weeks of a multi-week plan were squeezed into a single wide row, making each day's column unreadably narrow. Titles view now chunks by week like the existing Meals view, with a "Week N — date range" label when a plan spans more than one week.
+
+**Feature: "Remember my choice" for the servings prompt.** Adding a recipe to a meal plan asks whether to adjust serving sizes. A new checkbox lets users skip that prompt going forward (persisted per-user via `profiles.skip_servings_modal`, migration 058); a toggle in the planner's `···` menu re-enables it. Applies to the recipe-selector flow and the Suggest-modal single-add flow.
+
+**Fix: grocery cart under-shops when a planned recipe's yield is edited later.** The cart's ingredient-scaling math divided by the recipe's *current* servings, not what it was when the meal was planned — editing a recipe's yield after planning silently changed the shopping list for every plan using it, with no notice. Each meal-plan entry now snapshots the recipe's yield at the moment it's added (`meal_plan_entries.base_servings`, migration 059) and scales against that instead. Entries created before this migration keep the old (live-yield) behavior; nothing is backfilled. See ADR-0009.
+
+**Fix: missing servings no longer silently scaled a recipe to 1/4 (or less) of its ingredients.** A meal-plan entry with no stored serving count was coerced to `1` and scaled accordingly — a 4-serving recipe planned without an explicit count would under-shop by 75%. Null now correctly means "use the recipe's base yield." Checked production data for affected rows before merging: 0 found.
+
+**Fix: `fl oz` ingredient quantities weren't recognized as a volume unit.** They were treated as a countable/discrete item — rounding up unnecessarily and never merging with `cup`/`ml` quantities of the same ingredient. Now merges and converts correctly.
+
+---
 
 ## 2026-10-21 (Color contrast: end-to-end overhaul, measured in a real browser) `main`
 

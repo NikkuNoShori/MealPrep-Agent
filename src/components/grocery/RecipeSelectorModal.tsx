@@ -261,6 +261,7 @@ const RecipeSelectorModal = ({
             recipeName: raw.title || display?.name || 'Untitled',
             recipeImage: raw.imageUrl,
             servings: raw.servings || 4,
+            baseServings: raw.servings || 4,
             prepTime: raw.prepTime ? parseInt(raw.prepTime) : undefined,
             cookTime: raw.cookTime ? parseInt(raw.cookTime) : undefined,
           });
@@ -271,6 +272,7 @@ const RecipeSelectorModal = ({
             recipeName: display.name,
             recipeImage: display.image,
             servings: display.serves,
+            baseServings: display.serves,
           });
         }
       }

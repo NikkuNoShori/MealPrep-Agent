@@ -104,6 +104,7 @@ const AddToPlanButton = ({
       recipeName,
       recipeImage,
       servings,
+      baseServings: servings,
       prepTime,
       cookTime,
     };
@@ -139,6 +140,7 @@ const AddToPlanButton = ({
       recipeName,
       recipeImage,
       servings,
+      baseServings: servings,
       prepTime,
       cookTime,
     };

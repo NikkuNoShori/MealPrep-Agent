@@ -766,14 +766,15 @@ class ApiClient {
     const meals: Record<string, any> = {};
     for (const e of entries) {
       const entry = {
-        id:          e.id,
-        recipeId:    e.recipeId    || '',
-        recipeName:  e.recipeName  || '',
-        recipeImage: e.recipeImage || undefined,
-        servings:    e.servings    ?? 1,
-        prepTime:    e.prepTime    ?? undefined,
-        cookTime:    e.cookTime    ?? undefined,
-        notes:       e.notes       || undefined,
+        id:           e.id,
+        recipeId:     e.recipeId     || '',
+        recipeName:   e.recipeName   || '',
+        recipeImage:  e.recipeImage  || undefined,
+        servings:     e.servings     ?? undefined,
+        baseServings: e.baseServings ?? undefined,
+        prepTime:     e.prepTime     ?? undefined,
+        cookTime:     e.cookTime     ?? undefined,
+        notes:        e.notes        || undefined,
       };
       if (e.date && e.slot) {
         if (!meals[e.date]) meals[e.date] = {};
@@ -969,14 +970,15 @@ class ApiClient {
     if (sourceEntries.length > 0) {
       const shiftedEntries = sourceEntries.map((e: any) => {
         const shifted: any = {
-          recipeName:  e.recipeName,
-          recipeId:    e.recipeId    || undefined,
-          recipeImage: e.recipeImage || undefined,
-          servings:    e.servings,
-          prepTime:    e.prepTime    ?? undefined,
-          cookTime:    e.cookTime    ?? undefined,
-          notes:       e.notes       || undefined,
-          position:    e.position    ?? 0,
+          recipeName:   e.recipeName,
+          recipeId:     e.recipeId     || undefined,
+          recipeImage:  e.recipeImage  || undefined,
+          servings:     e.servings,
+          baseServings: e.baseServings ?? undefined,
+          prepTime:     e.prepTime     ?? undefined,
+          cookTime:     e.cookTime     ?? undefined,
+          notes:        e.notes        || undefined,
+          position:     e.position     ?? 0,
         };
         if (e.date) {
           const d = new Date(e.date);
@@ -1018,7 +1020,8 @@ class ApiClient {
     recipeId?: string;
     recipeName: string;
     recipeImage?: string;
-    servings: number;
+    servings?: number;
+    baseServings?: number;
     prepTime?: number;
     cookTime?: number;
     notes?: string;
@@ -1028,17 +1031,18 @@ class ApiClient {
       .from("meal_plan_entries")
       .insert({
         meal_plan_id: planId,
-        date:         entry.date       || null,
-        slot:         entry.slot       || null,
-        list_key:     entry.listKey    || null,
-        recipe_id:    entry.recipeId   || null,
-        recipe_name:  entry.recipeName,
-        recipe_image: entry.recipeImage || null,
-        servings:     entry.servings,
-        prep_time:    entry.prepTime   ?? null,
-        cook_time:    entry.cookTime   ?? null,
-        notes:        entry.notes      || null,
-        position:     entry.position   ?? 0,
+        date:          entry.date       || null,
+        slot:          entry.slot       || null,
+        list_key:      entry.listKey    || null,
+        recipe_id:     entry.recipeId   || null,
+        recipe_name:   entry.recipeName,
+        recipe_image:  entry.recipeImage || null,
+        servings:      entry.servings   ?? null,
+        base_servings: entry.baseServings ?? null,
+        prep_time:     entry.prepTime   ?? null,
+        cook_time:     entry.cookTime   ?? null,
+        notes:         entry.notes      || null,
+        position:      entry.position   ?? 0,
       })
       .select()
       .single();
@@ -1140,16 +1144,17 @@ class ApiClient {
         const listKey = key.slice(1); // strip leading _
         (val as any[]).forEach((e: any, idx: number) => {
           rows.push({
-            meal_plan_id: planId,
-            list_key:     listKey,
-            recipe_id:    e.recipeId   || null,
-            recipe_name:  e.recipeName || '',
-            recipe_image: e.recipeImage || null,
-            servings:     e.servings   ?? 1,
-            prep_time:    e.prepTime   ?? null,
-            cook_time:    e.cookTime   ?? null,
-            notes:        e.notes      || null,
-            position:     idx,
+            meal_plan_id:  planId,
+            list_key:      listKey,
+            recipe_id:     e.recipeId   || null,
+            recipe_name:   e.recipeName || '',
+            recipe_image:  e.recipeImage || null,
+            servings:      e.servings   ?? null,
+            base_servings: e.baseServings ?? null,
+            prep_time:     e.prepTime   ?? null,
+            cook_time:     e.cookTime   ?? null,
+            notes:         e.notes      || null,
+            position:      idx,
           });
         });
       } else if (typeof val === 'object' && !Array.isArray(val)) {
@@ -1158,17 +1163,18 @@ class ApiClient {
           if (!Array.isArray(entries)) continue;
           entries.forEach((e: any, idx: number) => {
             rows.push({
-              meal_plan_id: planId,
-              date:         key,
+              meal_plan_id:  planId,
+              date:          key,
               slot,
-              recipe_id:    e.recipeId   || null,
-              recipe_name:  e.recipeName || '',
-              recipe_image: e.recipeImage || null,
-              servings:     e.servings   ?? 1,
-              prep_time:    e.prepTime   ?? null,
-              cook_time:    e.cookTime   ?? null,
-              notes:        e.notes      || null,
-              position:     idx,
+              recipe_id:     e.recipeId   || null,
+              recipe_name:   e.recipeName || '',
+              recipe_image:  e.recipeImage || null,
+              servings:      e.servings   ?? null,
+              base_servings: e.baseServings ?? null,
+              prep_time:     e.prepTime   ?? null,
+              cook_time:     e.cookTime   ?? null,
+              notes:         e.notes      || null,
+              position:      idx,
             });
           });
         }
@@ -2095,6 +2101,30 @@ class ApiClient {
     if (error) throw error;
   }
 
+  // ── Servings Modal Preference (MOP-TBD) ──
+
+  async getSkipServingsModal() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    // skip_servings_modal is a new column (migration 058) — cast to any until
+    // Supabase types are regenerated post-deploy.
+    const { data, error } = await (supabase.from("profiles") as any)
+      .select("skip_servings_modal")
+      .eq("id", user.id)
+      .single();
+    if (error) throw error;
+    return !!data?.skip_servings_modal;
+  }
+
+  async setSkipServingsModal(skip: boolean) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const { error } = await (supabase.from("profiles") as any)
+      .update({ skip_servings_modal: skip })
+      .eq("id", user.id);
+    if (error) throw error;
+  }
+
   // ── Admin Methods (via admin-api edge function) ──
 
   async adminGetAllUsers() {
@@ -2939,6 +2969,28 @@ export const useSetPlanPeriodConfig = () => {
       apiClient.setPlanPeriodConfig(config),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plan-period-config"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+};
+
+// ── Servings Modal Preference Hooks ──
+
+export const useSkipServingsModal = () => {
+  const { user, isLoading: authLoading } = useAuthStore();
+  return useQuery({
+    queryKey: ["skip-servings-modal"],
+    queryFn: () => apiClient.getSkipServingsModal(),
+    enabled: !authLoading && !!user,
+  });
+};
+
+export const useSetSkipServingsModal = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (skip: boolean) => apiClient.setSkipServingsModal(skip),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["skip-servings-modal"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
   });

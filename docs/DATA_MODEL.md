@@ -2,8 +2,8 @@
 
 > Tables, columns, constraints, relationships, triggers, and RLS policies for MealPrep Agent.
 
-**Last reviewed:** 2026-10-16
-**Last updated:** 2026-10-16 (MOP-0011: meal_plans JSONB → meal_plan_entries + grocery_list_items child tables, migrations 044–046; get_dashboard_stats rewritten to JOIN child tables, migration 045; migration index extended through 050 and corrected — the previous 001–020 range listed filenames that don't exist on disk). Previous: 2026-09-25 (MOP-0031: recipe_shares table + 5 sharing RPCs — migration 043)
+**Last reviewed:** 2026-10-30
+**Last updated:** 2026-10-30 (MOP-0043 Phase 1+2: `meal_plan_entries.servings` null semantics fixed — no longer coerced to `1` on read/write; added `meal_plan_entries.base_servings` to snapshot the recipe's yield at entry-creation time so grocery-cart scaling doesn't drift when a recipe is edited later, per ADR-0009; migrations 058–059 added to the index). Previous: 2026-10-16 (MOP-0011: meal_plans JSONB → meal_plan_entries + grocery_list_items child tables, migrations 044–046; get_dashboard_stats rewritten to JOIN child tables, migration 045; migration index extended through 050 and corrected — the previous 001–020 range listed filenames that don't exist on disk). Previous: 2026-09-25 (MOP-0031: recipe_shares table + 5 sharing RPCs — migration 043)
 
 ---
 
@@ -226,7 +226,8 @@ One row per planned meal assignment. Replaces the old `meal_plans.meals` JSONB. 
 | `recipe_id` | UUID | FK → `recipes(id)` ON DELETE SET NULL | |
 | `recipe_name` | TEXT | | Denormalized snapshot — survives recipe deletion |
 | `recipe_image` | TEXT | | Denormalized snapshot |
-| `servings` | INT | | |
+| `servings` | INT | Nullable | Absolute serving count the user chose for this entry. As of migration 059 (MOP-0043), null means "use the recipe's base yield" — it is never coerced to `1` on read or write. Pre-059 rows may already store a literal `1` from the old coercion and cannot be distinguished from an intentional choice |
+| `base_servings` | INT | Nullable (migration 059, MOP-0043) | Snapshot of the recipe's `servings` at the moment this entry was created. The grocery cart scales ingredients by `servings / (base_servings ?? recipe.servings ?? 4)` so editing a recipe's yield later doesn't silently change the quantities on existing plans (ADR-0009). Null for entries created before migration 059 — those fall back to the recipe's live yield (prior behavior, unchanged) |
 | `prep_time` | INT | | |
 | `cook_time` | INT | | |
 | `notes` | TEXT | | |
@@ -235,7 +236,7 @@ One row per planned meal assignment. Replaces the old `meal_plans.meals` JSONB. 
 | `updated_at` | TIMESTAMPTZ | DEFAULT now() | |
 
 **Indexes:** meal_plan_id; (meal_plan_id, date); (meal_plan_id, date, slot); recipe_id
-**RLS:** Uses the `is_meal_plan_owner(meal_plan_id)` `SECURITY DEFINER` helper (avoids an N+1 per-row subquery against `meal_plans`). Four policies (`mpe_select`/`mpe_insert`/`mpe_update`/`mpe_delete`), all gated on `is_meal_plan_owner()`.
+**RLS:** Uses the `is_meal_plan_owner(meal_plan_id)` `SECURITY DEFINER` helper (avoids an N+1 per-row subquery against `meal_plans`). Four policies (`mpe_select`/`mpe_insert`/`mpe_update`/`mpe_delete`), all gated on `is_meal_plan_owner()`. `base_servings` inherits these policies — no new column-specific RLS needed.
 **Triggers:** `update_meal_plan_entries_updated_at`
 
 ---
@@ -637,3 +638,6 @@ Five `SECURITY DEFINER set search_path = public` RPCs for user-to-user recipe sh
 | `20261011000000_050_fix_dropped_is_public_column.sql` | 050b | **Duplicate migration number** — see note below. Fixed 5 RPCs still referencing `recipes.is_public`, dropped by migration 013 and superseded by the `visibility` text column (migration 009) |
 
 > **Duplicate number 050 (unresolved as of 2026-10-16):** two files share migration number 050 — `20261004000000_050_fix_respond_to_household_invite_ambiguity.sql` and `20261011000000_050_fix_dropped_is_public_column.sql`. Both ran (filename-timestamp order makes this safe; Supabase's migration runner orders by filename, not by the embedded number), and the table above labels them 050a/050b to disambiguate in prose, but the files on disk are not renamed. Future migrations should use `051` next, not continue the collision.
+
+| `20261030120000_058_servings_modal_preference.sql` | 058 | Added `profiles.skip_servings_modal BOOLEAN DEFAULT false` — lets a user opt out of the servings-adjustment prompt when adding recipes to a meal plan |
+| `20261030130000_059_meal_plan_entries_base_servings.sql` | 059 | Added `meal_plan_entries.base_servings INTEGER` — snapshots the recipe's yield at entry-creation time so the grocery cart's scale factor doesn't drift if the recipe's yield is edited later (MOP-0043 Phase 2, ADR-0009). No backfill; existing rows get null, preserving prior live-divisor behavior |

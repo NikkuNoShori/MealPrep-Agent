@@ -67,6 +67,80 @@ describe('aggregateIngredients', () => {
     expect(garlic!.amount).toBe(6);
   });
 
+  it('null entry servings scales to 1x base yield', () => {
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        dinner: [
+          // servings omitted entirely, as a legacy/null row would arrive
+          { id: 'm-1', recipeId: 'r-1', recipeName: 'Pasta' } as any,
+        ],
+      },
+    };
+
+    const items = aggregateIngredients(meals, makeRecipeMap());
+    const garlic = items.find((i) => i.name === 'Garlic');
+    // Pasta's base yield is 4 servings / 3 cloves — no scaling should occur.
+    expect(garlic!.amount).toBe(3);
+  });
+
+  it('editing recipe yield after planning does not change scale when baseServings is set', () => {
+    const recipeMap = makeRecipeMap();
+    // Simulate the recipe's yield being edited from 4 -> 6 after the plan
+    // was made (live read), while the entry still carries its original
+    // baseServings snapshot of 4.
+    recipeMap.set('r-1', { ...recipeMap.get('r-1')!, servings: 6 });
+
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        dinner: [
+          { id: 'm-1', recipeId: 'r-1', recipeName: 'Pasta', servings: 4, baseServings: 4 },
+        ],
+      },
+    };
+
+    const items = aggregateIngredients(meals, recipeMap);
+    const garlic = items.find((i) => i.name === 'Garlic');
+    // scale = 4 / baseServings(4) = 1.0, unaffected by the live yield change to 6.
+    expect(garlic!.amount).toBe(3);
+  });
+
+  it('legacy entry without baseServings uses live recipe yield', () => {
+    const recipeMap = makeRecipeMap();
+    recipeMap.set('r-1', { ...recipeMap.get('r-1')!, servings: 6 });
+
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        dinner: [
+          // No baseServings — a legacy entry predating ADR-0009.
+          { id: 'm-1', recipeId: 'r-1', recipeName: 'Pasta', servings: 4 },
+        ],
+      },
+    };
+
+    const items = aggregateIngredients(meals, recipeMap);
+    const garlic = items.find((i) => i.name === 'Garlic');
+    // scale = 4 / live recipe.servings(6) = 0.667 — old drift behavior preserved.
+    expect(garlic!.amount).toBeCloseTo(2, 0);
+  });
+
+  it('treats a zero or negative baseServings as missing instead of dividing by it', () => {
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        dinner: [
+          // Malformed data (bypassing the DB's positive-value CHECK via a
+          // direct write) must not produce an Infinity/NaN divisor.
+          { id: 'm-1', recipeId: 'r-1', recipeName: 'Pasta', servings: 4, baseServings: 0 },
+        ],
+      },
+    };
+
+    const items = aggregateIngredients(meals, makeRecipeMap());
+    const garlic = items.find((i) => i.name === 'Garlic');
+    // Falls back to the recipe's live yield (4), same as having no snapshot.
+    expect(garlic!.amount).toBe(3);
+    expect(Number.isFinite(garlic!.amount)).toBe(true);
+  });
+
   it('keeps null amounts as unquantified line items', () => {
     const meals: MealPlanMeals = {
       '2026-03-16': {
@@ -184,6 +258,44 @@ describe('aggregateIngredients', () => {
     expect(water).toHaveLength(1);
     expect(water[0].unit).toBe('ml');
     expect(water[0].amount).toBeCloseTo(976, 0);
+  });
+
+  it('recognizes fl oz as volume and merges it with cup', () => {
+    const recipeMap = new Map([
+      [
+        'v-3',
+        {
+          id: 'v-3',
+          title: 'Smoothie',
+          servings: 1,
+          ingredients: [{ name: 'Milk', amount: 1, unit: 'cup', category: 'dairy' }],
+        },
+      ],
+      [
+        'v-4',
+        {
+          id: 'v-4',
+          title: 'Pancakes',
+          servings: 1,
+          ingredients: [{ name: 'Milk', amount: 4, unit: 'fl oz', category: 'dairy' }],
+        },
+      ],
+    ]);
+    const meals: MealPlanMeals = {
+      '2026-03-16': {
+        dinner: [
+          { id: 'm-1', recipeId: 'v-3', recipeName: 'Smoothie', servings: 1 },
+          { id: 'm-2', recipeId: 'v-4', recipeName: 'Pancakes', servings: 1 },
+        ],
+      },
+    };
+
+    const items = aggregateIngredients(meals, recipeMap);
+    const milk = items.filter((i) => i.name.toLowerCase() === 'milk');
+    // 1 cup (~236.6ml) + 4 fl oz (~118.3ml) = ~354.9ml, merged into one line.
+    expect(milk).toHaveLength(1);
+    expect(milk[0].unit).toBe('ml');
+    expect(milk[0].amount).toBeCloseTo(354.9, 0);
   });
 
   it('does not merge weight and volume units of the same ingredient (no density data)', () => {

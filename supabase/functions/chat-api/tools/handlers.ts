@@ -598,6 +598,7 @@ async function assignRecipeToMealPlanSlot(
         recipe_id: recipeId,
         recipe_name: recipeTitle,
         servings: recipeServings,
+        base_servings: recipeServings,
         position: 0,
       });
     if (entryErr) return { ok: false, error: entryErr.message, retryable: true };
@@ -639,6 +640,7 @@ async function assignRecipeToMealPlanSlot(
         recipe_id: recipeId,
         recipe_name: recipeTitle,
         servings: recipeServings,
+        base_servings: recipeServings,
         position: 0,
       });
     if (entryErr) return { ok: false, error: entryErr.message, retryable: true };
@@ -1847,6 +1849,7 @@ export async function executeConfirmedTool(
         recipe_id: recipeId,
         recipe_name: recipeTitle,
         servings: recipeServings,
+        base_servings: recipeServings,
         position: 0,
       });
     if (insErr) return { ok: false, error: insErr.message, retryable: true };

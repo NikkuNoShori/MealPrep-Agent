@@ -16,19 +16,23 @@ interface ServingsModalProps {
   recipes: SelectedRecipeInfo[];
   onConfirm: (recipes: SelectedRecipeInfo[]) => void;
   onClose: () => void;
+  /** Called when the user checks "Don't ask again" and confirms. Persist as a user preference. */
+  onRememberChoice?: () => void;
 }
 
 type Phase = 'ask' | 'adjust';
 
-const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps) => {
+const ServingsModal = ({ open, recipes, onConfirm, onClose, onRememberChoice }: ServingsModalProps) => {
   const [phase, setPhase] = useState<Phase>('ask');
   const [servingsMap, setServingsMap] = useState<Map<string, number>>(new Map());
+  const [rememberChoice, setRememberChoice] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Reset on open
   useEffect(() => {
     if (open) {
       setPhase('ask');
+      setRememberChoice(false);
       const initial = new Map<string, number>();
       for (const r of recipes) {
         initial.set(r.recipeId, r.servings);
@@ -48,6 +52,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
   }, [open, onClose]);
 
   const handleSkip = () => {
+    if (rememberChoice) onRememberChoice?.();
     onConfirm(recipes);
   };
 
@@ -56,6 +61,7 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
       ...r,
       servings: servingsMap.get(r.recipeId) || r.servings,
     }));
+    if (rememberChoice) onRememberChoice?.();
     onConfirm(updated);
   };
 
@@ -110,6 +116,18 @@ const ServingsModal = ({ open, recipes, onConfirm, onClose }: ServingsModalProps
               )}
             </div>
           </div>
+
+          <label className="flex items-center justify-center gap-2 px-6 pb-4 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberChoice}
+              onChange={(e) => setRememberChoice(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-surface-300 dark:border-white/[0.2] text-brand focus:ring-brand/40"
+            />
+            <span className="text-xs text-fg-muted">
+              Remember my choice and don't ask again
+            </span>
+          </label>
 
           <div className="flex gap-3 px-6 pb-6">
             <Button

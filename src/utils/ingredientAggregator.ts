@@ -27,6 +27,8 @@ const UNIT_ALIASES: Record<string, string> = {
   teaspoon: 'tsp', teaspoons: 'tsp', tsps: 'tsp',
   cup: 'cup', cups: 'cup',
   ounce: 'oz', ounces: 'oz',
+  'fl oz': 'fl oz', 'fl. oz': 'fl oz', 'fl oz.': 'fl oz', floz: 'fl oz',
+  'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz',
   pound: 'lb', pounds: 'lb', lbs: 'lb',
   gram: 'g', grams: 'g',
   kilogram: 'kg', kilograms: 'kg',
@@ -63,7 +65,7 @@ function normalizeUnit(unit: string): string {
 // keep the previous exact-unit grouping, unchanged.
 
 const WEIGHT_UNITS = new Set(['g', 'kg', 'oz', 'lb']);
-const VOLUME_UNITS = new Set(['ml', 'l', 'cup', 'tbsp', 'tsp']);
+const VOLUME_UNITS = new Set(['ml', 'l', 'cup', 'tbsp', 'tsp', 'fl oz']);
 
 type UnitCategory = 'weight' | 'volume' | 'other';
 
@@ -154,7 +156,19 @@ export function aggregateIngredients(
     const recipe = recipeMap.get(entry.recipeId);
     if (!recipe?.ingredients) continue;
 
-    const scale = (entry.servings || recipe.servings) / (recipe.servings || 4);
+    // Scale against the recipe's yield as it was when this entry was
+    // planned (baseServings), not its current/live yield — so editing a
+    // recipe later doesn't silently change the quantities on past plans.
+    // Legacy entries with no snapshot fall back to the live yield,
+    // preserving prior behavior. See ADR-0009.
+    // A 0/negative value (malformed data, bypassing the DB CHECK via direct
+    // write) is treated as missing rather than used as a divisor — it would
+    // otherwise produce Infinity/NaN amounts.
+    const divisor = (entry.baseServings && entry.baseServings > 0) ? entry.baseServings
+      : (recipe.servings && recipe.servings > 0) ? recipe.servings
+      : 4;
+    const rawServings = entry.servings && entry.servings > 0 ? entry.servings : null;
+    const scale = (rawServings ?? divisor) / divisor;
 
     for (const ing of recipe.ingredients) {
       const ingKey = groceryKey(ing.name, ing.unit || '');

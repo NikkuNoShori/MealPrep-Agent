@@ -9,7 +9,15 @@ export interface PlannedMealEntry {
   recipeId: string;
   recipeName: string;
   recipeImage?: string;
-  servings: number;
+  /** Absolute serving count the user chose. Undefined means "use the
+   * recipe's base yield" — never coerce a missing value to 1. */
+  servings?: number;
+  /** The recipe's yield at the moment this entry was created. Used as the
+   * grocery-cart scale divisor instead of the recipe's live/current yield,
+   * so editing a recipe later doesn't silently change past plans. Undefined
+   * for legacy entries — falls back to the recipe's current yield. See
+   * ADR-0009. */
+  baseServings?: number;
   prepTime?: number;
   cookTime?: number;
   notes?: string;

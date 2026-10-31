@@ -33,6 +33,7 @@ import {
   Shuffle,
   Sparkles,
   Trash2,
+  Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { MealPlanStatus, MealSlot, PlannedMealEntry } from '@/types/mealPlan';
@@ -45,7 +46,7 @@ import type { RecipeAssignment } from '@/components/meal-planning/DayAssignmentM
 import GroceryCart from '@/components/meal-planning/GroceryCart';
 import MealPlanHistory from '@/components/meal-planning/MealPlanHistory';
 import { PlannerSettingsMenu } from '@/components/meal-planning/PlannerSettingsMenu';
-import { usePlanPeriodConfig, useRecipesLight } from '@/services/api';
+import { usePlanPeriodConfig, useRecipesLight, useSkipServingsModal, useSetSkipServingsModal } from '@/services/api';
 import type { PlanPeriodConfigValue } from '@/components/settings/PlanPeriodConfig';
 import { selectRandomMeals, toPlanEntry } from '@/services/randomizer';
 import type { RandomizerPoolRecipe } from '@/services/randomizer';
@@ -427,6 +428,9 @@ const MealPlanner = () => {
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [planListInputs, setPlanListInputs] = useState<Record<string, string>>({});
 
+  const { data: skipServingsModal } = useSkipServingsModal();
+  const setSkipServingsModal = useSetSkipServingsModal();
+
   const titleInputRef = useRef<HTMLInputElement>(null);
   const titleEditRef = useRef<HTMLDivElement>(null);
   // Click-outside to save title
@@ -670,18 +674,22 @@ const MealPlanner = () => {
     setSelectorOpen(true);
   };
 
-  const handleMultiSelectDone = (recipes: SelectedRecipeInfo[]) => {
-    setSelectorOpen(false);
-    if (recipes.length === 0) return;
-    setPendingMultiRecipes(recipes);
-    setShowServingsModal(true);
-  };
-
   const handleServingsConfirmed = (recipes: SelectedRecipeInfo[]) => {
     setShowServingsModal(false);
     if (recipes.length === 0) return;
     setPendingMultiRecipes(recipes);
     setShowAssignmentModal(true);
+  };
+
+  const handleMultiSelectDone = (recipes: SelectedRecipeInfo[]) => {
+    setSelectorOpen(false);
+    if (recipes.length === 0) return;
+    if (skipServingsModal) {
+      handleServingsConfirmed(recipes);
+      return;
+    }
+    setPendingMultiRecipes(recipes);
+    setShowServingsModal(true);
   };
 
   const handleAssignmentConfirmed = (assignments: RecipeAssignment[]) => {
@@ -697,6 +705,7 @@ const MealPlanner = () => {
         recipeName: recipe.recipeName,
         recipeImage: recipe.recipeImage,
         servings: recipe.servings,
+        baseServings: recipe.baseServings ?? recipe.servings,
       };
 
       if (slot === 'snacks') {
@@ -1068,7 +1077,17 @@ const MealPlanner = () => {
                   </button>
                 </div>
 
-                <PlannerSettingsMenu options={[]} />
+                <PlannerSettingsMenu options={[
+                  {
+                    id: 'toggle-servings-prompt',
+                    label: skipServingsModal ? 'Ask for servings when adding meals' : "Don't ask for servings when adding meals",
+                    description: skipServingsModal
+                      ? 'Re-enable the servings prompt when adding recipes to this plan'
+                      : 'Skip the servings prompt and always use each recipe’s default',
+                    icon: Users,
+                    onClick: () => setSkipServingsModal.mutate(!skipServingsModal),
+                  },
+                ]} />
               </div>
             </div>
             )} {/* end !isEditingPlanTitle */}
@@ -1210,7 +1229,7 @@ const MealPlanner = () => {
                 ))}
               </div>
             ) : calendarView === 'titles' ? (
-              /* ── Titles View: compact slot×date grid showing recipe names only ── */
+              /* ── Titles View: compact slot×date grid showing recipe names only, one week per row ── */
               <div className="space-y-1 animate-fade-in">
                 {DAILY_SLOTS.map((slot) => (
                   <div key={slot.key} className="rounded-xl border border-surface-200/60 dark:border-white/[0.06] overflow-hidden">
@@ -1218,38 +1237,55 @@ const MealPlanner = () => {
                       <slot.icon className={`h-3.5 w-3.5 ${slot.color}`} />
                       <span className={`text-xs font-semibold ${slot.color}`}>{slot.label}</span>
                     </div>
-                    <div className="overflow-x-auto">
-                      <div className="grid min-w-0" style={{ gridTemplateColumns: `repeat(${planDates.length}, minmax(80px, 1fr))` }}>
-                        {planDates.map((date) => {
-                          const dateStr = date.toISOString().split('T')[0];
-                          const meals = weekPlan?.meals?.[dateStr]?.[slot.key] || [];
-                          const isToday = dateStr === new Date().toISOString().split('T')[0];
-                          return (
-                            <div
-                              key={dateStr}
-                              className={`border-r last:border-r-0 border-surface-100 dark:border-white/[0.04] px-2 py-2 min-h-[52px] ${
-                                isToday ? 'bg-primary-50/40 dark:bg-primary-500/[0.05]' : ''
-                              }`}
-                            >
-                              <p className={`text-[9px] font-medium mb-1 ${isToday ? 'text-brand' : 'text-fg-muted'}`}>
-                                {date.toLocaleDateString('en-US', { weekday: 'narrow', month: 'numeric', day: 'numeric' })}
-                              </p>
-                              {meals.length > 0 ? (
-                                <div className="space-y-0.5">
-                                  {meals.map((meal: PlannedMealEntry) => (
-                                    <p key={meal.id} className="text-[10px] text-fg-secondary leading-tight truncate" title={meal.recipeName}>
-                                      {meal.recipeName}
-                                    </p>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-[10px] text-fg-muted italic">—</p>
+                    {planWeeks.map((weekRow, weekIdx) => (
+                      <div key={weekIdx} className={weekIdx > 0 ? 'border-t border-surface-100 dark:border-white/[0.04]' : ''}>
+                        {planWeeks.length > 1 && (
+                          <div className="px-3 pt-1.5 pb-0.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                              Week {weekIdx + 1}
+                              {weekRow[0] && (
+                                <span className="ml-1 font-normal normal-case tracking-normal">
+                                  — {weekRow[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  {weekRow[weekRow.length - 1] && ` – ${weekRow[weekRow.length - 1].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                                </span>
                               )}
-                            </div>
-                          );
-                        })}
+                            </span>
+                          </div>
+                        )}
+                        <div className="overflow-x-auto">
+                          <div className="grid min-w-[560px] md:min-w-0" style={{ gridTemplateColumns: `repeat(${weekRow.length}, minmax(80px, 1fr))` }}>
+                            {weekRow.map((date) => {
+                              const dateStr = date.toISOString().split('T')[0];
+                              const meals = weekPlan?.meals?.[dateStr]?.[slot.key] || [];
+                              const isToday = dateStr === new Date().toISOString().split('T')[0];
+                              return (
+                                <div
+                                  key={dateStr}
+                                  className={`border-r last:border-r-0 border-surface-100 dark:border-white/[0.04] px-2 py-2 min-h-[52px] ${
+                                    isToday ? 'bg-primary-50/40 dark:bg-primary-500/[0.05]' : ''
+                                  }`}
+                                >
+                                  <p className={`text-[9px] font-medium mb-1 ${isToday ? 'text-brand' : 'text-fg-muted'}`}>
+                                    {date.toLocaleDateString('en-US', { weekday: 'narrow', month: 'numeric', day: 'numeric' })}
+                                  </p>
+                                  {meals.length > 0 ? (
+                                    <div className="space-y-0.5">
+                                      {meals.map((meal: PlannedMealEntry) => (
+                                        <p key={meal.id} className="text-[10px] text-fg-secondary leading-tight truncate" title={meal.recipeName}>
+                                          {meal.recipeName}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-[10px] text-fg-muted italic">—</p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -1619,6 +1655,7 @@ const MealPlanner = () => {
         recipes={pendingMultiRecipes}
         onConfirm={handleServingsConfirmed}
         onClose={() => setShowServingsModal(false)}
+        onRememberChoice={() => setSkipServingsModal.mutate(true)}
       />
 
       {/* Day Assignment Modal (after servings) */}
@@ -1673,7 +1710,12 @@ const MealPlanner = () => {
               recipeName: recipe.title,
               recipeImage: recipe.imageUrl,
               servings: recipe.servings ?? 4,
+              baseServings: recipe.servings ?? 4,
             };
+            if (skipServingsModal) {
+              handleServingsConfirmed([recipeInfo]);
+              return;
+            }
             setPendingMultiRecipes([recipeInfo]);
             setShowServingsModal(true);
           }}
@@ -1696,6 +1738,7 @@ const MealPlanner = () => {
                   recipeName: recipe.title,
                   recipeImage: recipe.imageUrl,
                   servings: recipe.servings ?? 4,
+                  baseServings: recipe.servings ?? 4,
                 }];
                 currentMeals[dateStr] = day;
                 filled++;

@@ -131,5 +131,6 @@ export function toPlanEntry(recipe: RandomizerPoolRecipe, servings = 4) {
     recipeId: recipe.id,
     recipeName: recipe.title,
     servings,
+    baseServings: servings,
   };
 }
